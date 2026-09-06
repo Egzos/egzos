@@ -1,0 +1,40 @@
+name: Governance
+description: >
+  Propose a change to .github/workflows/** or another governance file.
+  The egzos-forge App has no Workflows permission; the Chief commits these directly.
+title: "governance: "
+labels:
+  - governance
+body:
+  - type: input
+    id: governance-file
+    attributes:
+      label: Which workflow or governance file
+      description: "The file to be changed, e.g. .github/workflows/core-queue.yml"
+      placeholder: ".github/workflows/"
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-change
+    attributes:
+      label: Proposed change
+      description: Describe what should change and the intent.
+    validations:
+      required: true
+  - type: textarea
+    id: patch
+    attributes:
+      label: Full patch (unified diff)
+      description: >
+        Paste the complete unified diff here. The Chief applies this directly —
+        the egzos-forge App cannot push .github/workflows/**; the Chief commits.
+      render: diff
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: Why is this change needed? What breaks or is missing without it?
+    validations:
+      required: true

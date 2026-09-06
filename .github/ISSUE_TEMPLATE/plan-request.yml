@@ -1,0 +1,29 @@
+name: Plan request
+description: Ask a1p-planner to draft or refresh the issue queue for a phase.
+title: "plan: "
+labels:
+  - plan-request
+body:
+  - type: input
+    id: phase
+    attributes:
+      label: Phase
+      description: "Which phase to plan or refresh, e.g. 1.1"
+      placeholder: "0.4"
+    validations:
+      required: true
+  - type: input
+    id: scope
+    attributes:
+      label: Scope
+      description: "e.g. full phase, Store + Ledger only, phase-boundary review"
+      placeholder: "full phase"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Additional context for the planner (decisions made since the last plan, open questions, etc.).
+    validations:
+      required: false

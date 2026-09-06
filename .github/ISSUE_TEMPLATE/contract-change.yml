@@ -1,0 +1,37 @@
+name: Contract change
+description: A proposed change to a contract in spec/contracts/ that cannot wait for the next phase boundary.
+title: "contract: "
+labels:
+  - contract-change
+body:
+  - type: input
+    id: contract
+    attributes:
+      label: Contract
+      description: Which file in spec/contracts/ is affected?
+      placeholder: "spec/contracts/container.md"
+    validations:
+      required: true
+  - type: textarea
+    id: current-text
+    attributes:
+      label: Current text
+      description: Quote the exact contract text that needs to change.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-change
+    attributes:
+      label: Proposed change
+      description: What should the text say instead?
+    validations:
+      required: true
+  - type: textarea
+    id: why-now
+    attributes:
+      label: Why it cannot wait for the phase boundary
+      description: >
+        Explain why this must be escalated now. Contract changes are normally
+        batched at phase boundaries; the bar for an out-of-cycle change is high.
+    validations:
+      required: true

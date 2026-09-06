@@ -1,0 +1,93 @@
+# Copyright 2026 Ali Sasanian
+# SPDX-License-Identifier: Apache-2.0
+#
+# egzos label manifest — synced by labels-sync.yml on push to main.
+# Format: plain YAML list of {name, color (6-hex, no #), description}.
+
+# ── Shared labels (identical in both repos) ──────────────────────────────────
+
+- name: security
+  color: "cc0000"
+  description: "Security vulnerability or concern — opens a private advisory, never a public issue"
+
+- name: governance
+  color: "7a2d8c"
+  description: "Governance-sensitive change touching CLAUDE.md, .github/**, .claude/**, or spec/contracts/**"
+
+- name: drift
+  color: "b45309"
+  description: "Nightly integration drift report (one per night, updated not duplicated)"
+
+- name: design-gap
+  color: "0e7490"
+  description: "Missing design decision; A2 returns options for the Chief's pick"
+
+- name: design-approved
+  color: "065f46"
+  description: "Design direction approved by the Chief"
+
+- name: contract-change
+  color: "7c3aed"
+  description: "Proposed change to a frozen contract; escalated to a1p-planner, batched at phase boundaries"
+
+- name: plan-request
+  color: "1e40af"
+  description: "Requests a1p-planner to decompose a phase or work item into issues"
+
+- name: chief-hold
+  color: "1c1917"
+  description: "Chief is reviewing; do not merge or action"
+
+- name: chief-declined
+  color: "44403c"
+  description: "Chief declined this PR or issue"
+
+- name: size-exception
+  color: "78350f"
+  description: "Chief-granted exception to the 600-line / 30-file PR size cap"
+
+- name: stale
+  color: "d6d3d1"
+  description: "PR has been inactive for 2+ days and will be flagged for attention"
+
+- name: phase-0.0
+  color: "164e63"
+  description: "Scaffold phase 0.0 work item"
+
+# ── egzos-specific agent labels ───────────────────────────────────────────────
+
+- name: "agent:a1p-planner"
+  color: "1d4ed8"
+  description: "Assign to a1p-planner (Fable): phase decomposition, spec authorship, shared files"
+
+- name: "agent:a1r-reviewer"
+  color: "1d4ed8"
+  description: "Assign to a1r-reviewer (Fable) in build mode: integration + conformance suites only"
+
+- name: "agent:a3-store"
+  color: "1d4ed8"
+  description: "Assign to a3-store (Sonnet): node model, resolver, embeddings, blob store, .xmb core"
+
+- name: "agent:a3-trust"
+  color: "1d4ed8"
+  description: "Assign to a3-trust (Fable): trust engine, OAuth 2.1 AS, tokens, presence"
+
+- name: "agent:a3-ledger"
+  color: "1d4ed8"
+  description: "Assign to a3-ledger (Sonnet): append-only audit chain, event taxonomy, anomaly primitives"
+
+- name: "agent:a3-doorman"
+  color: "1d4ed8"
+  description: "Assign to a3-doorman (Fable): CLI, MCP, REST surface, .xmb verbs, serve --tls"
+
+- name: "agent:a5-dinghy"
+  color: "1d4ed8"
+  description: "Assign to a5-dinghy (Sonnet): lifeboat FastAPI + Jinja + htmx in-process UI"
+
+- name: "agent:a6-adversary"
+  color: "1d4ed8"
+  description: "Assign to a6-adversary (Fable): security sweep; writes adversarial/** only"
+
+- name: "agent:haiku-mechanic"
+  color: "1d4ed8"
+  description: "Assign to haiku-mechanic (Haiku): fixtures, changelogs, docstrings — low blast radius"

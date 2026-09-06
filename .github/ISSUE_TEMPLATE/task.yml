@@ -1,0 +1,43 @@
+name: Task
+description: A concrete unit of work assigned to one agent queue.
+title: ""
+labels: []
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What should be built, changed, or delivered?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: How will you know this is done? List checkable conditions.
+    validations:
+      required: true
+  - type: dropdown
+    id: owner-agent
+    attributes:
+      label: Owner agent
+      description: Which agent will work this task?
+      options:
+        - a1p-planner
+        - a3-store
+        - a3-trust
+        - a3-ledger
+        - a3-doorman
+        - a5-dinghy
+        - a6-adversary
+        - haiku-mechanic
+    validations:
+      required: true
+  - type: input
+    id: phase
+    attributes:
+      label: Phase
+      description: "e.g. 0.2, 1.1, 2.3"
+      placeholder: "0.0"
+    validations:
+      required: true

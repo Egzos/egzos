@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "egzos"
+version = "0.0.0a0"
+description = "MCP-first, CLI-first personal context layer"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+authors = [
+    { name = "Ali Sasanian" },
+]
+dependencies = []
+# Nothing yet — the walking skeleton adds them (Phase 0.1).
+
+[project.optional-dependencies]
+# Local ONNX embeddings (lazy download via egzos[embed]).
+# Never torch in the base install.
+embed = [
+    "onnxruntime",
+]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[project.scripts]
+egzos = "egzos.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/egzos"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "adversarial"]
+markers = [
+    "adversarial: attack-shaped test (see adversarial/README.md)",
+    "xfail_finding: known non-security finding (see linked issue)",
+]
