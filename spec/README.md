@@ -34,7 +34,7 @@ Design specs and principles that are open-core surfaces:
 - The step-up tap + pending-approval page spec — public because the tap spec being public is good
   for trust (R10)
 
-Flagship screen specs live in the private sibling `Egzos/egzos-platform/spec/design` — closed
+Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed
 product, closed specs (R10). The tokens file is the shared dependency across repos; the platform
 consumes it, never forks it.
 
