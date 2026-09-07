@@ -10,7 +10,7 @@ and exits 0 (pass) or 1 (fail).
 1. **Branch classification** — branches starting with `agent/` are agent
    branches; all others are human (Chief) branches.
 2. **Human branches** — print "human branch — Chief owns everything" and pass.
-   The size cap still applies; governance path notices are still emitted.
+   The size cap is a warning, not a failure, on human branches (the Chief is the gate); governance path notices are still emitted.
 3. **Agent branches** — derive the agent name from the second path segment
    (`agent/<name>/<slug>`).  The agent must exist in `OWNERSHIP.yml`.
 4. **File ownership** — each changed file must match at least one of the
@@ -24,7 +24,7 @@ and exits 0 (pass) or 1 (fail).
    failure when the file is otherwise owned by the agent.
 8. **Size cap** — counts added+removed lines (excluding `size_cap.exclude`
    globs) and total non-excluded files.  Exceeding `size_cap.lines` (600) or
-   `size_cap.files` (30) is a failure unless the PR carries the `size-exception`
+   `size_cap.files` (30) is a failure on agent branches — a `::warning::` on human branches — unless the PR carries the `size-exception`
    label.
 
 ### Glob syntax

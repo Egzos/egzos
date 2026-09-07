@@ -22,8 +22,8 @@ embed = [
     "onnxruntime",
 ]
 dev = [
-    "pytest",
-    "ruff",
+    "pytest>=8",
+    "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change
 ]
 
 [project.scripts]
@@ -35,6 +35,13 @@ packages = ["src/egzos"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# Explicit selection so the gate is deterministic across ruff releases.
+select = ["E", "F", "W", "I", "UP", "B", "C4", "FURB"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["egzos"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "adversarial"]
