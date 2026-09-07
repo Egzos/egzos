@@ -94,6 +94,9 @@ Need something outside your paths? File the issue and take the next item:
 - Commit subjects imperative and specific; reference the issue in the body.
 - Never `git push --force`, never rewrite history on a shared branch, never push to `main`.
 - A new push after an approval voids the approval by design (approve-what-you-saw). Push once, then wait.
+- Third-party actions are SHA-pinned; Dependabot proposes pin bumps as `governance`-labeled PRs. Those runs
+  carry no secrets, so the three review checks pass early on them and the Chief reviews the diff directly
+  — a workflow file is the Chief's commit in every case.
 
 ## Model pins (fixed per definition; runtime-independent)
 
