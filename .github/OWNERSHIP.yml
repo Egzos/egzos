@@ -1,0 +1,108 @@
+# Copyright 2026 Ali Sasanian
+# SPDX-License-Identifier: Apache-2.0
+#
+# egzos path-ownership map — read by .github/scripts/check_ownership.py
+# Schema version 1. Do not edit on an agent branch; changes are flagged to the Watcher.
+
+version: 1
+branch_prefix: "agent/"
+
+size_cap:
+  lines: 600
+  files: 30
+  exclude:
+    - "**/*.lock"
+    - "tests/fixtures/**"
+
+# Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
+governance_paths:
+  - "CLAUDE.md"
+  - ".github/**"
+  - ".claude/**"
+  - "spec/contracts/**"
+
+agents:
+  # Foreman / planner: owns shared files, CI, spec, docs.
+  a1p-planner:
+    paths:
+      - "CLAUDE.md"
+      - "pyproject.toml"
+      - ".github/**"
+      - ".claude/**"
+      - "spec/**"
+      - "docs/**"
+      - "tests/conftest.py"
+      - "src/egzos/__init__.py"
+      - "src/egzos/_types.py"
+      - "CHANGELOG.md"
+    exclusive: []
+
+  # Core store: node model, resolver, embeddings, sqlite backend, blob store, .xmb core.
+  a3-store:
+    paths:
+      - "src/egzos/store/**"
+      - "src/egzos/vault/**"
+      - "tests/store/**"
+      - "tests/vault/**"
+    exclusive: []
+
+  # Trust engine: statuses, policies, OAuth 2.1 AS, tokens, presence.
+  a3-trust:
+    paths:
+      - "src/egzos/trust/**"
+      - "src/egzos/authz/**"
+      - "tests/trust/**"
+      - "tests/authz/**"
+    exclusive: []
+
+  # Ledger: append-only hash-chained audit, event taxonomy, anomaly primitives.
+  a3-ledger:
+    paths:
+      - "src/egzos/ledger/**"
+      - "tests/ledger/**"
+    exclusive: []
+
+  # Doorman: CLI, MCP, REST surface, .xmb verbs, serve --tls.
+  a3-doorman:
+    paths:
+      - "src/egzos/cli/**"
+      - "src/egzos/mcp/**"
+      - "src/egzos/api/**"
+      - "tests/cli/**"
+      - "tests/mcp/**"
+      - "tests/api/**"
+    exclusive: []
+
+  # Dinghy: lifeboat FastAPI + Jinja + htmx web UI.
+  a5-dinghy:
+    paths:
+      - "src/egzos/web/**"
+      - "tests/web/**"
+    exclusive: []
+
+  # Adversary: security testing. adversarial/** is exclusive — no other agent may touch it.
+  a6-adversary:
+    paths:
+      - "adversarial/**"
+    exclusive:
+      - "adversarial/**"
+
+  # Haiku mechanic: fixtures, changelogs, docs — low blast-radius mechanical work.
+  haiku-mechanic:
+    paths:
+      - "tests/fixtures/**"
+      - "CHANGELOG.md"
+      - "docs/**"
+    exclusive: []
+
+  # a1r-reviewer: review mode never pushes; build mode (core-queue label agent:a1r-reviewer,
+  # forge token) owns the integration + conformance suites the build plan gives A1r.
+  a1r-reviewer:
+    paths:
+      - "tests/integration/**"
+      - "tests/conformance/**"
+    exclusive: []
+
+  a2-conformance:
+    paths: []
+    exclusive: []

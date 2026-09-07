@@ -1,0 +1,63 @@
+name: labels-sync
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/labels.yml"
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  MODEL_FABLE: claude-fable-5-1
+  MODEL_SONNET: claude-sonnet-5
+  MODEL_HAIKU: claude-haiku-4-5-20251001
+
+jobs:
+  labels-sync:
+    name: labels-sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: sync-labels
+        run: |
+          pip install pyyaml --quiet
+          python3 - <<'EOF'
+          import yaml, subprocess, sys
+
+          with open(".github/labels.yml", "r") as fh:
+              labels = yaml.safe_load(fh)
+
+          if not isinstance(labels, list):
+              print("::error::labels.yml must be a YAML list")
+              sys.exit(1)
+
+          for entry in labels:
+              name  = entry.get("name", "").strip()
+              color = entry.get("color", "").strip().lstrip("#")
+              desc  = entry.get("description", "").strip()
+              if not name:
+                  continue
+              cmd = [
+                  "gh", "label", "create", name,
+                  "--color", color,
+                  "--description", desc,
+                  "--force",
+              ]
+              result = subprocess.run(cmd, capture_output=True, text=True)
+              if result.returncode != 0:
+                  print("::error::Failed to sync label '{}': {}".format(name, result.stderr.strip()))
+              else:
+                  print("Synced label: {}".format(name))
+          EOF

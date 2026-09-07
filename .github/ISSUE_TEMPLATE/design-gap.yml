@@ -1,0 +1,34 @@
+name: Design gap
+description: A UX or design question that needs A2's answer before work can continue.
+title: "design: "
+labels:
+  - design-gap
+body:
+  - type: input
+    id: screen-flow
+    attributes:
+      label: Screen or flow
+      description: Which screen, flow, or component is affected?
+    validations:
+      required: true
+  - type: textarea
+    id: gap
+    attributes:
+      label: The gap
+      description: What design decision is missing or unclear?
+    validations:
+      required: true
+  - type: textarea
+    id: options-seen
+    attributes:
+      label: Options seen
+      description: What options have you already considered or encountered?
+    validations:
+      required: false
+  - type: textarea
+    id: blocked
+    attributes:
+      label: What is blocked
+      description: What work cannot proceed until this is resolved?
+    validations:
+      required: true

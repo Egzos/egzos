@@ -1,0 +1,369 @@
+================================================================================
+EGZOS — DECISIONS LOG · v0.6 AMENDMENT SET
+Delta on top of the v0.4 log and the v0.5 amendment set. Resolves the third
+design review (round-three calls) and ratifies the build handoff (R1–R11).
+Sections not mentioned carry forward unchanged. Compiled 2026-09-03.
+Read together with: egzos-decisions-log-v0.4.txt · egzos-decisions-v0.5-
+amendments.txt · egzos-handoff.txt · egzos-build-plan-v1.2.txt
+================================================================================
+
+Status key:  [DECIDED] locked · [LEAN] stated preference, not locked ·
+             [OPEN→CHIEF] explicitly awaiting the Chief's call
+
+Confirm-or-veto list from the third review: EMPTY. Every item was ratified
+or redirected by the handoff (R1–R11) and is recorded below as [DECIDED].
+The two [LEAN]s in this set are forward-looking preferences (step-up riding
+the AS endpoints, §K; the private component registry, §P), not pending
+decisions.
+
+
+================================================================================
+J. BUILD GOVERNANCE — THE MERGE GATE (amends v0.5 §H; supersedes v1.1 A8's
+   merge rights)
+================================================================================
+
+[DECIDED] NO AGENT HAS MERGE RIGHTS. GitHub branch protection IS the manifest
+          binding, enforced by configuration rather than by charter:
+          - require review approval (the chief-proxy App identity, or the
+            Chief directly);
+          - dismiss stale approvals on new push — a post-approval push voids
+            the approval (approve-what-you-saw; TOCTOU closed by a checkbox);
+          - require branch up to date with main;
+          - required status checks encode the review chain: A1r on every PR,
+            A6 on `security`-labeled PRs, A2 design-conformance on UI paths;
+          - auto-merge executes at the approved SHA.
+          "Never merges around a failed review" is a GitHub property, not a
+          promise an LLM makes.
+
+[DECIDED] HERALD IS SCRIBE, NOT EXECUTOR. Herald distills PRs (what / why /
+          risk / diff-stat / pinned SHA) and design decisions to phone-
+          answerable texts, parses replies, fans out — and registers the
+          Chief's per-item yes as a PR review approval through a dedicated
+          GitHub App identity, `chief-proxy`. Never the Chief's PAT, never
+          impersonation: the approval shows chief-proxy; Herald's log holds
+          the text that caused it. Revocation = uninstall the App.
+
+[DECIDED] chief-proxy is Herald's ONLY write channel, and it is metadata-
+          only: pull_requests (reviews) and issues (comments / labels that
+          record a Chief disposition). contents: none — Herald can never
+          touch a branch. The v1.1 line "the one agent with merge rights has
+          nothing to merge" becomes "no agent has merge rights at all."
+
+[DECIDED] The Chief's direct GitHub approval is always equivalent. Herald is
+          convenience over the gate, never a lock on it. Every text, reply,
+          and registered approval is logged; the weekly digest carries
+          Herald's own action log. Actions run logs are the audit trail for
+          the CI side of the build.
+
+
+================================================================================
+K. CONTAINER AUTHORIZATION — ONE AUTHORIZATION SERVER (amends v0.5 §C;
+   supersedes its "device-code flow against the user's container" wording)
+================================================================================
+
+[DECIDED] The container runs its OWN OAuth 2.1 authorization server. One AS,
+          three client types:
+          - browsers (the flagship, any fork's UI): authorization-code + PKCE
+            — public client, no secret, redirect-based, code bound to the
+            initiating session; an intercepted code is useless;
+          - CLI / headless: device-code — its native habitat, unchanged;
+          - MCP clients (the Claude.ai custom connector and others): per the
+            MCP authorization spec, against the same AS (Phase 5).
+          Device-code in a browser imported the workaround's costs for
+          nothing, including its code-typing phishing surface. Retired.
+
+[DECIDED] TWO AUTHORITIES, deliberately separate (R2 ratified): the egzos.io
+          session (Firebase-as-identity) proves SUBSCRIPTION; the container
+          token proves AUTHORIZATION and is obtained via PKCE against the
+          user's own container, held browser-side. Refresh tokens rotate;
+          revocation is `token rm` like any client. Double login is the
+          default posture; a deployment MAY configure its container to trust
+          egzos.io (or any IdP) as OIDC identity to collapse it — never the
+          default.
+
+[DECIDED] THE CONSENT SCREEN IS A PRODUCT SURFACE: /authorize renders the
+          requested grant in `token ls` vocabulary — scopes, capabilities,
+          expiry, principal. Authorizing the flagship is indistinguishable
+          from minting any other client token because it IS one. Consent and
+          step-up pages are lifeboat-adjacent server-rendered Python, in-
+          process with the container: no new surface.
+
+[DECIDED] PRESENCE COMPOSITION: the interactive login PKCE performs against
+          the container is where principal: interactive is established for
+          browser sessions.
+[LEAN]    The step-up tap later rides the same AS endpoints rather than a
+          parallel bespoke channel.
+
+[DECIDED] CONTRACT-FREEZE CONSTRAINTS (Phase 0.2): AS metadata discovery;
+          client registration / redirect-URI allowlist per container config,
+          accommodating egzos.io AND localhost dev origins (the one BYOC-
+          specific wrinkle); PKCE mandatory for public clients; device-code
+          endpoints; revocation. Any UI, ours or a fork's, authenticates to
+          a container the same way.
+
+
+================================================================================
+L. PUBLICITY & DISCLOSURE (closes v0.5 [OPEN→CHIEF] A; amends v0.5 §H A6)
+================================================================================
+
+[DECIDED] `egzos` IS PUBLIC FROM PHASE 0 (R1): history born clean, Apache 2.0
+          headers from commit one, no pre-open archaeology; the walking
+          skeleton being publicly ugly costs nothing — nobody watches a repo
+          with no release. Requirement floor on record: public no later than
+          the v0.1 release, because PyPI ships source and "on PyPI but
+          source-private" does not exist for Python. `egzos-platform` stays
+          private throughout. Rejected: a private index for v0.1 (the first
+          five minutes begins `pipx install egzos`; a gated download reads
+          exactly wrong to exactly the audience that matters) and delaying
+          v0.1 to launch (forfeits the air the standard needs).
+
+[DECIDED] DISCLOSURE MECHANICS for the public era: unfixed SECURITY findings
+          live as private GitHub Security Advisories with the reproduction
+          attached there; the regression test enters adversarial/ only in
+          the fix PR, flipping from absent to passing. Non-security findings
+          (contract gaps, behavior bugs) keep the v0.5 xfail pattern. An
+          xfail with a repro in a public repo is a 0-day disclosure; that is
+          the whole reason for the split.
+
+[DECIDED] spec/ is public from Phase 0 as a publishable artifact (carry from
+          v0.5 §D). Which DESIGN specs are public is decided by surface, not
+          by habit — see R10 in §N.
+
+
+================================================================================
+M. RUNTIME TOPOLOGY (amends v0.5 §H "harness")
+================================================================================
+
+[DECIDED] TWO RUNTIMES, BY TRIGGER SHAPE. Event-shaped work runs in GitHub
+          Actions via claude-code-action@v1: the build roster (A1p/A1r,
+          Store, Trust, Ledger, Doorman, A4s/A4g, A5, A6, A9s/A9f) plus A2's
+          conformance mode. Fresh checkout per run, per-workflow
+          GITHUB_TOKEN least privilege, branch-pattern push rules, the
+          Actions log as the build's own audit trail, `--agent` reuse of the
+          .claude/agents/*.md definitions (verified in Phase 0.0; fallback
+          `--append-system-prompt` with the charter file). Persistent and
+          conversational work runs on Hyperagent: Herald, Watcher, A2's
+          studio mode, the OSS fleet. Hands run where the code lives; eyes
+          and voice run where persistence lives.
+
+[DECIDED] BOUNDARY RULES (into CLAUDE.md): the Hyperagent side never touches
+          the repo. Watcher is read-only. Herald writes only through chief-
+          proxy (§J; contents: none). A2 studio's approved specs are
+          committed by the Chief — the commit is the approval act, and every
+          spec in the repo arrived through the Chief's hands. Everything
+          with commit rights runs in CI. Security boundary = infrastructure
+          boundary; that alignment is what makes both auditable.
+
+[DECIDED] MODEL PINS ARE RUNTIME-INDEPENDENT: Herald and A2 studio are Fable
+          5.1 on Hyperagent, pinned in config, never left to a default;
+          Watcher runs a cheap open model from the Hyperagent catalogue
+          (R9). Roster models are fixed per definition (v1.1 philosophy #5),
+          now including A9s/A9f (R4).
+
+[DECIDED] Rejected on record: everything-on-Hyperagent (rebuilds a GitHub
+          event bridge and credential management for ten agents to gain
+          nothing the runners do not already do better); everything-in-
+          Actions (Watcher becomes a blind cron; Herald loses state and its
+          messaging surface — the two agents whose value is persistence).
+
+
+================================================================================
+N. SEQUENCING, MODULES & CONSISTENCY (third-review fixes; R4–R7, R9, R10)
+================================================================================
+
+[DECIDED] R6 — THE ADVERSARIAL SWEEP GATES v0.1. The presence-protocol sweep
+          runs BEFORE the release; until it passes on the record the build
+          is v0.1-rc. Shipping the presence protocol un-attacked is the
+          "gate was theater" story we refuse.
+
+[DECIDED] R4 — LANDLORD IS TWO DEFINITIONS: A9s (Sonnet 5) for routine
+          platform code; A9f (Fable 5.1) for billing and session-security
+          paths. Not Fable outright. Fixed-model-per-definition holds for
+          every agent with no exceptions.
+
+[DECIDED] R5 — STORE→VAULT SPLIT AT PHASE 5. Vault takes the blob store
+          (content-addressing, signed URLs, staging prefix), the backends
+          (sqlite, postgres+pgvector) and the .xmb core; Store keeps nodes,
+          resolver, find/%n, embeddings, auto-title. A1p cuts Phase 1–4
+          issues along that seam from day one so the split is a rename, not
+          a refactor — "split when modules earn it," firing on schedule.
+
+[DECIDED] SIGNED-URL ISSUANCE PASSES TRUST'S CAPABILITY CHECK: artifact
+          download IS fetch and blob pulls are separate audit events (§6),
+          so Store/Vault never mints a URL on its own authority. Interface
+          rule for the Phase 0 freeze.
+
+[DECIDED] R7 — CONTRACT v1.1 IS PLANNED at the Phase 5 boundary: the
+          intelligence read surface (suggestions, anomalies, auto-titles
+          over the wire — what BYOC's flagship renders, v0.5 §C) plus AS
+          metadata. Planned, versioned, reviewed by Chief + A1p + A6; not a
+          Phase 6 escalation.
+
+[DECIDED] R9 — WATCHER CADENCE: deterministic notices (CI broke, PR stale
+          >2d) on GitHub-native tooling (Actions notifications,
+          actions/stale); the LLM Watcher runs a few-hours live-mode cadence
+          for fuzzy-judgment anomalies only (A6-finding triage, drift
+          anomalies) with a strict checklist. Read-only; its notices reach
+          the Chief through Herald's digest.
+
+[DECIDED] R10 — SPEC LOCATIONS: flagship screen specs live in egzos-
+          platform/spec/design (closed product, closed specs). The shared
+          design system, the tokens file, DESIGN-PRINCIPLES.md, DESIGN-
+          SOURCES.md, the lifeboat spec, and the step-up tap + pending-
+          approval specs live in public egzos/spec/design — open-core
+          surfaces, and the tap spec being public is good for trust. The
+          flagship depends on the tokens file across repos.
+
+[DECIDED] CONSISTENCY FIXES: A6 has write access to adversarial/** only,
+          otherwise read-only. Census counts ROLES: 12 roles / 16
+          definitions (A1p/A1r, A2 studio/ci, A4s/A4g, A9s/A9f); Vault at
+          Phase 5 makes it 13 / 17. Phase 6.3 covers localhost + TLS-
+          reachable containers; relay coverage lands with 7.1. v0.4 §17's
+          "thin-server, not just a login wall" is amended to the accepted
+          tradeoff: for BYOC the subscription gates session-checked delivery
+          and continuous updates (there is no server-side intelligence to
+          gate — v0.5 §C); for hosted it gates server-side pipelines and the
+          always-on container itself. The data plane never touches egzos
+          servers, without an asterisk.
+
+
+================================================================================
+O. RATIFIED DEFAULTS (R2, R3, R11) — long-standing LEANs and OPENs closed
+================================================================================
+
+[DECIDED] R3 — STACK: React + TypeScript + Vite + Tailwind + shadcn/ui for
+          the flagship; FastAPI + Jinja + htmx for the lifeboat. The stack-
+          veto window is closed; the stack and the inspiration canon (§P)
+          are one decision, not two.
+[DECIDED] R11 — PURE CAPTURE: every add opens an auto-created, auto-titled
+          thread. (Closes open question #3.)
+[DECIDED] R11 — PERSONAL ROOT sits between org and global in the default
+          chain; invertible per user. (Closes #2.)
+[DECIDED] R11 — STAGED-BLOB RETENTION: 30 days cold, then purge. (Closes #8.)
+[DECIDED] R11 — STEP-UP WINDOW ≈5 minutes, per source→destination ring pair,
+          manifest-shape bounded, org-configurable to zero. (Closes the
+          window half of #9; proof channels beyond the localhost tap stay
+          open.)
+[DECIDED] R11 — uxo REMAINS UNDEFINED AND IS NON-BLOCKING for v0.1: container
+          types are instantiated at will, and uxo is simply not instantiated
+          until the Chief defines it. (#1 stays open, explicitly non-
+          blocking.)
+[DECIDED] R2 — DOUBLE LOGIN is the default posture (recorded in §K).
+
+
+================================================================================
+P. DESIGN SYSTEM & COMPONENT SOURCING (new; R8 + the approved plan item 8)
+================================================================================
+
+[DECIDED] OWNERSHIP: A2 decides, A4 installs, the lifeboat is EXEMPT (gitk-
+          ugly stands; it consumes tokens as CSS variables and no React
+          components). Component selection is a design decision and lives
+          with the designer; A4 never improvises a pick.
+
+[DECIDED] THE COMPONENT SYSTEM: shadcn/ui + Tailwind + Radix base (R3). The
+          design tokens are the identity: mapped to the Tailwind theme for
+          the flagship, emitted as CSS variables for the lifeboat, from the
+          ONE tokens file A2 ships (v0.5 §H exception). Identity guardrail:
+          inspiration flows THROUGH the tokens, never around them — a
+          catalogue component enters only re-themed to egzos tokens.
+
+[DECIDED] THE INSPIRATION CANON (R8), at four levels: 21st.dev + uiverse.io.
+          1. A2 cites sources per direction board and per spec.
+          2. DESIGN-PRINCIPLES.md (egzos/spec/design) states the principles
+             both UIs obey.
+          3. A4 carries the 21st MCP — API_KEY_21ST is a Chief-held Actions
+             secret scoped to A4s workflows (installs need a membership) —
+             under the vendored-via-PR supply-chain rule.
+          4. DESIGN-SOURCES.md records provenance: component, registry item
+             or URL, license, date, the spec that picked it.
+
+[DECIDED] PER-SCREEN PICKS LIVE IN THE SPEC: A2 names every component as a
+          registry item (license noted) or "bespoke." A4s installs picks via
+          the shadcn CLI against the registry into the flagship's components
+          directory and COMMITS them: copied-source, reviewed by A1r and A2
+          conformance like any code, never fetched at build time (21st's
+          own guidance, and ours).
+
+[DECIDED] POLICY: catalogue for primitives and chrome — nav, tables, dialogs,
+          forms, command palette, empty states, toasts; bespoke on A4g for
+          the differentiators — the onion graph, the drag-drop gate, the
+          triage flow, the permissions matrix. The onion, the gate and
+          triage ARE the product; nav and tables are commodity. Security-
+          surface flows (pending review, step-up tap, consent) stay bespoke
+          and A6-reviewed even when assembled from catalogue primitives: a
+          stock dialog wrapping the step-up flow is still a security
+          surface.
+
+[DECIDED] TRUST RULE: the 21st MCP — or any third-party catalogue MCP — runs
+          only in sessions with no merge or approval authority (A2 studio,
+          A4s); never A1r, A6, or Herald. Catalogue descriptions and
+          previews are data, not instructions. This closes the hole of a
+          poisoned catalogue description flowing into an agent that holds
+          authority.
+
+[DECIDED] RESEARCH: the OSS fleet performs catalogue sweeps and shortlists
+          (links, previews, license) per screen at low cost; A2 (Fable)
+          decides. Research and taste are separated the same way the rest
+          of the build separates volume from judgment.
+[LEAN]    Phase 6+: a private egzos component registry of the product's own
+          primitives (button, input, dialog, table row, empty state) and
+          domain components (item card, ring badge, trust label, audience-
+          delta notice), so agents install egzos's components rather than
+          reinvent them. Noted-future; not scheduled.
+
+[DECIDED] A2 INPUTS, NOT BINDING SPECS: egzos-design-brief.txt (A2's founding
+          brief) and egzos-north-star.html (the Chief's raw direction,
+          delivered visual: identity, tokens draft, mocked key screens —
+          dashboard + onion, the gate, inbox triage, pending review). A2's
+          process still runs: direction boards → Chief pick → binding spec.
+          Marked REACT, DON'T TRACE. They are studio context, not repo
+          artifacts, unless the Chief files them (R10 locations apply).
+
+
+================================================================================
+Q. SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.6 state)
+================================================================================
+
+  Read in this order:
+  1. egzos-decisions-log-v0.4.txt        — base log
+  2. egzos-decisions-v0.5-amendments.txt — repos, intelligence boundary,
+     BYOC/auth, promoted work, packaging, lifeboat tech, release ladder,
+     build trust posture
+  3. egzos-decisions-v0.6-amendments.txt — THIS: merge gate, one AS,
+     publicity/disclosure, runtimes, sequencing fixes, ratified defaults,
+     design system
+  4. egzos-handoff.txt                   — R1–R11, the Chief's action
+     checklist (§3), the standing sentence (§5)
+  5. egzos-build-plan-v1.2.txt           — the build plan (supersedes v1.1)
+  6. egzos-design-brief.txt              — A2 studio input (not yet in the
+     Hyperagent package as of this compile)
+  7. egzos-north-star.html               — A2 studio input, react-don't-
+     trace (not yet in the Hyperagent package as of this compile)
+
+  Open questions:
+  1. uxo definition — the Chief's; NON-BLOCKING for v0.1 (R11).
+  2. Same-scope key collisions: LWW now; CRDT later?
+  3. Tag taxonomy.
+  4. Federation peering protocol (scheduled design work; post-v1).
+  5. Decay / relevance scoring ownership.
+  6. v0.1 proof-of-presence channels beyond the localhost tap (the window
+     default is closed by R11).
+  7. Uniform-ack blind-drop proposals (deferred).
+  8. Per-scope E2EE key design — wrap-per-member, rotation on membership
+     change, sovereign-mode search UX (post-v1).
+  9. Price points and included-credit defaults for BYOC vs hosted; relay
+     pricing shape (add-on vs standalone).
+
+  [OPEN→CHIEF]: none. Closed this round: repo publicity (R1), double login
+  (R2), stack veto (R3), Landlord model (R4), Store→Vault (R5), sweep gates
+  v0.1 (R6), contract v1.1 (R7), inspiration canon (R8), Watcher cadence
+  (R9), spec locations (R10), four long-standing defaults + uxo non-blocking
+  (R11).
+
+  The Chief's action checklist lives in the handoff (§3) and is not
+  duplicated here: name claim · chief-proxy App · branch protection ·
+  Actions secrets · Herald channel.
+
+================================================================================
+END OF v0.6 AMENDMENT SET
+================================================================================
