@@ -9,9 +9,10 @@ This file binds every agent that runs in this repository. Read it first, then yo
 
 `egzos` is the open core of egzos — an MCP-first, CLI-first personal context layer where the user's
 container is the home and platforms are clients. Apache-2.0, **public from commit one**. The closed,
-paid flagship (`egzos.io` UI, hosting, relay, server-side intelligence) lives in the private sibling
-`Egzos/egzos-platform`, split from this repo on the container contract. Capabilities are never
-paywalled here; only experiences and infrastructure are, over there.
+paid flagship (`egzos.io` UI, hosting, relay, server-side intelligence) lives in the sibling
+`Egzos/egzos-platform` (proprietary; public only while it holds nothing but scaffolding, private from
+its first product-code commit — D10), split from this repo on the container contract. Capabilities are
+never paywalled here; only experiences and infrastructure are, over there.
 
 The build is contract-first: `spec/contracts/**` is drafted from the walking skeleton (Phase 0.2),
 reviewed by A6 and the Chief personally (Phase 0.3), and is then law. Changing a frozen contract is an

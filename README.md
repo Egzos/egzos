@@ -28,7 +28,7 @@ What is in this repository (Apache-2.0, public from commit one):
 - The authorization server surface
 - Spec and contracts (`spec/`)
 
-What is in `Egzos/egzos-platform` (proprietary, private):
+What is in `Egzos/egzos-platform` (proprietary; private from its first product-code commit):
 
 - The egzos.io flagship web UI
 - Hosted containers, previews, relay

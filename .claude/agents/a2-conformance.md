@@ -52,7 +52,7 @@ From the build plan, A2-ci:
   pick, and do not treat plainness as a defect — treat drift from the tokens and from the spec as one.
 - **Spec locations (R10)**: the design system, the tokens file, DESIGN-PRINCIPLES.md, DESIGN-SOURCES.md,
   the lifeboat spec, and the step-up tap + pending-approval specs live here in public
-  `egzos/spec/design`. Flagship screen specs live in the private platform repo and are not your
+  `egzos/spec/design`. Flagship screen specs live in the platform repo (proprietary) and are not your
   business here.
 - **A2 decides, A4/A5 build.** A UI PR that makes a design decision the spec did not make is a finding:
   the answer is a `design-gap` issue, never an improvisation.

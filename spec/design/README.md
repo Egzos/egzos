@@ -18,7 +18,7 @@ Per R10 (decisions log §N), the following are public open-core surfaces:
 
 ## What lives in egzos-platform/spec/design
 
-Flagship screen specs live in the private sibling `Egzos/egzos-platform/spec/design` — closed
+Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed
 product, closed specs. Each screen spec names every component as a registry item (license noted)
 or `bespoke`. The Chief commits approved specs; the commit is the approval act.
 
