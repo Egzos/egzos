@@ -1,0 +1,42 @@
+name: stale
+# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+
+on:
+  schedule:
+    # Daily at 05:00 UTC — deterministic notice R9, no model involved.
+    - cron: "0 5 * * *"
+
+permissions: {}
+
+env:
+  MODEL_FABLE: claude-fable-5-1
+  MODEL_SONNET: claude-sonnet-5
+  MODEL_HAIKU: claude-haiku-4-5-20251001
+
+jobs:
+  stale:
+    name: stale
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/stale@v9  # SHA-pinning is a Chief decision
+        with:
+          # Issues are exempt from staleness (R9: deterministic rule — PRs only).
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+          # PRs become stale after 2 days of inactivity.
+          days-before-pr-stale: 2
+          # Never close stale PRs automatically — the Chief decides.
+          days-before-pr-close: -1
+          stale-pr-label: stale
+          stale-pr-message: >
+            This PR has had no activity for 2 days (R9: deterministic staleness rule).
+            It will be labelled `stale` but will NOT be closed automatically.
+            Push a commit or comment to remove the label.
+          # Remove the stale label if there is new activity.
+          remove-stale-when-updated: true
+          # Avoid touching issues entirely.
+          operations-per-run: 30

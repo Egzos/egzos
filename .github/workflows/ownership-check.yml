@@ -1,0 +1,37 @@
+name: ownership-check
+# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions: {}
+
+env:
+  MODEL_FABLE: claude-fable-5-1
+  MODEL_SONNET: claude-sonnet-5
+  MODEL_HAIKU: claude-haiku-4-5-20251001
+
+jobs:
+  ownership:
+    name: ownership
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4  # SHA-pinning is a Chief decision
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: install-pyyaml
+        run: pip install pyyaml
+
+      - name: check-ownership
+        run: |
+          python3 .github/scripts/check_ownership.py \
+            --base "origin/${{ github.base_ref }}" \
+            --head HEAD \
+            --branch "${{ github.head_ref }}" \
+            --labels "${{ join(github.event.pull_request.labels.*.name, ',') }}"

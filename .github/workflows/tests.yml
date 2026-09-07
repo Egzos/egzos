@@ -1,0 +1,41 @@
+name: tests
+# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions: {}
+
+env:
+  MODEL_FABLE: claude-fable-5-1
+  MODEL_SONNET: claude-sonnet-5
+  MODEL_HAIKU: claude-haiku-4-5-20251001
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4  # SHA-pinning is a Chief decision
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5  # SHA-pinning is a Chief decision
+        with:
+          python-version: "3.12"
+
+      - name: install
+        run: pip install -e ".[dev]"
+
+      - name: lint
+        run: ruff check .
+
+      - name: pytest
+        run: pytest -q
