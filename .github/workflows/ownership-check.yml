@@ -1,5 +1,5 @@
 name: ownership-check
-# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
 
 on:
   pull_request:

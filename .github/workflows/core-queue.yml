@@ -1,5 +1,5 @@
 name: core-queue
-# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
 # Dispatches to: a3-store, a3-trust, a3-ledger, a3-doorman, a5-dinghy, haiku-mechanic,
 #   a1r-reviewer (build mode: tests/integration/**, tests/conformance/**) and
 #   a6-adversary (build mode: adversarial/**). Ownership is enforced by the `ownership` check.

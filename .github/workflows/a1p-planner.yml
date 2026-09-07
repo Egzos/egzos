@@ -1,5 +1,5 @@
 name: a1p-planner
-# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
 # Builder identity: egzos-forge App token.  Never pushes .github/workflows/** (App has no Workflows permission).
 
 on:

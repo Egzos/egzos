@@ -1,5 +1,5 @@
 name: a6-adversary
-# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
 # Required check on every PR — passes early (no model call) when the `security` label is absent.
 # Nightly and dispatch runs sweep main unconditionally (no verdict gate) under the egzos-forge identity,
 # so a6 can open private Security Advisories itself (D6). Public run logs carry only advisory ids.
@@ -45,7 +45,13 @@ jobs:
         id: scope
         env:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          ACTOR: ${{ github.actor }}
         run: |
+          if [[ "$ACTOR" == "dependabot[bot]" ]]; then
+            echo "applicable=false" >> "$GITHUB_OUTPUT"
+            echo "Dependabot pin bump — review checks pass early (Dependabot runs carry no secrets); the Chief reviews the diff directly."
+            exit 0
+          fi
           APPLICABLE=false
           IFS=',' read -ra LABELS <<< "$PR_LABELS"
           for lbl in "${LABELS[@]}"; do
@@ -113,7 +119,7 @@ jobs:
 
       - name: not-applicable
         if: always() && steps.scope.outputs.applicable != 'true'
-        run: echo "a6-adversary not applicable — 'security' label not present. Passing."
+        run: echo "a6-adversary not applicable — 'security' label not present, or Dependabot bump. Passing."
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
   a6-adversary-nightly:

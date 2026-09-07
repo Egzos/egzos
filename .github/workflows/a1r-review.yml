@@ -1,5 +1,5 @@
 name: a1r-review
-# SHA-pinning of third-party actions is a Chief decision; major-tag pinning used here.
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
 
 on:
   pull_request:
@@ -36,6 +36,7 @@ jobs:
       # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a1r-reviewer.md)"
       - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         id: review
+        if: github.actor != 'dependabot[bot]'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -53,6 +54,7 @@ jobs:
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
       - name: Verdict
+        if: github.actor != 'dependabot[bot]'
         env:
           STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         run: |
@@ -89,3 +91,7 @@ jobs:
               print("::error::a1r-reviewer returned verdict=fail")
               sys.exit(1)
           EOF
+
+      - name: dependabot-skip
+        if: always() && github.actor == 'dependabot[bot]'
+        run: echo "a1r-review not applicable — Dependabot pin bump (Dependabot runs carry no secrets); the Chief reviews the diff directly. Passing."
