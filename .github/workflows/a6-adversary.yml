@@ -35,7 +35,7 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4  # SHA-pinning is a Chief decision
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -59,7 +59,7 @@ jobs:
 
       # --agent loads .claude/agents/a6-adversary.md from the checked-out tree.
       # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a6-adversary.md)"
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true'
         with:
@@ -88,8 +88,8 @@ jobs:
 
           raw = os.environ.get("STRUCTURED_OUTPUT", "").strip()
           if not raw:
-              print("No structured output — treating as pass.")
-              sys.exit(0)
+              print("::error::No structured output from the review step — a required check does not pass on silence.")
+              sys.exit(1)
           try:
               data = json.loads(raw)
           except json.JSONDecodeError as exc:
@@ -113,7 +113,7 @@ jobs:
 
       - name: not-applicable
         if: always() && steps.scope.outputs.applicable != 'true'
-        run: echo "a6-adversary not applicable — `security` label not present. Passing."
+        run: echo "a6-adversary not applicable — 'security' label not present. Passing."
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
   a6-adversary-nightly:
@@ -124,7 +124,7 @@ jobs:
     permissions:
       contents: read   # the forge token carries the writes: issues and private Security Advisories
     steps:
-      - uses: actions/checkout@v4  # SHA-pinning is a Chief decision
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: main
           fetch-depth: 0
@@ -132,14 +132,14 @@ jobs:
 
       # Builder identity (D6): a6 files private Security Advisories and non-security issues as egzos-forge.
       - id: forge
-        uses: actions/create-github-app-token@v2  # SHA-pinning is a Chief decision
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
         with:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
 
       # --agent loads .claude/agents/a6-adversary.md from the checked-out tree.
       # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a6-adversary.md)"
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:

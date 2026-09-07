@@ -1,0 +1,15 @@
+# Actions are SHA-pinned (supply-chain: builder jobs mint the egzos-forge private key).
+# Dependabot raises bump PRs against those pins. Workflow files are Chief-only by
+# construction — no app identity holds GitHub's Workflows permission — so these PRs
+# are reviewed and merged by the Chief, never auto-merged.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - governance

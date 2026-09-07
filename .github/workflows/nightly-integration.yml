@@ -27,13 +27,13 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v4  # SHA-pinning is a Chief decision
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: main
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-python@v5  # SHA-pinning is a Chief decision
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
 
@@ -42,7 +42,7 @@ jobs:
 
       # --agent loads .claude/agents/a1r-reviewer.md from the checked-out tree.
       # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a1r-reviewer.md)"
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
