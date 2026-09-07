@@ -123,7 +123,7 @@ jobs:
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
   a6-adversary-nightly:
-    name: a6-adversary
+    name: a6-adversary-nightly   # distinct from the required check name; only the PR job reports a6-adversary
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 40
