@@ -119,8 +119,15 @@ jobs:
           echo "WIP cap reached — skipping dispatch."
 
       # Run the builder.  Works on branch agent/<name>/issue-<n>.
-      # --agent loads .claude/agents/<name>.md from the checked-out tree.
-      # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/${AGENT}.md)"
+      # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
+      # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
+      # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      - name: charter
+        if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
+        env:
+          AGENT: ${{ steps.resolve.outputs.agent }}
+        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' ".claude/agents/${AGENT}.md" > /tmp/charter.md
+
       - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
@@ -145,7 +152,7 @@ jobs:
             7. Comment the PR URL on issue #${{ steps.resolve.outputs.issue }}.
             8. Stop.
           claude_args: >-
-            --agent ${{ steps.resolve.outputs.agent }}
+            --append-system-prompt-file /tmp/charter.md
             --model ${{ steps.resolve.outputs.model }}
             --max-turns 60
             --allowedTools "Read,Write,Edit,MultiEdit,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"

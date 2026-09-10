@@ -4,7 +4,7 @@
 
 Every file in this directory is a Claude Code subagent definition: YAML frontmatter with exactly
 `name`, `description`, `model`, `tools`, then the charter as the body. The workflows in
-`.github/workflows/` reuse them with `--agent <name>`; the charter is the agent's system prompt.
+`.github/workflows/` load them by appending the definition's body to the system prompt; the charter is the agent's charter in CI too.
 
 ## The derivation rule
 
@@ -66,16 +66,21 @@ The Hyperagent side never touches this repository. Everything with commit rights
 3. **Chief, or the `chief-proxy` App** — the only approval on the gate. Branch protection dismisses
    stale approvals on push and auto-merge executes at the approved SHA. No agent has merge rights.
 
-## `--agent` reuse (and the fallback)
+## How CI loads a definition (Phase 0.0 outcome)
 
-Phase 0.0 verifies that `claude-code-action@v1` honours `--agent`. Every workflow passes the definition
-by name and keeps the fallback line commented directly beneath it:
+Every workflow strips the frontmatter and appends the body to the system prompt:
 
 ```yaml
-claude_args: --agent a3-store --model ${{ env.MODEL_SONNET }} --max-turns 30
-# fallback if --agent reuse is not honoured:
-# --append-system-prompt "$(cat .claude/agents/a3-store.md)"
+- name: charter-a3-store
+  run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a3-store.md > /tmp/charter-a3-store.md
+# then, on the claude-code-action step:
+claude_args: --append-system-prompt-file /tmp/charter-a3-store.md --model ${{ env.MODEL_SONNET }} --max-turns 60
 ```
 
-If the fallback is ever needed it is a workflow change: `.github/workflows/**` reaches `main` only
-through the Chief, so a1p-planner proposes it as an issue labeled `governance` carrying the patch.
+Phase 0.0 verified the alternative, `--agent <name>`, and rejected it: the flag makes the session take on
+the definition's **frontmatter `tools:` list as a hard restriction on the tool pool**, which removed the
+`StructuredOutput` tool that `--json-schema` relies on (review verdicts came back empty), the sticky-comment
+MCP tool, and `Skill`. The frontmatter stays: `model:` and `tools:` document the pins for local Claude Code
+use, and the workflow enforces the same pins with `--model` and `--allowedTools`. The token, not the
+frontmatter, is the guarantee.
+

@@ -40,8 +40,12 @@ jobs:
       - name: install
         run: pip install -e ".[dev]" 2>/dev/null || echo "Package not yet installable in Phase 0 — continuing."
 
-      # --agent loads .claude/agents/a1r-reviewer.md from the checked-out tree.
-      # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a1r-reviewer.md)"
+      # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
+      # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
+      # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      - name: charter-a1r-reviewer
+        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a1r-reviewer.md > /tmp/charter-a1r-reviewer.md
+
       - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -60,7 +64,7 @@ jobs:
                - If no match, create it: `gh issue create --title "drift report $(date +%F)" --label drift --body "..."`.
             4. The body must summarise: suites run, pass/fail counts, any drift findings, and the date.
           claude_args: >-
-            --agent a1r-reviewer
+            --append-system-prompt-file /tmp/charter-a1r-reviewer.md
             --model ${{ env.MODEL_FABLE }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
