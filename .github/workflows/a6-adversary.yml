@@ -63,8 +63,13 @@ jobs:
           echo "applicable=${APPLICABLE}" >> "$GITHUB_OUTPUT"
           echo "Scope check — security label present: ${APPLICABLE}"
 
-      # --agent loads .claude/agents/a6-adversary.md from the checked-out tree.
-      # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a6-adversary.md)"
+      # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
+      # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
+      # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      - name: charter-a6-adversary
+        if: steps.scope.outputs.applicable == 'true'
+        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a6-adversary.md > /tmp/charter-a6-adversary.md
+
       - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true'
@@ -78,10 +83,10 @@ jobs:
 
             You are a6-adversary. Review PR #${{ github.event.pull_request.number }} for security vulnerabilities. Focus on injection attacks, TOCTOU vs manifest binding, enumeration via error shapes, privilege escalation, trust boundary violations, OAuth surface issues, and catalogue-content injection. Post ONE sticky comment headed `## a6-adversary review`. Return a verdict JSON conforming to the schema. For any security-class finding: verdict `fail`; the sticky comment and the findings notes say exactly "security-class finding — awaiting advisory" and nothing more (no repro, no payload, no path detail — this repository and its logs are public); the Chief will trigger your workflow_dispatch sweep so you can file the private advisory under the forge identity.
           claude_args: >-
-            --agent a6-adversary
+            --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_FABLE }}
             --max-turns 30
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
+            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*),mcp__github_comment__update_claude_comment,StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
       - name: Verdict
@@ -143,8 +148,12 @@ jobs:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
 
-      # --agent loads .claude/agents/a6-adversary.md from the checked-out tree.
-      # fallback if --agent is rejected: --append-system-prompt "$(cat .claude/agents/a6-adversary.md)"
+      # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
+      # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
+      # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      - name: charter-a6-adversary
+        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a6-adversary.md > /tmp/charter-a6-adversary.md
+
       - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
@@ -163,7 +172,7 @@ jobs:
 
             For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding with `gh issue create`, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**. This sweep itself writes no files.
           claude_args: >-
-            --agent a6-adversary
+            --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_FABLE }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh api:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
