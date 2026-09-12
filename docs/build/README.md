@@ -17,6 +17,13 @@ publicity and disclosure (§L), runtime topology (§M), sequencing and consisten
 ratified defaults (§O), and the design system and component sourcing charter (§P).
 Compiled 2026-09-03.
 
+**`REVIEW-DECISIONS.md`**
+The review register: settled review dispositions that a1r-reviewer and a2-conformance consult
+**before** raising a finding, so a settled point is cited rather than re-litigated on every PR
+that touches the same paths. Chief-only (`chief_only` in `.github/OWNERSHIP.yml`). It can never
+settle a `blocker` or a security-class finding. `Egzos/egzos-platform` keeps its own register at
+the same path; entry ids are repo-local and are never cited across repositories.
+
 ## Earlier logs (not published)
 
 The earlier decisions logs — v0.3, v0.4, v0.5 and the v0.5 amendment set — are internal working
@@ -30,3 +37,6 @@ Read in this order to reconstruct the full decision context:
 
 1. `egzos-decisions-v0.6-amendments.txt` — the governing amendment set (§J–§P, R1–R11)
 2. `egzos-build-plan-v1.2.txt` — the build plan (roster, phases, philosophy)
+
+`REVIEW-DECISIONS.md` is not part of that reconstruction — it is an operational control read at
+review time, not a source-of-record text the scaffold derives from.
