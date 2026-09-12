@@ -18,7 +18,7 @@ A4 and A5 reference it when installing or implementing.
 
 The approved sources, in order of preference:
 
-- **21st.dev** — the primary registry (a4s-atelier carries the 21st MCP with `API_KEY_21ST`)
+- **21st.dev** — the primary registry (a4s-atelier carries the 21st CLI with `API_KEY_21ST`; skills vendored in `egzos-platform` under `.github/skills/21st/`)
 - **uiverse.io** — secondary source for interactive and animation-heavy components
 
 A component from any other source requires A2's explicit call in the spec. Third-party catalogue
