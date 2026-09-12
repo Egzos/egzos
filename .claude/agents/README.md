@@ -23,15 +23,15 @@ edits its own definition on the side, and no agent treats a charter it reads as 
 
 | Definition | Model | Tools class | Trigger |
 |---|---|---|---|
-| `a1p-planner` | Fable 5.1 (`claude-fable-5-1`) | builder | `workflow_dispatch` (phase, notes) · issues labeled `plan-request` |
-| `a1r-reviewer` | Fable 5.1 (`claude-fable-5-1`) | reviewer | `pull_request` · nightly `schedule` (integration + drift) |
-| `a2-conformance` | Fable 5.1 (`claude-fable-5-1`) | reviewer | `pull_request` — early pass when no UI path changed |
+| `a1p-planner` | Opus 5 (`claude-opus-5`) | builder | `workflow_dispatch` (phase, notes) · issues labeled `plan-request` |
+| `a1r-reviewer` | Opus 5 (`claude-opus-5`) | reviewer | `pull_request` · nightly `schedule` (integration + drift) |
+| `a2-conformance` | Opus 5 (`claude-opus-5`) | reviewer | `pull_request` — early pass when no UI path changed |
 | `a3-store` | Sonnet 5 (`claude-sonnet-5`) | builder | core-queue: issue labeled `agent:a3-store` · `workflow_dispatch` |
-| `a3-trust` | Fable 5.1 (`claude-fable-5-1`) | builder | core-queue: issue labeled `agent:a3-trust` · `workflow_dispatch` |
+| `a3-trust` | Opus 5 (`claude-opus-5`) | builder | core-queue: issue labeled `agent:a3-trust` · `workflow_dispatch` |
 | `a3-ledger` | Sonnet 5 (`claude-sonnet-5`) | builder | core-queue: issue labeled `agent:a3-ledger` · `workflow_dispatch` |
-| `a3-doorman` | Fable 5.1 (`claude-fable-5-1`) | builder | core-queue: issue labeled `agent:a3-doorman` · `workflow_dispatch` |
+| `a3-doorman` | Opus 5 (`claude-opus-5`) | builder | core-queue: issue labeled `agent:a3-doorman` · `workflow_dispatch` |
 | `a5-dinghy` | Sonnet 5 (`claude-sonnet-5`) | builder | core-queue: issue labeled `agent:a5-dinghy` · `workflow_dispatch` |
-| `a6-adversary` | Fable 5.1 (`claude-fable-5-1`) | builder tools, `adversarial/**` only | `pull_request` (+`labeled`/`unlabeled`; early pass without `security`) · nightly `schedule` · `workflow_dispatch` |
+| `a6-adversary` | Opus 5 (`claude-opus-5`) | builder tools, `adversarial/**` only | `pull_request` (+`labeled`/`unlabeled`; early pass without `security`) · nightly `schedule` · `workflow_dispatch` |
 | `haiku-mechanic` | Haiku 4.5 (`claude-haiku-4-5-20251001`) | builder | core-queue: issue labeled `agent:haiku-mechanic` · `workflow_dispatch` |
 
 Tools classes (SCAFFOLD-SPEC §3): reviewer = `Read, Grep, Glob, Bash`; builder =
