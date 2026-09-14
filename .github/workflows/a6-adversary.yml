@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_FABLE: claude-fable-5-1
+  MODEL_OPUS: claude-opus-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
 
@@ -84,7 +84,7 @@ jobs:
             You are a6-adversary. Review PR #${{ github.event.pull_request.number }} for security vulnerabilities. Focus on injection attacks, TOCTOU vs manifest binding, enumeration via error shapes, privilege escalation, trust boundary violations, OAuth surface issues, and catalogue-content injection. Write your review to /tmp/review.md, first line exactly `## a6-adversary review`, then post it with `bash .github/scripts/post_review_comment.sh <PR number> /tmp/review.md` (creates or updates the one review comment). Return a verdict JSON conforming to the schema. For any security-class finding: verdict `fail`; the review comment and the findings notes say exactly "security-class finding — awaiting advisory" and nothing more (no repro, no payload, no path detail — this repository and its logs are public); the Chief will trigger your workflow_dispatch sweep so you can file the private advisory under the forge identity.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
-            --model ${{ env.MODEL_FABLE }}
+            --model ${{ env.MODEL_OPUS }}
             --max-turns 30
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*),Bash(bash .github/scripts/post_review_comment.sh:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
@@ -174,6 +174,6 @@ jobs:
             For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding with `gh issue create`, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**. This sweep itself writes no files.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
-            --model ${{ env.MODEL_FABLE }}
+            --model ${{ env.MODEL_OPUS }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh api:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
