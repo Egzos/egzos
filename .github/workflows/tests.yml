@@ -10,7 +10,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_FABLE: claude-fable-5-1
+  MODEL_OPUS: claude-opus-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
 
