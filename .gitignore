@@ -93,3 +93,6 @@ secrets/
 
 # Distribution / packaging
 *.tar.gz
+
+# docs/build/ holds governance texts (the decisions log, the review register), not build output.
+!docs/build/

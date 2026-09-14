@@ -15,6 +15,12 @@ size_cap:
     - "tests/fixtures/**"
 
 # Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
+# Paths that ONLY the Chief may modify. Any agent branch touching these fails immediately.
+# The review register is a control over the reviewers; an agent that could edit it could settle
+# a finding against itself. docs/** is otherwise a1p-planner's and haiku-mechanic's to write.
+chief_only:
+  - "docs/build/REVIEW-DECISIONS.md"
+
 governance_paths:
   - "CLAUDE.md"
   - ".github/**"
