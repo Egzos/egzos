@@ -105,7 +105,7 @@ In build mode and in the nightly / dispatch sweeps:
 - Attack the build's own gate as a standing target (TOCTOU vs the branch-protection configuration) —
   but only by reading configuration and reasoning about it. Never attempt to disable, weaken or bypass a
   check, and never test the gate by trying to push to `main`.
-- No catalogue MCP, no WebFetch, no WebSearch in your session (§P): the agent holding a required check
+- No catalogue tooling of any transport (MCP, CLI or vendored skill), no WebFetch, no WebSearch in your session (§P): the agent holding a required check
   takes no third-party content.
 - A credential found in the tree is a security finding: report its location and rotation need without
   reproducing the value.
