@@ -22,7 +22,7 @@ The approved sources, in order of preference:
 - **uiverse.io** — secondary source for interactive and animation-heavy components
 
 A component from any other source requires A2's explicit call in the spec. Third-party catalogue
-MCPs run only in sessions with no merge or approval authority (§P trust rule).
+tooling runs only in sessions with no merge or approval authority (§P trust rule).
 
 ## Provenance table
 
