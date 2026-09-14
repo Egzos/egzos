@@ -128,7 +128,7 @@ jobs:
           AGENT: ${{ steps.resolve.outputs.agent }}
         run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' ".claude/agents/${AGENT}.md" > /tmp/charter.md
 
-      - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
+      - uses: anthropics/claude-code-action@56cf60fde42f7b19c3abfd5c9c48b69a1288461f # v1
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
