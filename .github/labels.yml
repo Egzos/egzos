@@ -58,11 +58,11 @@
 
 - name: "agent:a1p-planner"
   color: "1d4ed8"
-  description: "Assign to a1p-planner (Fable): phase decomposition, spec authorship, shared files"
+  description: "Assign to a1p-planner (Opus): phase decomposition, spec authorship, shared files"
 
 - name: "agent:a1r-reviewer"
   color: "1d4ed8"
-  description: "Assign to a1r-reviewer (Fable) in build mode: integration + conformance suites only"
+  description: "Assign to a1r-reviewer (Opus) in build mode: integration + conformance suites only"
 
 - name: "agent:a3-store"
   color: "1d4ed8"
@@ -70,7 +70,7 @@
 
 - name: "agent:a3-trust"
   color: "1d4ed8"
-  description: "Assign to a3-trust (Fable): trust engine, OAuth 2.1 AS, tokens, presence"
+  description: "Assign to a3-trust (Opus): trust engine, OAuth 2.1 AS, tokens, presence"
 
 - name: "agent:a3-ledger"
   color: "1d4ed8"
@@ -78,7 +78,7 @@
 
 - name: "agent:a3-doorman"
   color: "1d4ed8"
-  description: "Assign to a3-doorman (Fable): CLI, MCP, REST surface, .xmb verbs, serve --tls"
+  description: "Assign to a3-doorman (Opus): CLI, MCP, REST surface, .xmb verbs, serve --tls"
 
 - name: "agent:a5-dinghy"
   color: "1d4ed8"
@@ -86,7 +86,7 @@
 
 - name: "agent:a6-adversary"
   color: "1d4ed8"
-  description: "Assign to a6-adversary (Fable): security sweep; writes adversarial/** only"
+  description: "Assign to a6-adversary (Opus): security sweep; writes adversarial/** only"
 
 - name: "agent:haiku-mechanic"
   color: "1d4ed8"
