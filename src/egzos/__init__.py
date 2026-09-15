@@ -3,9 +3,9 @@
 """
 egzos — MCP-first, CLI-first personal context layer.
 
-This package will hold the container (store, trust, ledger), the CLI surface,
-the MCP server, and the lifeboat UI. The walking skeleton that makes these
-modules real is Phase 0.1. Everything here is a scaffold stub.
+The container: store (nodes, items, blobs), trust engine, hash-chained ledger, resolver,
+the CLI surface and the MCP stdio door. This is the Phase 0.1 WALKING SKELETON — ugly, end
+to end, throwaway by decision (v0.5 §H). spec/contracts is frozen FROM these running shapes.
 """
 
-__version__ = "0.0.0a0"
+__version__ = "0.0.1a0"

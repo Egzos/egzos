@@ -96,3 +96,6 @@ secrets/
 
 # docs/build/ holds governance texts (the decisions log, the review register), not build output.
 !docs/build/
+
+# local interpreter for the walking skeleton (uv venv --python 3.12 .venv)
+.venv/

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "egzos"
-version = "0.0.0a0"
+version = "0.0.1a0"
 description = "MCP-first, CLI-first personal context layer"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -12,8 +12,10 @@ requires-python = ">=3.11"
 authors = [
     { name = "Ali Sasanian" },
 ]
-dependencies = []
-# Nothing yet — the walking skeleton adds them (Phase 0.1).
+dependencies = [
+    "typer>=0.27",
+    "mcp>=2.2",
+]
 
 [project.optional-dependencies]
 # Local ONNX embeddings (lazy download via egzos[embed]).
@@ -39,6 +41,10 @@ target-version = "py311"
 [tool.ruff.lint]
 # Explicit selection so the gate is deterministic across ruff releases.
 select = ["E", "F", "W", "I", "UP", "B", "C4", "FURB"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer declares CLI parameters as call defaults by design.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["egzos"]
