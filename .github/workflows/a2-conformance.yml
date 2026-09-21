@@ -79,7 +79,7 @@ jobs:
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a2-conformance.md
             --model ${{ env.MODEL_OPUS }}
-            --max-turns 30
+            --max-turns 60
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*),Bash(bash .github/scripts/post_review_comment.sh:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
