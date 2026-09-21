@@ -125,8 +125,18 @@ jobs:
       - name: charter
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
+          # Refs via the environment, never ${{ }} into a run: line.
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           AGENT: ${{ steps.resolve.outputs.agent }}
-        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' ".claude/agents/${AGENT}.md" > /tmp/charter.md
+        run: |
+          set -euo pipefail
+          # Charter from the BASE, never the tree under review (#39). BASE_REF is empty on
+          # non-pull_request events, so fall back to the default branch. awk strips frontmatter.
+          REF="${BASE_REF:-$DEFAULT_BRANCH}"
+          git show "origin/${REF}:.claude/agents/${AGENT}.md" \
+            | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter.md
+          test -s /tmp/charter.md
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'

@@ -37,7 +37,18 @@ jobs:
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a1r-reviewer
         if: github.actor != 'dependabot[bot]'
-        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a1r-reviewer.md > /tmp/charter-a1r-reviewer.md
+        env:
+          # Refs via the environment, never ${{ }} into a run: line.
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Charter from the BASE, never the tree under review (#39). BASE_REF is empty on
+          # non-pull_request events, so fall back to the default branch. awk strips frontmatter.
+          REF="${BASE_REF:-$DEFAULT_BRANCH}"
+          git show "origin/${REF}:.claude/agents/a1r-reviewer.md" \
+            | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a1r-reviewer.md
+          test -s /tmp/charter-a1r-reviewer.md
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: review

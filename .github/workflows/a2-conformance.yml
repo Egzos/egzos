@@ -45,7 +45,10 @@ jobs:
             echo "Dependabot pin bump — review checks pass early (Dependabot runs carry no secrets); the Chief reviews the diff directly."
             exit 0
           fi
-          CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>/dev/null || true)
+          # Fail closed: a git failure must not read as "no UI paths changed".
+          if ! CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>&1); then
+            echo "::error::git diff failed — refusing to infer scope"; echo "$CHANGED"; exit 1
+          fi
           APPLICABLE=false
           while IFS= read -r f; do
             case "$f" in
@@ -62,7 +65,18 @@ jobs:
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a2-conformance
         if: steps.scope.outputs.applicable == 'true'
-        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a2-conformance.md > /tmp/charter-a2-conformance.md
+        env:
+          # Refs via the environment, never ${{ }} into a run: line.
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Charter from the BASE, never the tree under review (#39). BASE_REF is empty on
+          # non-pull_request events, so fall back to the default branch. awk strips frontmatter.
+          REF="${BASE_REF:-$DEFAULT_BRANCH}"
+          git show "origin/${REF}:.claude/agents/a2-conformance.md" \
+            | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a2-conformance.md
+          test -s /tmp/charter-a2-conformance.md
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: review
