@@ -38,6 +38,7 @@ agents:
       - "spec/**"
       - "docs/**"
       - "tests/conftest.py"
+      - "tests/types/**"
       - "src/egzos/__init__.py"
       - "src/egzos/_types.py"
       - "CHANGELOG.md"
