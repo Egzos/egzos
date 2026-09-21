@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dependabot early-pass: review checks pass early on Dependabot PRs (no secrets; the Chief reviews pin-bump diffs directly)
 - Platform sibling references: egzos-platform visibility wording and contract parity notes
 - Agent documentation: references clarified from "21st MCP" to "21st CLI"
+- Ownership map (#32): a1p-planner given a writable test path for `src/egzos/_types.py` (`tests/_types/**`, named to avoid colliding with the stdlib `types` module) and for the previously-unowned `tests/test_smoke.py`; `.github/OWNERSHIP.yml` itself added to `chief_only`, hard-enforced since #38 resolves both the checker and the map from the base ref rather than the PR's own tree; `.claude/agents/a1p-planner.md`'s `Owns` line updated to match
 
 ### Fixed
 
