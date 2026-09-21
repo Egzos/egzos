@@ -16,10 +16,12 @@ size_cap:
 
 # Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
 # Paths that ONLY the Chief may modify. Any agent branch touching these fails immediately.
-# The review register is a control over the reviewers; an agent that could edit it could settle
-# a finding against itself. docs/** is otherwise a1p-planner's and haiku-mechanic's to write.
+# The review register and this map are controls over the agents they govern — an agent that
+# could edit either could settle a finding, or widen its own reach, against itself.
+# docs/** is otherwise a1p-planner's and haiku-mechanic's to write.
 chief_only:
   - "docs/build/REVIEW-DECISIONS.md"
+  - ".github/OWNERSHIP.yml"
 
 governance_paths:
   - "CLAUDE.md"
@@ -38,7 +40,8 @@ agents:
       - "spec/**"
       - "docs/**"
       - "tests/conftest.py"
-      - "tests/types/**"
+      - "tests/test_smoke.py"
+      - "tests/_types/**"
       - "src/egzos/__init__.py"
       - "src/egzos/_types.py"
       - "CHANGELOG.md"
