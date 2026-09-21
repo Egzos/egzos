@@ -54,6 +54,10 @@
   color: "164e63"
   description: "Scaffold phase 0.0 work item"
 
+- name: phase-0.2
+  color: "164e63"
+  description: "Contract-drafting phase 0.2 work item"
+
 # ── egzos-specific agent labels ───────────────────────────────────────────────
 
 - name: "agent:a1p-planner"
