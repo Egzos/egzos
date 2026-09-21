@@ -2,7 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # egzos path-ownership map — read by .github/scripts/check_ownership.py
-# Schema version 1. Do not edit on an agent branch; changes are flagged to the Watcher.
+# Schema version 1. Do not edit on an agent branch. Today this is a norm the checker flags for
+# the Watcher (a visible, governance-path diff still requiring the Chief's approval to merge) —
+# not yet a hard-enforced one: the checker resolves this file from the PR's own head tree, so a
+# diff that edits this file and its own chief_only listing in the same commit currently passes.
+# See egzos#37.
 
 version: 1
 branch_prefix: "agent/"
