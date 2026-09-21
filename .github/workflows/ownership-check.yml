@@ -28,10 +28,27 @@ jobs:
       - name: install-pyyaml
         run: pip install pyyaml
 
+      # The gate must come from the BASE, never from the tree under review. checkout gives us the
+      # PR's own files, so resolving either the checker or OWNERSHIP.yml relatively let a PR supply
+      # the rules it is judged by: changing `branch_prefix` alone flipped is_agent_branch to false,
+      # which skips chief_only, skips every per-agent path rule including other agents' exclusive
+      # paths, and downgrades the size cap from a hard fail to a warning. The chief_only rule that
+      # should have blocked editing OWNERSHIP.yml is itself gated on is_agent_branch, so the file
+      # decided whether it was allowed to be edited. Both artefacts now come from origin/<base>.
+      - name: gate-from-base
+        run: |
+          set -euo pipefail
+          git show "origin/${{ github.base_ref }}:.github/scripts/check_ownership.py" > /tmp/check_ownership.py
+          git show "origin/${{ github.base_ref }}:.github/OWNERSHIP.yml"              > /tmp/OWNERSHIP.base.yml
+          test -s /tmp/check_ownership.py
+          test -s /tmp/OWNERSHIP.base.yml
+          echo "checker and OWNERSHIP.yml taken from origin/${{ github.base_ref }}"
+
       - name: check-ownership
         run: |
-          python3 .github/scripts/check_ownership.py \
+          python3 /tmp/check_ownership.py \
             --base "origin/${{ github.base_ref }}" \
             --head HEAD \
             --branch "${{ github.head_ref }}" \
+            --ownership /tmp/OWNERSHIP.base.yml \
             --labels "${{ join(github.event.pull_request.labels.*.name, ',') }}"
