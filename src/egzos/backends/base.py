@@ -4,9 +4,11 @@
 The backend contract, skeleton edition (v0.3 §8): put / get / query / tombstone / audit_append.
 The backend returns candidates; the resolver applies precedence, trust and key-override.
 
-SKELETON additions the contract will have to name at 0.2: node storage (put_node / get_node /
-list_nodes), token storage, and the pending-proposal queue. Blobs are NOT here — the blob store
-sits inside the store module on the Store/Vault seam (v0.5 §D, R5).
+This Protocol is the UNION the skeleton needed to run. The freeze splits it (Chief, 2026-09-21,
+F3) into two contracts: ItemStore — put / get / query / tombstone, pluggable and delegable
+(sqlite → postgres → mem0/zep) — and ContainerState — nodes, tokens, proposals and the audit
+chain, sqlite by default, postgres at Phase 5, NEVER delegated to a third-party store. Blobs are
+a third seam already: the blob store sits inside the store module (v0.5 §D, R5).
 """
 
 from __future__ import annotations

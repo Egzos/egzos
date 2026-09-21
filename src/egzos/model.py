@@ -48,6 +48,8 @@ KINDS: tuple[str, ...] = (
 TRUST_STATUSES: tuple[str, ...] = ("unverified", "verified", "quarantined")
 # Serving policy per container type (v0.3 §5): serve-unverified at thread/project (the stated
 # tradeoff), verified-only from team outward. Rules are verified-only at EVERY scope (v0.4 §4).
+# The personal root is verified-only (Chief, 2026-09-21, freeze decision F4): it rides along in
+# every chain, so an unverified item there reaches further than any org scope. Reach → verification.
 SERVING_POLICY: dict[str, str] = {
     "inbox": "serve-unverified",
     "thread": "serve-unverified",
@@ -57,10 +59,12 @@ SERVING_POLICY: dict[str, str] = {
     "exo": "verified-only",
     "uxo": "verified-only",
     "global": "verified-only",
-    "user": "serve-unverified",  # SKELETON: the personal root behaves like its own project
+    "user": "verified-only",
 }
 VERIFIED_ONLY_KINDS: frozenset[str] = frozenset({"rule"})
-INLINE_BLOB_LIMIT = 64 * 1024  # SKELETON: small files inline on fetch, large via signed URL later
+# Small blobs inline on fetch; above the threshold the contract returns a BlobGrant descriptor
+# minted by Trust (F5). The number itself is container config at 0.2; 64 KiB is the skeleton's.
+INLINE_BLOB_LIMIT = 64 * 1024
 
 # --- capabilities and principals --------------------------------------------------------
 # Six capabilities are the ENTIRE vocabulary (v0.3 §5). Ordered as the ladder.

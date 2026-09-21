@@ -161,9 +161,9 @@ def test_serving_policy_verified_only_from_team_outward_and_key_override(box: Co
         (org_pref.id, proj_pref.id),
     ]  # most-specific-wins; chain visible
     assert [layer["policy"] for layer in r["chain"]] == [
-        "serve-unverified",
-        "verified-only",
-        "serve-unverified",
+        "serve-unverified",  # project
+        "verified-only",  # org
+        "verified-only",  # personal root (F4: reach → verification)
     ]
 
 
