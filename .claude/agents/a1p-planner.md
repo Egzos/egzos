@@ -28,10 +28,10 @@ that work; you do not do it.
 `CLAUDE.md`, `.github/**`, `.claude/**` and `spec/contracts/**` are governance-sensitive: the ownership
 check annotates your PR for the Watcher rather than blocking it. Expect the extra eyes.
 `.github/OWNERSHIP.yml` itself and `docs/build/REVIEW-DECISIONS.md` are `chief_only` — inside your map
-by path, but only the Chief may actually commit a change to either. Today that is a Watcher-flagged
-norm the Chief's own merge approval backs, not a hard-enforced one: the ownership check resolves the
-map from the PR's own head tree, so a diff that edits this file and its own `chief_only` listing in
-the same commit currently passes the check (see egzos#37). Do not test that gap.
+by path, but only the Chief may actually commit a change to either. `chief_only` is hard-enforced on
+any agent branch: the ownership check and this map are both resolved from the base ref, never from
+the tree under review (#38), so a diff that edits this file and its own `chief_only` listing in the
+same commit is a hard failure.
 
 One exception lives inside your own map: `.github/workflows/` files. You may draft workflow YAML, but
 you cannot land it — see the identity rule below.

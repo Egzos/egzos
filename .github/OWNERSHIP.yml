@@ -2,11 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # egzos path-ownership map — read by .github/scripts/check_ownership.py
-# Schema version 1. Do not edit on an agent branch. Today this is a norm the checker flags for
-# the Watcher (a visible, governance-path diff still requiring the Chief's approval to merge) —
-# not yet a hard-enforced one: the checker resolves this file from the PR's own head tree, so a
-# diff that edits this file and its own chief_only listing in the same commit currently passes.
-# See egzos#37.
+# Schema version 1. Do not edit on an agent branch: chief_only is hard-enforced — the checker and
+# this file are both resolved from the base ref per #38, never from the tree under review.
 
 version: 1
 branch_prefix: "agent/"
@@ -18,7 +15,6 @@ size_cap:
     - "**/*.lock"
     - "tests/fixtures/**"
 
-# Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
 # Paths that ONLY the Chief may modify. Any agent branch touching these fails immediately.
 # The review register and this map are controls over the agents they govern — an agent that
 # could edit either could settle a finding, or widen its own reach, against itself.
@@ -27,6 +23,7 @@ chief_only:
   - "docs/build/REVIEW-DECISIONS.md"
   - ".github/OWNERSHIP.yml"
 
+# Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
 governance_paths:
   - "CLAUDE.md"
   - ".github/**"
