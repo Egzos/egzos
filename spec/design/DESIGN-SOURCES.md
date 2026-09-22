@@ -82,7 +82,7 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Lifeboat — home/search, item detail, not-found, scheme switch, pending parity | **none** (exempt — §P; plain HTML from tokens.css; decided) | — | 2026-09-21 | lifeboat.md §17 |
 | Consent page, device-code entry, login, outcomes | **none** (bespoke security surface, lifeboat-adjacent; the lifeboat shell partial imported; decided) | — | 2026-09-21 | consent.md §17 |
 
-## Provenance table — flagship search / list (egzos-platform, `search-list.md` v1.2)
+## Provenance table — flagship search / list (egzos-platform, `search-list.md` v1.4)
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
@@ -116,7 +116,7 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.2 §17 |
 | Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.2 §17 |
 
-## Provenance table — flagship permissions dashboard (egzos-platform, `permissions-dashboard.md` v1.0)
+## Provenance table — flagship permissions dashboard (egzos-platform, `permissions-dashboard.md` v1.4)
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
@@ -139,7 +139,7 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Delete Account Form (type-to-confirm) | **declined** · https://21st.dev/@cnippet-dev/components/delete-account-form · #25081 | per item page | 2026-09-22 | permissions-dashboard.md §14/§17 — type-to-confirm is too heavy for a per-token act; only its irreversibility copy informed `grant.immutable` and `revoke.notice`. |
 
 ## Corrections log
-- 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.2 §17.
+- 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.6 §17.
 
 ## Considered and declined (on the record)
 

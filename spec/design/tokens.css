@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.4 · 2026-09-22 (v0.3: 2026-09-11)
+ * egzos design tokens · v0.5 · 2026-09-22 (v0.4 · v0.3: 2026-09-11)
  * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
@@ -64,6 +64,10 @@
   --egz-motion-arrival:  200ms;  /* arrival: new items pill, triage ring step */
   --egz-motion-presence: 4000ms; /* presence: one full circuit of the window beam along the frame */
   --egz-ease:            linear;
+  --egz-t-hold:          700ms;  /* v0.5: press-and-hold fill (flagship enhancement only). The other
+     interaction timeouts — the two-step arm, the lifeboat's fragment refresh, the new-items debounce — are
+     deliberately NOT tokens: the arm is validated server-side and the refresh is an htmx trigger, so a CSS
+     variable there would imply a deployment could restyle a security timeout. See the tap spec §5 (D-T2). */
 
   /* ── media (moodboard imagery, marketing only) ────────────────── */
   --egz-img-filter:  grayscale(.15) contrast(1.02);

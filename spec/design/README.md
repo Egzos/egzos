@@ -8,14 +8,16 @@ Per R10 (decisions log §N), the following are public open-core surfaces. Every 
 
 | file | version | date | what it binds |
 |---|---|---|---|
-| `tokens.css` | 0.4 | 2026-09-22 | The ONE code artifact A2 ships: `--egz-*` CSS variables for light, dark-neutral and dark-violet schemes; colour law (two colours), structure (radius 0, 2 px, 4 px offset), type, motion tokens; Tailwind mapping and shadcn/ui bridge in comments. The lifeboat consumes it as CSS variables; the flagship maps it — never forks it. |
-| `DESIGN-PRINCIPLES.md` | 1.1 | 2026-09-13 | The five decided §P principles verbatim, the thirteen principles of the bound direction (Docket v2), incl. principle 13: the spec is exhaustive; a gap is a defect. |
+| `tokens.css` | 0.5 | 2026-09-22 | The ONE code artifact A2 ships: `--egz-*` CSS variables for light, dark-neutral and dark-violet schemes; colour law (two colours), structure (radius 0, 2 px, 4 px offset), type, motion tokens; Tailwind mapping and shadcn/ui bridge in comments. The lifeboat consumes it as CSS variables; the flagship maps it — never forks it. |
+| `DESIGN-PRINCIPLES.md` | 1.2 | 2026-09-22 | The five decided §P principles verbatim, the thirteen principles of the bound direction (Docket v2), incl. principle 13: the spec is exhaustive; a gap is a defect. |
 | `DESIGN-SOURCES.md` | 1.4 | 2026-09-22 | Provenance: theme seeds, typefaces, every catalogue component picked by a spec (registry item · licence · date · spec), the bespoke and none-on-this-screen decisions, considered-and-declined, corrections log. |
-| `step-up-tap-and-pending-approval.md` | 1.5 | 2026-09-22 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
-| `lifeboat.md` | 1.1 | 2026-09-22 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
-| `consent.md` | 1.2 | 2026-09-22 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
+| `step-up-tap-and-pending-approval.md` | 1.6 | 2026-09-22 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
+| `lifeboat.md` | 1.2 | 2026-09-22 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
+| `consent.md` | 1.3 | 2026-09-22 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
 
-**Version rule.** A file's own header is authoritative; this table is the index a builder checks first, and it is bumped in the same commit as the file. Additive provenance rows in `DESIGN-SOURCES.md` still bump the sibling specs' **Provenance:** pointers, so a reader never has to guess whether a version gap is meaningful.
+**Version rule.** A file's own header is authoritative; this table is the index a builder checks first, and it is bumped in the same commit as the file.
+
+**Pointers move with the file they point at — all of them.** A commit that bumps a file's version bumps, in the same commit: this index's row, every sibling's **Provenance:** pointer, and **every sibling's `Siblings:` / `Tokens:` / `Shell:` pointer aimed at it.** This clause was `Provenance:`-only for four revisions and the gap produced five instances of the same stale-pointer finding on one PR — the last of which resolved a reader to the one version of a file that could *not* answer the question it was sent there to ask. A reader must never have to guess whether a version gap is meaningful, so the rule now covers every pointer, not just the one that first drifted.
 
 Direction: **Docket v2** (bound 2026-09-11) — a record: paper and ink, IBM Plex Sans + Mono, radius 0, 2 px ink borders, a 4 px hard offset that collapses on press; two colours only (`--egz-act` for the human act, `--egz-alarm` Swiss Red for failures; no yellow anywhere); trust is a shape; motion law B (presence, arrival, reveal — nothing else); light is the record, dark is the same tokens re-valued with two user-selectable canvases.
 

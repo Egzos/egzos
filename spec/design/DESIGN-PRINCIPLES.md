@@ -1,7 +1,7 @@
 # DESIGN-PRINCIPLES.md
 
 **Owner:** A2 (Taste)
-**Status:** v1.1 — drafted from the direction sessions of 2026-09-09 → 2026-09-13 (Docket v2, bound; principle 13 added 2026-09-13). Supersedes the Phase 0.0 stub. The first section is carried verbatim from the decisions log (§P) and is locked; the second section is the direction's own principles, binding once the Chief commits this file.
+**Status:** v1.2 (2026-09-22) — principle 5's type colour corrected: it specified black type on the signing control, which measures 2.33:1 on `--egz-act` in light and fails WCAG 2.2 AA, contradicting principle 11 and the tokens' own `--egz-act-on`. Raised by a2-conformance on PR #45. v1.1 — drafted from the direction sessions of 2026-09-09 → 2026-09-13 (Docket v2, bound; principle 13 added 2026-09-13). Supersedes the Phase 0.0 stub. The first section is carried verbatim from the decisions log (§P) and is locked; the second section is the direction's own principles, binding once the Chief commits this file.
 
 ---
 
@@ -50,7 +50,7 @@ Radius 0; 2 px ink borders; a 4 px hard offset that collapses when pressed — t
 Verified is a solid stamp; unverified an outline; staged a dashed outline; quarantined a red outline with the word. Trust reads without colour and survives print, the lifeboat and colour-blindness; the only time trust takes a colour is when something went wrong.
 
 **5. The human act is the plainest thing on the page.**
-The control that signs is flat blue with black type, deliberate by construction (two presses; hold is an enhancement), never glossy, never animated, never focused by default, never pressed before the container answers. Everything decorative stays away from it.
+The control that signs is flat blue with its type in **`--egz-act-on`** — white by day, black at night, which is what the tokens carry and what the specs assert at ≥ 4.5:1 in all three canvases (black on the light blue measures 2.33:1 and fails AA; principle 11 is not a mode), deliberate by construction (two presses; hold is an enhancement), never glossy, never animated, never focused by default, never pressed before the container answers. Everything decorative stays away from it.
 
 **6. Motion means presence, arrival or reveal — and nothing else.**
 A beam travelling the frame while a window is open (presence); a pill or a ring step when a proposal lands (arrival); a section expanding or staged files fanning out (reveal). State changes are instantaneous. Every motion has a still equivalent under reduced-motion. The lifeboat does not move.
