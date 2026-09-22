@@ -83,7 +83,7 @@ jobs:
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1p-planner.md
             --model ${{ env.MODEL_OPUS }}
-            --max-turns 60
+            --max-turns 120
             --allowedTools "Read,Write,Edit,MultiEdit,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
