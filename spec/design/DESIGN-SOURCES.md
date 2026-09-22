@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v1.5 (2026-09-22; supersedes v1.4) — **retires the stale-heading class by deciding what a version number in this file means.** Four findings across three rounds were the same defect wearing different hats: a heading read *`search-list.md` v1.5* over thirty-one rows citing *v1.2*, the theme-seed heading read *tokens.css v0.3* while the file is at v0.6, the Status block described rows as added for *v1.0* under a v1.4 heading, and the corrections log's *fixed in v1.6* was bumped to v1.7 by a pointer sync that should never have touched it. See **Pointers and records** below: a version here is one or the other, headings carry neither, and the class cannot recur. Also adds the shadcn/ui variable-contract row (the key names are adopted from an MIT project and that is provenance), records **D-T3** in the corrections log, and gives the dashboard rows the version that picked them. v1.4 (2026-09-22; superseded) — adds the provenance rows for the flagship `permissions-dashboard.md` v1.0, including three explicit declines (Role Permissions Picker as an editable-grant pattern, Alert Dialog as a modal on a security surface, Delete Account Form's type-to-confirm). v1.3 (2026-09-22; superseded) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
+**Status:** v1.6 (2026-09-22; supersedes v1.5) — **the v1.5 commit performed, inside one diff hunk, the exact record-bump its own Status line four lines above declared must never happen.** Both reviewers caught it. The corrections-log entry naming where the Origin UI Table fix landed has now been bumped three times — `d33bdb0` wrote **v1.2**, `8299031` moved it to v1.6, `364408a` moved it to v1.7 *while explaining why that move is wrong*. Restored to **v1.2** and verified against the tree rather than reasoned about: `step-up-tap-and-pending-approval.md` at `d33bdb0` already reads `Table · Origin UI · #89 (MIT)`, so v1.2 is the revision carrying the corrected value — and, as the entry now says, the tap spec never carried #99 at all, which the old wording implied. Also closes a1r's minor 3: the tap-spec table's thirty-four rows and the lifeboat/consent rows carried **no** version in *Picked by spec*, the column v1.5 defined as the only remaining home for that fact once headings lost theirs. v1.5 (2026-09-22; superseded) — **retires the stale-heading class by deciding what a version number in this file means.** Four findings across three rounds were the same defect wearing different hats: a heading read *`search-list.md` v1.5* over thirty-one rows citing *v1.2*, the theme-seed heading read *tokens.css v0.3* while the file is at v0.6, the Status block described rows as added for *v1.0* under a v1.4 heading, and the corrections log's *fixed in v1.6* was bumped to v1.7 by a pointer sync that should never have touched it. See **Pointers and records** below: a version here is one or the other, headings carry neither, and the class cannot recur. Also adds the shadcn/ui variable-contract row (the key names are adopted from an MIT project and that is provenance), records **D-T3** in the corrections log, and gives the dashboard rows the version that picked them. v1.4 (2026-09-22; superseded) — adds the provenance rows for the flagship `permissions-dashboard.md` v1.0, including three explicit declines (Role Permissions Picker as an editable-grant pattern, Alert Dialog as a modal on a security surface, Delete Account Form's type-to-confirm). v1.3 (2026-09-22; superseded) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
 
 ## Purpose
 
@@ -57,40 +57,40 @@ A component from any other source requires A2's explicit call in the spec. Third
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
-| Tool Approval (pending item shape) | https://21st.dev/@starc007/components/tool-approval · #26580 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Approval Card (pending item shape) | https://21st.dev/@theshanelevine/components/approval-card · #23595 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Hold to Confirm (act enhancement only) | https://21st.dev/@ddoemonn/components/hold-to-confirm · #23527 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §2.3 |
-| Records Table (what moves) | https://21st.dev/@theshanelevine/components/records-table · #23604 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| File Diff (what moves, as diff) | https://21st.dev/@kvnkld/components/file-diff · #23584 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Avatar (resolved audience) | https://21st.dev/@originui/components/avatar · #415 | MIT (Origin UI) | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| Tool Approval (pending item shape) | https://21st.dev/@starc007/components/tool-approval · #26580 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Approval Card (pending item shape) | https://21st.dev/@theshanelevine/components/approval-card · #23595 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Hold to Confirm (act enhancement only) | https://21st.dev/@ddoemonn/components/hold-to-confirm · #23527 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §2.3 |
+| Records Table (what moves) | https://21st.dev/@theshanelevine/components/records-table · #23604 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| File Diff (what moves, as diff) | https://21st.dev/@kvnkld/components/file-diff · #23584 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Avatar (resolved audience) | https://21st.dev/@originui/components/avatar · #415 | MIT (Origin UI) | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
 | Role Permissions Picker (structure reference for a capability list; **not installed**) | https://21st.dev/@cnippet-dev/components/role-permissions-picker · #24929 | per item page | 2026-09-11 · re-scoped 2026-09-22 | Reference only. Considered for the tap page's audience roles and for `consent.md` §7's capabilities block; both are **bespoke** (`consent.md` §17). Retained here as provenance for the idea, picked by no spec. |
-| Compare Reveal (consequence: now vs after) | https://21st.dev/@rmahammad/components/compare-reveal · #23419 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Border Beam (presence beam — idea only, re-cut solid ink) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §2.4 |
-| PDF Viewer (staged preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Interactive Folder Gallery (staging reveal) | https://21st.dev/@alexperezcedeno/components/interactive-folder-gallery · #16368 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
-| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §3.2 |
-| New Items Pill (arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §3.1 |
-| Skeleton (loading; shimmer stripped) | https://21st.dev/@shadcn/components/skeleton · #1588 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Empty (empty state; title/description only) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Table (manifest fallback) | https://21st.dev/originui/table · #89 (v1.1 wrote #99 — corrected) | MIT (Origin UI) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Avatar Stack (audience fallback) | https://21st.dev/@cnippet-dev/components/avatar-stack · #23507 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Tooltip (role tooltip) | https://21st.dev/@shadcn/components/tooltip · #1277 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Image Comparison (consequence slider fallback) | https://21st.dev/@ibelick/components/image-comparison · #1466 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Collapsible (sections fallback) | https://21st.dev/@shadcn/components/collapsible · #847 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Long Press Button (hold fallback) | https://21st.dev/@ddoemonn/components/long-press-button · #23538 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Button (Deny, Approve without a window; base of the two-step act) | shadcn/ui button | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Kbd (shortcut hints) | https://21st.dev/@shadcn/components/kbd · #8672 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Alert (failure card structure reference only) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Segmented Control (flagship queue filters) | https://21st.dev/@ddoemonn/components/segmented-control · #23552 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Animated Tabs (filters fallback; animation stripped) | https://21st.dev/@educalvolpz/components/animated-tabs · #24930 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Kbd Input Group (search within pending) | https://21st.dev/@uiable/components/kbd-input-group · #26530 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Command (search fallback) | https://21st.dev/@originui/components/command · #382 | MIT (Origin UI) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Presence block, beam, stamps, two-step act, countdown, consequence box, failure cards | **bespoke** | — | 2026-09-11 | step-up-tap-and-pending-approval.md §§2–7, 17 |
+| Compare Reveal (consequence: now vs after) | https://21st.dev/@rmahammad/components/compare-reveal · #23419 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Border Beam (presence beam — idea only, re-cut solid ink) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §2.4 |
+| PDF Viewer (staged preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Interactive Folder Gallery (staging reveal) | https://21st.dev/@alexperezcedeno/components/interactive-folder-gallery · #16368 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §17 |
+| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §3.2 |
+| New Items Pill (arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §3.1 |
+| Skeleton (loading; shimmer stripped) | https://21st.dev/@shadcn/components/skeleton · #1588 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Empty (empty state; title/description only) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Table (manifest fallback) | https://21st.dev/originui/table · #89 (v1.1 wrote #99 — corrected) | MIT (Origin UI) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Avatar Stack (audience fallback) | https://21st.dev/@cnippet-dev/components/avatar-stack · #23507 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Tooltip (role tooltip) | https://21st.dev/@shadcn/components/tooltip · #1277 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Image Comparison (consequence slider fallback) | https://21st.dev/@ibelick/components/image-comparison · #1466 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Collapsible (sections fallback) | https://21st.dev/@shadcn/components/collapsible · #847 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Long Press Button (hold fallback) | https://21st.dev/@ddoemonn/components/long-press-button · #23538 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Button (Deny, Approve without a window; base of the two-step act) | shadcn/ui button | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Kbd (shortcut hints) | https://21st.dev/@shadcn/components/kbd · #8672 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Alert (failure card structure reference only) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Segmented Control (flagship queue filters) | https://21st.dev/@ddoemonn/components/segmented-control · #23552 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Animated Tabs (filters fallback; animation stripped) | https://21st.dev/@educalvolpz/components/animated-tabs · #24930 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Kbd Input Group (search within pending) | https://21st.dev/@uiable/components/kbd-input-group · #26530 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Command (search fallback) | https://21st.dev/@originui/components/command · #382 | MIT (Origin UI) | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
+| Presence block, beam, stamps, two-step act, countdown, consequence box, failure cards | **bespoke** | — | 2026-09-11 | step-up-tap-and-pending-approval.md v1.0 §§2–7, 17 |
 | Onion diagram | **bespoke** | — | 2026-09-11 · re-pointed 2026-09-22 | `egzos-platform/spec/design/onion-graph.md` (not yet committed). The tap spec §0 explicitly excludes the onion; the v1.2 row citing it was wrong. |
-| Toasts, dialogs, modals | **none on these pages** (decided) | — | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
+| Toasts, dialogs, modals | **none on these pages** (decided) | — | 2026-09-13 | step-up-tap-and-pending-approval.md v1.1 §17 |
 
 The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 
@@ -98,8 +98,8 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 
 | Surface | Components | Licence | Date | Spec |
 |---|---|---|---|---|
-| Lifeboat — home/search, item detail, not-found, scheme switch, pending parity | **none** (exempt — §P; plain HTML from tokens.css; decided) | — | 2026-09-21 | lifeboat.md §17 |
-| Consent page, device-code entry, login, outcomes | **none** (bespoke security surface, lifeboat-adjacent; the lifeboat shell partial imported; decided) | — | 2026-09-21 | consent.md §17 |
+| Lifeboat — home/search, item detail, not-found, scheme switch, pending parity | **none** (exempt — §P; plain HTML from tokens.css; decided) | — | 2026-09-21 | lifeboat.md v1.0 §17 |
+| Consent page, device-code entry, login, outcomes | **none** (bespoke security surface, lifeboat-adjacent; the lifeboat shell partial imported; decided) | — | 2026-09-21 | consent.md v1.0 §17 |
 
 ## Provenance table — flagship search / list (egzos-platform)
 
@@ -159,7 +159,7 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 
 ## Corrections log
 - 2026-09-22 · **D-T3** · the shadcn/ui bridge existed in `tokens.css` as a **comment** from v0.4 to v0.5 — twenty-five key names documented and none declared. A catalogue component resolved `--background` against the empty string, so a4s's only route to a rendering pick was to retype the block into the flagship theme: a fork by transcription, which that file's header forbids in the same breath as a fork by copy. Declared in `tokens.css` v0.6 as aliases (`var(--egz-*)`), which are scheme-independent by construction and inert where unread, so the lifeboat pays nothing. `--radius-sm/md/lg/xl` are pinned flat because shadcn derives them with `calc()` and radius 0 makes them negative — invalid, silently falling back to a rounded corner in a square system. `--chart-1…5` are refused on the record rather than omitted by accident.
-- 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.7 §17.
+- 2026-09-21 · Origin UI Table recorded as **#99** in this file at v1.1; the registry item is **#89** (`https://21st.dev/originui/table`). Corrected here in **v1.2**. The tap spec's §17 row has read #89 since that spec was first written, so nothing needed fixing there — the earlier wording of this entry implied otherwise and is corrected with it. *(This line is a **record**. Its version is frozen at v1.2. Three separate pointer syncs have moved it — to v1.6, then v1.7 — and each destroyed the only fact it carries; the third did so in the same commit that declared records frozen. If a sweep ever wants to move it again, the sweep is wrong.)*
 
 ## Considered and declined (on the record)
 

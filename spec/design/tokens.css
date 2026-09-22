@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.6 · 2026-09-22 (v0.5 · v0.4 · v0.3: 2026-09-11)
+ * egzos design tokens · v0.7 · 2026-09-22 (v0.6 · v0.5 · v0.4 · v0.3: 2026-09-11)
  * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
@@ -188,7 +188,18 @@ html[data-scheme="dark"][data-canvas="violet"] {
    * colour law nobody agreed, arriving through a component's back door.
    *
    * A pick needing any other unlisted key is likewise a design-gap against this file — never
-   * a literal in the component, and never a retyped block in the flagship theme. */
+   * a literal in the component, and never a retyped block in the flagship theme.
+   *
+   * SOURCE ORDER (v0.7, and binding on the flagship). This block only takes effect if it
+   * out-cascades shadcn's own definitions, which a current shadcn / Tailwind v4 setup emits
+   * from `@theme inline` into `:root` — the SAME selector at the SAME specificity, where
+   * source order alone decides. So: **this file loads AFTER the shadcn theme layer**, or that
+   * layer's colour and radius derivations are dropped. Either satisfies the requirement;
+   * neither is optional. Get it wrong and nothing errors — `--radius-sm` quietly resolves to
+   * `calc(0.625rem - 4px)` and a rounded corner appears in a square system, which is the
+   * failure this block exists to prevent, arriving by a different door. A2 states the
+   * requirement; where in the platform's CSS entry it is satisfied is a4s's to implement and
+   * a2-conformance's to check. */
 }
 
 @media (prefers-reduced-motion: reduce) {
