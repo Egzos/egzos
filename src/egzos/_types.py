@@ -10,14 +10,15 @@ Phase 1 builds against the frozen surface rather than the skeleton's.
 
 **Drafted, awaiting the Phase 0.3 freeze review** — A6 and the Chief declare the freeze, not a1p.
 
-Covered so far (issue #26): ``context-item.md``, ``capabilities.md``, ``events.md``.
-Storage protocols (#27), container and chain (#28) and the authorization-server surface (#29)
+Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26) and
+``storage.md`` (issue #27). Container and chain (#28) and the authorization-server surface (#29)
 land in their own PRs; the consolidation pass is #30.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal, NotRequired, TypedDict, get_args
+from collections.abc import Iterable, Iterator
+from typing import Any, Literal, NotRequired, Protocol, TypedDict, get_args
 
 # The runtime tuples below are DERIVED from their Literal unions, never written out twice: a
 # vocabulary that can drift from its own type is a vocabulary that will.
@@ -214,26 +215,132 @@ class AuditEntry(TypedDict):
     hash: str
 
 
+# --- the storage boundary (spec/contracts/storage.md) ---------------------------------------
+#
+# F3 splits the skeleton's ONE wide `Backend` Protocol into `ItemStore` (pluggable, delegable) and
+# `ContainerState` (never delegated); `BlobStore` was already separate. The METHODS below are
+# verbatim from the running code; the PARTITION is decided, not running. `audit_append` sits in
+# `ContainerState` so the chain's integrity never depends on whoever wrote the backend — this
+# amends v0.4 §11. See storage.md §1.
+#
+# These Protocols stay HERE when Phase 5 moves the implementations to Vault (R5): the seam is the
+# type, and the type sits above both modules, so Store/Trust/Ledger never import Vault for a name.
+
+#: TODO(a1p): `Node` and `Proposal` are issue #28's to define (container contract). The signatures
+#: that reference them are final — only the referent is outstanding — so they are aliased to the
+#: open mapping the skeleton passes rather than pre-empting #28's shapes. #30 removes both aliases.
+Node = dict[str, Any]
+Proposal = dict[str, Any]
+
+
+class ItemStore(Protocol):
+    """Pluggable and delegable: sqlite -> postgres+pgvector -> mem0/zep.
+
+    A filter, never a decision. The backend returns CANDIDATES; the resolver applies precedence,
+    trust and key-override above it (v0.4 §11). Every getter returns `None`/a shorter list for
+    absent, tombstoned and out-of-coverage alike — a distinguishable "exists but forbidden" is
+    enumeration by another name (storage.md §5).
+    """
+
+    def put(self, item: ContextItem) -> None: ...
+    def get(self, item_id: str) -> ContextItem | None: ...
+    def query(
+        self,
+        scopes: Iterable[str],
+        *,
+        kinds: Iterable[Kind] | None = None,
+        key: str | None = None,
+        statuses: Iterable[TrustStatus] | None = None,
+        text: str | None = None,
+        include_tombstoned: bool = False,
+    ) -> list[ContextItem]: ...
+    def tombstone(self, item_id: str) -> bool: ...
+    #: ^ internal to this boundary. No surface may reflect it to an external caller.
+
+
+class ContainerState(Protocol):
+    """The container's own state: nodes, tokens, proposals and the audit chain.
+
+    sqlite by default, postgres at Phase 5, **never delegated to a third-party store** (F3).
+    """
+
+    # nodes
+    def put_node(self, node: Node) -> None: ...
+    def get_node(self, node_id: str) -> Node | None: ...
+    def list_nodes(self, parent: str | None = None, type: str | None = None) -> list[Node]: ...
+    def find_root(self, type: str) -> Node | None: ...
+
+    # tokens
+    def put_token(self, token: Token) -> None: ...
+    def get_token(self, token_id: str) -> Token | None: ...
+    def list_tokens(self) -> list[Token]: ...
+
+    # pending proposals (cross-audience moves, staged artifacts)
+    def put_proposal(self, proposal: Proposal) -> None: ...
+    def get_proposal(self, proposal_id: str) -> Proposal | None: ...
+    def list_proposals(self, status: str | None = None) -> list[Proposal]: ...
+
+    # audit chain — append-only; the LEDGER computes the chain, the store only appends
+    def audit_append(self, entry: AuditEntry) -> AuditEntry: ...
+    #: ^ the input carries no `seq`: the store assigns it, returns the stored entry (events.md §3)
+    def audit_last(self) -> AuditEntry | None: ...
+    def audit_iter(self) -> Iterator[AuditEntry]: ...
+    def audit_tail(self, n: int) -> list[AuditEntry]: ...
+
+
+class BlobStore(Protocol):
+    """Content-addressed bytes over `sha256/<hash>`, staged under `staging/<hash>`.
+
+    Issues NOTHING. Trust mints a `BlobGrant`; Store/Vault renders it and decides nothing (F5) —
+    signed-URL issuance passes Trust's capability check, because artifact download IS fetch. The
+    mint (`blob.grant`) and the redemption (`blob.pull`) are two separate audit events.
+
+    The staging prefix is invisible to resolution: `get`/`exists` address `sha256/<hash>` ONLY, and
+    no flag or alternate method reads `staging/`. A staged blob is unaddressable until `promote`.
+
+    Moves to Vault whole at Phase 5 (R5) — no back-reference into nodes, resolver or items, and
+    addressing is by `sha256` alone.
+    """
+
+    def put(self, data: bytes) -> str: ...
+    def stage(self, data: bytes) -> str: ...
+    def promote(self, sha: str) -> None: ...
+    def get(self, sha: str) -> bytes | None: ...
+    def exists(self, sha: str) -> bool: ...
+    #: ^ an existence oracle over guessable addresses: never reachable from an external path.
+
+
+#: The two contracts F3 split out of the skeleton's union, and the third seam that was already
+#: separate. Ordered as storage.md §1 lists them.
+STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore")
+
+
 __all__ = [
     "ArtifactContent",
     "AuditEntry",
     "BlobGrant",
+    "BlobStore",
     "CAPABILITIES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
+    "ContainerState",
     "ContextItem",
     "EVENTS",
     "Event",
     "GENESIS_HASH",
     "HUMAN_ONLY_ACTS",
+    "ItemStore",
     "KINDS",
     "Kind",
     "Lifecycle",
+    "Node",
     "PRINCIPALS",
     "Principal",
+    "Proposal",
     "Provenance",
     "ROLE_BUNDLES",
     "Role",
+    "STORAGE_CONTRACTS",
     "TRUST_STATUSES",
     "TextContent",
     "Token",
