@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.5 · 2026-09-22 (v0.4 · v0.3: 2026-09-11)
+ * egzos design tokens · v0.6 · 2026-09-22 (v0.5 · v0.4 · v0.3: 2026-09-11)
  * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
@@ -116,6 +116,81 @@ html[data-scheme="dark"][data-canvas="violet"] {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * shadcn/ui bridge — DECLARED, not documented (D-T3, tokens v0.6)
+ *
+ * Until v0.6 these keys existed only as a comment at the foot of this file. A comment
+ * declares nothing: a catalogue component resolved `--background` against the empty string,
+ * and a4s's only way to make the pick render was to retype all twenty-five lines into the
+ * flagship theme — a fork by transcription, which this file's header forbids in the same
+ * breath as a fork by copy. They are declarations now. The flagship maps the `--egz-*` layer
+ * into Tailwind and gets this layer for free; nothing is retyped anywhere.
+ *
+ * Every value is an ALIAS, so the block is scheme-independent by construction: `var()`
+ * resolves at use time against whichever scheme block is winning on <html>, which is why
+ * there is no dark copy of this list and must never be one. A dark copy would be a second
+ * place to forget.
+ *
+ * The lifeboat pays nothing: an unreferenced custom property is inert — no paint, no layout,
+ * no cascade cost. It is catalogue-exempt and simply never reads these names.
+ * --------------------------------------------------------------------------- */
+:root {
+  /* surfaces */
+  --background:              var(--egz-canvas);
+  --foreground:              var(--egz-ink);
+  --card:                    var(--egz-canvas);
+  --card-foreground:         var(--egz-ink);
+  --popover:                 var(--egz-canvas);   /* Command #382, Popover, Context Menu, Tooltip */
+  --popover-foreground:      var(--egz-ink);
+  --muted:                   var(--egz-paper);
+  --muted-foreground:        var(--egz-ink-3);
+
+  /* the one act colour, and the one failure colour — there is no third */
+  --primary:                 var(--egz-act);
+  --primary-foreground:      var(--egz-act-on);
+  --destructive:             var(--egz-alarm);
+  --destructive-foreground:  var(--egz-alarm-on);
+  --secondary:               var(--egz-paper);
+  --secondary-foreground:    var(--egz-ink);
+  --accent:                  var(--egz-paper);
+  --accent-foreground:       var(--egz-ink);
+
+  /* edges */
+  --border:                  var(--egz-rule-soft);
+  --input:                   var(--egz-rule);     /* the field's 2px ink edge, not a hairline */
+  --ring:                    var(--egz-act);
+
+  /* radius. shadcn derives --radius-sm/md/lg/xl with calc(var(--radius) ∓ 2px|4px), which at
+   * radius 0 yields NEGATIVE lengths — invalid, so the component silently falls back to the
+   * browser default and a rounded corner appears in a square system. Each is pinned flat. */
+  --radius:                  var(--egz-radius);   /* 0 */
+  --radius-sm:               0;
+  --radius-md:               0;
+  --radius-lg:               0;
+  --radius-xl:               0;
+
+  /* sidebar family — the flagship app shell's primary pick (search-list.md §17) */
+  --sidebar:                    var(--egz-paper);
+  --sidebar-foreground:         var(--egz-ink);
+  --sidebar-primary:            var(--egz-act);
+  --sidebar-primary-foreground: var(--egz-act-on);
+  --sidebar-accent:             var(--egz-canvas);
+  --sidebar-accent-foreground:  var(--egz-ink);
+  --sidebar-border:             var(--egz-rule);
+  --sidebar-ring:               var(--egz-act);
+
+  /* DELIBERATELY ABSENT: --chart-1 … --chart-5. shadcn ships five categorical hues; egzos has
+   * two colours and both are reserved (--act asks a human, --alarm reports a failure), so a
+   * categorical ramp cannot be built from this palette without inventing a third. A pick that
+   * reads a chart key is a design-gap against THIS file — A2 answers it with a non-chromatic
+   * encoding (shape, hatch, position) or the Chief takes a colour-law decision. Do not alias
+   * them to ink tints to make a component render: five greys that mean five categories is a
+   * colour law nobody agreed, arriving through a component's back door.
+   *
+   * A pick needing any other unlisted key is likewise a design-gap against this file — never
+   * a literal in the component, and never a retyped block in the flagship theme. */
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --egz-motion-reveal:   0ms;
@@ -133,25 +208,8 @@ html[data-scheme="dark"][data-canvas="violet"] {
  *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)
  *   fontFamily.ui / mono → the two stacks above   fontSize.1…7 → --egz-fs-1…7
  *   transitionDuration.state / reveal / arrival / presence → the motion tokens
- * shadcn/ui bridge (so catalogue components re-theme without edits):
- *   --background: var(--egz-canvas)  --foreground: var(--egz-ink)  --card: var(--egz-canvas)
- *   --muted: var(--egz-paper)  --muted-foreground: var(--egz-ink-3)  --border: var(--egz-rule-soft)
- *   --primary: var(--egz-act)  --primary-foreground: var(--egz-act-on)
- *   --destructive: var(--egz-alarm)  --destructive-foreground: var(--egz-alarm-on)
- *   --ring: var(--egz-act)  --radius: var(--egz-radius)
- *   --secondary / --accent: var(--egz-paper)
- *   --secondary-foreground / --accent-foreground: var(--egz-ink) — there is no third colour.
- * Bridge keys added in v0.4, because catalogue picks already recorded in DESIGN-SOURCES.md read them
- * and an unmapped key means the component resolves against nothing (a4s would then hard-code a value,
- * which is the identity flowing AROUND the tokens — §P forbids it, and the round-trip was avoidable):
- *   --popover: var(--egz-canvas)   --popover-foreground: var(--egz-ink)
- *       (Command #382, Popover, Context Menu, Tooltip)
- *   --input: var(--egz-rule)       (Input, Checkbox — the field's 2px ink edge)
- *   --card-foreground: var(--egz-ink)
- *   --sidebar: var(--egz-paper)                --sidebar-foreground: var(--egz-ink)
- *   --sidebar-primary: var(--egz-act)          --sidebar-primary-foreground: var(--egz-act-on)
- *   --sidebar-accent: var(--egz-canvas)        --sidebar-accent-foreground: var(--egz-ink)
- *   --sidebar-border: var(--egz-rule)          --sidebar-ring: var(--egz-act)
- *       (shadcn Sidebar — the flagship app shell's primary pick)
- * A pick that needs a key not listed here is a design-gap against THIS file, not a literal.
+ * shadcn/ui bridge: DECLARED ABOVE (D-T3, v0.6), not listed here. The block above this comment
+ * is the bridge; it was a comment in v0.4–v0.5 and nothing declared the keys. A pick needing a
+ * key the block does not declare is a design-gap against THIS file, never a literal in the
+ * component and never a retyped block in the flagship theme.
  */
