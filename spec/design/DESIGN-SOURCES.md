@@ -82,39 +82,39 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Lifeboat — home/search, item detail, not-found, scheme switch, pending parity | **none** (exempt — §P; plain HTML from tokens.css; decided) | — | 2026-09-21 | lifeboat.md §17 |
 | Consent page, device-code entry, login, outcomes | **none** (bespoke security surface, lifeboat-adjacent; the lifeboat shell partial imported; decided) | — | 2026-09-21 | consent.md §17 |
 
-## Provenance table — flagship search / list (egzos-platform, `search-list.md` v1.0)
+## Provenance table — flagship search / list (egzos-platform, `search-list.md` v1.2)
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
-| Sidebar (app shell rail) | shadcn/ui sidebar | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
-| Sidebar (fallback) | https://21st.dev/uniquesonu/sidebar · #2737 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Tree View (scope tree) | https://21st.dev/ddoemonn/tree-view · #23573 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Tree View (fallback) | https://21st.dev/preetsuthar17/tree-view · #2771 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| File Tree (fallback 2) | https://21st.dev/edwinvakayil/file-tree · #19150 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Command (palette; chip pickers) | https://21st.dev/originui/command · #382 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
-| Command Palette (fallback) | https://21st.dev/ddoemonn/command-palette · #23522 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Kbd Input Group (search input) | https://21st.dev/uiable/kbd-input-group · #26530 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Input, Popover, Badge, Checkbox, Button, Toggle Group, Resizable, Tooltip, Kbd, Context Menu, Skeleton, Collapsible, Data Table, Breadcrumb | shadcn/ui | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
-| Segmented Control (trust chip; scheme fallback) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Table (results grid; sortable variant) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
-| Data Grid Table (fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Data Table (fallback 2) | https://21st.dev/shadcn/data-table · #1050 | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
-| Empty (empty / no-results) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| New Items Pill (new results; arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Resizable (fallback) | https://21st.dev/preetsuthar17/resizable · #4424 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Breadcrumb (scope path) | https://21st.dev/originui/breadcrumb · #440 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
-| PDF Viewer (preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Hold to Confirm / Long Press Button (hold enhancement) | #23527 / #23538 (rows above) | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Status (session facts — structure reference only) | https://21st.dev/diceui/status · #25395 | MIT (Dice UI) | 2026-09-21 | search-list.md v1.1 §17 |
-| Border Beam (window chip beam — idea only) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Context Menu (fallback) | https://21st.dev/cnippet-dev/context-menu · #23642 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Alert (failure card structure reference) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
-| Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.1 §17 |
-| Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.1 §17 |
+| Sidebar (app shell rail) | shadcn/ui sidebar | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.2 §17 |
+| Sidebar (fallback) | https://21st.dev/uniquesonu/sidebar · #2737 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Tree View (scope tree) | https://21st.dev/ddoemonn/tree-view · #23573 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Tree View (fallback) | https://21st.dev/preetsuthar17/tree-view · #2771 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| File Tree (fallback 2) | https://21st.dev/edwinvakayil/file-tree · #19150 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Command (palette; chip pickers) | https://21st.dev/originui/command · #382 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.2 §17 |
+| Command Palette (fallback) | https://21st.dev/ddoemonn/command-palette · #23522 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Kbd Input Group (search input) | https://21st.dev/uiable/kbd-input-group · #26530 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Input, Popover, Badge, Checkbox, Button, Toggle Group, Resizable, Tooltip, Kbd, Context Menu, Skeleton, Collapsible, Data Table, Breadcrumb | shadcn/ui | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.2 §17 |
+| Segmented Control (trust chip; scheme fallback) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Table (results grid; sortable variant) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.2 §17 |
+| Data Grid Table (fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Data Table (fallback 2) | https://21st.dev/shadcn/data-table · #1050 | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.2 §17 |
+| Empty (empty / no-results) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| New Items Pill (new results; arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Resizable (fallback) | https://21st.dev/preetsuthar17/resizable · #4424 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Breadcrumb (scope path) | https://21st.dev/originui/breadcrumb · #440 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.2 §17 |
+| PDF Viewer (preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Hold to Confirm / Long Press Button (hold enhancement) | #23527 / #23538 (rows above) | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Status (session facts — structure reference only) | https://21st.dev/diceui/status · #25395 | MIT (Dice UI) | 2026-09-21 | search-list.md v1.2 §17 |
+| Border Beam (window chip beam — idea only) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Context Menu (fallback) | https://21st.dev/cnippet-dev/context-menu · #23642 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Alert (failure card structure reference) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-21 | search-list.md v1.2 §17 |
+| Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.2 §17 |
+| Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.2 §17 |
 
 ## Provenance table — flagship permissions dashboard (egzos-platform, `permissions-dashboard.md` v1.0)
 

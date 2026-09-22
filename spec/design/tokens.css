@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.3 · 2026-09-11
+ * egzos design tokens · v0.4 · 2026-09-22 (v0.3: 2026-09-11)
  * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
@@ -40,6 +40,7 @@
   /* ── structure (Neo Brutalism, bones only) ────────────────────── */
   --egz-radius:      0;
   --egz-bw:          2px;       /* structural border weight */
+  --egz-hair:        1px;       /* hairlines inside tables and lists; skeleton borders (v0.4) */
   --egz-off:         4px;       /* hard offset: box-shadow var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink) */
   --egz-off-lg:      8px;       /* the page frame */
   --egz-focus:       var(--egz-bw) solid var(--egz-act);  /* outline; outline-offset 3px */
@@ -87,6 +88,9 @@ html[data-scheme="dark"] {
   color-scheme: dark;
 }
 
+/* NOTE: the prefers-color-scheme block below duplicates every value in this block.
+   Any change here must be made there too — it is checked by a2-conformance. */
+
 html[data-scheme="dark"][data-canvas="violet"] {
   /* the one thing taken from the Neon Cyber family: a cast, not a colour */
   --egz-canvas:      #0B0716;
@@ -102,6 +106,8 @@ html[data-scheme="dark"][data-canvas="violet"] {
     --egz-canvas: #0B0B0B; --egz-paper: #151515; --egz-ink: #F4F4F0; --egz-ink-2: #CFCFC9; --egz-ink-3: #9A9A94;
     --egz-rule: #F4F4F0; --egz-rule-soft: #3A3A3A; --egz-shadow-ink: #F4F4F0;
     --egz-act: #6B9BFF; --egz-act-on: #0B0B0B; --egz-alarm: hsl(0 100% 60%); --egz-alarm-on: #0B0B0B;
+    --egz-img-filter: grayscale(.2) brightness(.82) contrast(1.06);   /* v0.4: was missing, so an OS-dark
+       viewer with no stored scheme got the light filter on imagery */
     color-scheme: dark;
   }
 }
@@ -119,6 +125,7 @@ html[data-scheme="dark"][data-canvas="violet"] {
  *   colors.canvas → var(--egz-canvas)   colors.paper → var(--egz-paper)   colors.ink → var(--egz-ink)
  *   colors.ink-2 / ink-3 / rule / rule-soft / act / act-on / alarm / alarm-on likewise
  *   borderRadius.DEFAULT → var(--egz-radius) (0)   borderWidth.structural → var(--egz-bw)
+ *   borderWidth.hair → var(--egz-hair)
  *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)
  *   fontFamily.ui / mono → the two stacks above   fontSize.1…7 → --egz-fs-1…7
  *   transitionDuration.state / reveal / arrival / presence → the motion tokens
@@ -128,5 +135,19 @@ html[data-scheme="dark"][data-canvas="violet"] {
  *   --primary: var(--egz-act)  --primary-foreground: var(--egz-act-on)
  *   --destructive: var(--egz-alarm)  --destructive-foreground: var(--egz-alarm-on)
  *   --ring: var(--egz-act)  --radius: var(--egz-radius)
- *   --secondary / --accent: var(--egz-paper) with --egz-ink foreground — there is no third colour.
+ *   --secondary / --accent: var(--egz-paper)
+ *   --secondary-foreground / --accent-foreground: var(--egz-ink) — there is no third colour.
+ * Bridge keys added in v0.4, because catalogue picks already recorded in DESIGN-SOURCES.md read them
+ * and an unmapped key means the component resolves against nothing (a4s would then hard-code a value,
+ * which is the identity flowing AROUND the tokens — §P forbids it, and the round-trip was avoidable):
+ *   --popover: var(--egz-canvas)   --popover-foreground: var(--egz-ink)
+ *       (Command #382, Popover, Context Menu, Tooltip)
+ *   --input: var(--egz-rule)       (Input, Checkbox — the field's 2px ink edge)
+ *   --card-foreground: var(--egz-ink)
+ *   --sidebar: var(--egz-paper)                --sidebar-foreground: var(--egz-ink)
+ *   --sidebar-primary: var(--egz-act)          --sidebar-primary-foreground: var(--egz-act-on)
+ *   --sidebar-accent: var(--egz-canvas)        --sidebar-accent-foreground: var(--egz-ink)
+ *   --sidebar-border: var(--egz-rule)          --sidebar-ring: var(--egz-act)
+ *       (shadcn Sidebar — the flagship app shell's primary pick)
+ * A pick that needs a key not listed here is a design-gap against THIS file, not a literal.
  */

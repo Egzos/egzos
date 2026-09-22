@@ -2,7 +2,7 @@
 
 **Spec:** `spec/design/lifeboat.md` · **Version:** 1.1 · **Date:** 2026-09-22 (v1.0: 2026-09-21)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.3 · **Principles:** `DESIGN-PRINCIPLES.md` v1.1 · **Provenance:** `DESIGN-SOURCES.md` v1.3 · **Sibling:** `step-up-tap-and-pending-approval.md` v1.3 (the pending pages and the tap page; cited here as *the tap spec*).
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.4 · **Principles:** `DESIGN-PRINCIPLES.md` v1.1 · **Provenance:** `DESIGN-SOURCES.md` v1.4 · **Sibling:** `step-up-tap-and-pending-approval.md` v1.4 (the pending pages and the tap page; cited here as *the tap spec*).
 
 **Consumers.** a5-dinghy (builds it: `src/egzos/web/**`, `tests/web/**`); a2-conformance (checks UI PRs against it); a6-adversary (the pending flow and every act); a1r-reviewer (contract usage); a1p-planner (§14 lists what the frozen contract must make available).
 
