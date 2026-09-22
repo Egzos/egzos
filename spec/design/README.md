@@ -11,7 +11,7 @@ Per R10 (decisions log §N), the following are public open-core surfaces. Every 
 | `tokens.css` | 0.4 | 2026-09-22 | The ONE code artifact A2 ships: `--egz-*` CSS variables for light, dark-neutral and dark-violet schemes; colour law (two colours), structure (radius 0, 2 px, 4 px offset), type, motion tokens; Tailwind mapping and shadcn/ui bridge in comments. The lifeboat consumes it as CSS variables; the flagship maps it — never forks it. |
 | `DESIGN-PRINCIPLES.md` | 1.1 | 2026-09-13 | The five decided §P principles verbatim, the thirteen principles of the bound direction (Docket v2), incl. principle 13: the spec is exhaustive; a gap is a defect. |
 | `DESIGN-SOURCES.md` | 1.4 | 2026-09-22 | Provenance: theme seeds, typefaces, every catalogue component picked by a spec (registry item · licence · date · spec), the bespoke and none-on-this-screen decisions, considered-and-declined, corrections log. |
-| `step-up-tap-and-pending-approval.md` | 1.4 | 2026-09-22 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
+| `step-up-tap-and-pending-approval.md` | 1.5 | 2026-09-22 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
 | `lifeboat.md` | 1.1 | 2026-09-22 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
 | `consent.md` | 1.2 | 2026-09-22 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
 
