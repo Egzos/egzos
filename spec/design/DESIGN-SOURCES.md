@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v1.3 (2026-09-22; supersedes v1.2) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
+**Status:** v1.4 (2026-09-22; supersedes v1.3) — adds the provenance rows for the flagship `permissions-dashboard.md` v1.0, including three explicit declines (Role Permissions Picker as an editable-grant pattern, Alert Dialog as a modal on a security surface, Delete Account Form's type-to-confirm). v1.3 (2026-09-22; superseded) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
 
 ## Purpose
 
@@ -115,6 +115,28 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Alert (failure card structure reference) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
 | Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.1 §17 |
 | Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.1 §17 |
+
+## Provenance table — flagship permissions dashboard (egzos-platform, `permissions-dashboard.md` v1.0)
+
+| Component | Registry item / URL | Licence | Date | Picked by spec |
+|---|---|---|---|---|
+| Statistics Card (summary figures) | https://21st.dev/aghasisahakyan1/statistics-card · #8590 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Audit Log (token table) | https://21st.dev/corr/audit-log · #25163 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Interactive Logs Table (activity feed) | https://21st.dev/moumensoliman/interactive-logs-table-shadcnui · #10635 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Data Grid Table (token table, second fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Table (token table and activity fallback) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md §17 |
+| Command + Popover (scope picker) | https://21st.dev/originui/command · #382 · shadcn/ui popover | MIT (Origin UI · shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 |
+| Segmented Control (principal and status filters) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Toggle Group, Input, Collapsible, Button, Tooltip, Skeleton | shadcn/ui | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 |
+| Empty / Empty State (empty list) | #19745 · #1435 (rows above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Table Skeleton (fallback) | #19969 (row above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Avatar (principal chip fallback only — primary is a mono word) | https://21st.dev/originui/avatar · #415 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md §17 |
+| Alert (failure card structure reference) | #3587 (row above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
+| Status stamps, capability stamps, principal chip, field list, scope list, copy control, anomaly line, revoke act, grant notice, failure cards | **bespoke** (`apps/ui-flagship/src/bespoke/**`) | — | 2026-09-22 | permissions-dashboard.md §17 |
+| Toasts, dialogs, modals, drawers | **none on this screen** (decided) | — | 2026-09-22 | permissions-dashboard.md §17 |
+| Role Permissions Picker | **declined** · https://21st.dev/cnippet-dev/role-permissions-picker · #24929 | per item page | 2026-09-22 | permissions-dashboard.md §17 — a picker implies an editable grant; a grant changes only by revoke and a fresh mint (D-P6). Recorded as a reference of what not to build. |
+| Alert Dialog | **declined** · https://21st.dev/@shadcn/components/alert-dialog · #702 | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 — no modal on a security surface; failures replace the body inline and the revoke act is a two-step control. |
+| Delete Account Form (type-to-confirm) | **declined** · https://21st.dev/@cnippet-dev/components/delete-account-form · #25081 | per item page | 2026-09-22 | permissions-dashboard.md §14/§17 — type-to-confirm is too heavy for a per-token act; only its irreversibility copy informed `grant.immutable` and `revoke.notice`. |
 
 ## Corrections log
 - 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.2 §17.
