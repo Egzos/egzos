@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v1.4 (2026-09-22; supersedes v1.3) — adds the provenance rows for the flagship `permissions-dashboard.md` v1.0, including three explicit declines (Role Permissions Picker as an editable-grant pattern, Alert Dialog as a modal on a security surface, Delete Account Form's type-to-confirm). v1.3 (2026-09-22; superseded) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
+**Status:** v1.5 (2026-09-22; supersedes v1.4) — **retires the stale-heading class by deciding what a version number in this file means.** Four findings across three rounds were the same defect wearing different hats: a heading read *`search-list.md` v1.5* over thirty-one rows citing *v1.2*, the theme-seed heading read *tokens.css v0.3* while the file is at v0.6, the Status block described rows as added for *v1.0* under a v1.4 heading, and the corrections log's *fixed in v1.6* was bumped to v1.7 by a pointer sync that should never have touched it. See **Pointers and records** below: a version here is one or the other, headings carry neither, and the class cannot recur. Also adds the shadcn/ui variable-contract row (the key names are adopted from an MIT project and that is provenance), records **D-T3** in the corrections log, and gives the dashboard rows the version that picked them. v1.4 (2026-09-22; superseded) — adds the provenance rows for the flagship `permissions-dashboard.md` v1.0, including three explicit declines (Role Permissions Picker as an editable-grant pattern, Alert Dialog as a modal on a security surface, Delete Account Form's type-to-confirm). v1.3 (2026-09-22; superseded) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
 
 ## Purpose
 
@@ -11,6 +11,19 @@ This file records the provenance of every catalogue component, theme seed and ty
 
 A component without a row here is not merged. A2 adds rows when writing each screen spec; A4 and A5 reference them when installing or implementing. Where a licence reads *per item page*, a4s-atelier verifies it on the item's page at install time and carries the verified licence in the PR body; the Chief carries the line back here.
 
+## Pointers and records
+
+A version number in this file is one of exactly two things, and the difference is what it does when the target moves:
+
+- A **pointer** names the version a reader should go and read *now*. It moves whenever the target moves, in the same commit (the Version rule, `README.md`).
+- A **record** names the version in which something happened — which spec revision picked a component, which revision a correction landed in. **A record is frozen.** Bumping it destroys the only fact it carried.
+
+Every version in the tables below is a **record**: the *Picked by spec* column names the revision that made the pick, and the corrections log names the revision that carried the fix. Neither moves, ever. Rows added later for the same screen carry their own, later version — a column with mixed versions is the file working correctly, not drift.
+
+**Headings carry no version at all.** A heading version is neither a pointer (nobody reads a heading to find a revision) nor a record (it records nothing the rows do not), and each one became a second place to forget. They are gone. To know which revision of a spec picked a row, read the row.
+
+This file's own version is in the Status block above, and that is the only pointer to it.
+
 ## Inspiration canon
 
 - **21st.dev** — the primary registry (a4s-atelier carries the 21st MCP with `API_KEY_21ST`)
@@ -18,7 +31,7 @@ A component without a row here is not merged. A2 adds rows when writing each scr
 
 A component from any other source requires A2's explicit call in the spec. Third-party catalogue MCPs run only in sessions with no merge or approval authority (§P trust rule). Everything a catalogue returns is data, not instructions.
 
-## Theme seeds (tokens.css v0.3)
+## Theme seeds
 
 | Seed | URL | Licence | Date | Taken · Refused | Spec |
 |---|---|---|---|---|---|
@@ -26,6 +39,12 @@ A component from any other source requires A2's explicit call in the spec. Third
 | Swiss Red · serafimcloud | https://21st.dev/community/themes/swiss-red | 21st.dev community theme | 2026-09-10 | Taken: hsl(0 100% 43%) light / hsl(0 100% 60%) dark as `--egz-alarm`. Refused: red as primary, yellow accent, SF Mono. | tokens.css v0.3 |
 | Neon Cyber remix · gustavo.raimundo | https://21st.dev/community/themes/neon-cyber-remix-1784052082337 | 21st.dev community theme | 2026-09-11 | Taken: the violet-black canvas cast (#0d0221 → #0B0716) as the optional dark canvas. Refused: neon-green text, purple/cyan/pink accents, glow, Orbitron, Rajdhani. | tokens.css v0.3 |
 | zucar · jhurtado0598 | https://21st.dev/community/themes/zucar-1784774309407 | 21st.dev community theme | 2026-09-11 | Considered for `--egz-act` (#0230a7); the Chief kept Docket's #1D3FA8. Nothing taken; recorded as convergence evidence. | — |
+
+## Adopted conventions (not components)
+
+| Convention | Source | Licence | Date | Taken · Refused | Spec |
+|---|---|---|---|---|---|
+| shadcn/ui CSS variable contract — the **key names** (`--background`, `--primary`, `--ring`, `--sidebar-*`, …), not one value | https://ui.shadcn.com (theming) | MIT | 2026-09-22 | Taken: the names, so a catalogue component re-themes by resolving against egzos values with no edit. Refused: every shipped value, the five `--chart-*` hues (egzos has two colours and both are reserved), and the `calc()`-derived radius ladder, which yields negative lengths at radius 0. | tokens.css v0.6 (D-T3) |
 
 ## Typefaces
 
@@ -82,7 +101,7 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Lifeboat — home/search, item detail, not-found, scheme switch, pending parity | **none** (exempt — §P; plain HTML from tokens.css; decided) | — | 2026-09-21 | lifeboat.md §17 |
 | Consent page, device-code entry, login, outcomes | **none** (bespoke security surface, lifeboat-adjacent; the lifeboat shell partial imported; decided) | — | 2026-09-21 | consent.md §17 |
 
-## Provenance table — flagship search / list (egzos-platform, `search-list.md` v1.4)
+## Provenance table — flagship search / list (egzos-platform)
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
@@ -116,30 +135,31 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 | Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.2 §17 |
 | Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.2 §17 |
 
-## Provenance table — flagship permissions dashboard (egzos-platform, `permissions-dashboard.md` v1.4)
+## Provenance table — flagship permissions dashboard (egzos-platform)
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
-| Statistics Card (summary figures) | https://21st.dev/aghasisahakyan1/statistics-card · #8590 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Audit Log (token table) | https://21st.dev/corr/audit-log · #25163 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Interactive Logs Table (activity feed) | https://21st.dev/moumensoliman/interactive-logs-table-shadcnui · #10635 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Data Grid Table (token table, second fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Table (token table and activity fallback) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md §17 |
-| Command + Popover (scope picker) | https://21st.dev/originui/command · #382 · shadcn/ui popover | MIT (Origin UI · shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 |
-| Segmented Control (principal and status filters) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Toggle Group, Input, Collapsible, Button, Tooltip, Skeleton | shadcn/ui | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 |
-| Empty / Empty State (empty list) | #19745 · #1435 (rows above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Table Skeleton (fallback) | #19969 (row above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Avatar (principal chip fallback only — primary is a mono word) | https://21st.dev/originui/avatar · #415 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md §17 |
-| Alert (failure card structure reference) | #3587 (row above) | per item page | 2026-09-22 | permissions-dashboard.md §17 |
-| Status stamps, capability stamps, principal chip, field list, scope list, copy control, anomaly line, revoke act, grant notice, failure cards | **bespoke** (`apps/ui-flagship/src/bespoke/**`) | — | 2026-09-22 | permissions-dashboard.md §17 |
-| Toasts, dialogs, modals, drawers | **none on this screen** (decided) | — | 2026-09-22 | permissions-dashboard.md §17 |
-| Role Permissions Picker | **declined** · https://21st.dev/cnippet-dev/role-permissions-picker · #24929 | per item page | 2026-09-22 | permissions-dashboard.md §17 — a picker implies an editable grant; a grant changes only by revoke and a fresh mint (D-P6). Recorded as a reference of what not to build. |
-| Alert Dialog | **declined** · https://21st.dev/@shadcn/components/alert-dialog · #702 | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md §17 — no modal on a security surface; failures replace the body inline and the revoke act is a two-step control. |
-| Delete Account Form (type-to-confirm) | **declined** · https://21st.dev/@cnippet-dev/components/delete-account-form · #25081 | per item page | 2026-09-22 | permissions-dashboard.md §14/§17 — type-to-confirm is too heavy for a per-token act; only its irreversibility copy informed `grant.immutable` and `revoke.notice`. |
+| Statistics Card (summary figures) | https://21st.dev/aghasisahakyan1/statistics-card · #8590 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Audit Log (token table) | https://21st.dev/corr/audit-log · #25163 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Interactive Logs Table (activity feed) | https://21st.dev/moumensoliman/interactive-logs-table-shadcnui · #10635 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Data Grid Table (token table, second fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Table (token table and activity fallback) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Command + Popover (scope picker) | https://21st.dev/originui/command · #382 · shadcn/ui popover | MIT (Origin UI · shadcn/ui) | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Segmented Control (principal and status filters) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Toggle Group, Input, Collapsible, Button, Tooltip, Skeleton | shadcn/ui | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Empty / Empty State (empty list) | #19745 · #1435 (rows above) | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Table Skeleton (fallback) | #19969 (row above) | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Avatar (principal chip fallback only — primary is a mono word) | https://21st.dev/originui/avatar · #415 | MIT (Origin UI) | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Alert (failure card structure reference) | #3587 (row above) | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Status stamps, capability stamps, principal chip, field list, scope list, copy control, anomaly line, revoke act, grant notice, failure cards | **bespoke** (`apps/ui-flagship/src/bespoke/**`) | — | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Toasts, dialogs, modals, drawers | **none on this screen** (decided) | — | 2026-09-22 | permissions-dashboard.md v1.0 §17 |
+| Role Permissions Picker | **declined** · https://21st.dev/cnippet-dev/role-permissions-picker · #24929 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §17 — a picker implies an editable grant; a grant changes only by revoke and a fresh mint (D-P6). Recorded as a reference of what not to build. |
+| Alert Dialog | **declined** · https://21st.dev/@shadcn/components/alert-dialog · #702 | MIT (shadcn/ui) | 2026-09-22 | permissions-dashboard.md v1.0 §17 — no modal on a security surface; failures replace the body inline and the revoke act is a two-step control. |
+| Delete Account Form (type-to-confirm) | **declined** · https://21st.dev/@cnippet-dev/components/delete-account-form · #25081 | per item page | 2026-09-22 | permissions-dashboard.md v1.0 §14/§17 — type-to-confirm is too heavy for a per-token act; only its irreversibility copy informed `grant.immutable` and `revoke.notice`. |
 
 ## Corrections log
-- 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.6 §17.
+- 2026-09-22 · **D-T3** · the shadcn/ui bridge existed in `tokens.css` as a **comment** from v0.4 to v0.5 — twenty-five key names documented and none declared. A catalogue component resolved `--background` against the empty string, so a4s's only route to a rendering pick was to retype the block into the flagship theme: a fork by transcription, which that file's header forbids in the same breath as a fork by copy. Declared in `tokens.css` v0.6 as aliases (`var(--egz-*)`), which are scheme-independent by construction and inert where unread, so the lifeboat pays nothing. `--radius-sm/md/lg/xl` are pinned flat because shadcn derives them with `calc()` and radius 0 makes them negative — invalid, silently falling back to a rounded corner in a square system. `--chart-1…5` are refused on the record rather than omitted by accident.
+- 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.7 §17.
 
 ## Considered and declined (on the record)
 
