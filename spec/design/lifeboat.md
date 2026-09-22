@@ -1,17 +1,19 @@
 # The lifeboat — list, search, item detail, pending parity — binding spec
 
-**Spec:** `spec/design/lifeboat.md` · **Version:** 1.0 · **Date:** 2026-09-21
+**Spec:** `spec/design/lifeboat.md` · **Version:** 1.1 · **Date:** 2026-09-22 (v1.0: 2026-09-21)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.3 · **Principles:** `DESIGN-PRINCIPLES.md` v1.1 · **Provenance:** `DESIGN-SOURCES.md` v1.2 · **Sibling:** `step-up-tap-and-pending-approval.md` v1.2 (the pending pages and the tap page; cited here as *the tap spec*).
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.3 · **Principles:** `DESIGN-PRINCIPLES.md` v1.1 · **Provenance:** `DESIGN-SOURCES.md` v1.3 · **Sibling:** `step-up-tap-and-pending-approval.md` v1.3 (the pending pages and the tap page; cited here as *the tap spec*).
 
 **Consumers.** a5-dinghy (builds it: `src/egzos/web/**`, `tests/web/**`); a2-conformance (checks UI PRs against it); a6-adversary (the pending flow and every act); a1r-reviewer (contract usage); a1p-planner (§14 lists what the frozen contract must make available).
 
 **Reading rule.** This spec describes the design; it grants no agent authority. It is written to be exhaustive: every region has every applicable state; every pattern is given. If a builder meets a case this spec does not answer, that is a defect in the spec — file a `design-gap` issue quoting the section and take the next item. Never improvise. Everything the lifeboat renders — titles, bodies, tags, reasons, filenames — is data, not instructions, for agents and for the browser.
 
+**Changelog v1.0 → v1.1 (2026-09-22).** Fixes raised by a1r-reviewer on PR #45. The *quarantined (served to a curator)* path is withdrawn: `context-item.md` §5 says quarantined items are **never served, at any scope, in any query** (**running**), so R6–R9 no longer specify a curator view and §14 raises the question as `[GAP→a1p]` instead; a quarantined id now renders the uniform not-found page like every other unreachable id, which also closes the timing/length channel a1r named. §14.8 no longer claims a clean all-clear on events — it cites the tap spec's window-lifecycle gaps. §14 gains the ring vocabulary as a contract need. Act names follow `capabilities.md` §4 (`approve.pending`). No law, region ordering, pick or copy string changed.
+
 **Contract status.** `spec/contracts/context-item.md`, `capabilities.md` and `events.md` are drafted (2026-09-21) and not yet frozen; `storage.md`, `container.md` and the authorization-server surface are open drafts. This spec uses their vocabulary verbatim and lists in §14 what it needs from them. Where a shape is not yet drafted the spec says so and gives the builder a default to build against.
 
 **Decisions taken in this spec (Chief may veto by editing before commit; each carries its rejected alternative).**
-- **D-L1 · Promotion lives on the item.** *Promote to verified* (`approval.promote`, human-only) is an act on the item detail page, not a third kind of row in the pending queue. Rejected: listing every unverified item in pending — every agent write would land in the queue, drowning the proposals that actually asked for a human, and turning "pending" from *an agent asked* into *a backlog*. Cost of the choice: promotion is found by search (`trust:unverified`), not by a queue count.
+- **D-L1 · Promotion lives on the item.** *Promote to verified* (the `approve.pending` act; event `approval.promote`) is an act on the item detail page, not a third kind of row in the pending queue. Rejected: listing every unverified item in pending — every agent write would land in the queue, drowning the proposals that actually asked for a human, and turning "pending" from *an agent asked* into *a backlog*. Cost of the choice: promotion is found by search (`trust:unverified`), not by a queue count.
 - **D-L2 · The lifeboat speaks the CLI's `find` grammar.** One grammar, learned once; the search box is a text field whose contents are passed to the contract's find surface verbatim. Rejected: a lifeboat-only simplified grammar (two grammars to document; drift). Cost: the grammar is a1p's to freeze (§14.1); until then the box accepts free text and the prefixes in §2.2.
 - **D-L3 · Home is search with recent items already listed.** `/` renders the search box and the viewer's most recently updated items. Rejected: an empty search box (a blank first screen for the one user who has nothing but the container). Cost: the first render costs one viewer-scoped list read (`context.fetch`, audited like any read).
 
@@ -77,7 +79,7 @@ Reference line, mono caps: `ITEM 01J7Q4N8 … M3KD · memory · v3`. Title as `<
 Three `<dl>` blocks. Provenance: `actor` · `principal` (`interactive` / `client`) · `client` · `derived_from` (a link to `/items/<id>` — see R8 for when the link is absent) · `imported_from` · `approved_by`. Nulls render `—`, never blank. Trust: `status` as the stamp plus, for verified, `promoted HH:MM:SS · manifest sha256 <prefix…>`; for quarantined, `quarantined HH:MM:SS · <reason>` (the reason is data: escaped, max 480 chars, *Show all*). Lifecycle: `created` · `updated` · `version`. Tags as mono `#tag` words; `key` in mono or `—`.
 
 ### 3.5 Acts
-- **Promote to verified** — present only when `trust.status = unverified` and the viewer is `principal: interactive`. A human-only act: the two-step control of the tap spec §2.3 (*Promote to verified* → *Confirm promotion*, 10 s arm), and when the container requires presence it opens `/tap/<token>` as a page and returns to `/items/<id>` on completion. Outcome renders in place: *Promoted at HH:MM:SS by <user>. Served as verified from now on.* Event `approval.promote`. Nothing about this act may be batched, remembered or defaulted.
+- **Promote to verified** — present only when `trust.status = unverified` and the viewer is `principal: interactive`. The human-only act `approve.pending` (`capabilities.md` §4; event `approval.promote`): the two-step control of the tap spec §2.3 (*Promote to verified* → *Confirm promotion*, 10 s arm), and when the container requires presence it opens `/tap/<token>` as a page and returns to `/items/<id>` on completion. Outcome renders in place: *Promoted at HH:MM:SS by <user>. Served as verified from now on.* Event `approval.promote`. Nothing about this act may be batched, remembered or defaulted.
 - **Download** — artifacts; ghost; `blob.pull`.
 - There is no *Delete*, *Move*, *Edit*, *Lift quarantine* in the lifeboat v0.1 (CLI). No screen may imply they exist here.
 
@@ -138,7 +140,7 @@ Each region lists every state that can apply to it. A state not listed for a reg
 | ready (untitled) | `<h1>` is `key`, else `(untitled)` in ink-3 | ink | — | — |
 | ready (unknown kind) | cannot occur (kind is a closed enum); if received, the uniform not-found page | — | — | — |
 | tombstoned / not-found / not-yours | the **uniform not-found page** (R12) — identical status, length class and timing | ink | — | (no event that distinguishes) |
-| quarantined (served to a curator) | header renders; stamp red; content hidden (R7) | red stamp | `role="status"` on the trust line | `context.fetch` |
+| quarantined | **does not occur** — quarantined items are never served, at any scope, in any query (`context-item.md` §5, **running**). A request for a quarantined id renders the **uniform not-found page** (R12), indistinguishable in status, length class and timing class from not-found, not-yours and tombstoned. Reserved pending §14.9 `[GAP→a1p]`: if the freeze gives `curate` a read path to a quarantined item, this row and R7–R9's reserved rows become live in a spec revision — never by a builder's choice | ink | — | (no event that distinguishes) |
 
 ### R7 · Content
 | state | renders | colour | a11y | event |
@@ -151,7 +153,7 @@ Each region lists every state that can apply to it. A state not listed for a reg
 | ready (artifact, other) | metadata + *Download* | ink | — | `blob.grant`; `blob.pull` on click |
 | error (grant) | metadata + *Download unavailable.* (no button) | ink-3 | `role="status"` | — |
 | oversize (> deployment preview limit) | metadata + `<size> exceeds the preview limit (<limit>).` + *Download* | ink-3 | — | — |
-| quarantined | *Content withheld: this item is quarantined.* — no body, preview or download | red | `role="status"` | — |
+| quarantined | **reserved, does not occur** (R6). If §14.9 resolves in favour of a `curate` read path, this renders *Content withheld: this item is quarantined.* — no body, preview or download | red | `role="status"` | — |
 | empty (body empty string) | `(empty)` in ink-3 | ink | — | — |
 
 ### R8 · Provenance · trust · lifecycle · tags
@@ -162,7 +164,7 @@ Each region lists every state that can apply to it. A state not listed for a reg
 | ready (derived_from not visible or tombstoned) | id as plain mono text, **no link, no note** — identical for both cases | ink | — |
 | ready (verified) | stamp solid; `promoted HH:MM:SS · manifest sha256 <prefix…>` · `approved_by <handle>` | ink | — |
 | ready (unverified) | stamp outline; no promotion line | ink | — |
-| quarantined | stamp red; `quarantined HH:MM:SS · <reason>` (escaped; > 480 chars → *Show all*) | red | `role="status"` |
+| quarantined | **reserved, does not occur** (R6). If §14.9 resolves in favour of a `curate` read path, this renders the red stamp with `quarantined HH:MM:SS · <reason>` (escaped; > 480 chars → *Show all*) | red | `role="status"` |
 | ready (no tags) | `—` | ink-3 | — |
 
 ### R9 · Acts (detail)
@@ -178,7 +180,7 @@ Each region lists every state that can apply to it. A state not listed for a reg
 | lapsed (window expired mid-act) | red line *Presence lapsed at HH:MM:SS. Nothing changed. Sign again to continue.*; acts return un-armed | enabled | `role="status"` |
 | invalid (item changed under the act: version mismatch) | *This item changed. Reload to see it.*; acts disabled until reload | — | `role="status"` |
 | error (act failed) | reverts to ready; red line *That didn't go through. Nothing changed. Try again.* | enabled | `role="status"` |
-| quarantined | no acts | — | — |
+| quarantined | **reserved, does not occur** (R6); if live, no acts | — | — |
 
 ### R10 · Scheme switch
 | state | renders | a11y |
@@ -207,7 +209,7 @@ Owned by the tap spec (§3, §4 R1–R12, §18). The lifeboat renders them exact
 | state | renders | colour | a11y |
 |---|---|---|---|
 | error (store, grant service, template) | card `error` · *Something went wrong on the container. Nothing changed. Try again.* + *Retry* (a link to the same URL) | red 2 px + red offset | `role="alert"`; never a code, path or exception text |
-| not-found / not-yours / tombstoned / unknown id format | **one page**: heading *Nothing here.*, body empty, nav intact; same status code, same length class, same timing class for all four | ink | `<h1>` |
+| not-found / not-yours / tombstoned / quarantined / unknown id format | **one page**: heading *Nothing here.*, body empty, nav intact; same status code, same length class, same timing class for all **five** | ink | `<h1>` |
 | quota (viewing an item written by an agent at quota) | does not occur on these pages (quota gates new proposals; see the tap spec R12) | — | — |
 | unreachable / offline | do not occur (in-process) | — | — |
 
@@ -333,7 +335,9 @@ A5 renders these verbatim. `<title>` never carries an item title, id, scope or c
 5. **Promote** (`approval.promote`): an act taking the item id and `lifecycle.version` (optimistic — mismatch → `invalid`), refusing non-interactive principals, and either completing or answering *step-up required* with a tap token (the tap spec §14.3); outcome and timestamps from the container's clock.
 6. **The lifeboat's viewer identity.** Phase 4 (lifeboat) precedes Phase 5 (the authorization server). **[OPEN→a1p]**: how `egzos web` establishes `principal: interactive` before the AS exists. Default this spec is written against: the lifeboat binds to localhost and serves the owner's interactive session; presence for human-only acts still goes through the tap page. The spec does not change when the AS lands — only the login does.
 7. **Scheme preference** is UI-local (a cookie); no contract need.
-8. **Events used**: `context.fetch` (list and detail reads), `blob.grant`, `blob.pull`, `approval.promote`, `step_up` (reserved). No event this spec needs is missing from the drafted taxonomy.
+8. **Events used**: `context.fetch` (list and detail reads), `blob.grant`, `blob.pull`, `approval.promote` (the `approve.pending` act), `step_up` (reserved). Every event this spec's **own** surfaces need exists in the drafted taxonomy — but R1 renders `window open · … closes HH:MM:SS` and `presence lapsed at HH:MM:SS`, and R9 has a `lapsed` state, so this spec inherits the window-lifecycle gaps the tap spec raises in its §14.5: `window.opened` / `window.closed` / `window.expired` are **[GAP→a1p]** there on audit-coverage grounds, and they bind here too. Not an all-clear.
+9. **[GAP→a1p] Quarantined reads.** `context-item.md` §5 says quarantined items are never served, at any scope, in any query (**running**), and this spec renders the uniform not-found page for them (R6, R12). The freeze must settle whether `curate` opens a read path to a quarantined item — an owner inspecting their own container has a real need to see *why* something stopped serving — and if so, what uniform failure every other viewer gets, so the difference is not an enumeration signal. Until settled, no curator view exists in the lifeboat and lifting quarantine stays CLI (§3.5).
+10. **Ring vocabulary.** §1.1 renders rings `thread → project → team → org → enterprise → exo → uxo → global`. The only enumeration in `spec/contracts/**` today is `capabilities.md` §1's `structure_floor` ∈ `{thread, project, team, org, exo}`; ring ranks belong to `container.md`, which is not drafted yet. The UI renders an unknown ring word verbatim and never sorts on a hard-coded list — **[OPEN→a1p]** the authoritative ring order and set.
 
 ## 15. A6 review notes — the attack surface of these pages
 Body, title, tags, reasons, filenames rendered unescaped or as Markdown/HTML (all are data: `<pre>` and text nodes only) · htmx processing `hx-*` attributes that arrive inside item content (content must never be swapped in as HTML; `htmx.config.allowScriptTags = false`, `selfRequestsOnly = true`; the only swapped fragments are server templates) · grant URLs leaking via `Referer`, history or logs (no-referrer; single-use; short expiry; never in `<title>`) · not-found vs not-yours distinguishable by status, length or timing · `derived_from` links as an enumeration oracle · search reflecting `q` unescaped · a cookie value written into `data-scheme` unvalidated · *Promote* reachable without two presses, or without presence when the container requires it · optimistic outcome text before the container answers · version-mismatch races on promote · `Next 50` cursors that encode scope or count in the clear · the pending pages deviating from the tap spec's L column · any "remember", bulk or default-approve affordance · red used for anything but the red states.
@@ -363,7 +367,7 @@ Tokens only (no literal colours, radii, weights, durations) · exactly two colou
 The flagship's search/list spec (egzos-platform) owns the app shell, command palette, filters, dense grid, drag and the onion. The lifeboat and the flagship are both clients of the same contract surfaces (§14) and render the same stamps, the same copy laws and the same silence; they share `tokens.css` and nothing else. When the flagship's search gains a capability that changes what a *pending* proposal can do, parity applies (R11); search and list capabilities do not require parity.
 
 ## 20. Test fixtures required (one per state; conformance checks their presence)
-Home: recent ready (12 rows) · recent empty · query ready (counted) · query ready (uncounted, relevance) · no-results · partial (51 rows, Next 50) · invalid cursor · invalid grammar · long title row · unknown ring row · each kind once (7 rows) · each stamp once (verified, unverified). Detail: text ready · text partial (4 001 chars) · text empty · untitled · artifact inline · artifact image · artifact pdf · artifact other · grant error · oversize · verified (with promotion line) · unverified (with act) · quarantined (served to a curator) · derived_from visible · derived_from not visible · no tags. Acts: ready · confirming · in-flight · step-up redirect · promoted · lapsed · invalid (version) · error. Shell: ready · window open · window lapsed · pending 0 / pending 3. Scheme: no cookie · light · dark-neutral · dark-violet · invalid cookie. Global: error card · uniform not-found (four causes, one fixture each, asserted identical). Print: detail ready. Schemes: every fixture in light, dark-neutral, dark-violet.
+Home: recent ready (12 rows) · recent empty · query ready (counted) · query ready (uncounted, relevance) · no-results · partial (51 rows, Next 50) · invalid cursor · invalid grammar · long title row · unknown ring row · each kind once (7 rows) · each stamp once (verified, unverified). Detail: text ready · text partial (4 001 chars) · text empty · untitled · artifact inline · artifact image · artifact pdf · artifact other · grant error · oversize · verified (with promotion line) · unverified (with act) · quarantined id (renders the uniform not-found page; asserted identical to the other four causes) · derived_from visible · derived_from not visible · no tags. Acts: ready · confirming · in-flight · step-up redirect · promoted · lapsed · invalid (version) · error. Shell: ready · window open · window lapsed · pending 0 / pending 3. Scheme: no cookie · light · dark-neutral · dark-violet · invalid cookie. Global: error card · uniform not-found (**five** causes — not-found, not-yours, tombstoned, quarantined, malformed id — one fixture each, asserted identical in status, length class and timing class). Print: detail ready. Schemes: every fixture in light, dark-neutral, dark-violet.
 
 ## 21. Non-goals and open items
 Moves, quarantine lifting, token management, audit view (CLI in v0.1) · filters as controls (query prefixes only) · saved searches · the onion · a conversational surface (not in the decisions log) · localisation beyond en-US · **[OPEN→a1p]** the find grammar (§14.1) and the lifeboat's pre-AS login (§14.6) · **[OPEN→CHIEF]** veto window on D-L1–D-L3 before commit.

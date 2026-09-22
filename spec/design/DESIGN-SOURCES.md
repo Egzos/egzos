@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v1.2 (2026-09-21; supersedes v1.1) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
+**Status:** v1.3 (2026-09-22; supersedes v1.2) — corrects the stale §16 pointers to §17 (§16 is the conformance checklist), moves the onion-diagram row to the spec that actually owns it, and resolves the Role Permissions Picker row (provenance with no picker). v1.2 (2026-09-21; superseded) — adds the rows for `lifeboat.md` v1.0 and `consent.md` v1.0 (none: exempt / bespoke, decided), the picks for the flagship `search-list.md` v1.0 (egzos-platform), and one correction: Origin UI's Table is registry item **#89**, not #99 as v1.1 recorded (verified against the 21st.dev search index 2026-09-21). Rows are added as each screen spec is committed.
 
 ## Purpose
 
@@ -38,17 +38,17 @@ A component from any other source requires A2's explicit call in the spec. Third
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
-| Tool Approval (pending item shape) | https://21st.dev/@starc007/components/tool-approval · #26580 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| Approval Card (pending item shape) | https://21st.dev/@theshanelevine/components/approval-card · #23595 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
+| Tool Approval (pending item shape) | https://21st.dev/@starc007/components/tool-approval · #26580 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| Approval Card (pending item shape) | https://21st.dev/@theshanelevine/components/approval-card · #23595 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
 | Hold to Confirm (act enhancement only) | https://21st.dev/@ddoemonn/components/hold-to-confirm · #23527 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §2.3 |
-| Records Table (what moves) | https://21st.dev/@theshanelevine/components/records-table · #23604 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| File Diff (what moves, as diff) | https://21st.dev/@kvnkld/components/file-diff · #23584 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| Avatar (resolved audience) | https://21st.dev/@originui/components/avatar · #415 | MIT (Origin UI) | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| Role Permissions Picker (capabilities) | https://21st.dev/@cnippet-dev/components/role-permissions-picker · #24929 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| Compare Reveal (consequence: now vs after) | https://21st.dev/@rmahammad/components/compare-reveal · #23419 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
+| Records Table (what moves) | https://21st.dev/@theshanelevine/components/records-table · #23604 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| File Diff (what moves, as diff) | https://21st.dev/@kvnkld/components/file-diff · #23584 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| Avatar (resolved audience) | https://21st.dev/@originui/components/avatar · #415 | MIT (Origin UI) | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| Role Permissions Picker (structure reference for a capability list; **not installed**) | https://21st.dev/@cnippet-dev/components/role-permissions-picker · #24929 | per item page | 2026-09-11 · re-scoped 2026-09-22 | Reference only. Considered for the tap page's audience roles and for `consent.md` §7's capabilities block; both are **bespoke** (`consent.md` §17). Retained here as provenance for the idea, picked by no spec. |
+| Compare Reveal (consequence: now vs after) | https://21st.dev/@rmahammad/components/compare-reveal · #23419 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
 | Border Beam (presence beam — idea only, re-cut solid ink) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §2.4 |
-| PDF Viewer (staged preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
-| Interactive Folder Gallery (staging reveal) | https://21st.dev/@alexperezcedeno/components/interactive-folder-gallery · #16368 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §16 |
+| PDF Viewer (staged preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
+| Interactive Folder Gallery (staging reveal) | https://21st.dev/@alexperezcedeno/components/interactive-folder-gallery · #16368 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §17 |
 | Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §3.2 |
 | New Items Pill (arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-11 | step-up-tap-and-pending-approval.md §3.1 |
 | Skeleton (loading; shimmer stripped) | https://21st.dev/@shadcn/components/skeleton · #1588 | MIT (shadcn/ui) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
@@ -69,7 +69,8 @@ A component from any other source requires A2's explicit call in the spec. Third
 | Animated Tabs (filters fallback; animation stripped) | https://21st.dev/@educalvolpz/components/animated-tabs · #24930 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
 | Kbd Input Group (search within pending) | https://21st.dev/@uiable/components/kbd-input-group · #26530 | per item page | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
 | Command (search fallback) | https://21st.dev/@originui/components/command · #382 | MIT (Origin UI) | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
-| Presence block, beam, stamps, two-step act, countdown, consequence box, failure cards, onion diagram | **bespoke** | — | 2026-09-11 | step-up-tap-and-pending-approval.md §§2–7, 17 |
+| Presence block, beam, stamps, two-step act, countdown, consequence box, failure cards | **bespoke** | — | 2026-09-11 | step-up-tap-and-pending-approval.md §§2–7, 17 |
+| Onion diagram | **bespoke** | — | 2026-09-11 · re-pointed 2026-09-22 | `egzos-platform/spec/design/onion-graph.md` (not yet committed). The tap spec §0 explicitly excludes the onion; the v1.2 row citing it was wrong. |
 | Toasts, dialogs, modals | **none on these pages** (decided) | — | 2026-09-13 | step-up-tap-and-pending-approval.md §17 |
 
 The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
@@ -85,35 +86,35 @@ The lifeboat (a5-dinghy) uses none of the above: tokens as CSS variables only.
 
 | Component | Registry item / URL | Licence | Date | Picked by spec |
 |---|---|---|---|---|
-| Sidebar (app shell rail) | shadcn/ui sidebar | MIT (shadcn/ui) | 2026-09-21 | search-list.md §17 |
-| Sidebar (fallback) | https://21st.dev/uniquesonu/sidebar · #2737 | per item page | 2026-09-21 | search-list.md §17 |
-| Tree View (scope tree) | https://21st.dev/ddoemonn/tree-view · #23573 | per item page | 2026-09-21 | search-list.md §17 |
-| Tree View (fallback) | https://21st.dev/preetsuthar17/tree-view · #2771 | per item page | 2026-09-21 | search-list.md §17 |
-| File Tree (fallback 2) | https://21st.dev/edwinvakayil/file-tree · #19150 | per item page | 2026-09-21 | search-list.md §17 |
-| Command (palette; chip pickers) | https://21st.dev/originui/command · #382 | MIT (Origin UI) | 2026-09-21 | search-list.md §17 |
-| Command Palette (fallback) | https://21st.dev/ddoemonn/command-palette · #23522 | per item page | 2026-09-21 | search-list.md §17 |
-| Kbd Input Group (search input) | https://21st.dev/uiable/kbd-input-group · #26530 | per item page | 2026-09-21 | search-list.md §17 |
-| Input, Popover, Badge, Checkbox, Button, Toggle Group, Resizable, Tooltip, Kbd, Context Menu, Skeleton, Collapsible, Data Table, Breadcrumb | shadcn/ui | MIT (shadcn/ui) | 2026-09-21 | search-list.md §17 |
-| Segmented Control (trust chip; scheme fallback) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-21 | search-list.md §17 |
-| Table (results grid; sortable variant) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-21 | search-list.md §17 |
-| Data Grid Table (fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-21 | search-list.md §17 |
-| Data Table (fallback 2) | https://21st.dev/shadcn/data-table · #1050 | MIT (shadcn/ui) | 2026-09-21 | search-list.md §17 |
-| Empty (empty / no-results) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-21 | search-list.md §17 |
-| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-21 | search-list.md §17 |
-| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-21 | search-list.md §17 |
-| New Items Pill (new results; arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-21 | search-list.md §17 |
-| Resizable (fallback) | https://21st.dev/preetsuthar17/resizable · #4424 | per item page | 2026-09-21 | search-list.md §17 |
-| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-21 | search-list.md §17 |
-| Breadcrumb (scope path) | https://21st.dev/originui/breadcrumb · #440 | MIT (Origin UI) | 2026-09-21 | search-list.md §17 |
-| PDF Viewer (preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-21 | search-list.md §17 |
-| Hold to Confirm / Long Press Button (hold enhancement) | #23527 / #23538 (rows above) | per item page | 2026-09-21 | search-list.md §17 |
-| Status (session facts — structure reference only) | https://21st.dev/diceui/status · #25395 | MIT (Dice UI) | 2026-09-21 | search-list.md §17 |
-| Border Beam (window chip beam — idea only) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-21 | search-list.md §17 |
-| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-21 | search-list.md §17 |
-| Context Menu (fallback) | https://21st.dev/cnippet-dev/context-menu · #23642 | per item page | 2026-09-21 | search-list.md §17 |
-| Alert (failure card structure reference) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-21 | search-list.md §17 |
-| Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md §17 |
-| Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md §17 |
+| Sidebar (app shell rail) | shadcn/ui sidebar | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
+| Sidebar (fallback) | https://21st.dev/uniquesonu/sidebar · #2737 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Tree View (scope tree) | https://21st.dev/ddoemonn/tree-view · #23573 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Tree View (fallback) | https://21st.dev/preetsuthar17/tree-view · #2771 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| File Tree (fallback 2) | https://21st.dev/edwinvakayil/file-tree · #19150 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Command (palette; chip pickers) | https://21st.dev/originui/command · #382 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
+| Command Palette (fallback) | https://21st.dev/ddoemonn/command-palette · #23522 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Kbd Input Group (search input) | https://21st.dev/uiable/kbd-input-group · #26530 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Input, Popover, Badge, Checkbox, Button, Toggle Group, Resizable, Tooltip, Kbd, Context Menu, Skeleton, Collapsible, Data Table, Breadcrumb | shadcn/ui | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
+| Segmented Control (trust chip; scheme fallback) | https://21st.dev/ddoemonn/segmented-control · #23552 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Table (results grid; sortable variant) | https://21st.dev/originui/table · #89 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
+| Data Grid Table (fallback) | https://21st.dev/sean0205/data-grid-table · #4783 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Data Table (fallback 2) | https://21st.dev/shadcn/data-table · #1050 | MIT (shadcn/ui) | 2026-09-21 | search-list.md v1.1 §17 |
+| Empty (empty / no-results) | https://21st.dev/@cnippet-dev/components/cnippet-empty · #19745 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Empty State (fallback) | https://21st.dev/@serafimcloud/components/empty-state · #1435 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Table Skeleton (fallback) | https://21st.dev/@uiable/components/table-skeleton · #19969 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| New Items Pill (new results; arrival) | https://21st.dev/@ddoemonn/components/new-items-pill · #23546 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Resizable (fallback) | https://21st.dev/preetsuthar17/resizable · #4424 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Accordion 05 (detail sections) | https://21st.dev/@designali-in/components/accordion-05 · #8637 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Breadcrumb (scope path) | https://21st.dev/originui/breadcrumb · #440 | MIT (Origin UI) | 2026-09-21 | search-list.md v1.1 §17 |
+| PDF Viewer (preview) | https://21st.dev/@extend-hq/components/pdf-viewer · #15406 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Hold to Confirm / Long Press Button (hold enhancement) | #23527 / #23538 (rows above) | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Status (session facts — structure reference only) | https://21st.dev/diceui/status · #25395 | MIT (Dice UI) | 2026-09-21 | search-list.md v1.1 §17 |
+| Border Beam (window chip beam — idea only) | https://21st.dev/@larsen66/components/border-beam · #21703 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Kbd (fallback) | https://21st.dev/@preetsuthar17/components/kbd · #3368 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Context Menu (fallback) | https://21st.dev/cnippet-dev/context-menu · #23642 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Alert (failure card structure reference) | https://21st.dev/@sean0205/components/alert-1 · #3587 | per item page | 2026-09-21 | search-list.md v1.1 §17 |
+| Stamps, drag handle, selection bar, session facts, window chip, two-step promote, failure cards | **bespoke** | — | 2026-09-21 | search-list.md v1.1 §17 |
+| Toasts, drawers/sheets, dialogs (except the command palette), avatars | **none on this screen** (decided: D-S1, D-S6) | — | 2026-09-21 | search-list.md v1.1 §17 |
 
 ## Corrections log
 - 2026-09-21 · Origin UI Table recorded as #99 in v1.1; the registry item is #89 (`https://21st.dev/originui/table`). Fixed in this file and in `step-up-tap-and-pending-approval.md` v1.2 §17.
