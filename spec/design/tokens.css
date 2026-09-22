@@ -2,7 +2,15 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.7 · 2026-09-22 (v0.6 · v0.5 · v0.4 · v0.3: 2026-09-11)
+ * egzos design tokens · v0.8 · 2026-09-22 (v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ *
+ * v0.8 fixes that history line rather than extending it. Under this set's convention a list
+ * terminated by one date assigns it to every version in it, so v0.7 ... v0.4 all read 2026-09-11 --
+ * false for four of the five, and contradicted by this file's own header at 2b51955 (v0.4 ·
+ * 2026-09-22), by DESIGN-SOURCES' 2026-09-22 row for the v0.6 bridge, and by the tap spec's record
+ * that v1.6 shipped with tokens v0.5. Each bump prefixed the previous version without carrying its
+ * date, so v0.4's date was absorbed into v0.3's group at 8299031 and stayed absorbed. These are
+ * RECORDS (README.md, the Version rule): a sweep that moves one is the sweep being wrong.
  * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
@@ -75,6 +83,14 @@
   color-scheme: light;
 }
 
+/* NOTE — this comment annotates the block BELOW it, which is the rule a CSS comment binds to.
+   The @media (prefers-color-scheme: dark) fallback further down duplicates every value in THIS
+   block, value for value. Any change here must be made there too; a2-conformance checks it.
+   It must NOT be read as applying to the violet block: violet is a user setting with no effect
+   without data-canvas, so mirroring a violet value into the fallback would give an OS-dark viewer
+   with no stored scheme a cast they never chose — the shape of the v0.4 defect where that block
+   was missing --egz-img-filter. (Placement corrected in v0.8; it had sat above the violet block,
+   where the default reading made 'this block' the wrong one.) */
 html[data-scheme="dark"] {
   --egz-canvas:      #0B0B0B;
   --egz-paper:       #151515;
@@ -91,9 +107,6 @@ html[data-scheme="dark"] {
   --egz-img-filter:  grayscale(.2) brightness(.82) contrast(1.06);
   color-scheme: dark;
 }
-
-/* NOTE: the prefers-color-scheme block below duplicates every value in this block.
-   Any change here must be made there too — it is checked by a2-conformance. */
 
 html[data-scheme="dark"][data-canvas="violet"] {
   /* the one thing taken from the Neon Cyber family: a cast, not a colour */
@@ -169,7 +182,10 @@ html[data-scheme="dark"][data-canvas="violet"] {
   --radius-lg:               0;
   --radius-xl:               0;
 
-  /* sidebar family — the flagship app shell's primary pick (search-list.md §17) */
+  /* sidebar family — the flagship app shell's primary pick
+   * (Egzos/egzos-platform · spec/design/search-list.md §17 — a proprietary sibling repository,
+   * qualified because this file ships to every consumer of this Apache-2.0 repository, a fork
+   * included, where an unqualified pointer resolves to nothing with no indication why). */
   --sidebar:                    var(--egz-paper);
   --sidebar-foreground:         var(--egz-ink);
   --sidebar-primary:            var(--egz-act);
