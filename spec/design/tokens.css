@@ -1,0 +1,132 @@
+/*
+ * Copyright 2026 Ali Sasanian
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * egzos design tokens · v0.3 · 2026-09-11
+ * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
+ * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
+ * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
+ *
+ * Direction: Docket v2 (bound 2026-09-11). Colour law: two colours — --act asks a human,
+ * --alarm reports a failure. No yellow, lime or acid anywhere. Structure: radius 0, 2px ink
+ * borders, 4px hard offset. Schemes: light is the record; dark is the same record at night,
+ * with two canvases the user may choose between (neutral, violet).
+ *
+ * Scheme selection (both UIs):
+ *   <html data-scheme="light">                          the record (default)
+ *   <html data-scheme="dark" data-canvas="neutral">     the record at night
+ *   <html data-scheme="dark" data-canvas="violet">      the record at night, violet-black cast
+ * data-canvas is a USER SETTING (decided 2026-09-11), persisted per client; it has no effect
+ * in the light scheme. prefers-color-scheme picks the initial scheme when none is stored.
+ */
+
+:root {
+  /* ── canvas & ink ─────────────────────────────────────────────── */
+  --egz-canvas:      #FFFFFF;   /* page */
+  --egz-paper:       #F5F5F2;   /* queue rail, inset fields, secondary surfaces */
+  --egz-ink:         #000000;   /* text, borders, offsets, verified fill */
+  --egz-ink-2:       #333333;   /* secondary text */
+  --egz-ink-3:       #6B6B6B;   /* labels, metadata (≥ 4.5:1 on canvas) */
+  --egz-rule:        #000000;   /* 2px structural borders */
+  --egz-rule-soft:   #D6D6D2;   /* 1px hairlines inside tables and lists */
+  --egz-shadow-ink:  #000000;   /* the hard offset */
+
+  /* ── the two colours ──────────────────────────────────────────── */
+  --egz-act:         #1D3FA8;   /* a human is asked: sign, approve, open a window, focus, the outward arrow */
+  --egz-act-on:      #FFFFFF;
+  --egz-alarm:       hsl(0 100% 43%);  /* Swiss Red: quarantine, presence lapsed, quota, unreachable, anomaly */
+  --egz-alarm-on:    #FFFFFF;
+
+  /* ── structure (Neo Brutalism, bones only) ────────────────────── */
+  --egz-radius:      0;
+  --egz-bw:          2px;       /* structural border weight */
+  --egz-off:         4px;       /* hard offset: box-shadow var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink) */
+  --egz-off-lg:      8px;       /* the page frame */
+  --egz-focus:       var(--egz-bw) solid var(--egz-act);  /* outline; outline-offset 3px */
+
+  /* ── type ─────────────────────────────────────────────────────── */
+  --egz-font-ui:     "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --egz-font-mono:   "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --egz-fs-1: 12px;  --egz-fs-2: 13px;  --egz-fs-3: 14px;  --egz-fs-4: 16px;
+  --egz-fs-5: 20px;  --egz-fs-6: 28px;  --egz-fs-7: 44px;
+  --egz-lh:          1.5;
+  --egz-tracking-caps: .12em;   /* mono labels, uppercase */
+  --egz-tabular:     "tnum" 1;  /* font-feature-settings for ids, hashes, timestamps, countdowns */
+
+  /* ── space ────────────────────────────────────────────────────── */
+  --egz-sp-1: 4px;  --egz-sp-2: 8px;   --egz-sp-3: 12px;  --egz-sp-4: 16px;
+  --egz-sp-5: 24px; --egz-sp-6: 40px;  --egz-sp-7: 64px;
+
+  /* ── motion (law B · meaningful) ──────────────────────────────── */
+  --egz-motion-state:    0ms;    /* state changes are instantaneous — a stamp lands */
+  --egz-motion-reveal:   120ms;  /* reveal: expand, fan, slide; linear */
+  --egz-motion-arrival:  200ms;  /* arrival: new items pill, triage ring step */
+  --egz-motion-presence: 4000ms; /* presence: one full circuit of the window beam along the frame */
+  --egz-ease:            linear;
+
+  /* ── media (moodboard imagery, marketing only) ────────────────── */
+  --egz-img-filter:  grayscale(.15) contrast(1.02);
+
+  color-scheme: light;
+}
+
+html[data-scheme="dark"] {
+  --egz-canvas:      #0B0B0B;
+  --egz-paper:       #151515;
+  --egz-ink:         #F4F4F0;
+  --egz-ink-2:       #CFCFC9;
+  --egz-ink-3:       #9A9A94;
+  --egz-rule:        #F4F4F0;
+  --egz-rule-soft:   #3A3A3A;
+  --egz-shadow-ink:  #F4F4F0;   /* offsets go white: the record as a paper cutout */
+  --egz-act:         #6B9BFF;
+  --egz-act-on:      #0B0B0B;
+  --egz-alarm:       hsl(0 100% 60%);
+  --egz-alarm-on:    #0B0B0B;
+  --egz-img-filter:  grayscale(.2) brightness(.82) contrast(1.06);
+  color-scheme: dark;
+}
+
+html[data-scheme="dark"][data-canvas="violet"] {
+  /* the one thing taken from the Neon Cyber family: a cast, not a colour */
+  --egz-canvas:      #0B0716;
+  --egz-paper:       #150E24;
+  --egz-ink-3:       #9A96A8;
+  --egz-rule-soft:   #3A3350;
+  --egz-act-on:      #0B0716;
+  --egz-alarm-on:    #0B0716;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-scheme]) {
+    --egz-canvas: #0B0B0B; --egz-paper: #151515; --egz-ink: #F4F4F0; --egz-ink-2: #CFCFC9; --egz-ink-3: #9A9A94;
+    --egz-rule: #F4F4F0; --egz-rule-soft: #3A3A3A; --egz-shadow-ink: #F4F4F0;
+    --egz-act: #6B9BFF; --egz-act-on: #0B0B0B; --egz-alarm: hsl(0 100% 60%); --egz-alarm-on: #0B0B0B;
+    color-scheme: dark;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --egz-motion-reveal:   0ms;
+    --egz-motion-arrival:  0ms;
+    --egz-motion-presence: 0ms;   /* the beam becomes a static marked segment; the countdown stays numeric */
+  }
+}
+
+/*
+ * Tailwind mapping (flagship; A4s wires this in tailwind config / @theme):
+ *   colors.canvas → var(--egz-canvas)   colors.paper → var(--egz-paper)   colors.ink → var(--egz-ink)
+ *   colors.ink-2 / ink-3 / rule / rule-soft / act / act-on / alarm / alarm-on likewise
+ *   borderRadius.DEFAULT → var(--egz-radius) (0)   borderWidth.structural → var(--egz-bw)
+ *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)
+ *   fontFamily.ui / mono → the two stacks above   fontSize.1…7 → --egz-fs-1…7
+ *   transitionDuration.state / reveal / arrival / presence → the motion tokens
+ * shadcn/ui bridge (so catalogue components re-theme without edits):
+ *   --background: var(--egz-canvas)  --foreground: var(--egz-ink)  --card: var(--egz-canvas)
+ *   --muted: var(--egz-paper)  --muted-foreground: var(--egz-ink-3)  --border: var(--egz-rule-soft)
+ *   --primary: var(--egz-act)  --primary-foreground: var(--egz-act-on)
+ *   --destructive: var(--egz-alarm)  --destructive-foreground: var(--egz-alarm-on)
+ *   --ring: var(--egz-act)  --radius: var(--egz-radius)
+ *   --secondary / --accent: var(--egz-paper) with --egz-ink foreground — there is no third colour.
+ */

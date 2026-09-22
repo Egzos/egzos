@@ -4,34 +4,29 @@ Design specs and system artifacts for the open-core surfaces. This directory is 
 
 ## What lives here (egzos/spec/design)
 
-Per R10 (decisions log §N), the following are public open-core surfaces:
+Per R10 (decisions log §N), the following are public open-core surfaces. Every file below arrived through the Chief's hands; the commit is the approval act.
 
-- `DESIGN-PRINCIPLES.md` — the principles both UIs obey; owner A2 (Taste); drafted from direction
-  sessions in Phase 3; stub until then.
-- `DESIGN-SOURCES.md` — component provenance table (registry item, license, date, the spec that
-  picked it); owner A2; filled as components are selected.
-- The tokens file — the ONE code artifact A2 ships; the identity layer consumed by both the lifeboat
-  (egzos/src/egzos/web) and the flagship (egzos-platform). The platform consumes it; never forks it.
-- The lifeboat spec — the server-rendered in-process UI (FastAPI + Jinja + htmx; A5's build target).
-- The step-up tap + pending-approval page spec — A2's first deliverable; public because the tap spec
-  being public is good for trust.
+| file | version | date | what it binds |
+|---|---|---|---|
+| `tokens.css` | 0.3 | 2026-09-11 | The ONE code artifact A2 ships: `--egz-*` CSS variables for light, dark-neutral and dark-violet schemes; colour law (two colours), structure (radius 0, 2 px, 4 px offset), type, motion tokens; Tailwind mapping and shadcn/ui bridge in comments. The lifeboat consumes it as CSS variables; the flagship maps it — never forks it. |
+| `DESIGN-PRINCIPLES.md` | 1.1 | 2026-09-13 | The five decided §P principles verbatim, the thirteen principles of the bound direction (Docket v2), incl. principle 13: the spec is exhaustive; a gap is a defect. |
+| `DESIGN-SOURCES.md` | 1.2 | 2026-09-21 | Provenance: theme seeds, typefaces, every catalogue component picked by a spec (registry item · licence · date · spec), the bespoke and none-on-this-screen decisions, considered-and-declined, corrections log. |
+| `step-up-tap-and-pending-approval.md` | 1.2 | 2026-09-21 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
+| `lifeboat.md` | 1.0 | 2026-09-21 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
+| `consent.md` | 1.0 | 2026-09-21 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
+
+Direction: **Docket v2** (bound 2026-09-11) — a record: paper and ink, IBM Plex Sans + Mono, radius 0, 2 px ink borders, a 4 px hard offset that collapses on press; two colours only (`--egz-act` for the human act, `--egz-alarm` Swiss Red for failures; no yellow anywhere); trust is a shape; motion law B (presence, arrival, reveal — nothing else); light is the record, dark is the same tokens re-valued with two user-selectable canvases.
+
+## How to read a spec
+
+Every spec has the same shape: §0 scope · §1 vocabulary (contract words; the fixed state vocabulary) · §2–3 the pages · **§4 regions × states** (every region, every applicable state, verbatim copy, colour, a11y, audit event, lifeboat/flagship difference) · §5 constants, formats, layout, print · §6–9 colour, structure, type, motion laws · §10 silence-not-errors · §11 unverified-by-default · §12 accessibility + keyboard map · **§13 canonical copy** (rendered verbatim; never paraphrased) · **§14 what the spec needs from the contract** (`[OPEN→a1p]` / `[GAP→a1p]` are raised, never invented) · §15 A6 review notes · §16 a2-conformance checklist · **§17 component picks** (primary + fallback + take/strip + installer + licence; or *none*) · §18 URLs and HTML patterns · §19 relationship to the other UI · **§20 test fixtures, one per state** · §21 non-goals and open items.
+
+A state not listed for a region cannot occur there. If a builder meets a case a spec does not answer, that is a defect in the spec: file a `design-gap` issue quoting the section and take the next item. Never improvise.
 
 ## What lives in egzos-platform/spec/design
 
-Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed
-product, closed specs. Each screen spec names every component as a registry item (license noted)
-or `bespoke`. The Chief commits approved specs; the commit is the approval act.
-
-## A2's first deliverable
-
-The step-up tap + pending-approval page spec. This lands in this directory (public) and drives:
-- Trust's implementation of the localhost tap (egzos/src/egzos/trust)
-- The lifeboat's pending-approval page (egzos/src/egzos/web)
-- The flagship's corresponding screen (egzos-platform/spec/design — spec only)
+Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed product, closed specs, in build order: search/list (the app shell), permissions dashboard, pending review with previews, onion graph, drag-drop gate, triage flow, permissions matrix, step-up integration. Each names every component as a registry item (licence noted) or `bespoke`, and its picks are recorded here in `DESIGN-SOURCES.md`.
 
 ## How specs arrive
 
-A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces 2–3 direction
-boards with tradeoffs → Chief picks → A2 writes the binding spec → the Chief commits it to this
-directory. The commit IS the approval. Agents build from committed specs only; a missing spec is a
-`design-gap` issue, not an improvisation.
+A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces direction boards with tradeoffs → the Chief picks → A2 writes the binding spec, exhaustive → the Chief commits it to this directory. The commit IS the approval. Decisions A2 takes inside a spec are listed in its header with the rejected alternative and the cost, and the Chief may veto by editing before commit. Agents build from committed specs only.
