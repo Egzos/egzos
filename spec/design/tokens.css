@@ -2,7 +2,15 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.9 · 2026-09-22 (v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ * egzos design tokens · v0.10 · 2026-09-22 (v0.9 · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ *
+ * v0.10 restores v0.8 to the line above. v0.9 replaced the leading version in place instead of
+ * prefixing it, erasing the one revision whose whole content WAS this history line — "v0.8 fixes
+ * that history line rather than extending it" is still in this file, describing a revision the line
+ * no longer admitted. A history entry is a RECORD, and an erasure is a move: a sweep that moves one
+ * is the sweep being wrong. Third instance of this class in this file, which is why A2's pre-push
+ * audit now derives this chain too (it had only ever checked files with **Changelog** entries, and
+ * this file has none — a CSS comment was the blind spot).
  *
  * v0.8 fixes that history line rather than extending it. Under this set's convention a list
  * terminated by one date assigns it to every version in it, so v0.7 ... v0.4 all read 2026-09-11 --
