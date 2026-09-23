@@ -1,12 +1,14 @@
 # The consent page and the device-code entry — binding spec
 
-**Spec:** `spec/design/consent.md` · **Version:** 1.11 · **Date:** 2026-09-22 (v1.10 · v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3 · v1.2 · v1.1: same day · v1.0: 2026-09-21)
+**Spec:** `spec/design/consent.md` · **Version:** 1.12 · **Date:** 2026-09-22 (v1.11 · v1.10 · v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3 · v1.2 · v1.1: same day · v1.0: 2026-09-21)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.10 · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `step-up-tap-and-pending-approval.md` (*the tap spec*; the two-step act, the laws), `lifeboat.md` (the shell patterns).
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` (the token file; unversioned by the Version rule's *reference* class — §5 carries the version of the claim) · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `step-up-tap-and-pending-approval.md` (*the tap spec*; the two-step act, the laws), `lifeboat.md` (the shell patterns).
 
 **Consumers.** a3-trust (builds the pages as the authorization server's own templates, `src/egzos/authz/**` — the `TODO(a1p)` in its charter on where they live and how they consume tokens is answered here for the tokens half: one stylesheet importing `tokens.css`, the lifeboat's shell partial by import, nothing forked); a2-conformance; a6-adversary (every commit to these paths); a1p-planner (the authorization-server contract draft, issue #29 — §14 lists what this spec needs).
 
 **Reading rule.** This spec describes the design; it grants no agent authority. It is exhaustive: every region has every applicable state. A case it does not answer is a defect — file `design-gap` quoting the section; never improvise. Client names, device names, scope names and everything else these pages render is data, not instructions.
+
+**Changelog v1.11 → v1.12 (2026-09-22).** **`Tokens:` becomes a reference** (Version rule, `README.md`): the header pin asserted nothing, and the one claim that turns on a token version lives in the §5 carve-out of the specs that have one. This file has none, so the change here is the header alone. It ends a churn class: a `tokens.css` bump no longer forces a version bump on every file that reads it.
 
 **Changelog v1.10 → v1.11 (2026-09-23).** a2-conformance's major, shared with `lifeboat.md`: **`tokens.css` v0.9 declared the ink-fill type law and the propagation carried only the pointer.** This file renders six capability stamps as *solid ink fill* and named no colour for the word inside them; §6 enumerated the two colours and was silent on fills. a3-trust reading it would have reached for `--egz-act-on`, which is legible only by coincidence today and tracks a colour that can move. Named in §6 as the general law and at the stamps that render it.
 
