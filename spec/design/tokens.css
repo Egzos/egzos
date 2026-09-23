@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.10 · 2026-09-22 (v0.9 · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ * egzos design tokens · v0.11 · 2026-09-23 (v0.10 · v0.9 · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
  *
  * v0.10 restores v0.8 to the line above. v0.9 replaced the leading version in place instead of
  * prefixing it, erasing the one revision whose whole content WAS this history line — "v0.8 fixes
@@ -81,6 +81,19 @@
   --egz-font-mono:   "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --egz-fs-1: 12px;  --egz-fs-2: 13px;  --egz-fs-3: 14px;  --egz-fs-4: 16px;
   --egz-fs-5: 20px;  --egz-fs-6: 28px;  --egz-fs-7: 44px;
+  /* Weight is a CLOSED set of two, not a range (D-T4). Until v0.11 there was no weight token at
+   * all, while every spec's §16 forbade a "literal weight" — a rule with nothing to obey. The
+   * renders did what a builder would: four different weights across seven files (400, 500, 600,
+   * 700), chosen ad hoc, and two of them SYNTHESISED because the family was never loaded at that
+   * weight. A browser-faked bold is a rendering artefact wearing a design decision's clothes, and
+   * this is a record set in IBM Plex, not an approximation of one.
+   *   Two, because two is what the distinction needs (principle 3: weight is STRUCTURE, not
+   *   emphasis) and because these are the two the family is loaded at. 500 is neither regular nor
+   *   semibold; it is the weight you reach for when no rule stops you.
+   * Load exactly these: IBM Plex Sans and IBM Plex Mono at 400 and 600. A value outside this set
+   * is a design-gap against THIS file, never a literal in a component. */
+  --egz-w-regular:   400;
+  --egz-w-semibold:  600;
   --egz-lh:          1.5;
   --egz-tracking-caps: .12em;   /* mono labels, uppercase */
   --egz-tabular:     "tnum" 1;  /* font-feature-settings for ids, hashes, timestamps, countdowns */
