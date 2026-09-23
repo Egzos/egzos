@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v2.5 (2026-09-22; supersedes v2.4) — closes the three places v2.4's withdrawal did not reach. The Accordion Multiple row still repeated *#8637 did not return* **as fact**, fifty-two lines above the entry withdrawing it, and a pick row is what a builder reads; the pick stands, on the requirement it always stood on. The frozen **v2.2** and **v2.3** entries below still assert their withdrawn corrections with no in-place marker — which is the practice **v1.9** made binding here (*a reader scanning one Status block should not have to decide which of two contradictory sentences is current*) and which **v1.8** already applied once, immediately adjacent to the claim it withdrew. Nearness was never the test. Both now carry a marker. And `§P` was attributed to `CLAUDE.md` three times, which has no lettered sections — §P is the decisions log, as `:188` in this file already writes out in full. v2.4 (2026-09-22; supersedes v2.3) — **three "corrections" in this register were false positives, and all three came from the same mistake: comparing a search result instead of probing the id.** A2's session probed all five disputed ids directly with `get_component` (the one transport that answers *does this id exist and what is it*), and every one resolves:
+**Status:** v2.6 (2026-09-22; supersedes v2.5) — **every registry id this register cites has now been probed.** 74 distinct ids, each through `get_component` rather than a search, at ≥ 0.9 s with 429 back-off. The sweep exists because three "corrections" here turned out to be false positives read off search results, and the rule that replaced them (*Probe, never search*) is only worth anything if it is actually run. Result: **73 live, one dead.** `Statistics Card · aghasisahakyan1` **#8590** — the permissions dashboard's primary for its summary figures — returns *no component found*, and the author returns nothing either, so it is a delisting and not a ranking artefact. a4s dispatched to that row would have opened an item page that does not resolve. The row is now bespoke (`permissions-dashboard.md` v1.15 §17), with the two live alternatives named and declined on the merits. The sweep also confirmed, directly, the three pairs this file had wrongly "reconciled" — `#89`/`#99`, `#4783`/`#4821`, `#25393`/`#25395` are each two demos of one component — and found **no other** id wrong anywhere in the file. v2.5 (2026-09-22; supersedes v2.4) — closes the three places v2.4's withdrawal did not reach. The Accordion Multiple row still repeated *#8637 did not return* **as fact**, fifty-two lines above the entry withdrawing it, and a pick row is what a builder reads; the pick stands, on the requirement it always stood on. The frozen **v2.2** and **v2.3** entries below still assert their withdrawn corrections with no in-place marker — which is the practice **v1.9** made binding here (*a reader scanning one Status block should not have to decide which of two contradictory sentences is current*) and which **v1.8** already applied once, immediately adjacent to the claim it withdrew. Nearness was never the test. Both now carry a marker. And `§P` was attributed to `CLAUDE.md` three times, which has no lettered sections — §P is the decisions log, as `:188` in this file already writes out in full. v2.4 (2026-09-22; supersedes v2.3) — **three "corrections" in this register were false positives, and all three came from the same mistake: comparing a search result instead of probing the id.** A2's session probed all five disputed ids directly with `get_component` (the one transport that answers *does this id exist and what is it*), and every one resolves:
 
 | id | component | demo |
 |---|---|---|
@@ -315,6 +315,31 @@ and the demo, or it errors. That is a direct answer where a search is a ranked g
 
 Only a session with **no** review authority may run either transport (§P trust rule), which is why both
 reviewers correctly declined to settle these and left them to A2.
+
+## Id audit — 2026-09-22
+
+Every id cited in a table row above, probed with `get_component` (never search — see *Probe, never
+search*). This section is dated because it is a claim about a moving registry: it was true at the
+moment it ran, and a row added later is unverified until the next sweep.
+
+| | |
+|---|---|
+| ids probed | **74** (every distinct id in this file's tables) |
+| live | **73** |
+| delisted | **1** — `Statistics Card · aghasisahakyan1` **#8590**, below |
+| wrong (component is not what the row says) | **0** |
+| sibling-demo pairs confirmed, not conflicts | `#89`/`#99` (`originui/table`) · `#4783`/`#4821` (`sean0205/data-grid-table`) · `#19745`/`#19746` (`cnippet-dev/cnippet-empty`) · `#25393`/`#25395` (`diceui/status`) |
+
+| Component | Registry item / URL | Licence | Date | Picked by spec |
+|---|---|---|---|---|
+| Statistics Card · aghasisahakyan1 — **DELISTED** | `aghasisahakyan1/statistics-card`, **#8590** — `get_component` returns *no component found* (probed 2026-09-22); a search for the author returns nothing either | — | 2026-09-22 | was `permissions-dashboard.md` v1.0 §17 R3 · Stats blocks. **Replaced by a bespoke figure-over-label** in v1.15, not by another pick: the take was one composition, the fallback was already bespoke, and a grid component to render three bordered figures is more dependency than the row needs |
+| Stats Grid · shadcnui-blocks | **considered, not used** · `shadcnui-blocks/stats-04`, demo ***Default*** · **#29195** | per item page | 2026-09-22 | permissions-dashboard.md v1.15 §17 — the closest live replacement for #8590 (a bordered grid of key metrics). Declined: see the row above |
+| Statistics Card 2 · sean0205 | **considered, not used** · `sean0205/statistics-card-2`, demo ***default.tsx*** · **#4237** | per item page | 2026-09-22 | permissions-dashboard.md v1.15 §17 — second live replacement considered, from an author this register already carries. Declined with the row above |
+
+**What a delisting means for a row, stated once.** A dead id is not a licence question and not a
+`design-gap` against the spec — it is a pick that no longer exists, which is A2's to re-take. The
+register records the death, the alternatives found, and the disposition, so that the next reader
+neither re-searches nor assumes the row was always bespoke.
 
 ## Corrections log
 - 2026-09-22 · **WITHDRAWN, same day.** `#8637` (`designali-in/accordion-05`, demo *default.tsx*) was recorded as having *did not return on the 2026-09-22 pass*. It returns: probed directly on 2026-09-22 and live. A search's silence is not a delisting — see *Probe, never search*. The tap spec §17 and `search-list.md` §17 keep the pick, and the two rows above stand unmarked because there was nothing to mark.
