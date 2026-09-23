@@ -1,7 +1,7 @@
 # DESIGN-SOURCES.md
 
 **Owner:** A2 (Taste)
-**Status:** v2.6 (2026-09-22; supersedes v2.5) — **every registry id this register cites has now been probed.** 74 distinct ids, each through `get_component` rather than a search, at ≥ 0.9 s with 429 back-off. The sweep exists because three "corrections" here turned out to be false positives read off search results, and the rule that replaced them (*Probe, never search*) is only worth anything if it is actually run. Result: **73 live, one dead.** `Statistics Card · aghasisahakyan1` **#8590** — the permissions dashboard's primary for its summary figures — returns *no component found*, and the author returns nothing either, so it is a delisting and not a ranking artefact. a4s dispatched to that row would have opened an item page that does not resolve. The row is now bespoke (`permissions-dashboard.md` v1.15 §17), with the two live alternatives named and declined on the merits. The sweep also confirmed, directly, the three pairs this file had wrongly "reconciled" — `#89`/`#99`, `#4783`/`#4821`, `#25393`/`#25395` are each two demos of one component — and found **no other** id wrong anywhere in the file. v2.5 (2026-09-22; supersedes v2.4) — closes the three places v2.4's withdrawal did not reach. The Accordion Multiple row still repeated *#8637 did not return* **as fact**, fifty-two lines above the entry withdrawing it, and a pick row is what a builder reads; the pick stands, on the requirement it always stood on. The frozen **v2.2** and **v2.3** entries below still assert their withdrawn corrections with no in-place marker — which is the practice **v1.9** made binding here (*a reader scanning one Status block should not have to decide which of two contradictory sentences is current*) and which **v1.8** already applied once, immediately adjacent to the claim it withdrew. Nearness was never the test. Both now carry a marker. And `§P` was attributed to `CLAUDE.md` three times, which has no lettered sections — §P is the decisions log, as `:188` in this file already writes out in full. v2.4 (2026-09-22; supersedes v2.3) — **three "corrections" in this register were false positives, and all three came from the same mistake: comparing a search result instead of probing the id.** A2's session probed all five disputed ids directly with `get_component` (the one transport that answers *does this id exist and what is it*), and every one resolves:
+**Status:** v2.7 (2026-09-23; supersedes v2.6) — adds the **Contrast audit** section: 5 433 rendered text nodes across all seven mocks and all three canvases, zero failures, with the instrument shown to go red on a poisoned token before the green was believed. It lands here rather than in `DESIGN-PRINCIPLES.md` on purpose — this register is cited as a *reference* in every header, so a dated measurement can be recorded in it without moving a single pointer, which is the churn the reference class exists to prevent. v2.6 (2026-09-22; supersedes v2.5) — **every registry id this register cites has now been probed.** 74 distinct ids, each through `get_component` rather than a search, at ≥ 0.9 s with 429 back-off. The sweep exists because three "corrections" here turned out to be false positives read off search results, and the rule that replaced them (*Probe, never search*) is only worth anything if it is actually run. Result: **73 live, one dead.** `Statistics Card · aghasisahakyan1` **#8590** — the permissions dashboard's primary for its summary figures — returns *no component found*, and the author returns nothing either, so it is a delisting and not a ranking artefact. a4s dispatched to that row would have opened an item page that does not resolve. The row is now bespoke (`permissions-dashboard.md` v1.15 §17), with the two live alternatives named and declined on the merits. The sweep also confirmed, directly, the three pairs this file had wrongly "reconciled" — `#89`/`#99`, `#4783`/`#4821`, `#25393`/`#25395` are each two demos of one component — and found **no other** id wrong anywhere in the file. v2.5 (2026-09-22; supersedes v2.4) — closes the three places v2.4's withdrawal did not reach. The Accordion Multiple row still repeated *#8637 did not return* **as fact**, fifty-two lines above the entry withdrawing it, and a pick row is what a builder reads; the pick stands, on the requirement it always stood on. The frozen **v2.2** and **v2.3** entries below still assert their withdrawn corrections with no in-place marker — which is the practice **v1.9** made binding here (*a reader scanning one Status block should not have to decide which of two contradictory sentences is current*) and which **v1.8** already applied once, immediately adjacent to the claim it withdrew. Nearness was never the test. Both now carry a marker. And `§P` was attributed to `CLAUDE.md` three times, which has no lettered sections — §P is the decisions log, as `:188` in this file already writes out in full. v2.4 (2026-09-22; supersedes v2.3) — **three "corrections" in this register were false positives, and all three came from the same mistake: comparing a search result instead of probing the id.** A2's session probed all five disputed ids directly with `get_component` (the one transport that answers *does this id exist and what is it*), and every one resolves:
 
 | id | component | demo |
 |---|---|---|
@@ -315,6 +315,36 @@ and the demo, or it errors. That is a direct answer where a search is a ranked g
 
 Only a session with **no** review authority may run either transport (§P trust rule), which is why both
 reviewers correctly declined to settle these and left them to A2.
+
+## Contrast audit — 2026-09-23
+
+Principle 11 says *contrast verified per canvas*. Until now that was a claim backed by a handful of
+**token pairs** computed by hand. This is the measurement: every visible text node in every spec surface
+of all seven mocks, its **effective** background resolved by walking to the first opaque ancestor, in all
+three canvases, against the WCAG 2.2 AA threshold chosen per node from its computed size and weight
+(3:1 for large text, 4.5:1 otherwise).
+
+**5 433 text nodes measured. Zero failures.** Every rendered pair clears its threshold in light,
+dark-neutral and dark-violet — including the pairs no spec asserts, which were the reason to measure:
+`--egz-ink-3` on `--egz-paper` inside a chip, `--egz-alarm` on paper, and everything the violet canvas
+re-values.
+
+`--egz-ink-3` on canvas, the pair most at risk because it carries every metadata line:
+
+| canvas | ratio | threshold |
+|---|---|---|
+| light | 5.33:1 | 4.5:1 |
+| dark · neutral | 6.96:1 | 4.5:1 |
+| dark · violet | 6.91:1 | 4.5:1 |
+
+**The instrument was made to fail before the result was trusted**, as everything in this project now is:
+`--egz-ink-3` was poisoned to `#BBBBBB` and the same measurement returned **1.92:1**, then 5.33:1 again on
+restore. A green audit that has never been shown to go red is not evidence — it is the shape of evidence,
+which this project has now mistaken for the real thing three times.
+
+Dated for the same reason the id audit is: it is true of the tokens and the surfaces as they stood when it
+ran. A token re-valued or a surface added later is unverified until the next sweep — `contrast_audit.py`,
+one command.
 
 ## Id audit — 2026-09-22
 
