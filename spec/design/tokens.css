@@ -2,7 +2,7 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.8 · 2026-09-22 (v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ * egzos design tokens · v0.9 · 2026-09-22 (v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
  *
  * v0.8 fixes that history line rather than extending it. Under this set's convention a list
  * terminated by one date assigns it to every version in it, so v0.7 ... v0.4 all read 2026-09-11 --
@@ -42,6 +42,21 @@
   /* ── the two colours ──────────────────────────────────────────── */
   --egz-act:         #1D3FA8;   /* a human is asked: sign, approve, open a window, focus, the outward arrow */
   --egz-act-on:      #FFFFFF;
+  /* --egz-act-on is the type colour ON --egz-act, and on nothing else.
+   *
+   * TYPE ON AN INK FILL IS --egz-canvas (v0.9). Five specs render a word inside a solid ink
+   * fill — the `verified` stamp, `active`, a held capability stamp, the matrix's explicit-coverage
+   * cell, the gate's count badge — and until v0.9 none of them named a colour for that word, so
+   * every one left it to a builder. The one spec that did answer reached for --egz-act-on, which
+   * is legible today only because --egz-act-on and --egz-canvas happen to carry the same value in
+   * all three schemes. They have unrelated jobs: --egz-act-on tracks whatever --egz-act becomes,
+   * and --egz-canvas is the page. Re-value --egz-act to a lighter blue needing dark type by day
+   * and --egz-act-on flips to near-black — at which point every ink-filled stamp renders black on
+   * black, and nothing in the file would have predicted it.
+   *
+   * --egz-canvas is correct by construction: ink is the opposite of the canvas in every scheme,
+   * so type in the canvas colour is always legible on an ink fill and always will be. Same for
+   * --egz-alarm-on: it is the type colour on --egz-alarm, never on ink. */
   --egz-alarm:       hsl(0 100% 43%);  /* Swiss Red: quarantine, presence lapsed, quota, unreachable, anomaly */
   --egz-alarm-on:    #FFFFFF;
 

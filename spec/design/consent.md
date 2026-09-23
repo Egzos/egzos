@@ -2,7 +2,7 @@
 
 **Spec:** `spec/design/consent.md` · **Version:** 1.10 · **Date:** 2026-09-22 (v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3 · v1.2 · v1.1: same day · v1.0: 2026-09-21)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.8 · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `step-up-tap-and-pending-approval.md` (*the tap spec*; the two-step act, the laws), `lifeboat.md` (the shell patterns).
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.9 · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `step-up-tap-and-pending-approval.md` (*the tap spec*; the two-step act, the laws), `lifeboat.md` (the shell patterns).
 
 **Consumers.** a3-trust (builds the pages as the authorization server's own templates, `src/egzos/authz/**` — the `TODO(a1p)` in its charter on where they live and how they consume tokens is answered here for the tokens half: one stylesheet importing `tokens.css`, the lifeboat's shell partial by import, nothing forked); a2-conformance; a6-adversary (every commit to these paths); a1p-planner (the authorization-server contract draft, issue #29 — §14 lists what this spec needs).
 

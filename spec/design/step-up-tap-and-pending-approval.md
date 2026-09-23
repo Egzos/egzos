@@ -2,7 +2,7 @@
 
 **Spec:** `spec/design/step-up-tap-and-pending-approval.md` · **Version:** 1.14 · **Date:** 2026-09-22 (v1.13 · v1.12 · v1.11 · v1.10 · v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3: same day · **v1.2: 2026-09-21 · v1.1: 2026-09-13 · v1.0: 2026-09-11**)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.8 · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `lifeboat.md` · `consent.md`
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` v0.9 · **Principles:** `DESIGN-PRINCIPLES.md` v1.4 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `lifeboat.md` · `consent.md`
 
 **Consumers.** a3-trust (the step-up tap page and the consent page, `src/egzos/authz/**`); a5-dinghy (the lifeboat pending pages, `src/egzos/web/**`); a4s / a4g (the flagship's pending review and step-up integration — screen specs in `egzos-platform/spec/design` cite this file); a2-conformance (checks UI PRs against it); a6-adversary (reviews every commit to these surfaces).
 
