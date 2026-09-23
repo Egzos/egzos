@@ -2,7 +2,23 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: Apache-2.0
  *
- * egzos design tokens · v0.11 · 2026-09-23 (v0.10 · v0.9 · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: same day · v0.3: 2026-09-11)
+ * egzos design tokens · v0.12 · 2026-09-23 (v0.11 · v0.10 · v0.9: same day · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: 2026-09-22 · v0.3: 2026-09-11)
+ *
+ * v0.12 is the FOURTH failure of the line above, and the worst-behaved: the seven versions
+ * v0.10 … v0.4 were re-dated to 2026-09-23 as a side effect of v0.11's bump. Nothing edited
+ * them. `same day` is a POINTER AT THE HEADER DATE, so when the header moved forward a day the
+ * whole run moved with it, silently, and seven revisions written on the 22nd (and one on
+ * 09-11, saved only by carrying an explicit date) claimed a day they did not happen on. The
+ * three earlier failures were erasures a reader could notice; this one leaves the line looking
+ * exactly as well-formed as before.
+ *
+ * So `same day` is no longer allowed to span a date boundary in this file: each run now states
+ * its own date, on the evidence of this file's pushed blob at `6fa85751` — the branch's last
+ * commit dated on or before 2026-09-22 — which reads `v0.8 · 2026-09-22 (v0.7 · v0.6 · v0.5 ·
+ * v0.4: same day · v0.3: 2026-09-11)`. A2's audit now reads DATES and not only version numbers:
+ * a header against its own newest entry, a history that must run forward, a version the chain
+ * names but nothing can date, and both index tables' date columns. It had thirty-four wrong
+ * dates to find across thirteen files and found none, because every number agreed.
  *
  * v0.10 restores v0.8 to the line above. v0.9 replaced the leading version in place instead of
  * prefixing it, erasing the one revision whose whole content WAS this history line — "v0.8 fixes
