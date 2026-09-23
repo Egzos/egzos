@@ -62,6 +62,33 @@ A state not listed for a region cannot occur there. If a builder meets a case a 
 
 Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed product, closed specs, in build order: search/list (the app shell), permissions dashboard, pending review with previews, onion graph, drag-drop gate, triage flow, permissions matrix, step-up integration. Each names every component as a registry item (licence noted) or `bespoke`, and its picks are recorded here in `DESIGN-SOURCES.md`.
 
+## How a spec is checked before it is pushed
+
+Two instruments, both A2's, both run before every push. Neither replaces a reviewer; they catch the
+classes a reviewer reading prose cannot.
+
+**The pre-push audit** reads the set as text: header versions against a registry and against each file's
+own newest changelog, history parentheticals, pointer freshness across both repositories, frozen records,
+unoffered vetoes, index rows. Every blind spot it has ever had is recorded in its docstring, because each
+one was found by shipping the defect it existed to catch.
+
+**The width audit** reads the set as *rendered pixels*. Every screen has a state mock; the audit extracts
+each spec surface from every mock and measures it at every width **that spec itself declares** — 448
+measurements across the eight screens. It reports a surface that overflows its column and a control whose
+hit target falls below 44 px.
+
+It exists because three defects arrived the same way: a control specified in prose that never met a width.
+An uncapped window tray in a 48 px bar clipped two windows out of three; a filter bar in a 320 px queue
+column measured 388 px, taller than the queue it filtered; a ring label collided with its neighbours. A
+region × state matrix cannot catch any of those — the assertion and the violation live in different
+artefacts, and nothing read them against each other. **A spec is not finished here until it has been
+rendered and measured.**
+
+Both instruments are built so they can fail, and each new check is made to fail on purpose before it is
+trusted. That rule came from two real failures: a guard written so it could never match, and a first
+build of the width audit that returned 357 findings by measuring surfaces at widths no spec puts them at.
+A check that fires on questions nobody asked looks exactly like coverage.
+
 ## How specs arrive
 
 A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces direction boards with tradeoffs → the Chief picks → A2 writes the binding spec, exhaustive → the Chief commits it to this directory. The commit IS the approval. Decisions A2 takes inside a spec are listed in its header with the rejected alternative and the cost, and the Chief may veto by editing before commit. Agents build from committed specs only.
