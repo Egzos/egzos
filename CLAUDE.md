@@ -94,10 +94,16 @@ Need something outside your paths? File the issue and take the next item:
   `# Copyright 2026 Ali Sasanian` / `# SPDX-License-Identifier: Apache-2.0`.
 - Commit subjects imperative and specific; reference the issue in the body.
 - Never `git push --force`, never rewrite history on a shared branch, never push to `main`.
+- Builders checkpoint: open a draft PR on the first commit, push after each section, and mark it ready only
+  when the work is complete. A run killed by `--max-turns` keeps only what it pushed, so a prompt that ends in
+  one terminal commit→push→PR→stop is a defect (RD-004).
 - A new push after an approval voids the approval by design (approve-what-you-saw). Push once, then wait.
 - Third-party actions are SHA-pinned; Dependabot proposes pin bumps as `governance`-labeled PRs. Those runs
   carry no secrets, so the three review checks pass early on them and the Chief reviews the diff directly
   — a workflow file is the Chief's commit in every case.
+- A model-tier change is done only when all four places agree: the workflow's `--model` (via `MODEL_*`), the
+  definition's `model:` frontmatter and prose tier line, the pin table below and `.claude/agents/README.md`'s
+  roster, and every dispatcher that names the agent (`core-queue.yml`). Missing any one is a finding (RD-003).
 
 ## Model pins (fixed per definition; runtime-independent)
 

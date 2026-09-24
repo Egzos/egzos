@@ -45,6 +45,8 @@ the state the reasoning depends on, and the paths in scope. Status is one of:
 - **REJECTED** — the finding rests on a mistaken premise, named in the entry.
 - **PRE-EMPTIVE** — not yet raised by a reviewer; recorded because the tree looks wrong at a glance
   and the explanation is not local to the file being read.
+- **LIVE** — the finding is correct whenever it applies and is never settled. The entry exists so it
+  is not mistaken for a settled point or waved through as drift. Raise it.
 
 ---
 
@@ -113,3 +115,64 @@ raise that.
 with structured output, this is worth revisiting, and the entry is void.
 
 **Paths in scope.** `.github/workflows/**`, `.claude/agents/**`.
+
+---
+
+## RD-003 · A model pin change touches four places
+
+**Status:** LIVE — raised on #58
+
+**The finding a reviewer would raise.**
+
+> This PR changes `<agent>`'s model tier, but `<location>` still states the old one.
+
+**Disposition.** LIVE. A pin change that misses any of the four locations is not done. Raise it; no
+entry here settles it.
+
+**Reasoning.** A pin is stated in four places, and a change is checked against all four:
+
+1. the workflow's `--model` flag, through the `MODEL_*` env indirection — every call site that runs
+   the agent (`a6-adversary.yml` has two; `a1r-reviewer` runs in `a1r-review.yml` and
+   `nightly-integration.yml`);
+2. the definition's `model:` frontmatter **and** its prose tier line ("Opus 5, fixed.");
+3. CLAUDE.md's model-pin table and the roster in `.claude/agents/README.md`;
+4. every dispatcher that special-cases the agent by name — here, the `case` arms in `core-queue.yml`.
+
+RD-002's rule that frontmatter `tools:` and the workflow's `--allowedTools` change together extends to
+`model:` and `--model`. The prose and tables are what every agent reads as its charter, so a stale tier
+there is a wrong charter, not cosmetic drift. #58's first commit split `a1r-reviewer` across two tiers;
+a1r caught it, not process.
+
+**Holds while.** A pin is stated in more than one place. If the four are ever generated from a single
+source, this entry is void.
+
+**Paths in scope.** `.github/workflows/**`, `.claude/agents/**`, `CLAUDE.md`.
+
+---
+
+## RD-004 · Builder prompts checkpoint to a draft PR
+
+**Status:** LIVE · PRE-EMPTIVE — not yet raised
+
+**The finding a reviewer would raise.**
+
+> This builder prompt commits, pushes and opens the PR once, at the end. A run that reaches
+> `--max-turns` first leaves nothing behind.
+
+**Disposition.** LIVE. A prompt that ends in a single terminal commit→push→PR→stop sequence is a
+turn-budget defect. Raise it.
+
+**Reasoning.** A builder runs on a fresh checkout, so a run killed by the turn ceiling keeps only what
+it already pushed — the work is not truncated, it is discarded. `a1p-planner` spent 121 turns and
+$10.10 on #29 and committed nothing. A builder prompt therefore opens a draft PR on its first commit
+(`gh pr create --draft`, with `Bash(gh pr ready:*)` in `--allowedTools`), pushes after each section,
+and marks the PR ready only when the work is complete. A prompt that says "mark ready" without
+`gh pr ready` in `--allowedTools` is the same finding. Early drafts cost no review spend — the
+model-backed reviews are draft-gated (#58) — while `tests` and `ownership` still run on every push.
+#60 applies this to `a1p-planner.yml` and `core-queue.yml`.
+
+**Holds while.** The reviews stay draft-gated. If they ever run on drafts, early drafts carry review
+spend and the trade is worth revisiting.
+
+**Paths in scope.** `.github/workflows/a1p-planner.yml`, `.github/workflows/core-queue.yml`, and any
+workflow that runs a builder.
