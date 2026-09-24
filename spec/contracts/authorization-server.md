@@ -135,3 +135,180 @@ Because the flow's weakness is a human typing a code, three mitigations are cont
 step and with it most of the phishing surface the browser retirement was about — but it also makes
 the code copy-pasteable into a chat window, which is the same mistake with fewer steps. No source
 names it. The review should decide whether the AS issues it.
+
+## 4 · MCP clients — Phase 5, against this same AS
+
+**MCP clients authorize per the MCP authorization spec, against the same AS. §K.** Phase 5, and
+named here only to fix the two things that are this document's to fix:
+
+1. **The same AS.** An MCP client does not get a second authorization path, a second token shape or
+   a second permission vocabulary. It gets §7's grant, in a `Token` per `capabilities.md` §5, like
+   every other client.
+2. **Nothing in §§1–3 or §§5–9 may be relaxed to accommodate one.** PKCE stays mandatory, the
+   redirect rule stays exact, the grant stays six capabilities and node ids.
+
+The MCP-specific surface — protected-resource metadata (RFC 9728), the `WWW-Authenticate` challenge
+that points a client at this AS, and the `resource` parameter that binds a token to one container —
+is **contract v1.1 at the Phase 5 boundary** (`spec/contracts/README.md`), reviewed there by the
+Chief, a1p and A6. It is **planned, not a Phase 6 escalation**, and it is not drafted here: writing
+it now would freeze a surface against a spec version we have not built against.
+
+## 5 · Client registration and the redirect-URI allowlist
+
+**Clients are registered per container config, with a redirect-URI allowlist that accommodates both
+`egzos.io` and `localhost` dev origins. §K**, which flags this as *"the one BYOC-specific wrinkle"*
+— and it is named as such here: every other clause in this document is the same for a container
+running on the user's laptop and a container the flagship hosts. This one is not, because a
+self-hosted container must be able to authorize a UI it did not ship.
+
+**The flagship is registered like any other client.** `egzos.io` is not pre-trusted, not implicitly
+allowlisted, and holds no capability a fork's UI cannot hold. **a1p**, generalising §K's revocation
+sentence ("revocation is `token rm` like any client") from revocation to registration: a flagship
+that were privileged at registration would be privileged, and §K's whole shape is that it is not.
+
+**Registration is an owner act.** A client entry `{client_id, client_name, client_type,
+redirect_uris}` enters container config through an owner-authenticated path. **a1p** — no source
+names the verb, and the CLI spelling belongs to a3-doorman, not to this document.
+
+`[OPEN→0.3]` **Dynamic client registration** (RFC 7591) is what the MCP authorization spec expects
+(§4), and an **open** registration endpoint on a personal container lets any caller create a client
+entry. The two pull in opposite directions and the review must settle which wins before Phase 5
+builds against either. The AS metadata's `registration_endpoint` (§6) is advertised only if the
+answer is yes.
+
+### The matching rule is exact string comparison
+
+**A registered redirect URI matches by exact string comparison. a1p**, from OAuth 2.1, which
+requires it — and stated as a contract clause rather than left to "we implement OAuth 2.1", because
+a loose redirect rule is the classic AS hole and this is the sentence A6 will read the section for.
+
+Concretely, the AS MUST reject an authorization request whose `redirect_uri` is not byte-identical
+to a registered entry, and MUST NOT implement:
+
+- **prefix or path-prefix matching** — `https://egzos.io/cb` must not match `https://egzos.io/cb/x`
+  or `https://egzos.io/cbx`;
+- **wildcards** in host or path, at any position;
+- **query or fragment tolerance** — the query string is part of the comparison, and a registered
+  URI carries no fragment;
+- **scheme or host normalisation** beyond the URI's own case rules — no "http where https was
+  registered", no trailing-slash equivalence.
+
+A registered URI is absolute and `https`, with one exception, next.
+
+### The one exception: loopback ports
+
+**A registered loopback redirect URI matches with its port ignored and everything else exact. a1p**,
+from RFC 8252 §7.3: a native or dev client binds to an ephemeral port it cannot know at registration
+time, so the port is the one component that varies. The exception is bounded to:
+
+- host is the **literal loopback address** — `127.0.0.1` or `[::1]`;
+- scheme is `http` (this is the §2 TLS exception, and it is this and nothing else);
+- **only the port is ignored.** Path, query, scheme and host are compared exactly, as above.
+
+TODO(a1p): **`localhost` as a hostname is not covered by that exception, and §K says "localhost dev
+origins".** RFC 8252 §8.3 prefers the literal IP precisely because `localhost` resolves through a
+name — and a name is something a resolver, a hosts file or a hostile network can move. a1p's
+reading, for A6 and the freeze to confirm or overrule: a `http://localhost:<port>/…` entry is
+permitted, but **only as an exact registered string including the port** — it gets no port
+exception, so a developer registers the port they will actually bind. That keeps §K's "localhost dev
+origins" working without extending a wildcard to a resolvable name. If the review disagrees it
+should say so in the document, because this is the difference between one hole and none.
+
+## 6 · AS metadata discovery
+
+**AS metadata discovery is part of the frozen surface. §K** (a named Phase 0.2 freeze constraint).
+The reason §K gives is the one that makes it a contract rather than a convenience: *"any UI, ours or
+a fork's, authenticates to a container the same way."* A UI cannot be written against "the egzos
+container" as a category unless every container announces itself identically — the metadata document
+**is** the interoperability surface, and the rest of this document is only reachable through it.
+
+**Endpoint:** `/.well-known/oauth-authorization-server`, at the container's own origin, served
+**unauthenticated** over TLS (§2's loopback exception applies). **a1p** — RFC 8414's location; §K
+names the requirement and not the path.
+
+Unauthenticated is deliberate and is not a leak: the document describes the *protocol* a container
+speaks, identically for every container, and reveals nothing about what is inside one. Nothing
+container-specific — no node ids, no client names, no owner identity — may be added to it.
+
+**The fields, enumerated. a1p** — the set is what §§1–3, §5 and §7 require a client to know:
+
+| field | value |
+|---|---|
+| `issuer` | the container's own origin; every token's `iss` |
+| `authorization_endpoint` | §2 |
+| `token_endpoint` | §2, §3 |
+| `device_authorization_endpoint` | §3 |
+| `revocation_endpoint` | §9 |
+| `registration_endpoint` | §5 — **advertised only if** dynamic registration is enabled |
+| `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
+| `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
+| `code_challenge_methods_supported` | `["S256"]` — `plain` is never advertised (§2) |
+| `token_endpoint_auth_methods_supported` | `["none"]` — every client is public (§1) |
+| `scopes_supported` | the six capability names (§7) |
+
+**The metadata is a conformance surface, not a description.** A container MUST NOT advertise a
+method, grant or endpoint it does not implement, and MUST NOT implement one it does not advertise —
+a fork's UI reads this document *through* the metadata, so a mismatch is a conformance failure and
+not a documentation bug.
+
+`[OPEN→0.3]` **Whether `scopes_supported` also advertises the `node:` form.** §7's node-scope
+strings are container-specific by construction; listing the *prefix* reveals nothing, listing any
+actual node id would break the "nothing container-specific" rule above. The review should say
+`node:` is advertised as a form, or that it is not advertised at all and clients learn it from this
+contract.
+
+## 7 · The grant is six capabilities and node ids — nothing else
+
+**The grant an AS token carries is expressed only in the frozen capability vocabulary.** No scope
+string that is not a node id, no capability that is not one of the six. **The AS must not become a
+second, parallel permission system** — the one failure mode that would make every clause in
+`capabilities.md` and `container.md` advisory.
+
+A token minted through the AS **is** a `Token` per `capabilities.md` §5. Same fields, same six
+capabilities, same node-id scopes, same coverage computed down the path at check time, same
+revocation. §K says it of the flagship — *"authorizing the flagship is indistinguishable from
+minting any other client token because it IS one"* — and it is true of every client.
+
+**The binding onto OAuth's `scope` parameter. a1p** — §K fixes the rule and not the spelling; this
+is the spelling, and the freeze may change it as long as the rule survives. A `scope` value is a
+space-delimited set drawn from exactly two forms:
+
+- **a bare capability name** — one of `fetch remember organize publish curate admin`;
+- **`node:<node-id>`** — a scope entry of `Token.scopes`. `node:*` is the whole container.
+
+The AS expands the request into `{capabilities, scopes}` on the minted token. Anything else in the
+`scope` value is refused; the request is **not** silently narrowed to the part that parsed.
+
+Three consequences that are contract, not style:
+
+1. **Role bundles are not scope strings.** `reader`, `contributor`, `operator` and `curator` never
+   appear in a `scope` value: a bundle is expanded at mint time and the token carries capabilities
+   (`capabilities.md` §2), so a bundle in a grant would be a second vocabulary that can drift.
+   A consent screen may *display* a bundle's name (#61); the grant does not carry it.
+2. **`admin` in a scope value is the capability, never the bundle.** The two vocabularies collide on
+   exactly this word — `admin` is a capability and `admin` is the all-six bundle — and a reader who
+   guesses wrong grants five capabilities they did not mean to. Stated here so no implementation
+   resolves the collision the other way.
+3. **`node:*` is the owner's grant.** `capabilities.md` §5 says `["*"]` is the owner's token; a
+   client asking for `node:*` is asking for the whole container, and the consent screen must render
+   it as that (#61).
+
+### The AS is not an enumeration oracle
+
+**A `node:<id>` the requester may not reach and a `node:<id>` that does not exist MUST produce the
+same result. a1p** — this is `capabilities.md` §6 and `container.md` §4 invariant 3 applied at the
+authorization endpoint, and it needs saying because OAuth's error vocabulary invites the opposite:
+an AS that answers `invalid_scope` for an unknown node and `access_denied` for a forbidden one has
+handed any registered client a way to enumerate the owner's container through error shapes, without
+ever holding a token.
+
+The rule, stated so it is testable:
+
+- **Unknown node id, unreachable node id, owner declined** → the same error, the same shape, in the
+  same time budget. `access_denied` is the one to use.
+- `invalid_scope` is reserved for a scope value that is **malformed or not one of the six capability
+  names** — a fact about the vocabulary in this document, identical for every container, revealing
+  nothing about any of them.
+
+This applies to the device flow (§3) identically: a rejected device authorization reveals no more
+than a rejected redirect does.
