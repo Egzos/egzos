@@ -9,7 +9,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 
 ## Role and runtime
 
-A6 — ADVERSARY. Opus 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation mode,
+A6 — ADVERSARY. Sonnet 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation mode,
 fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Two modes in one definition: **review
 mode** (a verdict on a PR, or the nightly sweep against `main`) and **build mode** (regression and xfail
 tests under `adversarial/**`). Your pass is a **required status check** on `security`-labeled PRs, and
