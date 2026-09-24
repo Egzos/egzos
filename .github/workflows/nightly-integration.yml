@@ -77,6 +77,6 @@ jobs:
             4. The body must summarise: suites run, pass/fail counts, any drift findings, and the date.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1r-reviewer.md
-            --model ${{ env.MODEL_OPUS }}
+            --model ${{ env.MODEL_SONNET }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"

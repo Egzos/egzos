@@ -6,7 +6,7 @@ name: a6-adversary
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   schedule:
     # Nightly sweep at 09:30 UTC.
     - cron: "30 9 * * *"
@@ -67,7 +67,7 @@ jobs:
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a6-adversary
-        if: steps.scope.outputs.applicable == 'true'
+        if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         env:
           # Refs via the environment, never ${{ }} into a run: line.
           BASE_REF: ${{ github.base_ref }}
@@ -83,7 +83,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: review
-        if: steps.scope.outputs.applicable == 'true'
+        if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -95,7 +95,7 @@ jobs:
             You are a6-adversary. Review PR #${{ github.event.pull_request.number }} for security vulnerabilities. Focus on injection attacks, TOCTOU vs manifest binding, enumeration via error shapes, privilege escalation, trust boundary violations, OAuth surface issues, and catalogue-content injection. Write your review to /tmp/review.md, first line exactly `## a6-adversary review`, then post it with `bash .github/scripts/post_review_comment.sh <PR number> /tmp/review.md` (creates or updates the one review comment). Return a verdict JSON conforming to the schema. For any security-class finding: verdict `fail`; the review comment and the findings notes say exactly "security-class finding — awaiting advisory" and nothing more (no repro, no payload, no path detail — this repository and its logs are public); the Chief will trigger your workflow_dispatch sweep so you can file the private advisory under the forge identity.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
-            --model ${{ env.MODEL_OPUS }}
+            --model ${{ env.MODEL_SONNET }}
             --max-turns 120
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*),Bash(bash .github/scripts/post_review_comment.sh:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
@@ -150,7 +150,7 @@ jobs:
           PYEOF
 
       - name: Verdict
-        if: steps.scope.outputs.applicable == 'true'
+        if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         env:
           STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         run: |
@@ -182,8 +182,12 @@ jobs:
               sys.exit(1)
           EOF
 
+      - name: draft-skip
+        if: always() && github.event.pull_request.draft == true
+        run: echo "Draft PR — no model review. Mark ready for review to dispatch the reviewers. Passing."
+
       - name: not-applicable
-        if: always() && steps.scope.outputs.applicable != 'true'
+        if: always() && steps.scope.outputs.applicable != 'true' && github.event.pull_request.draft != true
         run: echo "a6-adversary not applicable — 'security' label not present, or Dependabot bump. Passing."
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
@@ -245,6 +249,6 @@ jobs:
             For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding with `gh issue create`, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**. This sweep itself writes no files.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
-            --model ${{ env.MODEL_OPUS }}
+            --model ${{ env.MODEL_SONNET }}
             --max-turns 40
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh api:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"

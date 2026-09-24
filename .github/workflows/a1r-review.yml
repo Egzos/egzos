@@ -3,7 +3,7 @@ name: a1r-review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 permissions: {}
 
@@ -36,7 +36,7 @@ jobs:
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a1r-reviewer
-        if: github.actor != 'dependabot[bot]'
+        if: github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false
         env:
           # Refs via the environment, never ${{ }} into a run: line.
           BASE_REF: ${{ github.base_ref }}
@@ -52,7 +52,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: review
-        if: github.actor != 'dependabot[bot]'
+        if: github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -119,7 +119,7 @@ jobs:
           PYEOF
 
       - name: Verdict
-        if: github.actor != 'dependabot[bot]'
+        if: github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false
         env:
           STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         run: |
@@ -158,5 +158,5 @@ jobs:
           EOF
 
       - name: dependabot-skip
-        if: always() && github.actor == 'dependabot[bot]'
+        if: always() && (github.actor == 'dependabot[bot]' || github.event.pull_request.draft == true)
         run: echo "a1r-review not applicable — Dependabot pin bump (Dependabot runs carry no secrets); the Chief reviews the diff directly. Passing."
