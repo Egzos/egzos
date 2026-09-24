@@ -81,7 +81,7 @@ def svg64(inner, extra=""):
     return f'<svg {XMLNS} width="64" height="64" viewBox="0 0 64 64"{extra}>{inner}</svg>'
 
 def favicon_svg():
-    inner = mark_inner("pending", "flat", "currentColor", "var(--p)")
+    inner = mark_inner("orb", "flat", "currentColor", "var(--p)")
     return (f'<svg {XMLNS} width="64" height="64" viewBox="0 0 64 64"><style>:root{{color:{INK["light"]};--p:{CANVAS["light"]}}}'
             f'@media (prefers-color-scheme: dark){{:root{{color:{INK["dark"]};--p:{CANVAS["dark"]}}}}}</style>{inner}</svg>')
 
@@ -106,12 +106,12 @@ def lockup_svg(ink, paper, F=100, stacked=False, box_px=None):
     if not stacked:
         W, H = box + gap + adv, asc + desc
         return (f'<svg {XMLNS} width="{W:.2f}" height="{H:.2f}" viewBox="0 0 {W:.2f} {H:.2f}">'
-                f'<g transform="scale({box/64:.5f})">{M("pending", box_px or box, ink, paper)}</g>'
+                f'<g transform="scale({box/64:.5f})">{M("orb", box_px or box, ink, paper)}</g>'
                 f'<path transform="translate({box+gap:.2f} {asc:.2f})" d="{d}" fill="{ink}"/></svg>')
     box2 = asc * 1.5; gap2 = asc * 0.45
     W, H = max(adv, box2), box2 + gap2 + asc + desc
     return (f'<svg {XMLNS} width="{W:.2f}" height="{H:.2f}" viewBox="0 0 {W:.2f} {H:.2f}">'
-            f'<g transform="translate({(W-box2)/2:.2f} 0) scale({box2/64:.5f})">{M("pending", box_px or box2, ink, paper)}</g>'
+            f'<g transform="translate({(W-box2)/2:.2f} 0) scale({box2/64:.5f})">{M("orb", box_px or box2, ink, paper)}</g>'
             f'<path transform="translate({(W-adv)/2:.2f} {box2+gap2+asc:.2f})" d="{d}" fill="{ink}"/></svg>')
 
 # ── placements ────────────────────────────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ def badge_inner(scheme, canvas, px):
     ink = INK["light" if scheme == "light" else "dark"]; cv = CANVAS[canvas or scheme]
     return (f'<rect x="5" y="5" width="56" height="56" fill="{ink}"/>'
             f'<rect x="1.25" y="1.25" width="53.5" height="53.5" fill="{cv}" stroke="{ink}" stroke-width="2.5"/>'
-            f'<g transform="translate(10 10) scale(0.5625)">{M("pending", px * 0.5625, ink, cv)}</g>')
+            f'<g transform="translate(10 10) scale(0.5625)">{M("orb", px * 0.5625, ink, cv)}</g>')
 
 def badge_svg(scheme="light", canvas=None, px=512):
     return svg64(badge_inner(scheme, canvas, px))
@@ -132,7 +132,7 @@ def app_svg(solid, px=200):
 
 def maskable_svg(scheme="light", px=512):
     ink, cv = INK["light" if scheme == "light" else "dark"], CANVAS[scheme]
-    return svg64(f'<rect width="64" height="64" fill="{cv}"/><g transform="translate(13.44 13.44) scale(0.58)">{M("pending", px * 0.58, ink, cv)}</g>')
+    return svg64(f'<rect width="64" height="64" fill="{cv}"/><g transform="translate(13.44 13.44) scale(0.58)">{M("orb", px * 0.58, ink, cv)}</g>')
 
 def touch_svg(px=180):
     return svg64(f'<rect width="64" height="64" fill="{CANVAS["light"]}"/><g transform="translate(6 6) scale(0.8125)">{badge_inner("light", None, px * 0.8125)}</g>')
@@ -145,7 +145,7 @@ def readme_header_svg(scheme):
     return (f'<svg {XMLNS} width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-label="egzos">'
             f'<rect x="8" y="8" width="1272" height="312" fill="{ink}"/>'
             f'<rect x="1" y="1" width="1270" height="310" fill="{cv}" stroke="{ink}" stroke-width="2"/>'
-            f'<g transform="translate({x0} {y0:.2f}) scale({box/64:.5f})">{M("pending", box, ink, cv)}</g>'
+            f'<g transform="translate({x0} {y0:.2f}) scale({box/64:.5f})">{M("orb", box, ink, cv)}</g>'
             f'<path transform="translate({x0+box+gap:.2f} {y0+asc:.2f})" d="{d}" fill="{ink}"/>'
             f'<path transform="translate({1200-ladv:.2f} 268)" d="{ld}" fill="{ink}"/></svg>')
 
@@ -157,7 +157,7 @@ def social_svg():
     return (f'<svg {XMLNS} width="1280" height="640" viewBox="0 0 1280 640"><rect width="1280" height="640" fill="{cv}"/>'
             f'<rect x="40" y="40" width="1208" height="568" fill="{ink}"/>'
             f'<rect x="33" y="33" width="1206" height="566" fill="{cv}" stroke="{ink}" stroke-width="2.5"/>'
-            f'<g transform="translate({x0:.2f} {y0:.2f}) scale({box/64:.5f})">{M("pending", box, ink, cv)}</g>'
+            f'<g transform="translate({x0:.2f} {y0:.2f}) scale({box/64:.5f})">{M("orb", box, ink, cv)}</g>'
             f'<path transform="translate({x0+box+gap:.2f} {y0+asc:.2f})" d="{d}" fill="{ink}"/>'
             f'<path transform="translate({640-ladv/2:.2f} 448)" d="{ld}" fill="{ink}"/>'
             f'<path transform="translate(72 560)" d="{gd}" fill="{ink}"/>'
@@ -200,11 +200,13 @@ def render(out=BRAND, dist=None):
     L, D, CL, CD = INK["light"], INK["dark"], CANVAS["light"], CANVAS["dark"]
     masters = {}
     # marks · three solids × three tiers × light/dark files + inline
-    for solid in ("pending", "whole", "slice"):
+    # (file stem, solid name) — the published stem stays "pending" because BRAND.md, pwa/head.html
+    # and the icon manifests reference mark/pending-*.svg; the solid orb.py builds is "orb".
+    for stem, solid in (("pending", "orb"), ("whole", "whole"), ("slice", "slice")):
         for t in ("64", "32", "flat"):
-            masters[f"mark/{solid}-{t}.svg"] = svg64(mark_inner(solid, t, L, CL))
-            masters[f"mark/{solid}-{t}-dark.svg"] = svg64(mark_inner(solid, t, D, CD))
-            masters[f"mark/inline/{solid}-{t}.svg"] = svg64(mark_inner(solid, t, "currentColor", "var(--egz-canvas)"))
+            masters[f"mark/{stem}-{t}.svg"] = svg64(mark_inner(solid, t, L, CL))
+            masters[f"mark/{stem}-{t}-dark.svg"] = svg64(mark_inner(solid, t, D, CD))
+            masters[f"mark/inline/{stem}-{t}.svg"] = svg64(mark_inner(solid, t, "currentColor", "var(--egz-canvas)"))
     masters["mark/favicon.svg"] = favicon_svg()
     # wordmark & lockups
     masters["wordmark/wordmark.svg"] = wordmark_svg(L); masters["wordmark/wordmark-dark.svg"] = wordmark_svg(D)
@@ -217,7 +219,7 @@ def render(out=BRAND, dist=None):
     # placements
     masters["badge/badge-light.svg"] = badge_svg("light"); masters["badge/badge-dark.svg"] = badge_svg("dark")
     masters["badge/badge-dark-violet.svg"] = badge_svg("dark", "violet")
-    masters["app/chief-proxy.svg"] = app_svg("whole"); masters["app/egzos-forge.svg"] = app_svg("pending")
+    masters["app/chief-proxy.svg"] = app_svg("whole"); masters["app/egzos-forge.svg"] = app_svg("orb")
     masters["pwa/maskable-light.svg"] = maskable_svg("light"); masters["pwa/maskable-dark.svg"] = maskable_svg("dark")
     masters["pwa/apple-touch-icon.svg"] = touch_svg()
     masters["pwa/head.html"] = HEAD_HTML
@@ -234,7 +236,7 @@ def render(out=BRAND, dist=None):
     masters["terminal/slice-16-blocks.txt"] = O.terminal(16, "blocks", solid="slice")
     # rasters
     os.makedirs(dist, exist_ok=True)
-    small = svg64(mark_inner("pending", "flat", L, CL))
+    small = svg64(mark_inner("orb", "flat", L, CL))
     rasters = {
         "org-avatar-512.png": (masters["badge/badge-light.svg"], 512),
         "org-avatar-dark-512.png": (masters["badge/badge-dark.svg"], 512),
@@ -245,8 +247,8 @@ def render(out=BRAND, dist=None):
         "icon-512.png": (masters["badge/badge-light.svg"], 512),
         "icon-maskable-512.png": (masters["pwa/maskable-light.svg"], 512),
         "favicon-16.png": (small, 16), "favicon-32.png": (small, 32), "favicon-48.png": (small, 48),
-        "mcp-icon-48.png": (svg64(M("pending", 48, L, CL)), 48),
-        "mcp-icon-96.png": (svg64(M("pending", 96, L, CL)), 96),
+        "mcp-icon-48.png": (svg64(M("orb", 48, L, CL)), 48),
+        "mcp-icon-96.png": (svg64(M("orb", 96, L, CL)), 96),
         "readme-header-light-1280x320.png": (masters["banner/readme-header-light.svg"], 1280, 320),
         "readme-header-dark-1280x320.png": (masters["banner/readme-header-dark.svg"], 1280, 320),
         "social-preview-1280x640.png": (masters["banner/social-preview.svg"], 1280, 640),

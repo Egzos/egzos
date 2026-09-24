@@ -35,6 +35,11 @@ packages = ["src/egzos"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# The brand pipeline under spec/ is a design-asset generator, not part of the egzos package
+# (see [tool.hatch.build.targets.wheel] packages). It is deliberately dense one-liner style and
+# ships nothing. Linting it with product rules blocked `ruff check .` and therefore pytest, which
+# runs after it in the tests workflow. Its own correctness gate is pipeline/check.py.
+extend-exclude = ["spec/design/brand/pipeline"]
 
 [tool.ruff.lint]
 # Explicit selection so the gate is deterministic across ruff releases.
