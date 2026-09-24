@@ -79,6 +79,11 @@ jobs:
 
             CRITICAL: Any change to `.github/workflows/**` must be proposed as a `governance`-labelled issue with the full patch in the issue body. NEVER push a workflow file — the egzos-forge App has no Workflows permission and the push will be rejected by GitHub. State this constraint explicitly in any governance issue you file.
 
+            Push and open the PR as a draft the moment you have ANYTHING committed — do not wait until the work is
+            complete. Commit and push again after each artifact section or acceptance-criterion group, not only
+            once at the end: a run that is killed by the turn budget must leave a recoverable draft PR with
+            partial progress, never nothing. Mark the PR ready for review only once everything is done.
+
             Commit with imperative subject lines referencing the issue number. WIP cap: 1 open PR under agent/a1p-planner/. PR size cap: 600 lines or 30 files (lockfiles excluded). Comment the PR URL on the triggering issue, then stop.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1p-planner.md

@@ -160,10 +160,13 @@ jobs:
             2. Respect OWNERSHIP.yml — touch only your owned paths. PR size cap: 600 changed lines or 30 files (lockfiles and tests/fixtures/** excluded).
             3. NEVER touch `.github/workflows/**` — the egzos-forge App has no Workflows permission; any workflow change must be proposed as a `governance`-labelled issue with the patch in the issue body.
             4. Add license headers (`# Copyright 2026 Ali Sasanian` / `# SPDX-License-Identifier: Apache-2.0`) to every new source file.
-            5. Commit with imperative subject lines referencing issue #${{ steps.resolve.outputs.issue }}.
-            6. Push the branch and open a PR filling `.github/PULL_REQUEST_TEMPLATE.md` completely (What / Why / Risk / Contract impact / Checks).
-            7. Comment the PR URL on issue #${{ steps.resolve.outputs.issue }}.
-            8. Stop.
+            5. Push and open the PR as a draft the moment you have ANYTHING committed — do not wait until the
+               work is complete. Commit and push again as you make progress, not only once at the end: a run
+               killed by the turn budget must leave a recoverable draft PR, never nothing. Fill
+               `.github/PULL_REQUEST_TEMPLATE.md` completely (What / Why / Risk / Contract impact / Checks).
+            6. Mark the PR ready for review only once everything is done, then comment the PR URL on issue
+               #${{ steps.resolve.outputs.issue }}.
+            7. Stop.
           claude_args: >-
             --append-system-prompt-file /tmp/charter.md
             --model ${{ steps.resolve.outputs.model }}
