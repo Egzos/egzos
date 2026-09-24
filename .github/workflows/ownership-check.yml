@@ -36,19 +36,28 @@ jobs:
       # should have blocked editing OWNERSHIP.yml is itself gated on is_agent_branch, so the file
       # decided whether it was allowed to be edited. Both artefacts now come from origin/<base>.
       - name: gate-from-base
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          git show "origin/${{ github.base_ref }}:.github/scripts/check_ownership.py" > /tmp/check_ownership.py
-          git show "origin/${{ github.base_ref }}:.github/OWNERSHIP.yml"              > /tmp/OWNERSHIP.base.yml
+          git show "origin/${BASE_REF}:.github/scripts/check_ownership.py" > /tmp/check_ownership.py
+          git show "origin/${BASE_REF}:.github/OWNERSHIP.yml"              > /tmp/OWNERSHIP.base.yml
           test -s /tmp/check_ownership.py
           test -s /tmp/OWNERSHIP.base.yml
-          echo "checker and OWNERSHIP.yml taken from origin/${{ github.base_ref }}"
+          echo "checker and OWNERSHIP.yml taken from origin/${BASE_REF}"
 
       - name: check-ownership
+        env:
+          # Branch names and label names are both attacker-chosen text, and ${{ }}
+          # substitution happens before bash parses the line. egzos-forge holds
+          # issues: write, which covers creating a label and applying it to a PR.
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           python3 /tmp/check_ownership.py \
-            --base "origin/${{ github.base_ref }}" \
+            --base "origin/${BASE_REF}" \
             --head HEAD \
-            --branch "${{ github.head_ref }}" \
+            --branch "$HEAD_REF" \
             --ownership /tmp/OWNERSHIP.base.yml \
-            --labels "${{ join(github.event.pull_request.labels.*.name, ',') }}"
+            --labels "$PR_LABELS"

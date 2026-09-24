@@ -45,7 +45,10 @@ jobs:
             echo "Dependabot pin bump — review checks pass early (Dependabot runs carry no secrets); the Chief reviews the diff directly."
             exit 0
           fi
-          CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>/dev/null || true)
+          # Fail closed: a git failure must not read as "no UI paths changed".
+          if ! CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>&1); then
+            echo "::error::git diff failed — refusing to infer scope"; echo "$CHANGED"; exit 1
+          fi
           APPLICABLE=false
           while IFS= read -r f; do
             case "$f" in
@@ -62,7 +65,18 @@ jobs:
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a2-conformance
         if: steps.scope.outputs.applicable == 'true'
-        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a2-conformance.md > /tmp/charter-a2-conformance.md
+        env:
+          # Refs via the environment, never ${{ }} into a run: line.
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Charter from the BASE, never the tree under review (#39). BASE_REF is empty on
+          # non-pull_request events, so fall back to the default branch. awk strips frontmatter.
+          REF="${BASE_REF:-$DEFAULT_BRANCH}"
+          git show "origin/${REF}:.claude/agents/a2-conformance.md" \
+            | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a2-conformance.md
+          test -s /tmp/charter-a2-conformance.md
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         id: review
@@ -79,9 +93,58 @@ jobs:
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a2-conformance.md
             --model ${{ env.MODEL_OPUS }}
-            --max-turns 60
+            --max-turns 120
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*),Bash(bash .github/scripts/post_review_comment.sh:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
+
+      # Three different faults all surface as "did not return structured_output", and the number
+      # that separates them lives only in the login-gated run log. #35, the tier cap and #47 each
+      # cost hours for want of these ten lines. Name the cause in the checks tab instead.
+      - name: diagnose-failure
+        if: failure() && steps.review.outputs.execution_file != ''
+        env:
+          EXEC_FILE: ${{ steps.review.outputs.execution_file }}
+          MAX_TURNS: '120'
+        run: |
+          python3 - <<'PYEOF'
+          import json, os
+          p = os.environ.get("EXEC_FILE", "")
+          cap = int(os.environ.get("MAX_TURNS", "0") or 0)
+          try:
+              raw = open(p).read()
+          except OSError as e:
+              print(f"::warning::no execution file to diagnose ({e})"); raise SystemExit
+          res = None
+          for line in raw.splitlines():
+              line = line.strip()
+              if not line.startswith("{"): continue
+              try: obj = json.loads(line)
+              except ValueError: continue
+              if obj.get("type") == "result": res = obj
+          if res is None:
+              try: res = json.loads(raw)
+              except ValueError:
+                  print("::warning::execution file has no parseable result object"); raise SystemExit
+          turns = res.get("num_turns"); cost = res.get("total_cost_usd")
+          err = res.get("is_error"); sub = res.get("subtype")
+          print(f"num_turns={turns} total_cost_usd={cost} is_error={err} subtype={sub}")
+          if turns == 1 and not cost:
+              print("::error::DIAGNOSIS: the model never ran. One turn, zero cost, no token usage "
+                    "means the request was rejected before inference - a drained model-tier window "
+                    "or a rate limit. Not a review failure. Re-run once the window resets; if a "
+                    "re-run fails identically and immediately, the window is drained, not throttled.")
+          elif cap and isinstance(turns, int) and turns > cap:
+              print(f"::error::DIAGNOSIS: turn budget exhausted ({turns} > {cap}). The review most "
+                    "likely COMPLETED - structured_output is emitted last, so the ceiling discards a "
+                    "verdict rather than truncating a review. Read the posted review comment: if it "
+                    "carries a verdict, that verdict stands and only the budget needs raising.")
+          elif err:
+              print("::error::DIAGNOSIS: the run failed mid-flight with real token usage. Not a cap "
+                    "and not the ceiling. Read the execution file for the provider error.")
+          else:
+              print("::error::DIAGNOSIS: the run reported success but emitted no structured output. "
+                    "Check that --json-schema is well-formed and StructuredOutput is in --allowedTools.")
+          PYEOF
 
       - name: Verdict
         if: steps.scope.outputs.applicable == 'true'

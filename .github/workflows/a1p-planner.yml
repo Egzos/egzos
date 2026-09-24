@@ -49,7 +49,18 @@ jobs:
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
       - name: charter-a1p-planner
-        run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a1p-planner.md > /tmp/charter-a1p-planner.md
+        env:
+          # Refs via the environment, never ${{ }} into a run: line.
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          # Charter from the BASE, never the tree under review (#39). BASE_REF is empty on
+          # non-pull_request events, so fall back to the default branch. awk strips frontmatter.
+          REF="${BASE_REF:-$DEFAULT_BRANCH}"
+          git show "origin/${REF}:.claude/agents/a1p-planner.md" \
+            | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a1p-planner.md
+          test -s /tmp/charter-a1p-planner.md
 
       - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
         with:
@@ -72,7 +83,7 @@ jobs:
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1p-planner.md
             --model ${{ env.MODEL_OPUS }}
-            --max-turns 60
+            --max-turns 120
             --allowedTools "Read,Write,Edit,MultiEdit,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
