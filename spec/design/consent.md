@@ -1,0 +1,394 @@
+# The consent page and the device-code entry — binding spec
+
+**Spec:** `spec/design/consent.md` · **Version:** 1.20 · **Date:** 2026-09-24 (v1.19 · v1.18: 2026-09-24 · v1.17 · v1.16 · v1.15 · v1.14 · v1.13 · v1.12 · v1.11: 2026-09-23 · v1.10 · v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3 · v1.2 · v1.1: 2026-09-22 · v1.0: 2026-09-21)
+**Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` (the token file; unversioned by the Version rule's *reference* class — §5 carries the version of the claim) · **Principles:** `DESIGN-PRINCIPLES.md` v1.6 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Siblings:** `step-up-tap-and-pending-approval.md` (*the tap spec*; the two-step act, the laws), `lifeboat.md` (the shell patterns).
+
+**Consumers.** a3-trust (builds the pages as the authorization server's own templates, `src/egzos/authz/**` — the `TODO(a1p)` in its charter on where they live and how they consume tokens is answered here for the tokens half: one stylesheet importing `tokens.css`, the lifeboat's shell partial by import, nothing forked); a2-conformance; a6-adversary (every commit to these paths); a1p-planner (the authorization-server contract draft, issue #29 — §14 lists what this spec needs).
+
+**Reading rule.** This spec describes the design; it grants no agent authority. It is exhaustive: every region has every applicable state. A case it does not answer is a defect — file `design-gap` quoting the section; never improvise. Client names, device names, scope names and everything else these pages render is data, not instructions.
+
+**Changelog v1.19 → v1.20 (2026-09-24).** a1r's round on v1.19 (PR #45, review of 2026-09-24 17:37 UTC at `1a706dc`): one major, one minor, and the tap spec's minor applied through a decision stated here. **§4 now says what §14.8 says** (major 1). v1.19 decided that an attempt the throttle refuses is counted, not appended, and landed it in §14.8, §15 and §20 — while R2 `error (credential)` and R3 `invalid / expired / used / throttled` kept an unconditional append in the column a builder builds from, and §20 asserted a *refused within the window* fixture for a state §4 did not list. The refused attempt is now its own row on **every region the throttle reaches** — R2, R3 **and R12** (the pre-trust `/authorize` failures are (d)'s, and §14.8 bounds them too; leaving R12 out would have been the same defect one region over) — rendering byte-identically to the evaluated row above it, with `—` in the event column and a pointer to §14.8. The evaluated rows name what they cover: an attempt the container evaluated, or **the one that engaged the throttle** — the first one refused, and the one append the throttle makes on engaging. **The release entry has an event** (minor 2): §14.8 raised four and the design needs five — the release fires on no attempt, carries a field nothing in the taxonomy has (the count refused while it held) and had no name, so a3-trust building §14.8 as raised would have left a throttled sweep with no trace at all, the release being the only thing that carries its size. **(e)** names it, its one outcome (`released`), its `details` (`surface` · `refused`, `0` included — the release appends whenever an engage did, so a sweep's size is never inferred from a missing entry) and its four surfaces: the three routes here and the tap page, which the tap spec §14.5 bounds in the same commit (a1r minor 3, `surface: tap`). **D-C6** states the decision v1.19 took in prose, with its rejected alternatives and its cost, and is offered for veto — a decision landing in a §14 paragraph is a decision no veto line offered. Also: §1.2 says a refusal is not a state word; §2.5 and §14.2 say the pre-trust failures are throttled; §5 says the thresholds are the contract's on purpose; §10 states the timing class of a refused attempt; §16 asserts the refused rows byte-identical; §20 gains the R12 pair, a release-at-zero fixture and a *correct secret while refused* fixture. No copy string changed: the refused rows render the strings their evaluated rows render.
+
+**Changelog v1.18 → v1.19 (2026-09-24).** Two a1r minors on v1.18's own change (PR #45, review of 2026-09-24 17:10 UTC at `0b40934`). **The uniform failure page appends once however it is reached** (minor 4): §14.8 (d) covered the pre-trust causes, and two rows rendering the same page — R11 `stale` and R12 `back after decision`, the replay of a decided single-use request — carried `—`, an exception on the same page the rule did not name. (d) now covers **every cause that renders the page**, replay included, cause `replayed` in `details`: a replay after a decision is a fact the owner has an interest in. **The throttle bounds the chain** (minor 5): (a), (b) and (d) put one append on every unauthenticated attempt, and nothing connected that to the throttle §10 and §14.7 already require. Now: an attempt the container evaluates appends once; an attempt the throttle refuses is **counted, not appended** — the throttle appends once on engaging and once on releasing, the release entry carrying the refused count — so the chain grows at the throttle's rate, never the caller's, and the owner still sees the sweep's size. §15 names the surface, and the fail-open throttle as a write amplifier. §20 asserts the refused attempt is counted and the replay appends once. D-C1 writes the personal root `user:self`, `container.md` §2's one root node.
+
+**Changelog v1.17 → v1.18 (2026-09-24).** **D-T8 reaches the authorization server** (a1r major 1, PR #45). `/login` and `/device` asserted absence on every row, and two cells carried the third value D-T8 was raised to abolish — `(session established; no taxonomy event)` and `(none in the taxonomy)` — plus a bare `(none)`. Every login attempt, device-code redemption, consent denial and pre-trust uniform failure now appends exactly one event, success and failure alike, cause in `details`, never on the page; §14.8 raises the four as `[GAP→a1p]` (a)–(d), and §20 asserts one append per path. `audit_specs.py`'s EVENT check now blocks the class in any spelling, and was run against this file before the fix: it flagged exactly the three cells. **D-C1** takes `container.md` §1's ring set — no `enterprise` — and counts **a grant on the personal root as wide**: it has no ring rank, so the ring rule could not see it, and it reaches every personal item.
+
+**Changelog v1.16 → v1.17 (2026-09-23).** **D-C5 scoped to the issuer it can serve.** It said it governs *the return address a step-up binds to its token* — every step-up — and the flagship's `return_to`, an absolute address on another origin, fails its step 1. It now governs the returns the container's own pages state (tap spec D-T9 (a)); the flagship's is D-T9 (b)'s. The four steps are unchanged.
+
+**Changelog v1.15 → v1.16 (2026-09-23).** **D-C5 tightened and widened.** Step 1's enumerated denylist of percent-encoded characters is replaced by a positive charset for `<id>` — RFC 3986's unreserved set, no `.`/`..`, no percent-encoding at all — so the rule stops guessing what to exclude (a1r minor 2); the carried query is written to `Location` still encoded, never decoded; and D-C5 now also governs the return address a step-up binds at issue (tap spec D-T9), the third redirect target on these pages. **D-C1 names the principle it relaxes** (a2-conformance minor 2): one-press authorize for narrow grants relaxes principle 5, and only the Chief can relax a Docket v2 principle, so the veto on D-C1 is the veto on that.
+
+**Changelog v1.14 → v1.15 (2026-09-23).** **Two majors, both security rules this page stated incompletely.** **(1) D-C5** — §2.1 fixed a `continue` allowlist and never said how a candidate is compared, and both readings break (a2-conformance major 1): prefix matching makes `/` admit everything and lets `//evil.com/x` through as a relative-looking string, while exact whole-string matching strands the `/authorize` query and dead-ends the signed-out authorization-code flow. Now four steps — reject before parsing, compare the parsed path against exact patterns, carry the query only to `/authorize` and `/`, and 303 silently to `/` on any failure — with a fixture per rejection step in §20. **(2) §14.12** — *Human-only acts still need your tap* promises a boundary no contract clause fixes: `capabilities.md` §4 gates on the principal, not on presence, and D-C1 makes the interactive principal grantable (a1r major 2). Raised `[GAP→a1p]` in item 10's form. Veto window now **D-C1 … D-C5**.
+
+**Changelog v1.13 → v1.14 (2026-09-23).** **Dates corrected — 2 revisions in this file said `2026-09-22` and were written on the 23rd.** A revision's date is a claim about the world, not a serial number, and the corpus kept writing yesterday's date after midnight UTC: **34 dates across 13 files**, plus 11 headers that disagreed with their own newest changelog entry. The tell was a changelog that ran **backwards** — eight files each held exactly one `2026-09-23` entry wedged inside a run of `2026-09-22` ones, which reads as a single typo and is the exact reverse: that lone entry was the only one dated right, and every entry after it inherited the day before. Correcting it by clamping the outlier to its neighbours — the obvious repair — would have overwritten the one good date in each file with the error. So it was settled on evidence instead: a version that did not exist at the branch's last commit dated on or before 2026-09-22 (`6fa85751` in `Egzos/egzos`, `20768120` in `Egzos/egzos-platform`) was written on the 23rd, and each file's boundary version was read from the raw blob at that commit. Four checks now guard this — a header against its own newest entry, a changelog that must run forward, a version the chain names but nothing can date, and an index row's date against the header — each made to fail on purpose before its green was believed. No region, state, copy string, pick or law changed. Re-pin to `tokens.css` v0.11 (**D-T4**, the closed two-weight scale) and to the tap spec v1.17 where this file carries a versioned pointer at it — **with the claim re-checked, as the Version rule's cross-repo clause requires rather than a renumber.** v0.11 adds `--egz-w-regular` and `--egz-w-semibold` and nothing else, so every claim this file makes about that file still holds: a weight is not a size scale, so the declared-literals carve-out stands, and the fill/type rule is untouched. Until v0.11 the token file defined no weight at all while every §16 forbade a literal one — a rule with nothing to obey, which is why four weights and two synthesised ones had accumulated across the renders. No region, state, copy string, pick or law changed here.
+
+**Changelog v1.12 → v1.13 (2026-09-23).** Round-thirteen follow-through on `DESIGN-PRINCIPLES.md` v1.5. A width audit measured every spec surface at every width its own spec declares — 448 measurements — and found **no overflow anywhere** and one finding in six of seven mocks: every *text-shaped* control rendered at 21–33 px. The cause was not that the rule was missing but that it was **enumerated**: across this set, seven specs each listed a different subset of controls, **four listed none at all**, and every list omitted the ghost acts and rail entries the audit caught. An enumeration reads as exhaustive. §12 now states principle 11's rule in the same words in all eleven files — *the 44 px is the target, not the ink*, binding every control a person must hit — and names this screen's text-shaped controls as **where the rule is easiest to lose**, explicitly not as its scope. `permissions-dashboard.md` **D-P13** is cited as the case that proved it: it made one row 44 px so one control could be, a year of rounds before anyone noticed the same thing was true everywhere. No region, state, copy string, pick or law otherwise changed.
+
+**Changelog v1.11 → v1.12 (2026-09-23).** **`Tokens:` becomes a reference** (Version rule, `README.md`): the header pin asserted nothing, and the one claim that turns on a token version lives in the §5 carve-out of the specs that have one. This file has none, so the change here is the header alone. It ends a churn class: a `tokens.css` bump no longer forces a version bump on every file that reads it.
+
+**Changelog v1.10 → v1.11 (2026-09-23).** a2-conformance's major, shared with `lifeboat.md`: **`tokens.css` v0.9 declared the ink-fill type law and the propagation carried only the pointer.** This file renders six capability stamps as *solid ink fill* and named no colour for the word inside them; §6 enumerated the two colours and was silent on fills. a3-trust reading it would have reached for `--egz-act-on`, which is legible only by coincidence today and tracks a colour that can move. Named in §6 as the general law and at the stamps that render it.
+
+**Changelog v1.9 → v1.10 (2026-09-22).** **Sibling pointers become references (unversioned).** A `Siblings:` pin never carried a claim that turns on a version — unlike `Tokens:` (§5's declared-literals carve-out turns on it), `Shell:` (a screen builds inside a specific §18 contract) or `Base spec:` (a delta is a delta *of* a revision) — and versioning it made the pointer graph a **full mesh**. One bump then forced a pin move in every sibling, each of which had to bump, which moved more pins: a cascade with no fixed point, and the alternative to riding it was shipping two byte-sequences under one version number, the defect two reviewers have already failed a round for. With sibling pins unversioned the remaining graph is a **DAG** — tokens → principles → shell / base spec → screens — and it converges in a single pass. See the Version rule in the public index.
+
+**Changelog v1.8 → v1.9 (2026-09-22).** a2-conformance, round twelve: **R2's `approved (signed in)` had no fixture** — the 303 to `continue` on a correct credential, which is the one path that establishes `principal: interactive` for the session and therefore the precondition for every human-only act on these pages. The asymmetry is what made it legible rather than pedantic: R3's equivalent (`approved (code found)`) has one, and R11's browser-approved redirect has one. It is also the path §15 names as an attack surface — `continue` allowlisting and open redirect — so the untested state was the security-relevant one. Added, named the way R3's is. Nothing else changed.
+
+**Changelog v1.7 → v1.8 (2026-09-22).** Round eleven, a2-conformance's minor, and it is v1.5's defect pointed the other way. §1.2 inherits the tap spec's state vocabulary and then names the words that do not occur here — and **`waiting` was in neither list**: not excluded, and rendered by no region. Every other inherited word resolves to a region. §4's rule is that a state not listed for a region cannot occur there, so a3-trust reading §1.2 learns `waiting` *can* occur on these pages, finds nowhere for it, and by this spec's own Reading rule files a `design-gap` and takes the next item. One word closes it: `waiting` is a proposal awaiting a human, which is the pending queue's business, and nothing on `/login`, `/device` or `/authorize` waits on anyone but the person in front of them.
+
+**Changelog v1.6 → v1.7 (2026-09-22).** Header history only. The date parenthetical had lost v1.4, v1.5 — a defect a1r raised once on the tap spec and which had silently recurred in **seven** files by round ten, because a bump edits the version number and the parenthetical on the same line and only one of them is ever noticed. The audit now derives the expected set from the file's own changelog entries and fails on any gap, so this class is closed rather than swept. Nothing else changed.
+
+**Changelog v1.5 → v1.6 (2026-09-22).** The **Provenance:** pointer becomes a *reference* and loses its version, per the Version rule's new third class in `README.md`: a pointer whose target is append-only and on which this spec makes no version-dependent claim carries no version. It removes the only reason this file would ever bump for someone else's screen. `tokens.css` keeps its version — §5's carve-out is precisely a claim that turns on one. Nothing else changed.
+
+**Changelog v1.4 → v1.5 (2026-09-22).** Round eight, a2-conformance's minor, and it is a vocabulary defect rather than a wording one: §1.2 listed **`partial`** among the states *not occurring on these pages* while R8 specified *8 lines + `+ N more`* and §20 required a fixture for it — the exact shape the tap spec and `lifeboat.md` both label `partial`, adopted here under §1.2's own rule that the same word always means the same thing. So a2's §16 check — *every region renders every state in §4* — could not see a state the page has. `partial` is declared as occurring **at R8 only**, R8's row is renamed from `ready (many scopes)`, and the fixture follows. Choosing the other resolution — keeping it a `ready` variant and explaining why — would have bought a paragraph of exception in place of a word that already means this. Pointers moved.
+
+**Changelog v1.3 → v1.4 (2026-09-22).** Round seven. §5's Durations paragraph named the claim *durations from `tokens.css` (these pages use none)* as wrong in both directions — and the claim was still two lines below it, so the file stated and denied the same sentence on one screen. Deleted. §16 now names D-T2's interaction-timeout exception, so the checklist stops contradicting the 10 s arm §3 mandates. The `Siblings:` pointer moved to tap v1.7 in the previous commit without a version bump, so this file shipped two byte-sequences as v1.3 — corrected, pointer now v1.8. The v1.3 entry also claimed a §1.2 reconciliation that never applied: `oversize` appears nowhere in this file, which is correct (these pages render no artifact), so the claim is withdrawn rather than implemented.
+
+**Changelog v1.2 → v1.3 (2026-09-22).** Round five on PR #45. §5 asserted *durations from `tokens.css` (these pages use none)* while §3 specifies a 10 s arm — wrong in both directions at once. Corrected per the tap spec's **D-T2**: the arm is a spec constant because it is server-validated, and these pages animate nothing so they read no motion token. §1.2's inherited vocabulary list is reconciled with the tap spec v1.6 (which declares `oversize`; these pages never render it, so it is noted as inherited-but-unused rather than transcribed). Pins moved to `tokens.css` v0.5, tap v1.6, `lifeboat.md` v1.2.
+
+**Changelog v1.1 → v1.2 (2026-09-22).** a1r and a2-conformance minors on PR #45: §14's numbered list ran 9 → 11 → 10 in source, so Markdown rendered the new `publish` entry under the wrong number — the list a1p works through by number at the 0.2 closing pass. Renumbered. Tokens and provenance pointers bumped to `tokens.css` v0.4 / `DESIGN-SOURCES.md` v1.4. Nothing else changed.
+
+**Changelog v1.0 → v1.1 (2026-09-22).** Fixes raised by a1r-reviewer and a2-conformance on PR #45: §14 now records that `cap.publish`'s rendered meaning rides on an `[OPEN→0.3]` in `capabilities.md`; §17 states that the imported lifeboat shell partial takes the viewer line as a **parameter**, so one copy key does not require one string across three specs. No law, region, state or other copy string changed.
+
+**Why this page matters.** Decisions §K: *the consent screen is a product surface*. `/authorize` renders the requested grant in `token ls` vocabulary — scopes, capabilities, expiry, principal — and authorizing the flagship is indistinguishable from minting any other client token because it IS one. This is where a person learns what a machine will be able to do in their container, in the same six words the CLI uses.
+
+**Decisions taken in this spec (Chief may veto by editing before commit; each carries its rejected alternative).**
+- **D-C1 · Authorize is two-step when the grant is wide, one press otherwise.** *Wide* = any of: `curate` or `admin` requested · scope `*` or any scope at ring org, exo, uxo or global (the ring set is `container.md` §1's; it has no `enterprise`) · **a scope at the personal root** (`user:self` — it has no ring rank, `container.md` §2, and a grant there reaches every personal item beneath it: the inbox and every thread) · no expiry · `principal: interactive`. Rejected: always two-step (friction on every `reader` connect teaches people to double-press without reading) and never (an `admin`, no-expiry, whole-container grant on one press). Cost: builders implement one control with two behaviours; the rule is a table, not a judgment (R11). **This relaxes principle 5** — *deliberate by construction (two presses)* — for narrow grants, deliberately and only here; only the Chief can relax a Docket v2 principle, so the veto on D-C1 is also the veto on that relaxation.
+- **D-C2 · Accept or deny the request exactly as asked; no narrowing on the page in v0.1.** Rejected: capability/scope/expiry editors on the consent page (a second `token mint` UI, on a security surface, before the flagship exists). Cost: a person who wants less than asked denies and mints in the CLI (`token mint`); the page says so (§13 `narrow.hint`).
+- **D-C3 · The login step's credential is the contract's, not this spec's.** The container must authenticate the human before consent; this spec fixes the login *page* (regions, states, copy laws, silence) and leaves the credential mechanism to a1p/the Chief (§14.7). Default built against: a container-local secret established at `init` (as the skeleton's owner token is), entered once per browser session.
+- **D-C4 · Device codes are 8 characters, shown `XXXX-XXXX`.** RFC 8628's user-code guidance; entry accepts with or without the hyphen, any case. Rejected: shorter codes (brute-force surface) and QR-only (excludes headless-with-phone paths).
+- **D-C5 · `continue` and `return` are matched on the parsed path against exact patterns, and the query rides only where the target consumes one.** It also governs the return address a step-up **issued from the container's own pages** binds to its token at issue (tap spec **D-T9 (a)**) — the third redirect target on these pages, and the one that fires after a human has signed. The flagship's `return_to` is an absolute address on another origin and is matched by **D-T9 (b)** instead, never by this list: step 1 alone would reject it. §2.1 fixed an allowlist and never said how a candidate is compared, and both readings break (a2-conformance major 1, PR #45). A **prefix** match makes `/` admit every path, and lets `//evil.com/x` through as a *relative-looking* string that a browser resolves cross-origin — the open redirect §15 names first, arriving through the guard meant to stop it. An **exact** match on the whole string strands `/authorize?response_type=…&code_challenge=…`, so the signed-out authorization-code flow dead-ends silently on the lifeboat home. The rule, in order: **(1) reject before parsing** any value that does not begin with exactly one `/`, or begins `//` or `/\`, or contains a backslash or a control character; **(2) compare the path component only**, exactly, against the patterns `/authorize` · `/device` · `/pending` · `/pending/<id>` · `/` · `/items/<id>`, where `<id>` is **one or more characters from `A–Z a–z 0–9 - . _ ~`** (RFC 3986's unreserved set), is not `.` or `..`, and contains **no percent-encoding at all** — stated positively, so step 1 need not guess what to exclude (a1r minor 2) — and the old list's trailing slash on `/items/` was a pattern all along, now written as one; **(3) carry the query string through verbatim — still percent-encoded, never decoded before it is written to `Location` —** for `/authorize` (its parameters *are* the request, and §14.2 validates them before anything renders) and for `/` (the search the viewer was on — `lifeboat.md` R10's scheme switch), and **drop it** for every other pattern; always drop the fragment; **(4)** anything that fails any step is a 303 to `/`, silently, as R2's `invalid continue` row already states. *Rejected:* prefix matching (vacuous) and exact whole-string matching (breaks the flow the allowlist exists to serve). *Cost:* the one security rule on these pages takes four steps rather than a list — deliberately, since a3-trust (Phase 5) and a5-dinghy (Phase 4) would otherwise each invent one, and whichever built first would decide for the other.
+- **D-C6 · An attempt the throttle refuses is counted, not appended; the throttle writes once on engaging and once on releasing, and the release entry carries the count.** (Decided in prose at v1.19; stated as a decision at v1.20, 2026-09-24 — a record, not a pin.) Binds every surface a caller reaches before anyone is authenticated: `/login`, `/device`, the pre-trust `/authorize` failures (§14.8 (a), (b), (d)) — and the tap page `/tap/<token>`, the fourth surface, which the tap spec §14.5 binds by citing this decision rather than restating it. An attempt the container **evaluates** appends once (tap spec D-T8). The attempt that **engages** the throttle — the first one refused — appends once under the same event, cause `throttled`. Every further attempt refused while it holds is **counted, not appended**, whatever it would have been — a correct secret included, because a refused attempt is not evaluated. The throttle appends once on **releasing**, §14.8 (e), and that entry carries the count. *Rejected:* one append per refused attempt — D-T8 read literally: the append-only chain grows one entry per request from an unauthenticated caller, so the ledger amplifies exactly the sweep it exists to record. *Rejected:* no append for refused attempts and none at release — the sweep leaves no trace at all, and a throttled credential sweep against `/login` becomes invisible to the one person entitled to see it. *Cost:* a fifth contract event, (e); a refused attempt makes zero writes, so it sits **outside** D-T8's uniform set — what stays uniform is the page (strings, status, length class), and a refused attempt's timing class is the throttle's own, which is not a secret, since a caller's own count already tells them the throttle holds; and §4 carries a refused row on every region the throttle reaches (R2, R3, R12 here; R11 in the tap spec), so the matrix says what §14.8 says.
+
+---
+
+## 0. Scope
+
+Four pages served by the container's authorization server, lifeboat-adjacent (server-rendered Python, in-process, no new surface):
+1. **Login** (`/login`) — the human proves identity to the container; establishes `principal: interactive` for the browser session.
+2. **Device-code entry** (`/device`) — where a CLI or headless client's user code is typed.
+3. **Consent** (`/authorize`) — the grant as requested, and the two acts.
+4. **Outcomes** — redirect for browser clients; a *done* page for device clients; one **uniform failure page** for every request the server will not act on.
+
+Not covered: the AS endpoints and their shapes (contract, issue #29); the tap page (the tap spec); token management after minting (CLI `token`; the flagship's permissions dashboard); MCP client registration mechanics (Phase 5; the consent page is the same page).
+
+## 1. Vocabulary
+
+### 1.1 Domain (contract vocabulary; binding as used here)
+- **Client** — a registered application per container config: name, client id, kind (`browser` · `device` · `mcp`), redirect origins (browser clients), registered-at. **Names and origins are shown; ids are shown as prefixes.**
+- **Grant request** — what the client asks for, expressed **only** in the frozen vocabulary: **capabilities** ⊆ {`fetch, remember, organize, publish, curate, admin`}, **scopes** = node ids (or `["*"]`), **expiry** (a time or none), **principal** (`interactive` for a browser UI acting as the present human; `client` for every machine client).
+- **Role bundle** — `reader · contributor · operator · curator · admin`; shown as a *label* when the requested set equals a bundle. The token carries capabilities, never the bundle name.
+- **Coverage** — a scope covers everything under it, computed down the path at check time — including containers created later. The page says this every time.
+- **Token** — `{id, principal, owner, client, capabilities, scopes, created_at, last_used, revoked, expires_at}`. The browser never sees a token value.
+- **User code** — the device flow's 8-character code the CLI displays and the human types here.
+
+### 1.2 States (the tap spec's vocabulary; two added)
+`empty · loading · ready · waiting · confirming · in-flight · approved · denied · expired · invalid · lapsed · quota · quarantined · unreachable · offline · error · stale · partial` as defined there, plus:
+
+| state | meaning |
+|---|---|
+| `wide` | the grant meets a D-C1 condition; the page marks it and Authorize is two-step |
+| `signed-out` | no interactive session; the login page is shown first |
+
+Not occurring on these pages: `loading`, `offline`, `unreachable`, `quota`, `quarantined`, `lapsed`, **`waiting`** (a proposal awaiting a human is a pending-queue concept; nothing on these three pages waits on anyone but the person in front of them). **`partial` does occur, at R8 only** — a scope list longer than eight lines truncates to `+ N more`, which is the same shape the tap spec (R2, R5, R6) and `lifeboat.md` (R3, R4, R5, R7) label `partial`, and §1.2 adopts that vocabulary on the stated basis that the same word always means the same thing. It occurs nowhere else on these pages. `approved` here means *authorized* (a token minted). Colour: **red** = `error` only. **Everything else is ink** — including `denied`, `expired` and `invalid`. A refused grant is not a failure; it is a decision or a stale request. **A throttle's refusal is not a state word**: an attempt refused while the throttle holds renders the region's existing failure state byte-identically and differs from it only in the event column — §4 lists it as its own row on R2, R3 and R12 so that column can say `—` (**D-C6**), and §20 gives it a fixture.
+
+## 2. The pages
+
+### 2.1 Login (`/login?continue=<relative>`)
+Shell (lifeboat R1 without the viewer line and nav; `<title>` `egzos · sign in`) · heading *Sign in to container <name>.* · the credential region (§14.7; default: one secret field, labelled *Container secret*, `autocomplete="current-password"`) · act **Sign in** (ink — signing in is not a human-only act) · nothing else: no "remember me", no links, no client information (the request is not shown until the human is known). On success: 303 to `continue` (matched by **D-C5**: parsed path only, exact patterns `/authorize` · `/device` · `/pending` · `/pending/<id>` · `/` · `/items/<id>`, query carried only to `/authorize` and `/`). Failure: *That didn't work. Try again.* — identical for wrong secret, unknown user, locked (the contract throttles; the page never says so).
+
+### 2.2 Device-code entry (`/device`)
+Shell · heading *Enter the code your terminal shows.* · one field labelled *Code*, mono, `XXXX-XXXX` placeholder, `inputmode="text"`, `autocomplete="one-time-code"`, `spellcheck="false"`, 9 characters max, uppercase on submit · act **Continue** (ink) · a line *Codes expire a few minutes after your terminal shows them.* On success: 303 to `/authorize?user_code=…` (the consent page in its device variant). Failure: *That code isn't valid or has expired.* — identical for unknown, expired, already used and throttled.
+
+### 2.3 Consent (`/authorize`)
+Required content, in this order (single column, max 640 px):
+1. **Shell** — container line; viewer line `you · <user> · principal: interactive · signed in HH:MM`.
+2. **Reference** — mono caps: `GRANT REQUEST · <client name> · requested HH:MM:SS`; device variant appends `· code XXXX-XXXX`.
+3. **Title** — a sentence: *<Client name> asks for a token to your container.* Max 2 lines; the client name is data (escaped, max 64 chars then `…`).
+4. **Client block** — `client · <name>` · `id <prefix…>` · browser: `redirects to <origin>` (origin only, never the full URI; a localhost origin adds `· local development origin`) · device: `requested from <requester hint>` when the contract provides one (§14.5), else the line is absent · `registered <date>` · kind word `browser · device · mcp`.
+5. **Principal block** — one of two sentences, verbatim (§13 `principal.client`, `principal.interactive`). This is the block that makes *a machine that proposes* and *a browser that acts as you* legibly different.
+6. **Capabilities block** — heading `capabilities`; the six in ladder order as **stamps**: requested = solid ink fill **with its word in `--egz-canvas`** (§6; `tokens.css` v0.12 — a fill with no stated type colour leaves the legibility of the word to a builder), not requested = ink outline (trust-is-a-shape, reused: the shape says *granted*, never a colour). Under the stamps, one line per **requested** capability: the word, then its meaning (§13 `cap.*`). Then `role · <bundle>` when the set equals a bundle, else `custom set`.
+7. **Scopes block** — heading `scopes`; each scope as `ring:name · ring <ring>`, then the coverage sentence (§13 `scope.coverage`). `*` renders `whole container` and the **consequence box** (`scope.all`). Scopes at ring org or wider are flagged (ink 2 px chip) and sorted first.
+8. **Expiry block** — `expires <date> HH:MM:SS · in N d` or the **consequence box** *No expiry. This token works until you revoke it.*
+9. **Existing tokens line** — when the viewer already owns live tokens for this client: *This client already holds N live tokens · latest minted <date>. Authorizing mints another.* (viewer-scoped; absent when zero).
+10. **Narrowing hint** — *Want to grant less than this? Deny, then mint it yourself: `egzos token mint`.* (D-C2).
+11. **The acts** — **Authorize** (`--egz-act`; two-step when `wide`, R11) · **Deny** (ink; one press). Initial focus on the heading, never on an act.
+
+### 2.4 Outcomes
+- **Browser client, authorized** — 303 to the registered redirect with the code; no page is shown. Event `token.mint`.
+- **Browser client, denied** — 303 to the registered redirect with `error=access_denied` and **no `error_description`**; no page is shown.
+- **Device client, authorized** — `/device/done`: heading *Done. Return to your terminal.* · line `token minted HH:MM:SS · <client name> · <bundle or custom set> · expires <date> / no expiry` · no token value anywhere. Event `token.mint`.
+- **Device client, denied** — `/device/done`: heading *Denied. Nothing was minted.* · line `denied HH:MM:SS`.
+- **Any client, request no longer valid** (code expired between entry and consent; PKCE request expired; client re-registered) — the consent page re-renders as `invalid`: title followed by *This request is no longer valid.* and no acts (R12).
+
+### 2.5 The uniform failure page
+For every request the server will not act on **before a client is trusted** — unknown client, redirect origin not registered, malformed request, unsupported response type, missing PKCE challenge: heading *This request can't be completed.* · body empty · shell intact · **identical status code, length class and timing class** across all causes. **Never a redirect** to an unregistered origin. When client id **and** redirect origin validate but the request is otherwise invalid (bad scope, unknown capability), the server redirects with the standard OAuth error code and no description (§14.4). Pre-trust requests are throttled per caller as `/login` and `/device` are (§14.8, **D-C6**); a refused request receives this same page.
+
+## 3. The two-step Authorize (R11)
+Baseline as the tap spec §2.3: pressing *Authorize* replaces it in place, same size, with **Confirm authorization** for 10 s; the second press mints. Escape, focus leaving the control, or 10 s reverts. No hold enhancement on these pages (they are lifeboat-adjacent; no JS required). When the grant is not `wide`, *Authorize* is one press. The pressed state renders only after the server has answered; while `in-flight` the control reads *Authorizing…* and both acts are disabled. **Deny** is always one press, ink. There is no *Remember this decision*, *Always allow*, *Trust this client*, or *Skip next time*, and no screen may imply they could exist.
+
+## 4. Regions × states — the matrix
+
+### R1 · Shell
+| state | renders | colour | a11y |
+|---|---|---|---|
+| signed-out (login page) | container line only; no viewer line, no nav | ink | `<header>` |
+| ready | container line · viewer line `you · <user> · principal: interactive · signed in HH:MM` · no nav (these pages have one job) | ink | `<header>` |
+| error | shell renders; body replaced by R12 error card | red card | `role="alert"` |
+
+### R2 · Login page
+| state | renders | colour | a11y | event |
+|---|---|---|---|---|
+| ready | heading · credential field(s) · *Sign in* | ink | `<h1>` first focus; `<label for>`; `autocomplete` set | — |
+| in-flight | *Signing in…* pressed, disabled | ink | `aria-busy` | — |
+| error (credential) — an attempt the container evaluated (wrong · unknown), or the one that engaged the throttle | field cleared; line *That didn't work. Try again.* — identical for all three, and identical to the row below | ink | `role="status"`; focus to the field | **[GAP→a1p]** §14.8 (a) — one login-attempt append; the cause (wrong · unknown · throttled — the last on the attempt that engaged the throttle, the first one refused) in `details`, never on the page (tap spec **D-T8**) |
+| error (credential) — refused while the throttle holds | byte-identical to the row above: field cleared, the same line, same status code and length class; the timing class is the throttle's own (§14.8). Whatever the attempt would have been — a correct secret included — it is not evaluated; no 303 | ink | as the row above | **—** counted, not appended (**D-C6**): the attempt writes nothing; its count rides on the throttle's release entry, §14.8 (e), `surface: login` |
+| approved (signed in) | 303 to `continue` | — | — | **[GAP→a1p]** §14.8 (a) — one login-attempt append, outcome `established` (tap spec **D-T8**) |
+| invalid `continue` | ignored; 303 to `/` | — | — | — |
+| already signed in | 303 to `continue` immediately (no page) | — | — | — |
+
+### R3 · Device-code entry
+| state | renders | colour | a11y | event |
+|---|---|---|---|---|
+| ready | heading · *Code* field · *Continue* · expiry line | ink | `<h1>` first focus → field | — |
+| ready (prefilled) | `/device?user_code=…` from a link the CLI printed: field prefilled, focus on *Continue* | ink | — | — |
+| in-flight | *Checking…* pressed, disabled | ink | `aria-busy` | — |
+| invalid / expired / used / throttled — an attempt the container evaluated, or the one that engaged the throttle | field kept; line *That code isn't valid or has expired.*; identical for all four, and identical to the row below | ink | `role="status"`; focus to the field | **[GAP→a1p]** §14.8 (b) — one device-code redemption append; the cause in `details` (`throttled` on the attempt that engaged the throttle, the first one refused), never on the page (**D-T8**) |
+| throttled — refused while the throttle holds | byte-identical to the row above; the timing class is the throttle's own (§14.8). Whatever the attempt would have been — malformed, or a valid code — it is not evaluated; no 303 | ink | as the row above | **—** counted, not appended (**D-C6**); its count rides on the throttle's release entry, §14.8 (e), `surface: device` |
+| approved (code found) | 303 to `/authorize?user_code=…` | — | — | **[GAP→a1p]** §14.8 (b) — one device-code redemption append, outcome `found` (**D-T8**) |
+| malformed (wrong length / characters) | same line as invalid (never "must be 8 characters" — a format hint is the placeholder's job) | ink | — | **[GAP→a1p]** §14.8 (b) — one device-code redemption append; the cause in `details`, never on the page (**D-T8**) — `malformed` is a cause like the other four |
+
+### R4 · Request header (reference, title)
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready | `GRANT REQUEST · <client> · requested HH:MM:SS` · `<h1>` title sentence | ink | `<h1>` first focus |
+| ready (device) | reference appends `· code XXXX-XXXX` | ink | — |
+| ready (long client name) | name cut at 64 chars + `…`; full name in `title` | ink | — |
+| invalid | header stays; under the title *This request is no longer valid.*; blocks below collapse to headings; no acts | ink | `role="status"` |
+
+### R5 · Client block
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready (browser) | `client · <name>` · `id <prefix…>` · `redirects to <origin>` · `registered <date>` · `browser` | ink | `<dl>` |
+| ready (browser, localhost origin) | `redirects to http://localhost:5173 · local development origin` | ink | — |
+| ready (device) | `client · <name>` · `id <prefix…>` · `requested from <hint>` (absent without a hint) · `registered <date>` · `device` | ink | — |
+| ready (mcp) | as browser/device per the client's registered kind; kind word `mcp` | ink | — |
+| ready (flagship) | **no special treatment** — the flagship is a browser client like any other | ink | — |
+
+### R6 · Principal block
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready (client) | `principal.client` sentence | ink | `<p>` |
+| ready (interactive) | `principal.interactive` sentence; the block is framed (2 px + offset) because this is `wide` | ink | `role="note"` |
+
+### R7 · Capabilities block
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready | six stamps in ladder order (requested solid, others outline) · a line per requested capability · `role · <bundle>` or `custom set` | ink | `<ul aria-label="Capabilities">`; each stamp's text is the word; requested ones carry `aria-description="requested"` |
+| ready (all six) | six solid stamps · `role · admin` · the block is framed (`wide`) | ink | — |
+| ready (curate or admin, not all) | as ready; framed (`wide`) | ink | — |
+| ready (fetch only) | one solid, five outline · `role · reader` | ink | — |
+| empty | cannot occur — a request must ask for ≥ 1 capability; if received, uniform failure page | — | — |
+| invalid (unknown capability word) | cannot reach render (§2.5) | — | — |
+
+### R8 · Scopes block
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready | one line per scope `project:atlas · ring project` + `scope.coverage` sentence | ink | `<ul aria-label="Scopes">` |
+| ready (`*`) | `whole container` + consequence box `scope.all`; framed (`wide`) | ink | `role="note"` on the box |
+| ready (org or wider) | that scope's chip flagged 2 px ink, sorted first; framed (`wide`) | ink | `aria-description="wide scope"` |
+| partial | 8 lines + `+ N more` (a link to `?full=1`) | ink | link ≥ 44 px |
+| ready (scope not visible to the viewer) | **cannot occur** — a viewer cannot grant coverage they do not hold; the request is `invalid` before render (§14.3) | — | — |
+| ready (unknown ring word) | ring rendered verbatim (the onion grows) | ink | — |
+
+### R9 · Expiry block
+| state | renders | colour | a11y |
+|---|---|---|---|
+| ready (expires) | `expires <date> HH:MM:SS · in N d` | ink | `<time datetime>` |
+| ready (no expiry) | consequence box `expiry.none`; framed (`wide`) | ink | `role="note"` |
+| ready (beyond container max) | cannot reach render — the server clamps or refuses per config (§14.6); if clamped, the page shows the clamped value and the line `expiry.clamped` | ink | — |
+
+### R10 · Existing tokens line
+| state | renders | a11y |
+|---|---|---|
+| ready (N ≥ 1) | `existing` sentence with N and latest date; viewer-scoped | `role="note"` |
+| empty (N = 0) | line absent | — |
+
+### R11 · The acts
+| state | Authorize | Deny | a11y |
+|---|---|---|---|
+| ready (not wide) | enabled, one press, `--egz-act` | enabled, ink | ≥ 44 px; focus order Authorize → Deny |
+| ready (wide) | enabled, two-step, `--egz-act`; the page carries the line *This is a wide grant. Authorizing takes two presses.* above the acts | enabled | `aria-describedby` → the line |
+| confirming | replaced in place by **Confirm authorization**, 10 s | enabled | `aria-live` *Press again to confirm.* |
+| in-flight | *Authorizing…* pressed, disabled | disabled | `aria-busy` |
+| approved | browser: redirect (no render) · device: `/device/done` | — | — |
+| denied | browser: redirect `error=access_denied` · device: `/device/done` denied | — | — |
+| invalid | acts absent (R4) | — | — |
+| error (mint failed) | reverts to ready; red line *That didn't go through. Nothing was minted. Try again.* | enabled | `role="status"` |
+| stale (request re-submitted after decision: back button) | the uniform failure page — **one append, cause `replayed`** (R12 `back after decision`, §14.8 (d)); while the throttle holds, R12's *refused* row — counted, not appended (D-C6) | — | — |
+
+### R12 · Outcomes and failures
+| state | renders | colour | a11y | event |
+|---|---|---|---|---|
+| approved (device) | `/device/done`: *Done. Return to your terminal.* + `done.minted` line | ink | `<h1>` | `token.mint` |
+| denied (device) | `/device/done`: *Denied. Nothing was minted.* + `denied HH:MM:SS` | ink | `<h1>` | **[GAP→a1p]** §14.8 (c) — consent denial |
+| approved / denied (browser) | 303; nothing rendered | — | — | `token.mint` / **[GAP→a1p]** §14.8 (c) — consent denial |
+| invalid (request expired or changed) | consent page in `invalid` (R4) | ink | `role="status"` | — |
+| uniform failure — an attempt the container evaluated, or the one that engaged the throttle | *This request can't be completed.*; body empty; identical status/length/timing for all pre-trust causes, and identical to the row below | ink | `<h1>` | **[GAP→a1p]** §14.8 (d) — one append on every cause that renders this page, pre-trust and replay alike, the cause in `details`, never on the page (**D-T8**); cause `throttled` on the attempt that engaged the throttle, the first one refused |
+| uniform failure — refused while the throttle holds | byte-identical to the row above; the timing class is the throttle's own (§14.8). Whatever the request would have been, it is not evaluated | ink | `<h1>` | **—** counted, not appended (**D-C6**); its count rides on the throttle's release entry, §14.8 (e), `surface: authorize` |
+| error | card `error` · *Something went wrong on the container. Nothing was minted. Try again.* + *Retry* | red 2 px + red offset | `role="alert"`; no code, id or detail | — |
+| back after decision | uniform failure page (the request is single-use) | ink | — | **[GAP→a1p]** §14.8 (d) — one append, cause `replayed` in `details`: the page writes once however it is reached (**D-T8**) |
+
+## 5. Interaction constants, formats, layout, print
+
+**Durations.** The two-step **arm** is a spec constant, not a token: it is validated server-side, so a CSS variable would imply a deployment could restyle a security timeout (tap spec §5, D-T2). These pages animate nothing, so they read no `--egz-motion-*` value at all — the earlier claim that durations come from `tokens.css` was wrong in both directions.
+
+**Constants.** Two-step arm **10 s** · user code **8** characters, shown `XXXX-XXXX`, entry max **9** · client name cut **64** chars · scopes shown before `+ N more`: **8** · consent page max width **640 px** · login and device pages **480 px**. **The throttle's thresholds and hold are the contract's** (§14.5, §14.7, §14.8) and deliberately not stated here: D-C3 leaves the credential mechanism to the contract and the throttle is part of it, and the page renders the same whatever they are, so no render depends on the number.
+
+**Formats.** Times `HH:MM:SS` local, zone once in the container line; dates `2026-09-21`; `in N d` (< 1 d: `in N h`; < 1 h: `in N min`); ids `cli_01J7 … 9KQ2` (first 8, ` … `, last 4; full in `title`); origins as scheme + host (+ port); capability words lowercase mono; ring words lowercase mono; principals `principal: client` / `principal: interactive`; counts integers.
+
+**Layout.** Single column, centred; the page frame carries `--egz-off-lg`; the principal block (interactive), consequence boxes, the acts carry `--egz-off`; `<dl>` and lists carry hairlines only. Blocks are separated by `--egz-sp-5`; block padding `--egz-sp-4 --egz-sp-5`. Below 480 px: acts stack full-width, Authorize above Deny.
+
+**Print.** A grant request prints as requested with the header line `not yet authorized` and no acts; `/device/done` prints its lines; footer `printed HH:MM:SS · <container>`. No page prints a token value or a full client id.
+
+**Language.** en-US; strings from §13 only, one place in the codebase.
+
+## 6. Colour law
+Two colours. **`--egz-act`** only on *Authorize* / *Confirm authorization* and keyboard focus. **`--egz-alarm`** only for `error`. Deny is ink. `denied`, `expired`, `invalid` and the uniform failure page are ink. No yellow, lime, amber or acid anywhere. The word *wide* is set in ink with a 2 px frame — never in colour.
+
+**Type on a solid ink fill is `--egz-canvas`** (`tokens.css` v0.12). Every stamp whose shape is a *fill* carries its word in the canvas colour — the word is the content, and a fill with no stated type colour leaves the one legibility decision on the shape to a builder. **Not `--egz-act-on`:** it is legible here only because it happens to hold the same value as `--egz-canvas` in all three schemes today, and it tracks whatever `--egz-act` becomes, so the day the act colour moves the stamp goes with it for no reason. Contrast needs no new assertion — the tap spec §12.1 carries ink-on-canvas at ≥ 15:1 in all three canvases, and contrast is symmetric.
+
+## 7. Structure law
+As the tap spec §7. Stamps on this page mean *requested* (solid) vs *not requested* (outline) — the same shapes as trust, the same rule: the shape carries the meaning, the word is always present. Consequence boxes and the interactive-principal block carry the 2 px border and hard offset. Fields are 2 px ink with no offset; buttons carry the offset. Pressed = translate, offset removed. Disabled = ink-3 text, `--egz-rule-soft` border, no offset.
+
+## 8. Type
+IBM Plex Sans (UI), IBM Plex Mono (ids, codes, origins, capability and ring words, principals, timestamps). The user code field and every `XXXX-XXXX` render in mono at `--egz-fs-5` with `--egz-tracking-caps`. Titles are sentences; buttons are verbs.
+
+## 9. Motion law
+**None** beyond the pressed offset. No transitions, no progress bars, no spinners; `in-flight` is a word.
+
+## 10. Silence-not-errors — on these pages
+- Login: wrong secret, unknown user and the attempt that engages the throttle produce one message, one status, one timing class. An attempt refused while the throttle holds produces the same message and status; its timing class is the throttle's own (§14.8, D-C6) — not a secret, since a caller's own count already says the throttle holds.
+- Device entry: unknown, expired, used, malformed and the attempt that engages the throttle produce one message and one timing class; a refused attempt, the same message, on the throttle's timing.
+- Pre-trust failures (unknown client, unregistered origin, malformed request) produce one page and never a redirect — evaluated or refused; only the timing class differs, and it says nothing but that the throttle holds.
+- Post-trust invalid requests redirect with a standard error code and **no description**.
+- The consent page never lists scopes the viewer cannot see (they cannot be requested of them; the request is invalid first).
+- The existing-tokens line counts only tokens the viewer owns.
+- `error` carries no code, id, path or message.
+- Every page sends `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Frame-Options: DENY` / `frame-ancestors 'none'`.
+
+## 11. Unverified-by-default — on these pages
+Not a trust surface for items — but the same honesty: the page shows the grant *as it will be minted*, after any server clamp, never as the client phrased it. `principal: client` is stated as *proposes, never approves*; `principal: interactive` as *acts as you while you are present; human-only acts still need your tap*.
+
+## 12. Accessibility
+
+### 12.1 Baseline
+WCAG 2.2 AA; contrast per the tap spec §12.1; focus ring `--egz-focus` offset 3 px; **Hit targets ≥ 44 px — and the 44 px is the target, not the ink** (`DESIGN-PRINCIPLES.md` principle 11). It binds **every control a person must hit**, and is deliberately not a list here: seven specs in this set each enumerated a different subset, four named none, and when the surfaces were measured six of seven had text-shaped controls at 21–33 px. On this screen the rule is easiest to lose on the ghost acts and *Retry* — they render as text and have no box to remind anyone of their height. Pad the target, never the type. Landmarks: `<header>`, `<main>`; `<h1>` per page; lists labelled (*Capabilities*, *Scopes*); consequence boxes `role="note"`; failure card `role="alert"`; act state changes announced (`aria-live="polite"`). Field errors: `aria-invalid="true"` + `aria-describedby`. No icon-only controls; the stamps carry their word. All pages work without JS.
+
+### 12.2 Keyboard map
+| key | where | does |
+|---|---|---|
+| Tab / Shift+Tab | consent | heading → client `<dl>` → principal → capabilities → scopes (+ N more) → expiry → existing → narrowing hint link → Authorize → Deny |
+| Enter | login / device field | submits |
+| Enter / Space | Authorize (not wide) | authorizes |
+| Enter / Space | Authorize (wide) | arms (→ Confirm authorization); second press authorizes |
+| Escape | while confirming | disarms; focus stays |
+| Enter / Space | Deny | denies (one press) |
+| Enter / Space | `+ N more` | reveals (re-render) |
+
+## 13. Copy — canonical strings (complete)
+| key | string |
+|---|---|
+| title.login | `egzos · sign in` · title.device `egzos · device code` · title.consent `egzos · grant request` · title.done `egzos · done` · title.failure `egzos` |
+| shell.container | `egzos · container <name> · <host:port>` |
+| shell.viewer | `you · <user> · principal: interactive · signed in HH:MM` |
+| login.title | `Sign in to container <name>.` |
+| login.secret | `Container secret` |
+| login.act | `Sign in` · login.inflight `Signing in…` |
+| login.error | `That didn't work. Try again.` |
+| device.title | `Enter the code your terminal shows.` |
+| device.label | `Code` · device.placeholder `XXXX-XXXX` |
+| device.act | `Continue` · device.inflight `Checking…` |
+| device.expiry | `Codes expire a few minutes after your terminal shows them.` |
+| device.error | `That code isn't valid or has expired.` |
+| ref.request | `GRANT REQUEST · <client> · requested HH:MM:SS` · ref.code `· code XXXX-XXXX` |
+| consent.title | `<Client> asks for a token to your container.` |
+| client.label | `client` · client.id `id` · client.redirect `redirects to <origin>` · client.local `local development origin` · client.from `requested from <hint>` · client.registered `registered <date>` |
+| kind.browser | `browser` · kind.device `device` · kind.mcp `mcp` |
+| principal.client | `principal: client — this token acts on its own. It can propose, never approve. Human-only acts stay with you.` |
+| principal.interactive | `principal: interactive — this token acts as you while you are present. Human-only acts still need your tap.` |
+| section.caps | `capabilities` · section.scopes `scopes` · section.expiry `expiry` |
+| cap.fetch | `fetch — reading context; downloading artifacts is fetch` |
+| cap.remember | `remember — writing, in the same scope only` |
+| cap.organize | `organize — moving items between containers` |
+| cap.publish | `publish — proposing a wider audience` |
+| cap.curate | `curate — quarantining items, and lifting quarantine` |
+| cap.admin | `admin — creating containers above a node's structure floor` |
+| role.bundle | `role · <bundle>` · role.custom `custom set` |
+| scope.line | `<scope> · ring <ring>` |
+| scope.coverage | `Coverage reaches everything under <scope> — including containers created there later.` |
+| scope.all | `Consequence. This token reaches everything in this container, including containers created later.` |
+| scope.more | `+ N more` |
+| expiry.at | `expires <date> HH:MM:SS · in N d` |
+| expiry.none | `No expiry. This token works until you revoke it.` |
+| expiry.clamped | `shortened to the container's maximum` |
+| existing | `This client already holds N live tokens · latest minted <date>. Authorizing mints another.` |
+| narrow.hint | `Want to grant less than this? Deny, then mint it yourself: egzos token mint` |
+| wide.note | `This is a wide grant. Authorizing takes two presses.` |
+| act.authorize | `Authorize` · act.confirm `Confirm authorization` · act.confirm.sr `Press again to confirm.` · act.inflight `Authorizing…` |
+| act.deny | `Deny` |
+| act.error | `That didn't go through. Nothing was minted. Try again.` |
+| invalid | `This request is no longer valid.` |
+| done.title | `Done. Return to your terminal.` |
+| done.minted | `token minted HH:MM:SS · <client> · <bundle or custom set> · expires <date> / no expiry` |
+| denied.title | `Denied. Nothing was minted.` · denied.at `denied HH:MM:SS` |
+| failure.title | `This request can't be completed.` |
+| fail.error | `Something went wrong on the container. Nothing was minted. Try again.` · fail.retry `Retry` |
+| print.header | `not yet authorized` · print.footer `printed HH:MM:SS · <container>` |
+
+Rendered verbatim by a3-trust; new strings require a spec revision.
+
+## 14. What this spec needs from the authorization-server contract (inputs to issue #29 and the freeze)
+1. **Client registry read**: name, id, kind (`browser · device · mcp`), redirect origins, registered-at — per container config; the flagship registered like any other.
+2. **Request validation before render**, in two tiers: pre-trust (client id + redirect origin exact-match → else the uniform failure, no redirect; throttled per caller as `/login` and `/device` are, §14.8, **D-C6**) and post-trust (capabilities ⊆ the six; scopes are node ids the viewer covers; expiry within config; PKCE challenge present for public clients → else redirect with a standard error code and no description).
+3. **Grant expressed only in the frozen vocabulary** — no scope string that is not a node id, no capability outside the six; the page renders exactly what will be minted (after any clamp).
+4. **Standard error redirects carry no `error_description`**; error shapes must not let a caller enumerate clients, tokens or scopes.
+5. **Device flow**: user-code issuance (8 chars), verification with throttling and single use, an optional requester hint (device/host the CLI reported) for the client block, expiry a few minutes; **[OPEN→a1p]** whether issuance is an auditable event (see 8).
+6. **Expiry policy** per container config: default and maximum; clamp-or-refuse rule. **[OPEN→a1p]**.
+7. **Login**: the credential mechanism that establishes `principal: interactive` for a browser session (D-C3) **[OPEN→a1p / Chief]**; a `continue` parameter matched by **D-C5** (parsed path, exact patterns, a leading `//` rejected); throttling.
+8. **Events**: `token.mint` on authorize (subject = token id; details carry client id, capabilities, scopes, expiry — never a value). **Every login attempt, every device-code redemption, every consent denial and every pre-trust uniform failure appends exactly one event — success and failure alike, the cause in `details` and never on the page.** This is the tap spec's **D-T8** applied to these pages, where v1.16 had stopped at the door (a1r major 1, PR #45): the uniformity §10 promises is owed to the *caller*, not to the owner's ledger, and a credential sweep against `/login` or a user-code sweep against `/device` — §15 names both — must be something the owner can see. `events.md` §4.2 (**running**) makes a surface that produces an effect without an event non-conforming. **[GAP→a1p]** — the drafted taxonomy has none of the four, raised, not invented, one each: **(a)** a login attempt (outcome `established` or `failed`; cause wrong · unknown · throttled in `details`); **(b)** a device-code redemption attempt (outcome `found` or `failed`; cause invalid · expired · used · throttled · malformed); **(c)** a consent denial (device and browser); **(d)** a uniform failure on `/authorize` (R12; cause in `details`) — **every cause that renders that page**: the pre-trust four (unknown client · origin mismatch · malformed · missing PKCE) **and the replay of a decided single-use request** (R11 `stale`, R12 `back after decision`; cause `replayed`). The page is one page, so it writes once however it is reached, and a replay after a decision is a fact the owner has an interest in (a1r minor 4, PR #45). One append per path, so no path is distinguishable by the number of writes it makes. **The throttle bounds the write rate** (a1r minor 5, PR #45; **D-C6**): `/login`, `/device` and the pre-trust `/authorize` failures are reachable before anyone is authenticated, and (a), (b) and (d) append on every attempt — so the append-only chain would otherwise grow one entry per request from an unauthenticated caller. An attempt the container **evaluates** appends once. The attempt that **engages** the throttle — the first one refused — appends once under (a), (b) or (d), cause `throttled`. Every further attempt refused while the throttle holds is **counted, not appended**, whatever it would have been — a correct secret or a valid code included: a refused attempt is not evaluated. The throttle appends once more on **releasing**, and that entry is the only thing that carries the sweep's size, so it is the fifth event (a1r minor 2, PR #45) — raised, not invented: **(e)** a throttle release (outcome `released` — one value, closed: a throttle that engages again after releasing writes a new engage entry under (a), (b) or (d), never a second outcome here); `details` carry **`surface`** — `login` · `device` · `authorize` · **`tap`** (the tap page is the fourth surface; the tap spec §14.5 binds it to this entry) — and **`refused`**, the integer count of attempts refused while it held, **`0` included**: the release appends whenever an engage did, so the size of a sweep is never inferred from a missing entry. How the entry names the caller the throttle keyed on, and how it is paired with its engage entry, are the contract's to shape (**[OPEN→a1p]**); nothing on the page depends on either. So the chain grows at the throttle's rate, never the caller's, and the owner still sees the sweep's size. Refused attempts receive the same page as evaluated ones — same strings, status and length class; R2, R3 and R12 each carry the refused row. A refused attempt's timing class is the throttle's own, which is not a secret — a throttle that hid itself would not be one, and a caller's own count already says it holds; what stays uniform is the page. A throttle that fails open, or that never writes its release, would turn the audit chain into a write amplifier or hide the sweep inside it, which is why §15 lists both.
+9. **Existing tokens for (viewer, client)**: count and latest minted-at, viewer-scoped.
+10. **`publish`'s meaning is rendered to a human before the freeze fixes it.** §13 `cap.publish` tells a person *"publish — proposing a wider audience"*, matching `capabilities.md` §1's table row. That row is marked **[OPEN→0.3]**: `publish` has no distinct enforcement point in the skeleton and "currently gates nothing that `organize` does not already reach". **[OPEN→a1p / 0.3]** — if the freeze gives `publish` a different checkable meaning, or records it as carried unenforced, this string is a spec revision, not a builder's edit. A security surface should not promise a capability boundary the contract has not fixed.
+11. **Single-use request state**: a decided request cannot be re-submitted (back button → uniform failure).
+12. **`principal.interactive` promises a presence backstop no contract clause fixes.** §13 tells a person *Human-only acts still need your tap.* — and that clause is the whole of what makes it safe to hand an interactive-principal token to a machine. `capabilities.md` §4 gates human-only acts on the **principal** (*an attempt by a `client` principal is refused as a human-only violation*), not on presence, and §3 says the interactive owner token *is* the proof until the step-up tap arrives; D-C1 makes `principal: interactive` grantable through `/authorize`. As drafted, then, a machine holding an interactive-principal token could take a human-only act without a tap, on a page that had told the human it could not. **[GAP→a1p]** — the contract must require presence re-proof for every human-only act regardless of the token's principal, or this string is a spec revision and not a builder's edit. Item 10's rule, applied to the page's other boundary promise: a security surface does not promise a boundary the contract has not fixed. (a1r major 2, PR #45.)
+
+## 15. A6 review notes — the attack surface of these pages
+Consent phishing — a client name that imitates the product (names come from container config; show the origin and kind beside the name, always) · open redirect via `continue` or `redirect_uri` (relative allowlist; exact-match registered origins; never redirect pre-trust) · clickjacking (`frame-ancestors 'none'`) · CSRF on the acts (request bound to the session; form token) · user-code brute force (throttle; identical message and timing) · remote device-flow phishing — an attacker asks the victim to approve a code (the client block shows kind and requester hint; `wide` grants take two presses) · `error_description` leaks · token values on any page or in any URL · the two-step bypassed when `wide` · optimistic outcome before the server answers · request replay after decision · timing differences between unknown client and origin mismatch · the login page revealing whether a user exists · autofill writing a container secret into the code field (distinct `autocomplete` values) · a scope name or client name rendered unescaped · principal sentence swapped (an interactive grant described as client) · red used for Deny or denied · **ledger growth from unauthenticated callers** — (a), (b) and (d) append from callers who have not signed in (§14.8); the throttle is the bound (**D-C6**): the attempt that engages it appends once, and every attempt refused while it holds is counted, not appended, the count riding on the release entry (e) — so a sweep cannot grow the chain faster than the throttle admits attempts · a throttle that **fails open** turns the audit chain into a write amplifier · a throttle whose **release entry is never written**, or written only when the count is non-zero — it loses the sweep's size, the one trace the refused attempts leave, which is why (e) appends at `0` · a throttle that **evaluates the correct secret while refusing wrong ones** — it then bounds the ledger and not the guessing; a refused attempt is not evaluated, whatever it would have been.
+
+## 16. a2-conformance checklist
+Tokens only (interaction timeouts are D-T2's declared exception; motion durations still read tokens) · exactly two colours per §6 · no yellow family · radius 0 · offsets only on §7 containers · no motion · every string from §13 by key, verbatim · **every region renders every state in §4; a fixture exists per state (§20)** · stamps carry words · Authorize two-step iff `wide` per D-C1's table; Deny one press; no remember/always affordances · uniform failure page identical across causes (asserted) · each *refused while the throttle holds* row (R2, R3, R12) byte-identical to the evaluated row above it (asserted) and appending nothing (D-C6) · no `error_description` · security headers per §10 · pages work without JS · no catalogue components · print per §5 · shell partial imported from the lifeboat, not forked.
+
+## 17. Component picks
+**None.** Security surface, lifeboat-adjacent, server-rendered: plain HTML from `tokens.css`, the lifeboat's shell partial imported, the two-step control per the tap spec §2.3. DESIGN-SOURCES.md row: *consent, device entry, login — none (bespoke; decided)*. Reference only, not installed: the tap spec §17 stamps and act; for the code field the pattern of an OTP input (catalogue examples in the `auth` sweep) — structure idea only, no dependency.
+
+## 18. Pages, URLs and HTML patterns (a3-trust)
+**URLs.** `/login?continue=` · `/device` (`?user_code=` prefill) · `/authorize` (browser: standard parameters; device: `?user_code=`) · `/device/done`. Headers on every response: `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, `X-Frame-Options: DENY`, CSP `default-src 'none'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'`.
+
+**The shell partial is parameterised.** a3-trust imports the lifeboat's shell partial (§16: imported, never forked) and passes the viewer line as a parameter: the lifeboat and the tap pages pass `shell.viewer` (*present since HH:MM (UTC−07:00)*), these pages pass this spec's `shell.viewer` (*signed in HH:MM* — there is no presence window on the authorization-server pages). One partial, one key per spec, no fork. Raised by a2-conformance on PR #45.
+
+**Patterns.**
+- Consent: `<main><p class="ref">GRANT REQUEST · Claude · requested 21:31:04</p><h1>Claude asks for a token to your container.</h1><dl class="client">…</dl><p class="principal">principal: client — …</p><section><h2>capabilities</h2><ul class="stamps" aria-label="Capabilities"><li class="stamp stamp--solid" aria-description="requested">fetch</li><li class="stamp stamp--outline">remember</li>…</ul><ul class="caps"><li><code>fetch</code> — reading context; downloading artifacts is fetch</li></ul><p class="role">role · reader</p></section><section><h2>scopes</h2><ul aria-label="Scopes"><li><code>project:atlas</code> · ring project<p>Coverage reaches everything under project:atlas — including containers created there later.</p></li></ul></section><section><h2>expiry</h2><p><time datetime="…">expires 2026-10-21 21:31:04 · in 30 d</time></p></section><p class="hint">Want to grant less than this? Deny, then mint it yourself: <code>egzos token mint</code></p><form method="post" class="acts">…<button class="act">Authorize</button><button class="deny" name="decision" value="deny">Deny</button></form></main>`.
+- Wide grant: `<p class="wide" id="wide-note">This is a wide grant. Authorizing takes two presses.</p>` and the two-step form as the tap spec §18 (hidden `arm` token, 10 s).
+- Consequence box: `<p class="box" role="note">No expiry. This token works until you revoke it.</p>`.
+- Login: `<main><h1>Sign in to container home.</h1><form method="post"><label for="secret">Container secret</label><input id="secret" type="password" autocomplete="current-password"><button>Sign in</button></form></main>`.
+- Device: `<main><h1>Enter the code your terminal shows.</h1><form method="post"><label for="code">Code</label><input id="code" class="code" inputmode="text" autocomplete="one-time-code" spellcheck="false" maxlength="9" placeholder="XXXX-XXXX"><button>Continue</button></form><p>Codes expire a few minutes after your terminal shows them.</p></main>`.
+- Done: `<main><h1>Done. Return to your terminal.</h1><p class="mono">token minted 21:31:40 · Claude · role · reader · expires 2026-10-21</p></main>`.
+- Uniform failure: `<main><h1>This request can't be completed.</h1></main>`.
+- No htmx on these pages.
+
+## 19. Relationship to the flagship and the lifeboat
+The flagship reaches this page as a browser client (PKCE) and never re-implements it; its permissions dashboard is where tokens are revoked. The lifeboat reaches `/login` for its own session once the AS lands (lifeboat spec §14.6). MCP clients (Phase 5) land on the same consent page with kind `mcp`. The shell partial is shared by import; nothing else is.
+
+## 20. Test fixtures required (one per state; conformance checks their presence)
+Login: ready · in-flight · **approved — signed in (303 to `continue`, matched by D-C5)** · `continue` rejected at each of D-C5's four steps — `//evil.com/x`, `/\x`, `/%2F%2Fx`, `/items/a/b`, `/elsewhere` — each a silent 303 to `/` · `continue=/authorize?…` carries its query intact · error (wrong) · error (unknown user) · error (throttled — the attempt that engages the throttle, the first one refused) — the three errors asserted identical **on the page, and each asserted to append exactly one login-attempt event carrying its own cause** (§14.8 (a), D-T8) · **refused while the throttle holds — identical page, asserted counted and not appended; the release entry (§14.8 (e), `surface: login`) carries the count** (D-C6) · **refused while the throttle holds, correct secret — the same page, not evaluated, no 303** · **release with nothing refused — (e) appends, `refused: 0`** · approved asserted to append exactly one, outcome `established` · already signed in · invalid continue. Device: ready · prefilled · in-flight · invalid · expired · used · malformed · throttled (the attempt that engages the throttle) — asserted identical on the page, **each asserted to append exactly one redemption event carrying its own cause** (§14.8 (b)) · **refused while the throttle holds — identical page, asserted counted and not appended; the release entry (§14.8 (e), `surface: device`) carries the count** (D-C6) · **refused while the throttle holds, valid code — the same page, not evaluated, no 303** · found (one append, outcome `found`). Consent: reader on one project (not wide, one press) · **reader on the personal root `user:self` (wide — D-C1; no ring rank, reaches every personal item)** · operator on two projects · curator on one project (wide by capability) · admin all six (wide) · `*` scope (wide) · org scope (wide, flagged) · no expiry (wide) · interactive principal (wide, framed) · device variant with requester hint · device variant without hint · localhost origin · mcp kind · long client name · partial (9 scopes, + N more) · unknown ring word · existing tokens (N = 2) · existing zero · expiry clamped · confirming · in-flight · error (mint) · invalid · stale (re-submitted after decision) · back after decision — **both the uniform failure page, each asserted to append exactly one event, cause `replayed`** (§14.8 (d)). Outcomes: device done (minted) · device denied (one denial append, §14.8 (c)) · browser approved (redirect asserted, no render) · browser denied (redirect with `error=access_denied`, no description; one denial append). Failures: unknown client · origin mismatch · malformed · missing PKCE · the attempt that engages the throttle (cause `throttled`) — asserted identical on the page, **each asserted to append exactly one uniform-failure event carrying its own cause** (§14.8 (d)) · **refused while the throttle holds — identical page, asserted counted and not appended; the release entry (§14.8 (e), `surface: authorize`) carries the count** (D-C6) · error card. Print: consent ready. Schemes: every fixture in light, dark-neutral, dark-violet.
+
+## 21. Non-goals and open items
+Narrowing on the page (D-C2; v0.2 candidate) · a "manage tokens" link (CLI / flagship) · IdP-collapsed login (deployment option, never default) · localisation · **[OPEN→a1p]** login credential (§14.7), expiry policy (§14.6), device-code issuance event (§14.5) · **[GAP→a1p]** the login-attempt, device-code redemption, consent-denial, pre-trust-failure and throttle-release events (§14.8 (a)–(e); D-T8 and D-C6 applied here), the presence backstop behind `principal.interactive` (§14.12) · **[OPEN→a1p]** how the release entry names the throttle's key and pairs with its engage entry (§14.8 (e)) · **[OPEN→CHIEF]** veto window on D-C1–D-C6 before commit. **D-C6 also binds the tap spec's R11 and §14.5**, which cite it rather than restating it; it is offered here because the series is this file's.

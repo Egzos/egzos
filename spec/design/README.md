@@ -4,34 +4,91 @@ Design specs and system artifacts for the open-core surfaces. This directory is 
 
 ## What lives here (egzos/spec/design)
 
-Per R10 (decisions log §N), the following are public open-core surfaces:
+Per R10 (decisions log §N), the following are public open-core surfaces. Every file below arrived through the Chief's hands; the commit is the approval act.
 
-- `DESIGN-PRINCIPLES.md` — the principles both UIs obey; owner A2 (Taste); drafted from direction
-  sessions in Phase 3; stub until then.
-- `DESIGN-SOURCES.md` — component provenance table (registry item, license, date, the spec that
-  picked it); owner A2; filled as components are selected.
-- The tokens file — the ONE code artifact A2 ships; the identity layer consumed by both the lifeboat
-  (egzos/src/egzos/web) and the flagship (egzos-platform). The platform consumes it; never forks it.
-- The lifeboat spec — the server-rendered in-process UI (FastAPI + Jinja + htmx; A5's build target).
-- The step-up tap + pending-approval page spec — A2's first deliverable; public because the tap spec
-  being public is good for trust.
+| file | version | date | what it binds |
+|---|---|---|---|
+| `tokens.css` | 0.12 | 2026-09-23 | The ONE code artifact A2 ships: `--egz-*` CSS variables for light, dark-neutral and dark-violet schemes; colour law (two colours), structure (radius 0, 2 px, 4 px offset), type, motion tokens. **The shadcn/ui bridge is declared here, not documented** (v0.6, D-T3), with the source-order requirement that makes the flat radius pins actually win stated in the file (v0.7): a catalogue component re-themes by resolving against egzos values, and nothing is retyped into the platform theme. The Tailwind mapping stays a comment — it is config a4s writes, not CSS. The lifeboat consumes this file as CSS variables; the flagship maps it — never forks it, by copy or by transcription. |
+| `DESIGN-PRINCIPLES.md` | 1.6 | 2026-09-23 | The five decided §P principles verbatim, the thirteen principles of the bound direction (Docket v2), incl. principle 13: the spec is exhaustive; a gap is a defect. |
+| `DESIGN-SOURCES.md` | 2.16 | 2026-09-24 | Provenance: theme seeds, typefaces, adopted conventions, every catalogue component picked by a spec (registry item · licence · date · the spec revision that picked it), the bespoke and none-on-this-screen decisions, considered-and-declined, corrections log. Versions in its tables are **records, not pointers** — see its *Pointers and records* section. **Every id it cites was probed on 2026-09-22** — 74 ids, 73 live, one delisted; see its *Id audit* section. |
+| `step-up-tap-and-pending-approval.md` | 1.30 | 2026-09-24 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
+| `lifeboat.md` | 1.21 | 2026-09-24 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
+| `consent.md` | 1.20 | 2026-09-24 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
+
+**Version rule.** A file's own header is authoritative; this table is the index a builder checks first, and it is bumped in the same commit as the file.
+
+**Pointers move with the file they point at — all of them.** A commit that bumps a file's version bumps, in the same commit: this index's row and **every `Tokens:` / `Shell:` / `Base spec:` pointer aimed at it.** (**`Siblings:` is no longer in this list**, and its removal is the same edit `Provenance:` got one clause earlier and for the same reason: a sibling pin carries no claim that turns on a version, so it is a *reference* and has none to move. Leaving it here made the three public headers non-conforming to the rule their own headers cite — which is word for word the failure the `Provenance:` parenthetical below describes, reproduced against the next pin class before the ink was dry. It also matters mechanically: the pre-push audit derives its pointer list from this sentence, so a stale entry here either demands a version on a pin that has none or re-adds one and restores the full mesh the reference class exists to break.) (**Provenance:** was the clause's original and only subject; it is no longer a pointer at all — `DESIGN-SOURCES.md` is cited as a *reference* and carries no version, so there is nothing there to bump. Leaving the old wording in made every spec header non-conforming to the rule its own header cites.) This clause was `Provenance:`-only for four revisions and the gap produced five instances of the same stale-pointer finding on one PR — the last of which resolved a reader to the one version of a file that could *not* answer the question it was sent there to ask. A reader must never have to guess whether a version gap is meaningful, so the rule now covers every pointer, not just the one that first drifted.
+
+**A version is a pointer, a record, or a reference.**
+
+**Sibling pointers are references too, and that is what keeps the rule solvable.** A `Siblings:` / `Public siblings:` pin carries no claim that turns on a version — and **neither does `Tokens:`, which was excluded from this class on 2026-09-22 and is now inside it.** `Shell:` (a screen builds inside a specific §18 contract) and `Base spec:` (a delta is a delta *of* a revision) keep theirs. Versioning the sibling pins made the pointer graph a **full mesh**: bumping one file forced a pin move in every sibling, each of which then had to bump, which moved more pins — a cascade with no fixed point, whose only alternative was shipping two byte-sequences under one version number, the defect two reviewers have already failed a round for. Unversioned, the remaining graph is a **DAG** — tokens → principles → shell / base spec → screens — and a bump converges in one pass. The test is unchanged: *would anything the citing spec says become false if the target moved?* A **pointer** names the version a reader should go and read *now* — every header pin above and every row in the table. A **record** names the version in which something happened: which spec revision picked a component, which revision carried a correction, what a changelog entry says about the past. **A record is frozen**; bumping one destroys the only fact it carried, and a sync that touches one is the sync being wrong, not the record. `DESIGN-SOURCES.md` is records throughout except its own Status line — its *Pointers and records* section states this for that file. Headings carry neither and therefore carry no version.
+
+A **reference** is the third class, and it exists because the first version of this rule created a churn class in a morning. `DESIGN-SOURCES.md` is an append-mostly register: it bumps whenever *any* screen spec lands its rows, so a versioned **Provenance:** pointer obliged every sibling to bump for a renumber no claim rested on. A reference is a pointer whose target is **append-only** and on which the citing spec makes **no claim that turns on a version** — it names the file and carries no version at all. `DESIGN-SOURCES.md` is cited this way in every spec header. `tokens.css` is **not** a reference and keeps its version, because a §5 carve-out asserting *this version carries no size scale* is exactly such a claim. The test is not how often the target changes; it is whether anything the citing spec says would become false if it did.
+
+**The version belongs to the claim, not to the header — which is why `Tokens:` is a reference now.** It was
+excluded from the reference class for one reason: §5's declared-literals carve-out asserts *this version carries
+no size scale*, so the version looked load-bearing. It was not the **header** making that claim; §5 was. The
+header pin was standing in for a claim it does not make, and the arrangement failed in the way that split
+predicts. A sweep can move a pin; only a person can re-check a claim — so after four `tokens.css` bumps in one
+day, **all seven specs carrying the carve-out asserted a re-check against a version two to four revisions behind
+the pin in the same sentence**, and one named no version at all. The sentence did not go stale: it became false,
+and said so seven times.
+
+So the version moves to where the claim is made. §5 states the version it was re-checked against, in the
+**record form** below — attached to the claim, never in the `` `file` vX `` pointer shape — so no sweep can
+touch it, and it changes only when someone re-checks. The header says which file, because that is all a header
+knows. This also ends the churn the exclusion created: a `tokens.css` bump now touches `tokens.css` and the
+index, and nothing else, where before it forced a version bump on every consuming spec to renumber a pin that
+asserted nothing.
+
+*Corollary, and it is the general form of this rule:* **before excluding a pointer from the reference class, name
+the sentence that makes the claim.** If the claim lives somewhere other than the header, the version belongs
+there and the header pin is a reference. `Shell:` and `Base spec:` survive the test — the claim *is* the pin, in
+both cases, because the spec builds inside that revision of a contract.
+
+**How to write a record so a sweep cannot eat it.** A pointer is `` `file.md` v1.4 `` — filename, then version — and that is the shape every sweep matches. A record therefore attaches its version to **the claim, not the filename**: *"`file.md` asserted both readings at once **at v1.4**"*, never *"`file.md`, then the version, then the claim"* — which is the pointer shape. (This paragraph deliberately does not spell the wrong form out with a real filename and version: the first draft did, and the sweep matched its own anti-example.). This is not a style preference. Records written in pointer form have now been silently bumped by a sweep three times — twice in `DESIGN-SOURCES.md` and once in the platform index — and each bump destroyed the only fact the line carried. The sweep refuses `DESIGN-SOURCES.md` by name because that file is records throughout; everywhere else the **shape** is the guard, because no tool can tell a claim about the past from a pointer to the present.
+
+**Across the repository boundary, a pointer is a pin to what the spec was written against.** A flagship spec in `Egzos/egzos-platform` cannot be bumped by a commit in this repository, so *same commit* is unachievable there and demanding it would make every cross-repo pin permanently non-conforming. The rule for a cross-repo pin: it is re-pinned at the **next commit to the consuming repository's `spec/design/`** — not merely the next commit that happens to touch that one file, which is a promise with no date — and at that moment **the claim that turns on the pin is re-checked and the re-check stated in the changelog** — for example a §5 parenthetical asserting *`tokens.css` vX carries no size scale* must be re-verified against the new version, not merely renumbered. Between the two commits the pin is a truthful record of what the spec was written against, not drift. Within this repository the synchronous rule stands, and a stale pointer here is a defect.
+
+Direction: **Docket v2** (bound 2026-09-11) — a record: paper and ink, IBM Plex Sans + Mono, radius 0, 2 px ink borders, a 4 px hard offset that collapses on press; two colours only (`--egz-act` for the human act, `--egz-alarm` Swiss Red for failures; no yellow anywhere); trust is a shape; motion law B (presence, arrival, reveal — nothing else); light is the record, dark is the same tokens re-valued with two user-selectable canvases.
+
+## How to read a spec
+
+Every spec has the same shape: §0 scope · §1 vocabulary (contract words; the fixed state vocabulary) · §2–3 the pages · **§4 regions × states** (every region, every applicable state, verbatim copy, colour, a11y, audit event, lifeboat/flagship difference) · §5 constants, formats, layout, print · §6–9 colour, structure, type, motion laws · §10 silence-not-errors · §11 unverified-by-default · §12 accessibility + keyboard map · **§13 canonical copy** (rendered verbatim; never paraphrased) · **§14 what the spec needs from the contract** (`[OPEN→a1p]` / `[GAP→a1p]` are raised, never invented) · §15 A6 review notes · §16 a2-conformance checklist · **§17 component picks** (primary + fallback + take/strip + installer + licence; or *none*) · §18 URLs and HTML patterns · §19 relationship to the other UI · **§20 test fixtures, one per state** · §21 non-goals and open items.
+
+A state not listed for a region cannot occur there. If a builder meets a case a spec does not answer, that is a defect in the spec: file a `design-gap` issue quoting the section and take the next item. Never improvise.
 
 ## What lives in egzos-platform/spec/design
 
-Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed
-product, closed specs. Each screen spec names every component as a registry item (license noted)
-or `bespoke`. The Chief commits approved specs; the commit is the approval act.
+Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed product, closed specs, in build order: search/list (the app shell), permissions dashboard, pending review with previews, onion graph, drag-drop gate, triage flow, permissions matrix, step-up integration. Each names every component as a registry item (licence noted) or `bespoke`, and its picks are recorded here in `DESIGN-SOURCES.md`.
 
-## A2's first deliverable
+## How a spec is checked before it is pushed
 
-The step-up tap + pending-approval page spec. This lands in this directory (public) and drives:
-- Trust's implementation of the localhost tap (egzos/src/egzos/trust)
-- The lifeboat's pending-approval page (egzos/src/egzos/web)
-- The flagship's corresponding screen (egzos-platform/spec/design — spec only)
+Two instruments, both A2's, both run before every push. Neither replaces a reviewer; they catch the
+classes a reviewer reading prose cannot.
+
+**The pre-push audit** reads the set as text: header versions against a registry and against each file's
+own newest changelog, history parentheticals, pointer freshness across both repositories, frozen records,
+unoffered vetoes, index rows. Every blind spot it has ever had is recorded in its docstring, because each
+one was found by shipping the defect it existed to catch.
+
+**The width audit** reads the set as *rendered pixels*. Every screen has a state mock; the audit extracts
+each spec surface from every mock and measures it at every width **that spec itself declares** — 448
+measurements across the eight screens. It reports a surface that overflows its column and a control whose
+hit target falls below 44 px.
+
+It exists because three defects arrived the same way: a control specified in prose that never met a width.
+An uncapped window tray in a 48 px bar clipped two windows out of three; a filter bar in a 320 px queue
+column measured 388 px, taller than the queue it filtered; a ring label collided with its neighbours. A
+region × state matrix cannot catch any of those — the assertion and the violation live in different
+artefacts, and nothing read them against each other. **A spec is not finished here until it has been
+rendered and measured.**
+
+Both instruments are built so they can fail, and each new check is made to fail on purpose before it is
+trusted. That rule came from two real failures: a guard written so it could never match, and a first
+build of the width audit that returned 357 findings by measuring surfaces at widths no spec puts them at.
+A check that fires on questions nobody asked looks exactly like coverage.
 
 ## How specs arrive
 
-A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces 2–3 direction
-boards with tradeoffs → Chief picks → A2 writes the binding spec → the Chief commits it to this
-directory. The commit IS the approval. Agents build from committed specs only; a missing spec is a
-`design-gap` issue, not an improvisation.
+A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces direction boards with tradeoffs → the Chief picks → A2 writes the binding spec, exhaustive → the Chief commits it to this directory. The commit IS the approval. Decisions A2 takes inside a spec are listed in its header with the rejected alternative and the cost, and the Chief may veto by editing before commit. Agents build from committed specs only.

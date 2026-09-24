@@ -1,0 +1,294 @@
+/*
+ * Copyright 2026 Ali Sasanian
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * egzos design tokens · v0.12 · 2026-09-23 (v0.11 · v0.10 · v0.9: same day · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: 2026-09-22 · v0.3: 2026-09-11)
+ *
+ * v0.12 is the FOURTH failure of the line above, and the worst-behaved: the seven versions
+ * v0.10 … v0.4 were re-dated to 2026-09-23 as a side effect of v0.11's bump. Nothing edited
+ * them. `same day` is a POINTER AT THE HEADER DATE, so when the header moved forward a day the
+ * whole run moved with it, silently, and seven revisions written on the 22nd (and one on
+ * 09-11, saved only by carrying an explicit date) claimed a day they did not happen on. The
+ * three earlier failures were erasures a reader could notice; this one leaves the line looking
+ * exactly as well-formed as before.
+ *
+ * So `same day` is no longer allowed to span a date boundary in this file: each run now states
+ * its own date, on the evidence of this file's pushed blob at `6fa85751` — the branch's last
+ * commit dated on or before 2026-09-22 — which reads `v0.8 · 2026-09-22 (v0.7 · v0.6 · v0.5 ·
+ * v0.4: same day · v0.3: 2026-09-11)`. A2's audit now reads DATES and not only version numbers:
+ * a header against its own newest entry, a history that must run forward, a version the chain
+ * names but nothing can date, and both index tables' date columns. It had thirty-four wrong
+ * dates to find across thirteen files and found none, because every number agreed.
+ *
+ * v0.10 restores v0.8 to the line above. v0.9 replaced the leading version in place instead of
+ * prefixing it, erasing the one revision whose whole content WAS this history line — "v0.8 fixes
+ * that history line rather than extending it" is still in this file, describing a revision the line
+ * no longer admitted. A history entry is a RECORD, and an erasure is a move: a sweep that moves one
+ * is the sweep being wrong. Third instance of this class in this file, which is why A2's pre-push
+ * audit now derives this chain too (it had only ever checked files with **Changelog** entries, and
+ * this file has none — a CSS comment was the blind spot).
+ *
+ * v0.8 fixes that history line rather than extending it. Under this set's convention a list
+ * terminated by one date assigns it to every version in it, so v0.7 ... v0.4 all read 2026-09-11 --
+ * false for four of the five, and contradicted by this file's own header at 2b51955 (v0.4 ·
+ * 2026-09-22), by DESIGN-SOURCES' 2026-09-22 row for the v0.6 bridge, and by the tap spec's record
+ * that v1.6 shipped with tokens v0.5. Each bump prefixed the previous version without carrying its
+ * date, so v0.4's date was absorbed into v0.3's group at 8299031 and stayed absorbed. These are
+ * RECORDS (README.md, the Version rule): a sweep that moves one is the sweep being wrong.
+ * The ONE code artifact A2 ships (decisions §P). Consumed as CSS variables by the lifeboat
+ * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
+ * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
+ *
+ * Direction: Docket v2 (bound 2026-09-11). Colour law: two colours — --act asks a human,
+ * --alarm reports a failure. No yellow, lime or acid anywhere. Structure: radius 0, 2px ink
+ * borders, 4px hard offset. Schemes: light is the record; dark is the same record at night,
+ * with two canvases the user may choose between (neutral, violet).
+ *
+ * Scheme selection (both UIs):
+ *   <html data-scheme="light">                          the record (default)
+ *   <html data-scheme="dark" data-canvas="neutral">     the record at night
+ *   <html data-scheme="dark" data-canvas="violet">      the record at night, violet-black cast
+ * data-canvas is a USER SETTING (decided 2026-09-11), persisted per client; it has no effect
+ * in the light scheme. prefers-color-scheme picks the initial scheme when none is stored.
+ */
+
+:root {
+  /* ── canvas & ink ─────────────────────────────────────────────── */
+  --egz-canvas:      #FFFFFF;   /* page */
+  --egz-paper:       #F5F5F2;   /* queue rail, inset fields, secondary surfaces */
+  --egz-ink:         #000000;   /* text, borders, offsets, verified fill */
+  --egz-ink-2:       #333333;   /* secondary text */
+  --egz-ink-3:       #6B6B6B;   /* labels, metadata (≥ 4.5:1 on canvas) */
+  --egz-rule:        #000000;   /* 2px structural borders */
+  --egz-rule-soft:   #D6D6D2;   /* 1px hairlines inside tables and lists */
+  --egz-shadow-ink:  #000000;   /* the hard offset */
+
+  /* ── the two colours ──────────────────────────────────────────── */
+  --egz-act:         #1D3FA8;   /* a human is asked: sign, approve, open a window, focus, the outward arrow */
+  --egz-act-on:      #FFFFFF;
+  /* --egz-act-on is the type colour ON --egz-act, and on nothing else.
+   *
+   * TYPE ON AN INK FILL IS --egz-canvas (v0.9). Five specs render a word inside a solid ink
+   * fill — the `verified` stamp, `active`, a held capability stamp, the matrix's explicit-coverage
+   * cell, the gate's count badge — and until v0.9 none of them named a colour for that word, so
+   * every one left it to a builder. The one spec that did answer reached for --egz-act-on, which
+   * is legible today only because --egz-act-on and --egz-canvas happen to carry the same value in
+   * all three schemes. They have unrelated jobs: --egz-act-on tracks whatever --egz-act becomes,
+   * and --egz-canvas is the page. Re-value --egz-act to a lighter blue needing dark type by day
+   * and --egz-act-on flips to near-black — at which point every ink-filled stamp renders black on
+   * black, and nothing in the file would have predicted it.
+   *
+   * --egz-canvas is correct by construction: ink is the opposite of the canvas in every scheme,
+   * so type in the canvas colour is always legible on an ink fill and always will be. Same for
+   * --egz-alarm-on: it is the type colour on --egz-alarm, never on ink. */
+  --egz-alarm:       hsl(0 100% 43%);  /* Swiss Red: quarantine, presence lapsed, quota, unreachable, anomaly */
+  --egz-alarm-on:    #FFFFFF;
+
+  /* ── structure (Neo Brutalism, bones only) ────────────────────── */
+  --egz-radius:      0;
+  --egz-bw:          2px;       /* structural border weight */
+  --egz-hair:        1px;       /* hairlines inside tables and lists; skeleton borders (v0.4) */
+  --egz-off:         4px;       /* hard offset: box-shadow var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink) */
+  --egz-off-lg:      8px;       /* the page frame */
+  --egz-focus:       var(--egz-bw) solid var(--egz-act);  /* outline; outline-offset 3px */
+
+  /* ── type ─────────────────────────────────────────────────────── */
+  --egz-font-ui:     "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --egz-font-mono:   "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --egz-fs-1: 12px;  --egz-fs-2: 13px;  --egz-fs-3: 14px;  --egz-fs-4: 16px;
+  --egz-fs-5: 20px;  --egz-fs-6: 28px;  --egz-fs-7: 44px;
+  /* Weight is a CLOSED set of two, not a range (D-T4). Until v0.11 there was no weight token at
+   * all, while every spec's §16 forbade a "literal weight" — a rule with nothing to obey. The
+   * renders did what a builder would: four different weights across seven files (400, 500, 600,
+   * 700), chosen ad hoc, and two of them SYNTHESISED because the family was never loaded at that
+   * weight. A browser-faked bold is a rendering artefact wearing a design decision's clothes, and
+   * this is a record set in IBM Plex, not an approximation of one.
+   *   Two, because two is what the distinction needs (principle 3: weight is STRUCTURE, not
+   *   emphasis) and because these are the two the family is loaded at. 500 is neither regular nor
+   *   semibold; it is the weight you reach for when no rule stops you.
+   * Load exactly these: IBM Plex Sans and IBM Plex Mono at 400 and 600. A value outside this set
+   * is a design-gap against THIS file, never a literal in a component. */
+  --egz-w-regular:   400;
+  --egz-w-semibold:  600;
+  --egz-lh:          1.5;
+  --egz-tracking-caps: .12em;   /* mono labels, uppercase */
+  --egz-tabular:     "tnum" 1;  /* font-feature-settings for ids, hashes, timestamps, countdowns */
+
+  /* ── space ────────────────────────────────────────────────────── */
+  --egz-sp-1: 4px;  --egz-sp-2: 8px;   --egz-sp-3: 12px;  --egz-sp-4: 16px;
+  --egz-sp-5: 24px; --egz-sp-6: 40px;  --egz-sp-7: 64px;
+
+  /* ── motion (law B · meaningful) ──────────────────────────────── */
+  --egz-motion-state:    0ms;    /* state changes are instantaneous — a stamp lands */
+  --egz-motion-reveal:   120ms;  /* reveal: expand, fan, slide; linear */
+  --egz-motion-arrival:  200ms;  /* arrival: new items pill, triage ring step */
+  --egz-motion-presence: 4000ms; /* presence: one full circuit of the window beam along the frame */
+  --egz-ease:            linear;
+  --egz-t-hold:          700ms;  /* v0.5: press-and-hold fill (flagship enhancement only). The other
+     interaction timeouts — the two-step arm, the lifeboat's fragment refresh, the new-items debounce — are
+     deliberately NOT tokens: the arm is validated server-side and the refresh is an htmx trigger, so a CSS
+     variable there would imply a deployment could restyle a security timeout. See the tap spec §5 (D-T2). */
+
+  /* ── media (moodboard imagery, marketing only) ────────────────── */
+  --egz-img-filter:  grayscale(.15) contrast(1.02);
+
+  color-scheme: light;
+}
+
+/* NOTE — this comment annotates the block BELOW it, which is the rule a CSS comment binds to.
+   The @media (prefers-color-scheme: dark) fallback further down duplicates every value in THIS
+   block, value for value. Any change here must be made there too; a2-conformance checks it.
+   It must NOT be read as applying to the violet block: violet is a user setting with no effect
+   without data-canvas, so mirroring a violet value into the fallback would give an OS-dark viewer
+   with no stored scheme a cast they never chose — the shape of the v0.4 defect where that block
+   was missing --egz-img-filter. (Placement corrected in v0.8; it had sat above the violet block,
+   where the default reading made 'this block' the wrong one.) */
+html[data-scheme="dark"] {
+  --egz-canvas:      #0B0B0B;
+  --egz-paper:       #151515;
+  --egz-ink:         #F4F4F0;
+  --egz-ink-2:       #CFCFC9;
+  --egz-ink-3:       #9A9A94;
+  --egz-rule:        #F4F4F0;
+  --egz-rule-soft:   #3A3A3A;
+  --egz-shadow-ink:  #F4F4F0;   /* offsets go white: the record as a paper cutout */
+  --egz-act:         #6B9BFF;
+  --egz-act-on:      #0B0B0B;
+  --egz-alarm:       hsl(0 100% 60%);
+  --egz-alarm-on:    #0B0B0B;
+  --egz-img-filter:  grayscale(.2) brightness(.82) contrast(1.06);
+  color-scheme: dark;
+}
+
+html[data-scheme="dark"][data-canvas="violet"] {
+  /* the one thing taken from the Neon Cyber family: a cast, not a colour */
+  --egz-canvas:      #0B0716;
+  --egz-paper:       #150E24;
+  --egz-ink-3:       #9A96A8;
+  --egz-rule-soft:   #3A3350;
+  --egz-act-on:      #0B0716;
+  --egz-alarm-on:    #0B0716;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:not([data-scheme]) {
+    --egz-canvas: #0B0B0B; --egz-paper: #151515; --egz-ink: #F4F4F0; --egz-ink-2: #CFCFC9; --egz-ink-3: #9A9A94;
+    --egz-rule: #F4F4F0; --egz-rule-soft: #3A3A3A; --egz-shadow-ink: #F4F4F0;
+    --egz-act: #6B9BFF; --egz-act-on: #0B0B0B; --egz-alarm: hsl(0 100% 60%); --egz-alarm-on: #0B0B0B;
+    --egz-img-filter: grayscale(.2) brightness(.82) contrast(1.06);   /* v0.4: was missing, so an OS-dark
+       viewer with no stored scheme got the light filter on imagery */
+    color-scheme: dark;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * shadcn/ui bridge — DECLARED, not documented (D-T3, tokens v0.6)
+ *
+ * Until v0.6 these keys existed only as a comment at the foot of this file. A comment
+ * declares nothing: a catalogue component resolved `--background` against the empty string,
+ * and a4s's only way to make the pick render was to retype all twenty-five lines into the
+ * flagship theme — a fork by transcription, which this file's header forbids in the same
+ * breath as a fork by copy. They are declarations now. The flagship maps the `--egz-*` layer
+ * into Tailwind and gets this layer for free; nothing is retyped anywhere.
+ *
+ * Every value is an ALIAS, so the block is scheme-independent by construction: `var()`
+ * resolves at use time against whichever scheme block is winning on <html>, which is why
+ * there is no dark copy of this list and must never be one. A dark copy would be a second
+ * place to forget.
+ *
+ * The lifeboat pays nothing: an unreferenced custom property is inert — no paint, no layout,
+ * no cascade cost. It is catalogue-exempt and simply never reads these names.
+ * --------------------------------------------------------------------------- */
+:root {
+  /* surfaces */
+  --background:              var(--egz-canvas);
+  --foreground:              var(--egz-ink);
+  --card:                    var(--egz-canvas);
+  --card-foreground:         var(--egz-ink);
+  --popover:                 var(--egz-canvas);   /* Command #382, Popover, Context Menu, Tooltip */
+  --popover-foreground:      var(--egz-ink);
+  --muted:                   var(--egz-paper);
+  --muted-foreground:        var(--egz-ink-3);
+
+  /* the one act colour, and the one failure colour — there is no third */
+  --primary:                 var(--egz-act);
+  --primary-foreground:      var(--egz-act-on);
+  --destructive:             var(--egz-alarm);
+  --destructive-foreground:  var(--egz-alarm-on);
+  --secondary:               var(--egz-paper);
+  --secondary-foreground:    var(--egz-ink);
+  --accent:                  var(--egz-paper);
+  --accent-foreground:       var(--egz-ink);
+
+  /* edges */
+  --border:                  var(--egz-rule-soft);
+  --input:                   var(--egz-rule);     /* the field's 2px ink edge, not a hairline */
+  --ring:                    var(--egz-act);
+
+  /* radius. shadcn derives --radius-sm/md/lg/xl with calc(var(--radius) ∓ 2px|4px), which at
+   * radius 0 yields NEGATIVE lengths — invalid, so the component silently falls back to the
+   * browser default and a rounded corner appears in a square system. Each is pinned flat. */
+  --radius:                  var(--egz-radius);   /* 0 */
+  --radius-sm:               0;
+  --radius-md:               0;
+  --radius-lg:               0;
+  --radius-xl:               0;
+
+  /* sidebar family — the flagship app shell's primary pick
+   * (Egzos/egzos-platform · spec/design/search-list.md §17 — a proprietary sibling repository,
+   * qualified because this file ships to every consumer of this Apache-2.0 repository, a fork
+   * included, where an unqualified pointer resolves to nothing with no indication why). */
+  --sidebar:                    var(--egz-paper);
+  --sidebar-foreground:         var(--egz-ink);
+  --sidebar-primary:            var(--egz-act);
+  --sidebar-primary-foreground: var(--egz-act-on);
+  --sidebar-accent:             var(--egz-canvas);
+  --sidebar-accent-foreground:  var(--egz-ink);
+  --sidebar-border:             var(--egz-rule);
+  --sidebar-ring:               var(--egz-act);
+
+  /* DELIBERATELY ABSENT: --chart-1 … --chart-5. shadcn ships five categorical hues; egzos has
+   * two colours and both are reserved (--act asks a human, --alarm reports a failure), so a
+   * categorical ramp cannot be built from this palette without inventing a third. A pick that
+   * reads a chart key is a design-gap against THIS file — A2 answers it with a non-chromatic
+   * encoding (shape, hatch, position) or the Chief takes a colour-law decision. Do not alias
+   * them to ink tints to make a component render: five greys that mean five categories is a
+   * colour law nobody agreed, arriving through a component's back door.
+   *
+   * A pick needing any other unlisted key is likewise a design-gap against this file — never
+   * a literal in the component, and never a retyped block in the flagship theme.
+   *
+   * SOURCE ORDER (v0.7, and binding on the flagship). This block only takes effect if it
+   * out-cascades shadcn's own definitions, which a current shadcn / Tailwind v4 setup emits
+   * from `@theme inline` into `:root` — the SAME selector at the SAME specificity, where
+   * source order alone decides. So: **this file loads AFTER the shadcn theme layer**, or that
+   * layer's colour and radius derivations are dropped. Either satisfies the requirement;
+   * neither is optional. Get it wrong and nothing errors — `--radius-sm` quietly resolves to
+   * `calc(0.625rem - 4px)` and a rounded corner appears in a square system, which is the
+   * failure this block exists to prevent, arriving by a different door. A2 states the
+   * requirement; where in the platform's CSS entry it is satisfied is a4s's to implement and
+   * a2-conformance's to check. */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --egz-motion-reveal:   0ms;
+    --egz-motion-arrival:  0ms;
+    --egz-motion-presence: 0ms;   /* the beam becomes a static marked segment; the countdown stays numeric */
+  }
+}
+
+/*
+ * Tailwind mapping (flagship; A4s wires this in tailwind config / @theme):
+ *   colors.canvas → var(--egz-canvas)   colors.paper → var(--egz-paper)   colors.ink → var(--egz-ink)
+ *   colors.ink-2 / ink-3 / rule / rule-soft / act / act-on / alarm / alarm-on likewise
+ *   borderRadius.DEFAULT → var(--egz-radius) (0)   borderWidth.structural → var(--egz-bw)
+ *   borderWidth.hair → var(--egz-hair)
+ *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)
+ *   fontFamily.ui / mono → the two stacks above   fontSize.1…7 → --egz-fs-1…7
+ *   transitionDuration.state / reveal / arrival / presence → the motion tokens
+ * shadcn/ui bridge: DECLARED ABOVE (D-T3, v0.6), not listed here. The block above this comment
+ * is the bridge; it was a comment in v0.4–v0.5 and nothing declared the keys. A pick needing a
+ * key the block does not declare is a design-gap against THIS file, never a literal in the
+ * component and never a retyped block in the flagship theme.
+ */
