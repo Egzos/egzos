@@ -9,20 +9,43 @@
 One fixture per asset. Exit 1 on any failure. Every check is a sentence in BRAND.md; a check with no sentence is
 a defect in this file, a sentence with no check is a defect in the spec.
 """
-import os, re, sys, json, argparse, struct, tempfile, filecmp
+import argparse
+import ast
+import filecmp
+import json
+import os
+import re
+import struct
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
 
 HERE = os.path.dirname(os.path.abspath(__file__)); BRAND = os.path.dirname(HERE)
 DECLARED = {"#000000": "--egz-ink (light)", "#F4F4F0": "--egz-ink (dark)", "#FFFFFF": "--egz-canvas (light)",
             "#0B0B0B": "--egz-canvas (dark)", "#0B0716": "--egz-canvas (dark · violet)"}
 FORBIDDEN_ELEMENTS = ("<linearGradient", "<radialGradient", "<filter", "<script", "<animate", "<image", "<text", "<foreignObject", "href=\"http")
 INLINE_TOKENS = ("currentColor", "var(--egz-canvas)")
+# render.py constant → §13 copy key (F-10)
+COPY_KEYS = {"LABEL": "brand.tagline", "URL_LINE": "brand.social.url", "LICENCE_LINE": "brand.social.licence"}
+
+def canonical_copy():
+    """The §13 table of BRAND.md as {key: string}."""
+    md = open(os.path.join(BRAND, "BRAND.md"), encoding="utf-8").read()
+    sec = re.search(r"^## §13 .*?$(.*?)^## ", md, re.DOTALL | re.MULTILINE).group(1)
+    return dict(re.findall(r"^\| `([a-z.]+)` \| `([^`]*)` \|", sec, re.MULTILINE))
+
+def render_constants():
+    """Top-level string constants of render.py, read with ast (no import: render.py needs numpy)."""
+    tree = ast.parse(open(os.path.join(HERE, "render.py"), encoding="utf-8").read())
+    return {t.id: n.value.value for n in tree.body if isinstance(n, ast.Assign) and isinstance(n.value, ast.Constant)
+            and isinstance(n.value.value, str) for t in n.targets if isinstance(t, ast.Name)}
 
 def masters():
     m = json.load(open(os.path.join(HERE, "manifest.json")))["masters"]
     return sorted(m)
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--regenerate", action="store_true"); a = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--regenerate", action="store_true"); ap.add_argument("-v", action="store_true", help="print passing rows too"); a = ap.parse_args()
     fails, rows = [], []
     def ok(fid, cond, note=""):
         rows.append((fid, "PASS" if cond else "FAIL", note))
@@ -31,11 +54,19 @@ def main():
     # F-01 · every master in the manifest exists and is non-empty
     for rel in files:
         p = os.path.join(BRAND, rel); ok(f"F-01 {rel}", os.path.exists(p) and os.path.getsize(p) > 0)
+    # F-01b · every SVG master is well-formed XML (stdlib parser; catches unclosed tags, duplicate attributes, truncation)
+    for rel in files:
+        if not rel.endswith(".svg"): continue
+        try:
+            ET.fromstring(open(os.path.join(BRAND, rel), encoding="utf-8").read()); err = ""
+        except (ET.ParseError, OSError) as e:
+            err = str(e)
+        ok(f"F-01b {rel} parses as XML", not err, err)
     # F-02 · file masters carry only declared literals; inline masters carry only tokens; forbidden elements absent
     for rel in files:
         if not rel.endswith(".svg"): continue
         s = open(os.path.join(BRAND, rel), encoding="utf-8").read()
-        hexes = set(h.upper() for h in re.findall(r"#[0-9A-Fa-f]{6}", s))
+        hexes = {h.upper() for h in re.findall(r"#[0-9A-Fa-f]{6}", s)}
         undeclared = sorted(h for h in hexes if h not in DECLARED)
         ok(f"F-02a {rel} declared literals only", not undeclared, ",".join(undeclared))
         if "/inline/" in rel:
@@ -84,10 +115,14 @@ def main():
     # F-07 · the App pair: chief-proxy = whole, egzos-forge = pending (the forge never wears the whole orb)
     cp = open(os.path.join(BRAND, "app/chief-proxy.svg")).read(); ef = open(os.path.join(BRAND, "app/egzos-forge.svg")).read()
     whole32 = open(os.path.join(BRAND, "mark/whole-32.svg")).read(); pend32 = open(os.path.join(BRAND, "mark/pending-32.svg")).read()
-    inner = lambda s: re.search(r"<g[^>]*>(.*)</g>", s, re.S).group(1)
-    body = lambda s: re.search(r'viewBox="0 0 64 64">(.*)</svg>', s, re.S).group(1)
+    inner = lambda s: re.search(r"<g[^>]*>(.*)</g>", s, re.DOTALL).group(1)
+    body = lambda s: re.search(r'viewBox="0 0 64 64">(.*)</svg>', s, re.DOTALL).group(1)
     ok("F-07a chief-proxy wears the whole orb", inner(cp) == body(whole32))
     ok("F-07b egzos-forge wears the pending orb", inner(ef) == body(pend32))
+    # F-10 · the strings render.py outlines near a mark are the §13 canonical copy, verbatim (§16.14)
+    copy, consts = canonical_copy(), render_constants()
+    for name, key in COPY_KEYS.items():
+        ok(f"F-10 render.{name} == §13 {key}", key in copy and consts.get(name) == copy[key], f"{consts.get(name)!r} vs {copy.get(key)!r}")
     # F-08 · rasters, when present in ./dist: sizes and the ICO frame count
     dist = os.path.join(os.getcwd(), "dist")
     if os.path.isdir(dist):
@@ -108,14 +143,15 @@ def main():
         rows.append(("F-08", "SKIP", "no ./dist — run render.py first"))
     # F-09 · regenerate and diff (the committed masters are exactly what the pipeline emits)
     if a.regenerate:
-        sys.path.insert(0, HERE); import render
+        sys.path.insert(0, HERE)
+        import render
         with tempfile.TemporaryDirectory() as td:
             render.render(td, os.path.join(td, "dist"))
             for rel in files + ["pipeline/manifest.json"]:
                 same = filecmp.cmp(os.path.join(BRAND, rel), os.path.join(td, rel), shallow=False)
                 ok(f"F-09 {rel} regenerates byte-identical", same)
     for fid, st, note in rows:
-        if st != "PASS" or "-v" in sys.argv: print(f"{st:4} {fid} {note}")
+        if st != "PASS" or a.v: print(f"{st:4} {fid} {note}")
     print(f"{sum(1 for r in rows if r[1]=='PASS')} pass · {len(fails)} fail · {sum(1 for r in rows if r[1]=='SKIP')} skip")
     sys.exit(1 if fails else 0)
 

@@ -17,13 +17,21 @@ Colours: an export is a fixed file and cannot read CSS variables, so file master
 as DECLARED LITERALS (BRAND.md §6 lists each with its token). Inline masters (mark/inline/**, wordmark/inline,
 lockup/inline) carry `currentColor` and `var(--egz-canvas)` instead and are the only form used inside the two UIs.
 """
-import os, sys, io, json, base64, hashlib, zipfile, argparse, urllib.request
+import argparse
+import base64
+import hashlib
+import io
+import json
+import os
+import sys
+import urllib.request
+import zipfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BRAND = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-import orb as O                                   # noqa: E402
-from outline import outline, metrics              # noqa: E402
+import orb as O  # noqa: E402
+from outline import metrics, outline  # noqa: E402
 
 # ── declared literals · tokens.css v0.8 (values unchanged since v0.3) ─────────────────────────────
 INK = {"light": "#000000", "dark": "#F4F4F0"}                       # --egz-ink
@@ -163,7 +171,7 @@ def social_svg():
             f'<path transform="translate(72 560)" d="{gd}" fill="{ink}"/>'
             f'<path transform="translate({1208-aadv:.2f} 560)" d="{ad}" fill="{ink}"/></svg>')
 
-HEAD_HTML = """<!-- egzos · favicon set · BRAND.md §8.4 · order matters: .ico first with sizes="any", then the SVG -->
+HEAD_HTML = """<!-- egzos · favicon set · BRAND.md §8.2 · order matters: .ico first with sizes="any", then the SVG -->
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
@@ -215,7 +223,7 @@ def render(out=BRAND, dist=None):
     masters["lockup/stacked.svg"] = lockup_svg(L, CL, stacked=True); masters["lockup/stacked-dark.svg"] = lockup_svg(D, CD, stacked=True)
     masters["lockup/inline/horizontal.svg"] = lockup_svg("currentColor", "var(--egz-canvas)")
     masters["lockup/inline/stacked.svg"] = lockup_svg("currentColor", "var(--egz-canvas)", stacked=True)
-    masters["lockup/inline/horizontal-nav.svg"] = lockup_svg("currentColor", "var(--egz-canvas)", box_px=22)   # the 22 px nav lockup: flat mark
+    masters["lockup/inline/horizontal-nav.svg"] = lockup_svg("currentColor", "var(--egz-canvas)", F=22, box_px=22)   # the nav lockup at its bound F = 22 (BRAND.md §4.2): flat mark
     # placements
     masters["badge/badge-light.svg"] = badge_svg("light"); masters["badge/badge-dark.svg"] = badge_svg("dark")
     masters["badge/badge-dark-violet.svg"] = badge_svg("dark", "violet")

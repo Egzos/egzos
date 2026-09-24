@@ -15,7 +15,9 @@ Light:  Lambert from the upper-left-front with an ambient floor; each texture tr
 All vector output is drawn in the 64-unit viewBox the other marks use (sphere radius 27, centre 32,32).
 Colours are `currentColor` for ink and `var(--egz-canvas)` for paper unless overridden.
 """
-import math, numpy as np
+import math
+
+import numpy as np
 
 AZ = math.radians(-35.0)
 EL = math.radians(25.0)
@@ -121,7 +123,7 @@ def cut_edges_paths(creases=True, arcs=True):
 def face_polygon(fid, n=90):
     p = np.vstack([np.zeros((1, 3)), _arc(fid, n)])
     u, v = project(p)
-    return "M" + " L".join(f"{x:.2f} {y:.2f}" for x, y in zip(*_uv(u, v))) + " Z"
+    return "M" + " L".join(f"{x:.2f} {y:.2f}" for x, y in np.column_stack(_uv(u, v))) + " Z"
 
 def slice_polygon():
     """Image-space outline of the slice alone: the ghost arc of the silhouette + the three face arcs' outer sides."""
@@ -129,7 +131,8 @@ def slice_polygon():
 
 def _mask_path(mask, n, margin, tol=0.08):
     """Trace a binary mask into a smooth SVG polygon with matplotlib's marching squares, then simplify."""
-    import matplotlib; matplotlib.use("Agg")
+    import matplotlib
+    matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     fig = plt.figure(); ax = fig.add_subplot()
     cs = ax.contour(mask.astype(float), levels=[0.5])
@@ -277,7 +280,7 @@ def dither_svg_inner(cells=64, ink="currentColor", paper="var(--egz-canvas)", ed
         row = grid[r]
         if not row.any(): continue
         d = np.diff(np.concatenate([[0], row.astype(int), [0]]))
-        for s, e in zip(np.where(d == 1)[0], np.where(d == -1)[0]):
+        for s, e in np.column_stack((np.where(d == 1)[0], np.where(d == -1)[0])):   # starts and ends pair 1:1 (padded diff)
             x = CX - RAD + s * scale; y = CY - RAD + r * scale
             parts.append(f"M{x:.2f} {y:.2f}h{(e - s) * scale:.2f}v{scale + 0.02:.2f}h{-(e - s) * scale:.2f}Z")
     out = [f'<path d="{"".join(parts)}" fill="{ink}" shape-rendering="crispEdges"/>']

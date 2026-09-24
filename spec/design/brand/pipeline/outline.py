@@ -9,13 +9,14 @@ present (simple pair lookups only) and an optional uniform tracking in em.
     from outline import outline
     d, advance = outline("egzos", "fonts/IBMPlexSans-Medium.ttf", size=64, tracking=0)
 """
-from fontTools.ttLib import TTFont
+from functools import cache
+
 from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
-from functools import lru_cache
+from fontTools.ttLib import TTFont
 
 
-@lru_cache(maxsize=None)
+@cache
 def _font(path):
     return TTFont(path)
 

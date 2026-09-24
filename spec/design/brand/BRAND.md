@@ -92,7 +92,7 @@ The mark is generated: `pipeline/orb.py` ray-casts the geometry into a face and 
 | tier | sphere px | box px (× 64/54) | cell size | file suffix | where it lands (§8) |
 |---|---|---|---|---|---|
 | **64** | ≥ 160 | ≥ 190 | ≥ 2.5 px | `-64` | org avatar 512, icon-512, maskable 512 |
-| **32** | 48 – 159 | 57 – 189 | 1.5 – 5 px | `-32` | App avatars 200, apple-touch 180, icon-192, MCP 96, README header, social preview, lockups at F ≥ 58 |
+| **32** | 48 – 159 | 57 – 189 | 1.5 – 5 px | `-32` | App avatars 200, apple-touch 180, icon-192, MCP 96, README header, social preview, horizontal lockups at F ≥ 56 |
 | **flat** | < 48 | < 57 | — | `-flat` | favicon (svg and every ICO frame), MCP 48, lifeboat header 20, nav lockup 22, minimum-size uses |
 
 A consumer that renders a master at a size outside its tier is non-conforming, with one accepted exception: a **single uploaded file GitHub displays at many sizes** (the org avatar, the App avatars) is the tier of its *uploaded* size; GitHub's downsampling to 20 px turns the field into tone, and that tone — a grey sphere with a lighter notch — is the intended small-size read of a dither (§8.1).
@@ -123,18 +123,18 @@ gradient (linear, radial, mesh) · specular highlight · glow, bloom or outer sh
 - The word is **`egzos`**, lowercase, always (D1) — in prose, at sentence starts, in titles, in the org name where a human writes it (the GitHub slug `Egzos` is a slug, not the wordmark).
 - Face: **IBM Plex Mono SemiBold** (version 2.004, release `@ibm/plex-mono@1.1.0`, OFL-1.1). The command's register: egzos is CLI-first. Default kerning and tracking; nothing adjusted.
 - **Outlined.** Every wordmark master is glyph outlines, not `<text>`: no placement depends on an installed font, and GitHub's SVG sanitiser (which strips styles and blocks web fonts) cannot alter it.
-- Proportions at font size *F*: ascender 0.984 F · descender 0.264 F · x-height 0.495 F · advance of `egzos` 2.88 F.
+- Proportions at font size *F*, as measured from the face by `pipeline/outline.py` (`hhea` ascent/descent, OS/2 `sxHeight`, advance at 1000 units/em): ascender 1.025 F · descender 0.275 F · x-height 0.516 F · advance of `egzos` 3.00 F.
 - Minimum: **F = 14 px** alone; in a lockup the lockup minimum governs.
 
 ### §4.2 Lockups
 
 | lockup | construction (F = font size of the wordmark) | minimum | file |
 |---|---|---|---|
-| **horizontal** | mark box = ascender height (0.984 F), left; gap 0.36 × box; wordmark baseline-aligned so the box top meets the ascender line | F = 16 (box 15.7 px → flat tier) | `lockup/horizontal*.svg` |
+| **horizontal** | mark box = ascender height (1.025 F), left; gap 0.36 × box; wordmark baseline-aligned so the box top meets the ascender line | F = 16 (box 16.4 px → flat tier) | `lockup/horizontal*.svg` |
 | **stacked** | mark box = 1.5 × ascender, centred; gap 0.45 × ascender; wordmark centred beneath | F = 20 | `lockup/stacked*.svg` |
 | **nav** | the horizontal lockup at **F = 22** with the flat mark (the flagship app-shell lockup) | fixed size | `lockup/inline/horizontal-nav.svg` |
 
-The mark in a lockup takes the tier of its own box (§3.1): flat below a 57 px box (F < 58), 32-field above. Lockup masters are emitted at F = 100 (32-field) and the nav lockup at F = 22 (flat); a consumer that needs another F regenerates through the pipeline rather than scaling the F = 100 master into the flat range.
+The mark in a lockup takes the tier of its own box (§3.1): flat below a 57 px box (horizontal F < 56), 32-field above. Lockup masters are emitted at F = 100 (32-field) and the nav lockup at F = 22 (flat); a consumer that needs another F regenerates through the pipeline rather than scaling the F = 100 master into the flat range.
 
 ### §4.3 Clear space
 
@@ -155,7 +155,7 @@ stretch or condense · kern, track or letter-space · set in any other weight or
 | App avatar | box 64 · white square · mark at `translate(12 12) scale(0.625)` — GitHub crops to a circle; the 40-unit mark box sits inside the 64-unit inscribed circle's 45-unit safe square |
 | maskable icon | box 64 · canvas square · mark at `translate(13.44 13.44) scale(0.58)` — the 37-unit mark sits inside the 80 %-diameter safe circle (radius 40 % = 25.6 units) |
 | apple-touch-icon | box 64 · canvas square · the badge at `translate(6 6) scale(0.8125)`; opaque (iOS rounds the corners) |
-| README header | 1280 × 320 · frame rect 1…1271 × 1…311 stroke 2, offset rect 8…1280 × 8…320 · mark box 94.5 px at (72, 100.1) · wordmark F = 96 · tagline F = 22 right-aligned at x = 1200, baseline 268 |
+| README header | 1280 × 320 · frame rect 1…1271 × 1…311 stroke 2, offset rect 8…1280 × 8…320 · mark box 98.4 px at (72, 97.6) · wordmark F = 96 · tagline F = 22 right-aligned at x = 1200, baseline 268 |
 | social preview | 1280 × 640 · canvas fill · card 33…1239 × 33…599 stroke 2.5, offset 40…1248 × 40…608 · lockup F = 150 centred at y = 300 · tagline F = 24 centred, baseline 448 · url F = 22 at (72, 560) · licence line F = 22 right-aligned at 1208, baseline 560 |
 | terminal cell | 1 : 2 (width : height); half-blocks give two field rows per text row; a splash of *r* rows is a (2r)² field → 2r columns |
 | files | SVG 1.1, `xmlns` only, no `<style>` except `mark/favicon.svg`, no `<text>`, `<script>`, `<filter>`, `<image>`, gradients or external references · TXT UTF-8, LF, no trailing spaces, one trailing newline · JSON 2-space |
@@ -240,7 +240,7 @@ GitHub does not document per-surface corner rounding for avatars; the badge is d
 | placement | master | size | tier | who | note | fixture |
 |---|---|---|---|---|---|---|
 | **lifeboat header mark** | `mark/inline/pending-flat.svg` | 20 px box | flat | a5-dinghy | **if** `lifeboat.md` places a mark in its header (that spec decides; §19); `aria-hidden="true"` beside the visible word `egzos`, or `role="img" aria-label="egzos"` when the word is absent | F-06 |
-| **flagship app-shell lockup** | `lockup/inline/horizontal-nav.svg` | F = 22 (height 27.5 px) | flat | a4s-atelier | the search-list app shell's brand slot (`search-list.md`, platform repo); `role="img" aria-label="egzos"`; never a link target larger than the lockup's own box | F-06 |
+| **flagship app-shell lockup** | `lockup/inline/horizontal-nav.svg` | F = 22 (28.6 px tall · 96.7 px wide) | flat | a4s-atelier | the search-list app shell's brand slot (`search-list.md`, platform repo); `role="img" aria-label="egzos"`; never a link target larger than the lockup's own box | F-06 |
 | **larger in-product marks** (empty states, about, sign-in) | `mark/inline/pending-32.svg` / `-64.svg` by §3.1 | ≥ 57 px box | 32 · 64 | either | only where a screen spec places one; none does today | F-06 |
 | **the proposal glyph** | `mark/inline/slice-*.svg` | by §3.1 | any | — | **reserved**: a later revision of `step-up-tap-and-pending-approval.md` may adopt the slice as the pending-item glyph; until it does, the slice appears nowhere in-product (§21) | F-06 |
 | tap page · consent page | — | — | — | a3-trust | those specs bind their own headers; if they place a mark it is `mark/inline/pending-flat.svg` at ≤ 24 px and nothing else (§19) | — |
@@ -342,7 +342,7 @@ Two adjacencies, neither a contract term:
 
 - **The forge never wears the whole orb.** `app/egzos-forge.svg` is the pending solid by construction and F-07b fails otherwise. An agent identity wearing the merged mark would claim, in every bot comment, a state only the human's proxy has.
 - **Uploads are the Chief's.** The org avatar, social preview and both App avatars are set in the GitHub UI by the Chief; no App identity holds the permission to change an avatar, and none of this repository's workflows touches them. A change of avatar is therefore a Chief action by construction.
-- **No network in the build.** `render.py --fetch-fonts` downloads two pinned release zips (sha256 in the script) — once, on a designer's machine. Nothing in CI fetches fonts or runs the pipeline; builders copy committed masters. A CI job that ran `--fetch-fonts` would be a supply-chain surface this file does not open.
+- **No network in the build.** `render.py --fetch-fonts` downloads two pinned release zips (sha256 in the script) — once, on a designer's machine. Nothing in CI fetches fonts or runs the pipeline; builders copy committed masters. CI runs only `pipeline/check.py` on its default path — stdlib only, no fonts, no numpy, no network — through `tests/conformance/test_brand_pipeline.py`; F-08 and F-09 stay on a designer's machine. A CI job that ran `--fetch-fonts` would be a supply-chain surface this file does not open.
 - **SVG hygiene.** No master contains `<script>`, `<filter>`, `<image>`, gradients, external references or `<text>`; only `mark/favicon.svg` carries a `<style>`, and it is served from egzos's own origin (F-02c/d). README masters are pure paths and survive GitHub's sanitiser without loss.
 - **Data URIs in `mcp/icons.json`** are PNG and SVG bytes generated here (F-05e checks the PNG magic); a client is told by the MCP spec to validate MIME by magic bytes and treat the declared type as advisory — the file is built to pass that.
 - **The terminal art is inert:** plain characters, no escape sequences, written only to a TTY, suppressed by `EGZOS_NO_ART` — it cannot be used to smuggle control sequences into a log or a pipe.
@@ -350,7 +350,7 @@ Two adjacencies, neither a contract term:
 
 ## §16 a2-conformance checklist
 
-1. Every file in `pipeline/manifest.json` exists and is non-empty (F-01).
+1. Every file in `pipeline/manifest.json` exists and is non-empty (F-01), and every SVG master parses as XML (F-01b).
 2. Every hex literal in a file master is one of the five declared in §6.2, and inline masters carry none (F-02a/b).
 3. No master contains a forbidden element (§3.4, §5 *files*) and only `mark/favicon.svg` has a `<style>` (F-02c/d).
 4. Terminal masters have the bound row counts, column widths, alphabets and no trailing spaces (F-03); the 8-row header is shaded and crease-free (F-04).
@@ -363,7 +363,7 @@ Two adjacencies, neither a contract term:
 11. A UI PR that ships the favicon set or PWA icons vendors rasters whose sha256 match a `render.py` run from the committed pipeline, and its `<head>` order and `manifest` entries match §18.
 12. The CLI PR that ships the splash ships `splash-16-blocks.txt` and `splash-16-ascii.txt` byte-identical to the masters and implements the §9.4 ladder in that order.
 13. No placement outside §8 exists; no colour outside §6; no treatment inside §3.4 or §4.4; the onion screen carries none of the orb's rendering (§2.3).
-14. Every string rendered near a mark is a §13 key.
+14. Every string rendered near a mark is a §13 key; for the outlined strings in the masters, the pipeline's copy constants equal §13 verbatim (F-10).
 
 ## §17 Component picks
 
@@ -418,8 +418,9 @@ The two UIs share one identity and differ only in form: the lifeboat includes in
 | id | fixture | asserts |
 |---|---|---|
 | F-01 | every manifest master | exists, non-empty |
+| F-01b | every SVG | parses with stdlib `xml.etree.ElementTree` |
 | F-02a | every SVG | only the five declared literals |
-| F-02b | every inline SVG | `currentColor`, no hex |
+| F-02b | every inline SVG | tier-aware: `currentColor` and no hex in all; `var(--egz-canvas)` required on `mark/inline/pending-flat.svg` and `lockup/inline/horizontal-nav.svg` (flat faces are paper), absent from the `-32` / `-64` stems (dither faces are transparent); neither required nor banned on `whole-flat` / `slice-flat` (no cut face) |
 | F-02c | every SVG | no gradient, filter, script, animate, image, text, foreignObject, external href |
 | F-02d | every SVG | no `<style>` except `mark/favicon.svg` |
 | F-03a–d | each terminal TXT | rows (16 · 8; slice ≤ 16), ≤ cols (32 · 16), alphabet, no trailing spaces |
@@ -430,8 +431,9 @@ The two UIs share one identity and differ only in form: the lifeboat includes in
 | F-07a/b | the two App masters | chief-proxy = whole-32 body · egzos-forge = pending-32 body |
 | F-08a–d | rasters in `./dist` | pixel sizes, < 1 MB, ICO frame count 3, apple-touch opaque |
 | F-09 | every master | regenerates byte-identical (`--regenerate`) |
+| F-10 | `render.py` `LABEL` · `URL_LINE` · `LICENCE_LINE` | equal §13 `brand.tagline` · `brand.social.url` · `brand.social.licence` verbatim (parsed from this file) |
 
-Run: `python3 pipeline/render.py --fetch-fonts` (once) · `python3 pipeline/render.py` · `python3 pipeline/check.py --regenerate`. 363 checks on 2026-09-23, all passing.
+Run: `python3 pipeline/render.py --fetch-fonts` (once) · `python3 pipeline/render.py` · `python3 pipeline/check.py --regenerate`. 415 checks on 2026-09-24, all passing (391 without `./dist`). The default path — `python3 pipeline/check.py`, no fonts, no third-party package — runs 331 checks with F-08 skipped, and is what CI runs (`tests/conformance/test_brand_pipeline.py`).
 
 ## §21 Non-goals and open items
 
@@ -471,4 +473,4 @@ Tools (pipeline, not shipped): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) 
 
 ## §23 Changelog
 
-- **v1.0 · 2026-09-22** — first binding revision. Direction D · Orb, dither (Chief, board v0.2). Studio decisions S1–S9. 59 masters, 17 rasters, 363 fixtures passing. Owed: index row and provenance rows after PR #45 merges (§21).
+- **v1.0 · 2026-09-22** — first binding revision. Direction D · Orb, dither (Chief, board v0.2). Studio decisions S1–S9. 59 masters, 17 rasters, 415 fixtures passing (331 on the font-free default path CI runs). Owed: index row and provenance rows after PR #45 merges (§21).

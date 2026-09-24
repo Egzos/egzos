@@ -35,15 +35,17 @@ packages = ["src/egzos"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-# The brand pipeline under spec/ is a design-asset generator, not part of the egzos package
-# (see [tool.hatch.build.targets.wheel] packages). It is deliberately dense one-liner style and
-# ships nothing. Linting it with product rules blocked `ruff check .` and therefore pytest, which
-# runs after it in the tests workflow. Its own correctness gate is pipeline/check.py.
-extend-exclude = ["spec/design/brand/pipeline"]
 
 [tool.ruff.lint]
 # Explicit selection so the gate is deterministic across ruff releases.
 select = ["E", "F", "W", "I", "UP", "B", "C4", "FURB"]
+
+[tool.ruff.lint.per-file-ignores]
+# The brand pipeline under spec/ is a design-asset generator, not part of the egzos package
+# (see [tool.hatch.build.targets.wheel] packages), written in deliberately dense one-liner style.
+# Only the E-class style codes that style trips are waived; F, B and the rest still run there.
+# Its conformance gate is pipeline/check.py, run by tests/conformance/test_brand_pipeline.py.
+"spec/design/brand/pipeline/*.py" = ["E501", "E701", "E702", "E731", "E741"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["egzos"]
