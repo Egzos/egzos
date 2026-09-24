@@ -103,8 +103,8 @@ Need something outside your paths? File the issue and take the next item:
 
 | Definition | Model | Runtime |
 |---|---|---|
-| a1p-planner, a1r-reviewer, a2-conformance, a3-trust, a3-doorman, a6-adversary | Opus 5 (`claude-opus-5`) | CI |
-| a3-store, a3-ledger, a5-dinghy | Sonnet 5 (`claude-sonnet-5`) | CI |
+| a1p-planner, a1r-reviewer, a3-trust, a3-doorman | Opus 5 (`claude-opus-5`) | CI |
+| a3-store, a3-ledger, a5-dinghy, a2-conformance, a6-adversary | Sonnet 5 (`claude-sonnet-5`) | CI |
 | haiku-mechanic | Haiku 4.5 (`claude-haiku-4-5-20251001`) | CI |
 | Herald, A2 studio | Fable 5.1, pinned in agent config | Hyperagent |
 | Watcher, OSS fleet | cheap open model from the Hyperagent catalogue | Hyperagent |

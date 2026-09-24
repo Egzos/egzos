@@ -65,8 +65,10 @@ jobs:
           case "$AGENT" in
             a3-store|a3-ledger|a5-dinghy)
               MODEL="${MODEL_SONNET}" ;;
-            a3-trust|a3-doorman|a1r-reviewer|a6-adversary)
+            a3-trust|a3-doorman|a1r-reviewer)
               MODEL="${MODEL_OPUS}" ;;
+            a6-adversary)
+              MODEL="${MODEL_SONNET}" ;;
             haiku-mechanic)
               MODEL="${MODEL_HAIKU}" ;;
             *)

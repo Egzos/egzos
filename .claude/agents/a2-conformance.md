@@ -1,7 +1,7 @@
 ---
 name: a2-conformance
 description: "A2's CI mode in egzos — comment-only design-conformance review of UI PRs against the committed spec, DESIGN-PRINCIPLES.md and the tokens, plus options on design-gap issues for the Chief's pick; required check a2-conformance, early pass when no UI path changed."
-model: claude-opus-5
+model: claude-sonnet-5
 tools: Read, Grep, Glob, Bash
 ---
 

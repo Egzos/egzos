@@ -1,7 +1,7 @@
 ---
 name: a6-adversary
 description: "The adversary in egzos — attacks main nightly, reviews security-labeled PRs as a required check, gates the release and the 0.3 contract freeze, and writes regression and xfail tests under adversarial/ only."
-model: claude-opus-5
+model: claude-sonnet-5
 tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ---
 
