@@ -39,7 +39,17 @@ def main():
         undeclared = sorted(h for h in hexes if h not in DECLARED)
         ok(f"F-02a {rel} declared literals only", not undeclared, ",".join(undeclared))
         if "/inline/" in rel:
-            ok(f"F-02b {rel} inline uses tokens", all(t in s for t in INLINE_TOKENS[:1]) and not hexes, "hex in inline master" if hexes else "")
+            # tier-aware (§6.3, S2): flat-tier cut faces are paper, so the pending flat mark and
+            # the 22 px nav lockup carry var(--egz-canvas); dither-tier faces are transparent,
+            # so -32/-64 must not; the whole and slice flats draw no cut face
+            stem = os.path.splitext(os.path.basename(rel))[0]
+            need = rel in ("mark/inline/pending-flat.svg", "lockup/inline/horizontal-nav.svg")
+            banned = stem.endswith(("-32", "-64"))
+            missing = [t for t in (INLINE_TOKENS if need else INLINE_TOKENS[:1]) if t not in s]
+            stray = banned and INLINE_TOKENS[1] in s
+            note = ";".join(["hex in inline master"] * bool(hexes) + [f"missing {t}" for t in missing]
+                            + [f"{INLINE_TOKENS[1]} in a dither tier"] * stray)
+            ok(f"F-02b {rel} inline uses tokens", not (hexes or missing or stray), note)
         ok(f"F-02c {rel} no light, script or text", not any(e in s for e in FORBIDDEN_ELEMENTS), ";".join(e for e in FORBIDDEN_ELEMENTS if e in s))
         ok(f"F-02d {rel} no <style> outside favicon", ("<style" not in s) or rel.endswith("favicon.svg"))
     # F-03 · terminal art: row counts, column widths, alphabets
@@ -101,8 +111,7 @@ def main():
         sys.path.insert(0, HERE); import render
         with tempfile.TemporaryDirectory() as td:
             render.render(td, os.path.join(td, "dist"))
-            for rel in files:
-                if rel == "pipeline/manifest.json": continue
+            for rel in files + ["pipeline/manifest.json"]:
                 same = filecmp.cmp(os.path.join(BRAND, rel), os.path.join(td, rel), shallow=False)
                 ok(f"F-09 {rel} regenerates byte-identical", same)
     for fid, st, note in rows:

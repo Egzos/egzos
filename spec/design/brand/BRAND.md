@@ -58,7 +58,7 @@ It does not bind: the onion graph screen (a flagship spec; §2.3), the CLI's hel
 
 ### §2.1 Geometry (all of it)
 
-Fixed numbers in `pipeline/orb.py`. World: unit sphere at the origin, *y* up, *z* toward the viewer.
+Fixed numbers in `pipeline/orb.py`. World: unit sphere at the origin, *y* up, *z* toward the viewer. The spec's solid vocabulary (`whole · pending · slice`) maps to the geometry module's (`whole · orb · slice`): `pending` is the published stem for the `orb` solid, bridged by the `(stem, solid)` pairs in `render.py`.
 
 | constant | value | meaning |
 |---|---|---|
@@ -66,7 +66,7 @@ Fixed numbers in `pipeline/orb.py`. World: unit sphere at the origin, *y* up, *z
 | solids | `pending = sphere − W` · `whole = sphere` · `slice = sphere ∩ W` | §1 |
 | camera | orthographic · azimuth **−35°** (toward −x, the viewer's left) · elevation **+25°** | the sketch's perspective; the camera looks at the origin |
 | view vector | (−0.5198, 0.4226, 0.7424) | derived; unit vector from the origin toward the camera |
-| light | (−0.4359, 0.7265, 0.5328) | unit vector; upper-left-front |
+| light | (−0.4355, 0.7259, 0.5323) | unit vector; upper-left-front |
 | shade | `0.18 + 0.82 · max(0, n · light)` | Lambert with an ambient floor so the dark limb still carries ink |
 | cut faces | wall `x = 0` (outward normal −x) · floor `y = 0` (+y) · back wall `z = 0` (+z) | shaded by the same rule; **never drawn as a field** (§3.2) |
 | box | 64 × 64 · sphere centre (32, 32) · radius **27** (spans 5 … 59) | every master |
@@ -159,7 +159,7 @@ stretch or condense · kern, track or letter-space · set in any other weight or
 | social preview | 1280 × 640 · canvas fill · card 33…1239 × 33…599 stroke 2.5, offset 40…1248 × 40…608 · lockup F = 150 centred at y = 300 · tagline F = 24 centred, baseline 448 · url F = 22 at (72, 560) · licence line F = 22 right-aligned at 1208, baseline 560 |
 | terminal cell | 1 : 2 (width : height); half-blocks give two field rows per text row; a splash of *r* rows is a (2r)² field → 2r columns |
 | files | SVG 1.1, `xmlns` only, no `<style>` except `mark/favicon.svg`, no `<text>`, `<script>`, `<filter>`, `<image>`, gradients or external references · TXT UTF-8, LF, no trailing spaces, one trailing newline · JSON 2-space |
-| pipeline | Python ≥ 3.9 · numpy · matplotlib (marching squares only) · fonttools · resvg-py 0.3.2 · Pillow 11 |
+| pipeline | Python ≥ 3.9 · numpy ≥ 2.0, < 3 · matplotlib (marching squares only) · fonttools · resvg-py 0.3.2 · Pillow 11 — pinned in `pipeline/requirements.txt` |
 | print | the record prints as drawn; a dither field prints as dots; below a 4 mm sphere (48 px at 300 dpi) the flat form is used |
 
 ## §6 Colour law for identity assets
@@ -431,7 +431,7 @@ The two UIs share one identity and differ only in form: the lifeboat includes in
 | F-08a–d | rasters in `./dist` | pixel sizes, < 1 MB, ICO frame count 3, apple-touch opaque |
 | F-09 | every master | regenerates byte-identical (`--regenerate`) |
 
-Run: `python3 pipeline/render.py --fetch-fonts` (once) · `python3 pipeline/render.py` · `python3 pipeline/check.py --regenerate`. 362 checks on 2026-09-22, all passing.
+Run: `python3 pipeline/render.py --fetch-fonts` (once) · `python3 pipeline/render.py` · `python3 pipeline/check.py --regenerate`. 363 checks on 2026-09-23, all passing.
 
 ## §21 Non-goals and open items
 
@@ -467,8 +467,8 @@ Considered and declined:
 |---|---|---|---|---|---|
 | Paper Shaders · *dithering* | 21st.dev · `paper-design/dithering` | Apache-2.0 | 2026-09-22 | a WebGL surface, not an identity; anti-reference for §17 | `BRAND.md` at v1.0 |
 
-Tools (pipeline, not shipped): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) · numpy 2.0 (BSD-3) · matplotlib 3.9 (PSF-based) · Pillow 11 (MIT-CMU).
+Tools (pipeline, not shipped): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) · numpy ≥ 2.0, < 3 (BSD-3; pinned in `pipeline/requirements.txt`) · matplotlib 3.9 (PSF-based) · Pillow 11 (MIT-CMU).
 
 ## §23 Changelog
 
-- **v1.0 · 2026-09-22** — first binding revision. Direction D · Orb, dither (Chief, board v0.2). Studio decisions S1–S9. 59 masters, 17 rasters, 362 fixtures passing. Owed: index row and provenance rows after PR #45 merges (§21).
+- **v1.0 · 2026-09-22** — first binding revision. Direction D · Orb, dither (Chief, board v0.2). Studio decisions S1–S9. 59 masters, 17 rasters, 363 fixtures passing. Owed: index row and provenance rows after PR #45 merges (§21).

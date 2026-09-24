@@ -158,7 +158,8 @@ def _simplify(pts, eps):
         a, b = pts[lo], pts[hi]
         if hi - lo < 2: return
         ab = b - a; L = np.hypot(*ab) or 1e-9
-        d = np.abs(np.cross(ab, pts[lo+1:hi] - a)) / L
+        w = pts[lo+1:hi] - a
+        d = np.abs(ab[0] * w[:, 1] - ab[1] * w[:, 0]) / L   # 2-D cross; np.cross is 3-D only
         i = np.argmax(d)
         if d[i] > eps:
             k = lo + 1 + i; keep[k] = True; dp(lo, k, keep); dp(k, hi, keep)

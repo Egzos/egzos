@@ -12,7 +12,7 @@ produced here because binary files are not committed to this directory.
     python3 pipeline/render.py                        # masters → spec/design/brand/** · rasters → dist/
     python3 pipeline/render.py --out /tmp/brand       # regenerate elsewhere (check.py uses this)
 
-Requires: python ≥ 3.9, numpy, matplotlib (contour tracing), fonttools, resvg-py, Pillow.
+Requires: python ≥ 3.9, numpy, matplotlib (contour tracing), fonttools, resvg-py, Pillow — pinned in pipeline/requirements.txt.
 Colours: an export is a fixed file and cannot read CSS variables, so file masters carry the tokens.css values
 as DECLARED LITERALS (BRAND.md §6 lists each with its token). Inline masters (mark/inline/**, wordmark/inline,
 lockup/inline) carry `currentColor` and `var(--egz-canvas)` instead and are the only form used inside the two UIs.
