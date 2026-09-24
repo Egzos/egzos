@@ -8,9 +8,10 @@ A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not 
 `SERVING_POLICY`, `VERIFIED_ONLY_KINDS`), `store/nodes.py`, `resolver.py`, `trust.py`. Freeze
 decisions **F1, F2, F4, F5** (Chief, 2026-09-21) and handoff **R11**.
 
-**The authorization-server surface is not here** — it is issue #29's and appends to this document
-set. This document fixes containers, addressing, the chain, serving policy, trust statuses, the gate
-and the container-config object; nothing about how a client obtains a token.
+**The authorization-server surface is not here** — it is `authorization-server.md` (issue #29), a
+sibling document in this set. This document fixes containers, addressing, the chain, serving policy,
+trust statuses, the gate and the container-config object; nothing about how a client obtains a
+token.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a freeze
 decision the skeleton does not execute), or `[OPEN→0.3]` (the freeze review must settle it).
@@ -293,7 +294,7 @@ The item's own shape, `visibility.ring` and `content` → `context-item.md`. Cap
 bundles, principals, tokens, coverage and human-only acts → `capabilities.md`. The event list, the
 entry shape and the hash chain → `events.md`. How nodes, tokens and proposals are **persisted**, and
 `BlobGrant`'s rendering → `storage.md`. **The authorization-server surface — auth-code + PKCE,
-device-code, MCP clients, client registration and the redirect allowlist, AS metadata — is issue
-#29's**; nothing above constrains it beyond §5's human-only clause. Presence, the localhost step-up
-tap and the consent pages are Phase 2.2 and A2's spec; only `step_up.window_seconds` and the
-reserved `step_up` event are frozen now.
+device-code, MCP clients, client registration and the redirect allowlist, AS metadata — is
+`authorization-server.md`** (issue #29); nothing above constrains it beyond §5's human-only clause.
+Presence, the localhost step-up tap and the consent pages are Phase 2.2 and A2's spec (issue #61);
+only `step_up.window_seconds` and the reserved `step_up` event are frozen now.
