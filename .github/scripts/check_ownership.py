@@ -16,6 +16,16 @@ Usage:
         [--ownership .github/OWNERSHIP.yml] \\
         [--changed-files /path/to/list.txt]  # one file per line; skips git \\
         [--numstat /path/to/numstat.txt]      # git diff --numstat output; skips git
+
+Renames and copies (#18, PR #19). `git diff --numstat` prints a rename as a display
+string (`old => new`, `dir/{old => new}`), not a path, and `--name-only` prints only the
+post-image side. Parsing the display string is ambiguous by construction — `=`, `>` and
+space are unquoted, so a modified file literally named `notes/a => b.txt` is
+indistinguishable from a rename. So git is asked with `-z`: a rename then arrives as
+three NUL-separated fields (counts, old path, new path) and a plain entry as two, and
+nothing is guessed. The size cap charges the post-image path; the ownership rules are
+applied to BOTH sides, because moving a file out of a `chief_only` or `exclusive` tree is
+a change to that tree.
 """
 
 import argparse
@@ -85,28 +95,71 @@ def matches_any(globs, path):
 # Git helpers
 # ---------------------------------------------------------------------------
 
-def git_changed_files(base, head):
-    """Return list of files changed between base and head (three-dot diff)."""
+def git_numstat_z(base, head):
+    """Return raw `git diff --numstat -z` output (base...head) as one string.
+
+    With -z, git emits `<added>\\t<removed>\\t<path>\\0` for an ordinary entry and
+    `<added>\\t<removed>\\t\\0<old>\\0<new>\\0` for a rename or copy — the third column
+    is empty and the two paths follow as their own fields. No display string, no
+    quoting, no guessing.
+    """
     result = subprocess.run(
-        ["git", "diff", "--name-only", f"{base}...{head}"],
+        ["git", "diff", "--numstat", "-z", f"{base}...{head}"],
         capture_output=True, text=True, check=True,
     )
-    return [f for f in result.stdout.splitlines() if f.strip()]
+    return result.stdout
 
 
-def git_numstat(base, head):
-    """Return raw lines from git diff --numstat (base...head)."""
-    result = subprocess.run(
-        ["git", "diff", "--numstat", f"{base}...{head}"],
-        capture_output=True, text=True, check=True,
-    )
-    return result.stdout.splitlines()
+def _counts(added_s, removed_s):
+    """Turn the two numstat columns into ints; binary files ('-') count zero lines."""
+    if added_s == "-" or removed_s == "-":
+        return 0, 0
+    try:
+        return int(added_s), int(removed_s)
+    except ValueError:
+        return 0, 0
+
+
+def parse_numstat_z(raw):
+    """Parse `git diff --numstat -z` output.
+
+    Returns a list of (added, removed, path, old_path) tuples. `path` is the post-image
+    path; `old_path` is the pre-image path for a rename/copy and None otherwise.
+    """
+    entries = []
+    fields = raw.split("\0")
+    i = 0
+    while i < len(fields):
+        rec = fields[i]
+        if not rec.strip():
+            i += 1
+            continue
+        parts = rec.split("\t", 2)
+        if len(parts) < 3:
+            i += 1
+            continue
+        added_s, removed_s, path = parts
+        added, removed = _counts(added_s, removed_s)
+        if path == "":
+            # Rename/copy: the next two fields are the old and new paths.
+            if i + 2 >= len(fields):
+                break
+            old_path, new_path = fields[i + 1], fields[i + 2]
+            entries.append((added, removed, new_path, old_path))
+            i += 3
+        else:
+            entries.append((added, removed, path, None))
+            i += 1
+    return entries
 
 
 def parse_numstat(lines):
-    """Parse numstat lines into list of (added, removed, path) tuples.
+    """Parse plain (non -z) numstat lines into (added, removed, path) tuples.
 
-    Binary files have '-' in both columns; we skip them (no line count impact).
+    Kept for the `--numstat <file>` test path and for callers that already hold line
+    output. It does NOT interpret rename display strings — see the module docstring
+    for why that is impossible to do safely; use `parse_numstat_z` on `-z` output
+    instead. Binary files have '-' in both columns and count as a file with no lines.
     """
     entries = []
     for line in lines:
@@ -117,13 +170,8 @@ def parse_numstat(lines):
         if len(parts) < 3:
             continue
         added_s, removed_s, path = parts
-        if added_s == "-" or removed_s == "-":
-            entries.append((0, 0, path))  # binary — counts as a file but no lines
-        else:
-            try:
-                entries.append((int(added_s), int(removed_s), path))
-            except ValueError:
-                entries.append((0, 0, path))
+        added, removed = _counts(added_s, removed_s)
+        entries.append((added, removed, path))
     return entries
 
 # ---------------------------------------------------------------------------
@@ -131,10 +179,15 @@ def parse_numstat(lines):
 # ---------------------------------------------------------------------------
 
 def compute_size(numstat_entries, exclude_globs):
-    """Return (total_lines_changed, file_count) excluding excluded paths."""
+    """Return (total_lines_changed, file_count) excluding excluded paths.
+
+    Accepts 3-tuples (added, removed, path) or 4-tuples with a trailing old_path;
+    the size cap follows the post-image path either way.
+    """
     total_lines = 0
     file_count = 0
-    for added, removed, path in numstat_entries:
+    for entry in numstat_entries:
+        added, removed, path = entry[0], entry[1], entry[2]
         if matches_any(exclude_globs, path):
             continue
         total_lines += added + removed
@@ -188,19 +241,36 @@ def main():
     labels_set = {label.strip() for label in args.labels.split(",") if label.strip()}
 
     # ---- Determine changed files and numstat ---------------------------------
+    # One git call, -z, feeds both halves of the check so they see one set of files.
+    # A rename contributes its post-image path to the size cap and BOTH of its paths
+    # to the ownership rules: the source side is a change to the tree it left.
+    rename_sources = {}   # new_path -> old_path, for the table's Note column
+    if args.numstat:
+        with open(args.numstat) as fh:
+            numstat_entries = parse_numstat(fh.read().splitlines())
+        derived_changed = [p for _, _, p in numstat_entries]
+    else:
+        z_entries = parse_numstat_z(git_numstat_z(args.base, args.head))
+        numstat_entries = [(a, r, p) for a, r, p, _ in z_entries]
+        derived_changed = []
+        for _, _, new_path, old_path in z_entries:
+            derived_changed.append(new_path)
+            if old_path is not None and old_path != new_path:
+                derived_changed.append(old_path)
+                rename_sources[new_path] = old_path
+
     if args.changed_files:
         with open(args.changed_files) as fh:
             changed = [f.strip() for f in fh.read().splitlines() if f.strip()]
     else:
-        changed = git_changed_files(args.base, args.head)
+        seen = set()
+        changed = []
+        for p in derived_changed:
+            if p not in seen:
+                seen.add(p)
+                changed.append(p)
 
-    if args.numstat:
-        with open(args.numstat) as fh:
-            ns_lines = fh.read().splitlines()
-    else:
-        ns_lines = git_numstat(args.base, args.head)
-
-    numstat_entries = parse_numstat(ns_lines)
+    moved_from = {old: new for new, old in rename_sources.items()}
 
     # ---- Determine if human or agent branch ----------------------------------
     branch = args.branch
@@ -235,6 +305,11 @@ def main():
     for path in changed:
         status = "OK"
         notes_for_file = []
+
+        if path in moved_from:
+            notes_for_file.append(f"moved to {moved_from[path]}")
+        elif path in rename_sources:
+            notes_for_file.append(f"moved from {rename_sources[path]}")
 
         # -- governance_paths notices (egzos schema) --------------------------
         if matches_any(governance_paths, path):
