@@ -114,18 +114,32 @@ jobs:
           if res is None:
               res = next((c for c in reversed(cands) if "num_turns" in c or "is_error" in c), None)
           if res is None:
-              print("::warning::execution file has no result object; first 400 chars follow")
-              print(raw[:400]); raise SystemExit
+              # Shape only, never content: this path fires when the file is already unexpected,
+              # and an unbounded slice of a model transcript must not reach a public log.
+              try:
+                  parsed = json.loads(raw)
+                  kinds = sorted({str(e.get("type")) for e in parsed if isinstance(e, dict)}) if isinstance(parsed, list) else [type(parsed).__name__]
+              except ValueError:
+                  kinds = ["<unparseable>"]
+              print(f"::warning::execution file has no result object. bytes={len(raw)} record_types={kinds}")
+              raise SystemExit
 
           turns = res.get("num_turns"); cost = res.get("total_cost_usd")
           err = res.get("is_error"); sub = res.get("subtype")
           print(f"num_turns={turns} total_cost_usd={cost} is_error={err} subtype={sub}")
-          # Surface the provider message: it is the one thing the action hides and the only
-          # thing that separates a drained window from a revoked key or a bad model id.
-          for k in ("result", "error", "message"):
-              v = res.get(k)
-              if isinstance(v, str) and v.strip():
-                  print(f"provider {k}: {v[:600]}")
+          # A provider diagnostic may be printed; the model's own words may not. On
+          # subtype == "success" the "result" string is the MODEL'S closing message, not a
+          # diagnostic - printing it would put a6's finding prose into a public run log, which
+          # CLAUDE.md forbids ("only the advisory id"). So: only when the run errored before
+          # producing output, and a6 withholds even then.
+          if err and sub != "success":
+              if os.environ.get("REDACT_PROVIDER_MESSAGE") == "true":
+                  print("provider message withheld: this job may carry finding detail")
+              else:
+                  for k in ("error", "message", "result"):
+                      v = res.get(k)
+                      if isinstance(v, str) and v.strip():
+                          print(f"provider {k}: {v[:300]}"); break
           if turns == 1 and not cost:
               print("::error::DIAGNOSIS: the model never ran. One turn, zero cost, no token usage "
                     "means the request was rejected before inference - a drained model-tier window, "
