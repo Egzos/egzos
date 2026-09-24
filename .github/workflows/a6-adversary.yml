@@ -117,25 +117,51 @@ jobs:
               raw = open(p).read()
           except OSError as e:
               print(f"::warning::no execution file to diagnose ({e})"); raise SystemExit
+
+          def results(obj):
+              """The execution file is a JSON array in this action; older shapes are JSONL
+              or a bare object. Accept all three and return every result-like dict."""
+              out = []
+              if isinstance(obj, dict):
+                  out.append(obj)
+              elif isinstance(obj, list):
+                  for el in obj:
+                      if isinstance(el, dict): out.append(el)
+              return out
+
+          cands = []
+          try:
+              cands = results(json.loads(raw))
+          except ValueError:
+              for line in raw.splitlines():
+                  line = line.strip()
+                  if not line.startswith(("{", "[")): continue
+                  try: cands += results(json.loads(line))
+                  except ValueError: continue
+
           res = None
-          for line in raw.splitlines():
-              line = line.strip()
-              if not line.startswith("{"): continue
-              try: obj = json.loads(line)
-              except ValueError: continue
-              if obj.get("type") == "result": res = obj
+          for c in cands:
+              if c.get("type") == "result": res = c
           if res is None:
-              try: res = json.loads(raw)
-              except ValueError:
-                  print("::warning::execution file has no parseable result object"); raise SystemExit
+              res = next((c for c in reversed(cands) if "num_turns" in c or "is_error" in c), None)
+          if res is None:
+              print("::warning::execution file has no result object; first 400 chars follow")
+              print(raw[:400]); raise SystemExit
+
           turns = res.get("num_turns"); cost = res.get("total_cost_usd")
           err = res.get("is_error"); sub = res.get("subtype")
           print(f"num_turns={turns} total_cost_usd={cost} is_error={err} subtype={sub}")
+          # Surface the provider message: it is the one thing the action hides and the only
+          # thing that separates a drained window from a revoked key or a bad model id.
+          for k in ("result", "error", "message"):
+              v = res.get(k)
+              if isinstance(v, str) and v.strip():
+                  print(f"provider {k}: {v[:600]}")
           if turns == 1 and not cost:
               print("::error::DIAGNOSIS: the model never ran. One turn, zero cost, no token usage "
-                    "means the request was rejected before inference - a drained model-tier window "
-                    "or a rate limit. Not a review failure. Re-run once the window resets; if a "
-                    "re-run fails identically and immediately, the window is drained, not throttled.")
+                    "means the request was rejected before inference - a drained model-tier window, "
+                    "a revoked credential, or a bad model id. Not a review failure. If a re-run "
+                    "minutes later fails identically, it is the window, not a transient rate limit.")
           elif cap and isinstance(turns, int) and turns > cap:
               print(f"::error::DIAGNOSIS: turn budget exhausted ({turns} > {cap}). The review most "
                     "likely COMPLETED - structured_output is emitted last, so the ceiling discards a "
@@ -143,7 +169,7 @@ jobs:
                     "carries a verdict, that verdict stands and only the budget needs raising.")
           elif err:
               print("::error::DIAGNOSIS: the run failed mid-flight with real token usage. Not a cap "
-                    "and not the ceiling. Read the execution file for the provider error.")
+                    "and not the ceiling. The provider message above, if any, names the cause.")
           else:
               print("::error::DIAGNOSIS: the run reported success but emitted no structured output. "
                     "Check that --json-schema is well-formed and StructuredOutput is in --allowedTools.")
