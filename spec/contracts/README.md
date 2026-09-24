@@ -8,8 +8,9 @@ the artifacts drafted in Phase 0.2. Until then, everything here is a draft.
 a1p-planner drafts the following from the running walking skeleton (Phase 0.2):
 
 - **ContextItem schema** — the canonical shape of a context item in the store
-- **Container contract** — the full surface the container exposes, including:
-  - The authorization-server surface:
+- **Container contract** — the full surface the container exposes
+- **Authorization-server contract** — its own document (`authorization-server.md`), because it is
+  the only contract here with no running shape to derive from; every clause in it is prose-derived:
     - Auth-code + PKCE endpoints (browsers and the flagship)
     - Device-code endpoints (CLI and headless clients)
     - MCP client authorization (per the MCP authorization spec; Phase 5)

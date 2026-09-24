@@ -312,3 +312,91 @@ The rule, stated so it is testable:
 
 This applies to the device flow (§3) identically: a rejected device authorization reveals no more
 than a rejected redirect does.
+
+## 8 · Two authorities, deliberately separate
+
+**§K, ratifying R2.** Two authorities exist and they do not merge:
+
+- **the `egzos.io` session** (Firebase-as-identity) proves **subscription**;
+- **the container token** proves **authorization**, is obtained via PKCE against the user's **own**
+  container (§2), and is held browser-side.
+
+**The container token is never derived from the `egzos.io` session.** There is no token exchange, no
+assertion grant, no path by which holding a flagship session produces container access: the only way
+to a container token is §2's or §3's flow against that container. **a1p** — §K fixes the separation;
+this sentence is what makes it checkable, and it is the clause that keeps a compromise of the
+flagship's identity provider from being a compromise of every container.
+
+The separation is worth the cost in both directions: a lapsed subscription must not revoke a user's
+access to their own data, and a revoked container token must not require a flagship account to
+restore. The container is the home; the subscription is a service.
+
+**Double login is the default posture. §K.** A deployment **MAY** configure its container to trust
+`egzos.io`, or any IdP, as OIDC identity to collapse the two logins into one — **never the default.**
+
+Stated as the document is required to state it, in terms an implementation can be tested against:
+
+- the collapse ships **off**, in every distribution, including the flagship's hosted containers;
+- it is enabled **only** by configuration inside the user's own container — there is no flagship-side
+  switch, and no remote party can turn it on;
+- **a container that collapses the two authorities without the owner having configured it to is
+  non-conforming.** Not misconfigured: non-conforming.
+
+`[OPEN→0.3]` The collapse is named by §K and not designed by it — which IdP claims map to which
+container identity, and what happens to live tokens when the trust is withdrawn, are unanswered. The
+review should either scope the collapse out of v1.0 explicitly or name the missing piece. It is not
+drafted here, because a half-specified identity bridge is worse than an absent one.
+
+## 9 · Revocation, rotation and expiry
+
+**Revocation is `token rm`, like any other client. §K.** The flagship's token is removed by the same
+verb, from the same list, with the same effect as a script's. There is no "sign out of egzos.io"
+that is also a container revocation, and no container revocation that requires the flagship.
+
+A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and revocation is checked
+**before** the capability set. `token.revoke` is written (`events.md` §1). **a1p** — the AS adds no
+second revocation semantics, which is the point.
+
+**Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
+
+1. A refresh token is **single-use**. Redeeming it issues a new access token **and** a new refresh
+   token, and invalidates the one presented.
+2. **Reuse is detection, not an error.** Presenting an already-redeemed refresh token means either a
+   race or a theft, and the AS cannot tell which — so it revokes **the entire chain descended from
+   that grant**, access and refresh alike, and writes `token.revoke`. A rotation scheme that merely
+   refuses the reused token leaves the thief's copy live, which is the failure the rotation was for.
+3. Rotation does not widen a grant. The new token carries the same capabilities and scopes; a
+   refresh that could add either would be §7's second permission system arriving through the back
+   door.
+
+`[OPEN→0.3]` **Whether rotation is an audit event**, and whether a denied or abandoned authorization
+is one at all. `events.md` §1 closes its vocabulary by construction and the AS produces five effects
+with only two events between them — filed as **#68** for the 0.3 batch, with a1p's recommendation
+there. Not answered in this document.
+
+`[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
+that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS
+default for a public browser client**, and no source names a number. The review should name one —
+a1p's reading is that an AS-issued public-client access token MUST carry a non-null `expires_at`,
+whatever the value, and that the null case stays available to `token mint` only.
+
+## 10 · What this document does not fix
+
+**The consent screen, the step-up pages and presence composition are issue #61**, Part B, which
+appends to this file: `/authorize` rendering the grant in `token ls` vocabulary, the in-process
+server-rendered consent and step-up pages, and where `principal: interactive` is established for
+browser sessions. §7 fixes what a grant may *contain*; #61 fixes how it is *shown* and what it
+proves about presence.
+
+The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`. Containers,
+the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
+`events.md`, plus **#68**. The MCP-specific surface → contract v1.1 at the Phase 5 boundary (§4).
+
+TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
+authorization codes, pending device authorizations and refresh-token chains are all durable state
+this document requires and `storage.md` §3 does not name a method group for — the same shape as
+`container.md` §8's open question about the config object, and the same reason it matters: state
+that Trust does not own is state that can be edited around Trust. a1p's reading is that all of it is
+`ContainerState` by F3's rule (it is never delegated to a pluggable backend), but F3 was written
+before this surface existed and should be asked, not assumed. The 0.3 review or the #30
+consolidation pass should settle it.
