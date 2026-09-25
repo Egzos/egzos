@@ -1,0 +1,9 @@
+# egzos identity pipeline · design tool only (BRAND.md §5, §22) — nothing under src/ imports it.
+#   pip install -r spec/design/brand/pipeline/requirements.txt      (python >= 3.9)
+# check.py --regenerate reproduces every master byte for byte with these pins; verified on
+# numpy 2.0.2 and 2.5.3, matplotlib 3.9.4 and 3.11.2, fonttools 4.60.2 and 4.66.0, Pillow 11.3.0 and 12.3.0.
+numpy>=2.0,<3
+matplotlib>=3.9,<4         # contour tracing of the flat-tier body (orb._mask_path)
+fonttools>=4.60,<5         # wordmark and label outlines (outline.py)
+resvg-py==0.3.2            # rasters; exact pin: mcp/icons.json embeds its PNG bytes, and 0.5.0 encodes them differently
+Pillow>=11,<13             # favicon.ico frames and the F-08 raster checks

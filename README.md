@@ -1,5 +1,10 @@
 # egzos
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="spec/design/brand/banner/readme-header-dark.svg">
+  <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
+</picture>
+
 > **Pre-alpha. Phase 0 scaffold — nothing to install yet. `pipx install egzos` arrives with v0.1.**
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
@@ -60,4 +65,4 @@ Pre-alpha. The walking skeleton (Phase 0.1) has not landed yet. Nothing here is 
 
 ## License
 
-Apache-2.0. See `LICENSE` and `NOTICE`.
+Apache-2.0. See `LICENSE` and `NOTICE`. The egzos name and mark are not part of the licence grant — see `TRADEMARKS.md`.
