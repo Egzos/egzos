@@ -414,6 +414,17 @@ AS_METADATA_CONDITIONAL_FIELDS: frozenset[str] = frozenset(
     {"revocation_endpoint", "registration_endpoint"}
 )
 
+#: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
+#: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
+#: `node:<node-id>` (a `Token.scopes` entry; `node:*` is the whole container, the owner's grant).
+#: There is no third form, and no constant here for one. Role bundle NAMES are not scope strings: a
+#: bundle is expanded at mint time and the token carries capabilities, so a bundle in a grant would
+#: be a second vocabulary that can drift. The two vocabularies collide on exactly one word — `admin`
+#: is a capability AND the all-six bundle — and in a `scope` value it is always the capability.
+#: Pinned in `tests/_types/test_as_shapes.py`, including the collision being that one word only.
+AS_SCOPE_NODE_PREFIX: str = "node:"
+AS_SCOPE_ALL_NODES: str = "node:*"
+
 #: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
 #: MUST be rejected; every client is public, so `none` is the only auth method. `scopes_supported`
 #: is absent: it is the six capability names, and whether `node:` joins them is `[OPEN->0.3]`.
@@ -533,6 +544,8 @@ __all__ = [
     "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
+    "AS_SCOPE_ALL_NODES",
+    "AS_SCOPE_NODE_PREFIX",
     "ASClientType",
     "ArtifactContent",
     "AudienceMember",

@@ -323,6 +323,13 @@ space-delimited set drawn from exactly two forms:
 The AS expands the request into `{capabilities, scopes}` on the minted token. Anything else in the
 `scope` value is refused; the request is **not** silently narrowed to the part that parsed.
 
+**Pinned**, in `src/egzos/_types.py` and `tests/_types/test_as_shapes.py`: the bare-name half of the
+vocabulary is exactly `CAPABILITIES` and the node form is exactly `AS_SCOPE_NODE_PREFIX`
+(`AS_SCOPE_ALL_NODES` for `node:*`) — **two forms, no third** — and the collision below is exactly
+one word, `set(ROLE_BUNDLES) & set(CAPABILITIES) == {"admin"}`. There is no constant for a third
+form because there is no third form; a seventh capability or a sixth bundle named after a capability
+breaks a test rather than an implementation.
+
 Three consequences that are contract, not style:
 
 1. **Role bundles are not scope strings.** `reader`, `contributor`, `operator` and `curator` never
