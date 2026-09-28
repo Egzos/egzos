@@ -29,10 +29,16 @@ FILED = {
 }
 
 STUB = """#!/usr/bin/env bash
-# Records every call; answers GET with the filed advisory, PATCH/POST with the id.
+# Records every call; answers GET with the filed advisory, PATCH/POST with the id, and keeps the
+# body it was sent, from --input's file or from stdin.
 printf '%s\\n' "$*" >> "$STUB_DIR/calls"
+input=""
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  [[ "${args[i]}" == "--input" ]] && input="${args[i+1]}"
+done
 if [[ "$*" == *"-X PATCH"* || "$*" == *"-X POST"* ]]; then
-  cat > "$STUB_DIR/sent.json"
+  if [[ -n "$input" && "$input" != "-" ]]; then cat "$input"; else cat; fi > "$STUB_DIR/sent.json"
   echo "$GHSA"
 else
   cat "$STUB_DIR/filed.json"
@@ -59,9 +65,10 @@ def stub(tmp_path):
     return tmp_path, env
 
 
-def _run(env, *args):
+def _run(env, *args, stdin=None):
     return subprocess.run(
-        ["bash", str(SCRIPT), *args], capture_output=True, text=True, env=env, check=False
+        ["bash", str(SCRIPT), *args], input=stdin, capture_output=True, text=True, env=env,
+        check=False,
     )
 
 
@@ -113,6 +120,32 @@ def test_create_sends_the_file_and_prints_only_the_id(stub):
     assert res.returncode == 0
     assert res.stdout.strip() == GHSA
     assert "REPRO" not in res.stdout + res.stderr
+
+
+def test_create_takes_the_body_on_stdin(stub):
+    # The sweep's session holds no write tool, so `-` is how it hands over a body (#71 round 3).
+    d, env = stub
+    res = _run(env, "create", "-", stdin=json.dumps({"summary": "s", "description": "REPRO"}))
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.strip() == GHSA
+    assert "REPRO" not in res.stdout + res.stderr
+    assert json.loads((d / "sent.json").read_text())["description"] == "REPRO"
+
+
+def test_update_takes_the_body_on_stdin_and_still_appends(stub):
+    d, env = stub
+    res = _run(env, "update", GHSA, "-", stdin=json.dumps({"description": "third vector"}))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert sent["description"].startswith("ORIGINAL REPRO\n\n### Update ")
+    assert sent["description"].endswith("third vector")
+
+
+@pytest.mark.parametrize("stdin", ["", "not json", "[1, 2]"])
+def test_stdin_body_must_be_a_json_object(stub, stdin):
+    d, env = stub
+    assert _run(env, "create", "-", stdin=stdin).returncode == 2
+    assert not (d / "sent.json").exists()
 
 
 def test_unknown_verb_is_refused(stub):

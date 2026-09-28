@@ -176,3 +176,46 @@ spend and the trade is worth revisiting.
 
 **Paths in scope.** `.github/workflows/a1p-planner.yml`, `.github/workflows/core-queue.yml`, and any
 workflow that runs a builder.
+
+---
+
+## RD-005 · Review sessions never execute the tree under review
+
+**Status:** LIVE (half 1) · ACCEPTED (half 2) — raised on #71
+
+**The findings a reviewer would raise.**
+
+> 1. This PR-review model step grants `Bash(python:*)` / `pytest` / `pip` / `ruff`. Running the
+>    tree's suite executes the tree's code in the review job, where it can rewrite the controls
+>    that `control-inputs-from-base` restored before the model reads or runs them.
+> 2. The reviewer cannot run the tests, so its review of test changes rests on reading alone.
+
+**Disposition.** Half 1 is LIVE: a PR-review model step that can execute the tree under review is a
+finding whenever it appears. Raise it. Half 2 is ACCEPTED: this is the cost of half 1, and the
+Chief is knowingly living with it.
+
+**Reasoning.** A process started by one step of a job outlives that step, so there is no "safe
+moment" inside the job to run the PR's code. The only clean separation is a job that runs it and
+holds nothing to protect. The `tests` check is exactly that job, and it is required. So the reviewer
+reads its result (`gh pr checks`, with `checks: read` / `statuses: read`) and cites it, rather than
+producing a second result in a job that holds the review token and the comment script. For the a6
+sweep, which holds the forge token and so runs no interpreter either, a plain step runs the
+adversarial suite against `main` before the token is minted. The sweep cites
+`/tmp/adversarial-suite.txt`; that step runs `main`'s reviewed code, never a PR's.
+
+The same rule covers scripts (#71 review, round 3). A session that can write files never also
+holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
+reviewers write `/tmp/review.md`, and a model-free `post-review` step posts it. That step reads the
+script from the base commit by SHA into a fresh file, with `PATH` pinned. The a6 sweep holds no
+write tool, and passes advisory bodies to `file_advisory.sh` on standard input. Every step after a
+review session runs with `PATH` pinned, and embedded Python runs with `-I`, so that a PR checkout
+in the working directory is not on `sys.path`.
+
+**Holds while.** The `tests` check runs the full suite (lint included) on every PR, and stays
+required. If it ever stops doing either, the reviewer is left with no executed result to cite, and
+half 2 has to be reopened.
+
+**Paths in scope.** `.github/workflows/a1r-review.yml`, `.github/workflows/a2-conformance.yml`,
+`.github/workflows/a6-adversary.yml`, `.claude/agents/a1r-reviewer.md`,
+`.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
+`.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.

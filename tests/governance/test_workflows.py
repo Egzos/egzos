@@ -79,14 +79,15 @@ def test_review_jobs_take_control_inputs_from_the_base(job_id):
     # Before the model runs, not merely before the verdict is read (#40 review).
     assert action_at is not None
     assert step_names.index("control-inputs-from-base") < action_at
-    assert "Bash(bash /tmp/post_review_comment.sh:*)" in allowed
-    assert ".github/scripts/post_review_comment.sh" not in allowed
+    # The session posts nothing itself: a model-free step does, after it ends (#71 round 3).
+    assert "Bash(bash " not in allowed
+    assert "post_review_comment.sh" not in allowed
 
 
 def test_embedded_python_compiles():
     # A syntax error in a heredoc would pass every text assertion here and surface only as a red
     # required check at runtime.
-    heredoc = re.compile(r"python3 - <<'(\w+)'\n(.*?)\n\1\n", re.DOTALL)
+    heredoc = re.compile(r"python3 (?:-I )?- <<'(\w+)'\n(.*?)\n\1\n", re.DOTALL)
     blocks = 0
     for wf, _, _, step in _steps():
         for m in heredoc.finditer(step.get("run", "") + "\n"):
@@ -103,22 +104,114 @@ def test_control_inputs_cover_everything_claude_code_loads():
         # At any depth, not only the root (#40 review): Claude Code loads nested ones too.
         for needle in ("-name CLAUDE.md", "CLAUDE.local.md", "-name .mcp.json",
                        "-name .claude -type d -prune", r"(^|/)\.claude/",
-                       "REVIEW-DECISIONS.md", "post_review_comment.sh"):
+                       "REVIEW-DECISIONS.md"):
             assert needle in run, (wf, job_id, needle)
+
+
+INTERPRETERS = (
+    "Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(pip:*)", "Bash(ruff:*)",
+)
+
+
+def _model_steps():
+    for wf, job_id, job, step in _steps():
+        if step.get("uses", "").startswith(ACTION):
+            yield wf, job_id, job, step
+
+
+def _gh_token(job, step):
+    # The step's env overrides the job's, as it does in Actions; either may carry the token.
+    return str({**job.get("env", {}), **step.get("env", {})}.get("GH_TOKEN", ""))
+
+
+def _after_model(job_id):
+    steps = [s for _, j, _, s in _steps() if j == job_id]
+    (at,) = [i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION)]
+    return steps[at + 1:]
+
+
+@pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
+def test_review_is_posted_by_a_model_free_step(job_id):
+    after = _after_model(job_id)
+    assert after[0].get("name") == "post-review"
+    post = after[0]
+    run = post["run"]
+    # From the base commit by SHA, into a fresh file, after the session: never a path it could
+    # have rewritten.
+    assert 'git show "${BASE_SHA}:.github/scripts/post_review_comment.sh"' in run
+    assert "mktemp" in run
+    assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+
+
+@pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
+def test_steps_after_the_model_run_pinned_and_isolated(job_id):
+    # Anything the session planted on PATH, or in the checkout that `python3 -` would import from,
+    # must not run with the job's token after it.
+    for step in _after_model(job_id):
+        assert step.get("env", {}).get("PATH") == "/usr/bin:/bin", step.get("name")
+        assert "python3 - " not in step.get("run", ""), step.get("name")
+
+
+@pytest.mark.parametrize("wf", WORKFLOWS, ids=lambda p: p.name)
+def test_no_heredoc_python_reads_the_working_directory(wf):
+    # `python3 -` puts the working directory first on sys.path, and in a PR job that is the tree
+    # under review; -I leaves it off. labels-sync is the one exception: it runs only on main's own
+    # tree (push to main, dispatch), and it needs the user-site pyyaml that -I would hide.
+    assert "python3 - <<" not in wf.read_text() or wf.name == "labels-sync.yml"
+    if wf.name == "labels-sync.yml":
+        assert "pull_request" not in str(_load(wf)["on"])
+
+
+def test_no_action_step_echoes_the_session_to_the_log():
+    # file_advisory.sh list, the review bodies and every tool result reach the log only if the
+    # action is told to show its full output; the logs of this repository are public.
+    for wf, job_id, _, step in _model_steps():
+        assert str(step["with"].get("show_full_output", "false")).lower() == "false", (wf, job_id)
 
 
 def test_forge_token_sessions_run_no_interpreter():
     # A model step holding the forge token as GH_TOKEN must not also hold an interpreter: with one,
-    # a narrowed gh grant is narrow only on paper (#71 review, finding 1).
-    interpreters = ("Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(pip:*)")
-    for wf, job_id, _, step in _steps():
-        if not step.get("uses", "").startswith(ACTION):
-            continue
-        if "forge" not in str(step.get("env", {}).get("GH_TOKEN", "")):
+    # a narrowed gh grant is narrow only on paper (Egzos/egzos#71 review, finding 1).
+    inspected = set()
+    for wf, job_id, job, step in _model_steps():
+        if "forge" not in _gh_token(job, step):
             continue
         if "Bash(git:*)" in step["with"].get("claude_args", ""):
             continue  # builders push code by design; their reach is bounded by ownership and review
-        assert not any(i in step["with"]["claude_args"] for i in interpreters), (wf, job_id)
+        inspected.add(job_id)
+        args = step["with"]["claude_args"]
+        assert not any(i in args for i in INTERPRETERS), (wf, job_id)
+        # A script grant is an interpreter too once the session can rewrite the script: never both
+        # (#71 review, round 3, finding 1).
+        if "Bash(bash " in args:
+            tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+            assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & set(tools), (wf, job_id)
+    # Never vacuous: a renamed token step or a token moved to the job still reaches the sweep.
+    assert "a6-adversary-nightly" in inspected
+
+
+def test_a6_sweep_suite_runs_before_the_forge_token_exists():
+    # The sweep's session runs no interpreter, so a plain step runs the adversarial suite and the
+    # model cites its file (Egzos/egzos#71 review, finding 3). It must precede the token mint, and
+    # hold no token of its own.
+    steps = [s for _, j, _, s in _steps() if j == "a6-adversary-nightly"]
+    names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
+    suite = steps[names.index("adversarial-suite")]
+    assert names.index("adversarial-suite") < names.index("forge")
+    assert "GH_TOKEN" not in suite.get("env", {})
+    assert "/tmp/adversarial-suite.txt" in suite["run"]
+    (model,) = [s for s in steps if s.get("uses", "").startswith(ACTION)]
+    assert "/tmp/adversarial-suite.txt" in model["with"]["prompt"]
+
+
+@pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
+def test_review_sessions_never_execute_the_tree(job_id):
+    # Code in the tree under review, run inside the review job, could rewrite the controls restored
+    # from the base before the model uses them. The tests check runs the suites; the reviewer reads
+    # its result (Egzos/egzos#71 review, finding 1 of the last round).
+    (args,) = [s["with"]["claude_args"] for _, j, _, s in _model_steps() if j == job_id]
+    assert not any(i in args for i in INTERPRETERS)
+    assert "Bash(gh pr checks:*)" in args
 
 
 @pytest.mark.parametrize("job_id", ["a2-conformance", "a6-adversary"])

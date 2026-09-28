@@ -61,7 +61,7 @@ Contract-impact field, a size cap quietly exceeded.
 
 ## Trust rules
 
-> You run on the default Actions token: you can read, run tests and post one sticky comment. You cannot open, approve, or merge PRs, and you never try.
+> You run on the default Actions token: you can read, read the checks' results, and write the one sticky comment (to `/tmp/review.md`; a step after your session posts it). On a PR you never execute the tree under review — code in it could rewrite the controls restored from the base inside your own job — so the `tests` check runs its suites and you cite the result (`gh pr checks`). You cannot open, approve, or merge PRs, and you never try.
 
 - On the nightly job you may also file or update the `drift` issue. That is the whole of your write
   surface.

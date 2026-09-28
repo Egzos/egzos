@@ -84,12 +84,13 @@ The a6-adversary nightly sweep's only route to the repository-advisory API, whic
 
 ```bash
 bash .github/scripts/file_advisory.sh list                           # GHSA id, state, summary
-bash .github/scripts/file_advisory.sh create /tmp/advisory.json      # prints the new GHSA id
-bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx /tmp/advisory.json
+bash .github/scripts/file_advisory.sh create - <<'JSON'               # body on stdin; prints the new GHSA id
+bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx - <<'JSON'
 ```
 
-Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object in a
-file; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
+Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object, in a
+file or on standard input (`-`). The sweep uses stdin because its session holds no write tool, so
+the script it runs is always the one its checkout holds; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
 only — never a reproduction. `update` is append-only: it reads the filed advisory and appends the new
 `description` under a dated heading (adding any new `vulnerabilities`), because the advisory is the
 only copy of an unfixed reproduction and a plain PATCH would replace it. Filed and new vulnerabilities alike are cut down to the fields a PATCH
@@ -99,5 +100,7 @@ updated rather than filed again.
 ## post_review_comment.sh
 
 Creates or updates the one review comment per reviewer on a PR, matched by its first line and by
-author. The review jobs run it from `/tmp`, extracted from the base ref, never from the tree under
-review.
+author. The review session never runs it: the session writes `/tmp/review.md`, and a model-free
+`post-review` step runs this script afterwards, read from the base commit by SHA into a fresh
+temporary file, with `PATH` pinned. A session that could both write files and run a script it could
+have rewritten would hold an interpreter (Egzos/egzos#71 review, round 3).
