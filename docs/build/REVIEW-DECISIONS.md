@@ -215,7 +215,9 @@ in the working directory is not on `sys.path`.
 covered: a pinned `PATH`, `-I` Python, blanked `BASH_ENV` / `ENV` / `LD_PRELOAD` (a step's own env wins over
 anything the session appends to `$GITHUB_ENV`), and a comment script fetched from the API rather
 than read from the checkout's `.git`, with the fetch and the post both run under `env -i` and an explicit
-allowlist (#79 and platform#42 reviews). What stays open is that such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+allowlist (#79 and platform#42 reviews). What stays open: the session still writes `/tmp/review.md`, which `post-review` posts, so the review
+text is the session's by design; the step pins which comment it lands in (the job's own marker, never
+another reviewer's). Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
 needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
 silently stops every review from being posted.
 

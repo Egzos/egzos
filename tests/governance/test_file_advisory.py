@@ -132,6 +132,20 @@ def test_update_drops_a_package_without_an_ecosystem(stub):
     assert all("ecosystem" in v["package"] for v in sent["vulnerabilities"] if "package" in v)
 
 
+def test_update_keeps_an_ecosystem_only_package(stub):
+    # name is optional in the advisory API; this repository's own code publishes no package
+    # (platform#42 review).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"package": {"ecosystem": "other"}}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert {"package": {"ecosystem": "other"}} in sent["vulnerabilities"]
+
+
 def test_update_without_a_description_is_refused(stub):
     d, env = stub
     new = d / "new.json"

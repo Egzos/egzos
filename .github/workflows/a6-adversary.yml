@@ -148,11 +148,21 @@ jobs:
           LD_PRELOAD: ""
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR: ${{ github.event.pull_request.number }}
+          # Everything env -i forwards is pinned here too, so $GITHUB_ENV cannot set it.
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          # The comment this job owns. The session does not choose it: a body opening with another
+          # reviewer's marker would replace that reviewer's comment (all three post as one bot).
+          MARKER: "## a6-adversary review"
         run: |
           set -euo pipefail
           if [[ ! -s /tmp/review.md ]]; then
             echo "::warning::the review session wrote no /tmp/review.md, so there is nothing to post"
             exit 0
+          fi
+          if [[ "$(head -n 1 /tmp/review.md)" != "$MARKER" ]]; then
+            echo "::error::the review body does not open with this job's marker; nothing posted"
+            exit 1
           fi
           export TMPDIR=/tmp
           H="$(mktemp -d)"
@@ -241,7 +251,7 @@ jobs:
                   for k in ("error", "message", "result"):
                       v = res.get(k)
                       if isinstance(v, str) and v.strip():
-                          print(f"provider {k}: {v[:300]}"); break
+                          print("provider {}: {}".format(k, " ".join(v[:300].splitlines()))); break
           if turns == 1 and not cost:
               print("::error::DIAGNOSIS: the model never ran. One turn, zero cost, no token usage "
                     "means the request was rejected before inference - a drained model-tier window, "

@@ -142,6 +142,16 @@ def test_review_is_posted_by_a_model_free_step(job_id):
     assert "env -i PATH=/usr/bin:/bin" in run
     assert "clean gh api" in run and 'clean bash --noprofile --norc "$S"' in run
     assert "git show" not in run
+    # The job's own marker, pinned; a body opening with another reviewer's is refused.
+    assert post["env"]["MARKER"] == {
+        "a1r-review": "## a1r-reviewer review",
+        "a2-conformance": "## a2-conformance review",
+        "a6-adversary": "## a6-adversary review",
+    }[job_id]
+    assert '!= "$MARKER"' in run
+    # Everything env -i forwards is pinned in the step's own env.
+    assert post["env"]["GH_TOKEN"] == "${{ github.token }}"
+    assert post["env"]["GITHUB_REPOSITORY"] == "${{ github.repository }}"
     assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     # Posted on failure too (a turn-capped review is still the Chief's to read), never when
     # cancelled.
