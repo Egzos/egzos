@@ -17,15 +17,22 @@ and exits 0 (pass) or 1 (fail).
    agent's `paths:` globs.  If it does not, the check fails.
 5. **Exclusive paths** — if the file matches another agent's `exclusive:` glob,
    the check fails even if the file is also in the acting agent's `paths:`.
-6. **Chief-only paths** (`egzos-platform` only, `chief_only:` key) — any agent
-   branch touching a chief-only path fails immediately.
-7. **Governance notices** (`egzos` only, `governance_paths:` key) — touching
-   these paths emits a `::notice::` annotation for the Watcher; it is not a
-   failure when the file is otherwise owned by the agent.
+6. **Chief-only paths** (`chief_only:` key) — any agent branch touching a
+   chief-only path, on either side of a rename, fails immediately.
+7. **Governance notices** (`governance_paths:` key) — touching these paths
+   emits a `::notice::` annotation for the Watcher; it is not a failure when
+   the file is otherwise owned by the agent.
 8. **Size cap** — counts added+removed lines (excluding `size_cap.exclude`
    globs) and total non-excluded files.  Exceeding `size_cap.lines` (600) or
-   `size_cap.files` (30) is a failure on agent branches — a `::warning::` on human branches — unless the PR carries the `size-exception`
-   label.
+   `size_cap.files` (30) is a failure on agent branches — a `::warning::` on
+   human branches — unless the PR carries `size-exception` **and** the login
+   that last applied it is in `size_exception_approvers`. The workflow looks
+   the applier up from the PR's label events.
+9. **Fail closed** — a diff record the parser cannot interpret, or labels that
+   are not a JSON array, fail the check (exit 1). Nothing is skipped.
+
+Tests: `tests/governance/test_check_ownership.py`, fed by real `git diff
+--numstat -z` output from throwaway repositories.
 
 ### Glob syntax
 
@@ -47,20 +54,41 @@ pip install pyyaml
 python3 .github/scripts/check_ownership.py \
     --base origin/main \
     --head HEAD \
-    --branch "$(git rev-parse --abbrev-ref HEAD)" \
-    --labels ""
+    --branch "$(git rev-parse --abbrev-ref HEAD)"
 
 # With canned changed-files and numstat (for unit testing)
 python3 .github/scripts/check_ownership.py \
     --base unused \
     --head unused \
     --branch "agent/a3-store/issue-1" \
-    --labels "" \
     --changed-files /tmp/files.txt \
     --numstat /tmp/numstat.txt
 ```
 
 ### Running the self-tests
 
-The test suite in `/tmp/` is created by hand or CI during the validation run.
-See the `VALIDATION` section of the scaffold spec for the canonical test cases.
+`pytest -q tests/governance` — part of the required `tests` check.
+
+## file_advisory.sh
+
+The a6-adversary nightly sweep's only route to the repository-advisory API, which replaced a raw
+`gh api` grant (drift F17). Three verbs, this repository only:
+
+```bash
+bash .github/scripts/file_advisory.sh list                           # GHSA id, state, summary
+bash .github/scripts/file_advisory.sh create /tmp/advisory.json      # prints the new GHSA id
+bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx /tmp/advisory.json
+```
+
+Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object in a
+file; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
+only — never a reproduction. `update` is append-only: it reads the filed advisory and appends the new
+`description` under a dated heading (adding any new `vulnerabilities`), because the advisory is the
+only copy of an unfixed reproduction and a plain PATCH would replace it. `list` comes first on every sweep, so a finding already filed is
+updated rather than filed again.
+
+## post_review_comment.sh
+
+Creates or updates the one review comment per reviewer on a PR, matched by its first line and by
+author. The review jobs run it from `/tmp`, extracted from the base ref, never from the tree under
+review.

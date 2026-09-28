@@ -8,11 +8,15 @@ pytest's import-mode configuration or collide with pytest's own loaded copy of t
 """
 
 import importlib.util
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 _CONFTEST_PATH = Path(__file__).parent / "conftest.py"
+_PYPROJECT_PATH = Path(__file__).parent.parent / "pyproject.toml"
 _spec = importlib.util.spec_from_file_location("_adversarial_conftest_under_test", _CONFTEST_PATH)
 _conftest = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_conftest)
@@ -109,3 +113,41 @@ def test_multiple_violations_are_all_reported_together():
 
     assert "test_bad_one" in str(excinfo.value)
     assert "test_bad_two" in str(excinfo.value)
+
+
+def test_hook_is_actually_wired_into_a_real_pytest_run(tmp_path):
+    """Proves the wiring, not just the predicate (issue #75).
+
+    The seven tests above call ``pytest_collection_modifyitems`` directly — they'd stay green
+    even if ``conftest.py`` were renamed, moved somewhere pytest doesn't load it from, or if
+    ``adversarial`` fell out of ``testpaths`` in pyproject.toml. This test instead runs a real,
+    separate ``pytest`` process against an isolated copy of the actual pyproject.toml and the
+    actual conftest.py, collecting a deliberately bare ``@pytest.mark.xfail_finding`` test placed
+    next to that copied conftest. A real hook, really wired in, is required for this to fail
+    collection; renaming/moving the hook or dropping ``adversarial`` from testpaths would make
+    the child process exit 0, which the assertions below would catch.
+
+    The bad test lives only in a subprocess's isolated tmp_path copy, never inside this
+    repository's own adversarial/ tree, so it can't ever poison this suite's own collection.
+    """
+    shutil.copy(_PYPROJECT_PATH, tmp_path / "pyproject.toml")
+    (tmp_path / "tests").mkdir()
+    probe_dir = tmp_path / "adversarial"
+    probe_dir.mkdir()
+    shutil.copy(_CONFTEST_PATH, probe_dir / "conftest.py")
+    (probe_dir / "test_bare_xfail_finding_probe.py").write_text(
+        "import pytest\n\n\n"
+        "@pytest.mark.xfail_finding\n"
+        "def test_bare_finding_without_companion_xfail():\n"
+        "    assert True\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "xfail_finding contract violated" in result.stdout + result.stderr
