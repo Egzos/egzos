@@ -61,7 +61,7 @@ The Hyperagent side never touches this repository. Everything with commit rights
 1. **`egzos-forge` App** — builders only. Pushes `agent/<name>/*` branches, opens PRs, files, labels and
    comments on issues. It authors every agent PR, so GitHub refuses its approval; it has no Workflows
    permission, so a push touching `.github/workflows/**` is rejected by GitHub itself.
-2. **default Actions token** (`github-actions[bot]`) — reviewers only. Reads, runs tests, posts one
+2. **default Actions token** (`github-actions[bot]`) — reviewers only. Reads, reads check results, posts one
    sticky comment (and, on the two nightly jobs, files or updates an issue). It can neither open nor
    approve a PR, and anything it created would not trigger another workflow anyway.
 3. **Chief, or the `chief-proxy` App** — the only approval on the gate. Branch protection dismisses
