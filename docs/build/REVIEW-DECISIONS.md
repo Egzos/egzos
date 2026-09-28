@@ -219,3 +219,43 @@ half 2 has to be reopened.
 `.github/workflows/a6-adversary.yml`, `.claude/agents/a1r-reviewer.md`,
 `.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
 `.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.
+
+---
+
+## RD-006 · A pull request's checks run from the workflow file in its own tree
+
+**Status:** ACCEPTED — raised on #40 (a1r), tracked as #44 item 3
+
+**The finding a reviewer would raise.**
+
+> The charter and the control inputs come from the base, but everything else a check does — its
+> `prompt:`, `--allowedTools`, `--model`, its Verdict step, the ownership step itself — is read
+> from the workflow file in the tree under review. A PR that edits a review workflow is judged by
+> its own edit.
+
+**Disposition.** ACCEPTED. The observation is exactly right. There is no configuration that fixes it
+without something worse.
+
+**Reasoning.** GitHub runs a `pull_request` workflow from the PR's merge ref. The one event that
+runs the base's file, `pull_request_target`, does so with the base's secrets, and checking out the
+PR's tree under it is the textbook way to hand those secrets to untrusted code. The compensating
+controls are identity controls:
+
+- **Agent PRs cannot carry a workflow edit.** The `egzos-forge` App holds no Workflows permission,
+  so GitHub itself rejects any agent push that touches `.github/workflows/**`.
+- **The Chief's own branches** are gated by the Chief by definition.
+- **A fork PR is the residue.** It carries no secrets, so its model steps cannot run. But the fork
+  controls the workflow file its checks run from, so **every required check on a fork PR is
+  forgeable by that PR**, the ownership check included.
+
+On a fork PR the checks are therefore advisory. The gate is the Chief's approval of the diff, and a
+diff touching `.github/workflows/**` is the tell. The stronger control is a setting, not a file:
+Settings → Actions → *Fork pull request workflows* → require approval for all outside
+collaborators. With it, no fork workflow runs, and so no check reports, until the Chief allows it.
+
+**Holds while.** The forge App holds no Workflows permission, fork runs stay secret-less, and no
+other identity with `contents: write` opens pull requests. If any of those changes, this entry is
+wrong, and the finding should be raised as it stands.
+
+**Paths in scope.** `.github/workflows/**`.
+

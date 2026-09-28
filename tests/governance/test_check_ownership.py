@@ -113,6 +113,70 @@ def test_rename_yields_both_sides(repo):
     assert co.parse_numstat_z(raw) == [(0, 0, "spec/rd.md", "docs/build/REVIEW-DECISIONS.md")]
 
 
+# Every rename shape whose display form #19 captured (brace prefix, brace suffix, across trees,
+# prefix-and-edit, an empty side), read from real `git diff --numstat -z` output: -z always
+# carries the two paths whole, so no display form reaches the parser (#62).
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("docs/a.md", "docs/b.md"),                    # same directory: docs/{a.md => b.md}
+        ("src/pkg/mod.py", "lib/pkg/mod.py"),          # common suffix: {src => lib}/pkg/mod.py
+        ("src/one/deep.py", "src/two/deep.py"),        # prefix and suffix: src/{one => two}/deep.py
+        ("top.md", "docs/top.md"),                     # empty side: {=> docs}/top.md
+        ("docs/sub/x.md", "x.md"),                     # empty side the other way
+    ],
+)
+def test_rename_shapes_all_yield_both_sides(repo, old, new):
+    _write(repo, old, "".join(f"line {i}\n" for i in range(40)))
+    _commit(repo, "base")
+
+    def mutate(r):
+        (r / new).parent.mkdir(parents=True, exist_ok=True)
+        _git(r, "mv", old, new)
+
+    raw = _branch_diff(repo, mutate)
+    assert co.parse_numstat_z(raw) == [(0, 0, new, old)]
+
+
+def test_rename_with_an_edit_keeps_both_sides_and_counts(repo):
+    _write(repo, "src/one/deep.py", "".join(f"line {i}\n" for i in range(40)))
+    _commit(repo, "base")
+
+    def mutate(r):
+        (r / "src/two").mkdir(parents=True)
+        _git(r, "mv", "src/one/deep.py", "src/two/deep.py")
+        with open(r / "src/two/deep.py", "a") as fh:
+            fh.write("added\n")
+
+    raw = _branch_diff(repo, mutate)
+    assert co.parse_numstat_z(raw) == [(1, 0, "src/two/deep.py", "src/one/deep.py")]
+
+
+def test_lock_and_fixture_renames_follow_the_post_image(repo):
+    # vendor/{a.lock => b.lock} stays excluded; a file moved into tests/fixtures/ is excluded, and
+    # one moved out of it counts: the size cap charges where the file lands (#62).
+    for rel in ("vendor/a.lock", "src/f.json", "tests/fixtures/moved.py"):
+        _write(repo, rel, "".join(f"{rel} {i}\n" for i in range(20)))
+    _commit(repo, "base")
+
+    def mutate(r):
+        (r / "tests/fixtures").mkdir(parents=True, exist_ok=True)
+        _git(r, "mv", "vendor/a.lock", "vendor/b.lock")
+        _git(r, "mv", "src/f.json", "tests/fixtures/f.json")
+        _git(r, "mv", "tests/fixtures/moved.py", "src/moved.py")
+        for rel in ("vendor/b.lock", "tests/fixtures/f.json", "src/moved.py"):
+            with open(r / rel, "a") as fh:
+                fh.write("edit\n")
+
+    entries = co.parse_numstat_z(_branch_diff(repo, mutate))
+    assert {(n, o) for _, _, n, o in entries} == {
+        ("vendor/b.lock", "vendor/a.lock"),
+        ("tests/fixtures/f.json", "src/f.json"),
+        ("src/moved.py", "tests/fixtures/moved.py"),
+    }
+    assert co.compute_size(entries, ["**/*.lock", "tests/fixtures/**"]) == (1, 1)
+
+
 def test_literal_arrow_filename_is_one_path(repo):
     _write(repo, "notes/a => b.txt", "x\n")
     _commit(repo, "base")

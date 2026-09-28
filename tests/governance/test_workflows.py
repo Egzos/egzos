@@ -222,6 +222,16 @@ def test_not_applicable_waits_for_a_successful_scope(job_id):
     assert "steps.scope.outcome == 'success'" in cond
 
 
+def test_a2_scope_fails_closed_when_git_fails():
+    # A git failure must not read as "no UI paths changed" and early-pass the check (#23).
+    (run,) = [
+        s["run"] for _, j, _, s in _steps() if j == "a2-conformance" and s.get("id") == "scope"
+    ]
+    assert 'if ! CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD"' in run
+    assert "|| true" not in run
+    assert "2>/dev/null" not in run
+
+
 def _verdict(job_id):
     (run,) = [s["run"] for _, j, _, s in _steps() if j == job_id and s.get("name") == "Verdict"]
     return run
