@@ -898,8 +898,91 @@ every outcome, so `consent.md` §13's `expiry.none` string stands as written eit
 
 ## 12 · The pre-authorization audit surface
 
-TODO(a1p): **being written in this PR (#61, Part B).** Section number fixed now; the clauses land on
-this branch.
+§9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
+**before any token or session exists** — and the drafted taxonomy has no name for one of them.
+`events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
+non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
+
+**Raised, not invented.** The five below are `spec/design/consent.md` §14.8 (a), (b), (d), (e) and
+(f), which that spec routes to this document and explicitly **not** to #68. Its (c), a consent
+denial, is #68's with the other four AS effects §9 names. **The naming and the `events.md` amendment
+are `[OPEN→0.3]`, batched as #86, to be decided in the same sitting as #68** — #68's option (b)
+`authz.grant` *is* (c), so splitting the two sittings leaves the denial in neither. **This section
+proposes no event names.** What it fixes is what must be recorded, and what each entry carries.
+
+| | the effect | outcome | `details.cause`, a closed word |
+|---|---|---|---|
+| **(a)** | a login attempt at `/login` | `established` · `failed` | `wrong` · `unknown` · `throttled` |
+| **(b)** | a device-code redemption at `/device` | `found` · `failed` | `invalid` · `expired` · `used` · `malformed` · `throttled` |
+| **(d)** | a pre-trust uniform failure at `/authorize` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` |
+| **(e)** | a throttle releasing | `released` | — (see below) |
+| **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` · `expiry` |
+
+### 12.1 · The rules, which are not open
+
+**a1p**, and stated so the review can overturn them deliberately rather than lose them inside a
+naming decision:
+
+1. **One append per *evaluated* attempt, success and failure alike** — the same shape `events.md`
+   invariant 2 already requires of a read. The cause lives in `details` and never on the page: §11.7
+   and §7 make the surfaces uniform to the *caller*, and that uniformity is owed to the caller, never
+   to the owner's own ledger.
+2. **One append per path, however the path is reached.** (d)'s page is one page; a request that
+   arrives at it by six different causes writes once each time, so no cause is distinguishable by the
+   *number* of writes it makes.
+3. **A refused attempt is counted, not appended.** The attempt that *engages* a throttle appends once
+   under (a), (b) or (d) with cause `throttled`. Every further attempt refused while the throttle
+   holds is counted and not appended. This is the clause that bounds the chain: (a), (b), (d) and (f)
+   are all reachable by a caller who has authenticated nothing — a public client's id and registered
+   redirect URI are not secrets — so without it an unauthenticated sweep grows an **append-only** log
+   the owner cannot prune, at the caller's rate.
+4. **A throttle that holds does not evaluate — a correct credential or a valid code included.** A
+   throttle that evaluated the right answer while refusing wrong ones would bound the ledger and not
+   the guessing, which is the opposite of what it is for. **A throttle MUST fail closed:** one that
+   fails open turns the audit chain into a write amplifier.
+5. **The release appends whenever an engage did, `refused: 0` included.** (e) is the only entry that
+   carries a sweep's size, so a release that appended only on a non-zero count would let the size be
+   inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
+   `authorize` · `tap` (the step-up tap is the fourth surface; if §10's `[LEAN]` is not taken, the
+   word is unused, not wrong) — and `refused`, an integer.
+6. **The deciding session's replay is never throttled.** Only the session that decided can re-submit
+   a decided request (§11.4), so the throttle neither counts nor refuses it: it is evaluated and
+   appends once, cause `replayed`, whatever the throttle's state. A replay after a decision is a fact
+   the owner has an interest in.
+7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
+   `events.md` invariant 4, restated because these are the five entries closest to a credential in
+   the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one
+   by accident.
+
+### 12.2 · What `actor` and `principal` carry when there is no caller
+
+`events.md` §2 makes `actor` and `principal` **mandatory** on every entry, and `capabilities.md` §3
+closes `principal` to `interactive` · `client`. None of the five can satisfy that: (a) fires on
+`/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before any
+token exists; and (e) fires on **no attempt at all** — a timer releasing, with no caller in any
+request. The gap is real and it is this document's to raise, `events.md`'s to close.
+
+`[OPEN→0.3]` **a1p's reading, for #86 to take or reject:**
+
+- **`principal` gains a third closed value — `none`.** Not a nullable field: `principal` being
+  mandatory is what makes the chain readable in one pass, and a nullable one is a branch every reader
+  and every `audit` query must carry forever. A third word costs one row in `capabilities.md` §3 and
+  says exactly what is true.
+- **`actor` carries the *surface*, not the caller** — the same closed four as (e)'s `surface`. It is
+  the only honest thing known about the append, and it is what pairs (e) with the entries it
+  summarises. **The caller's network identifier MUST NOT be the actor.** An IP or a client hint in
+  `actor` writes network identity into an append-only chain the owner cannot prune, which turns the
+  audit log into a surveillance record of everyone who ever touched the container's front door — a
+  cost the owner never agreed to and cannot undo.
+- **The engage entry and the release entry are paired by an opaque throttle key in `details`** — a
+  per-container, per-window value derived from whatever the throttle keyed on, never the key itself,
+  rotating with the window. It correlates the entries of one sweep and correlates nothing across
+  time, which is the whole of what pairing needs.
+
+Nothing on any page depends on any of the three; `consent.md` §14.8 says so in its own words.
+Whatever the review picks, `events.md` §2's description of the entry must say it — an implementation
+reading §2 alone today would have to invent a value for a mandatory field, and two implementations
+would invent different ones and break the chain across them (`events.md` §3).
 
 ## 13 · What this document does not fix
 
