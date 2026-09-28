@@ -34,8 +34,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: read     # gh pr checks: the tests check's result, which the model reads instead of running the tree
+      # gh pr checks: the tests check's result, which the model reads instead of running the tree.
+      # It resolves each check's workflow run, an Actions resource, so actions: read is needed too.
+      checks: read
       statuses: read
+      actions: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -135,12 +138,16 @@ jobs:
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
-      # The session writes /tmp/review.md, and nothing it wrote decides what runs from here on: the
-      # comment script is read from the base commit by SHA after the session ends, into a fresh
-      # file, so a path the session could have rewritten is never executed; and PATH is pinned, so a
-      # binary planted earlier on it is never found (Egzos/egzos#71 review, round 3).
+      # The session writes /tmp/review.md; it does not choose the script that posts it. The comment
+      # script is read from the base commit by SHA after the session ends, into a fresh file (object
+      # storage is content-addressed, so tampering fails this step rather than changing it), and
+      # PATH is pinned, so a binary planted earlier on it is never found (Egzos/egzos#71 review,
+      # round 3). The session's Write is unscoped; RD-005 records that residual.
       - name: post-review
-        if: steps.review.outcome == 'success'
+        # On failure too: a review cut off by the turn cap is still on disk and still the Chief's to
+        # read (diagnose-failure says so); Verdict fails the check on its own. Not when cancelled: a
+        # superseded run must not post a stale review.
+        if: ${{ !cancelled() && steps.review.outcome != 'skipped' }}
         env:
           PATH: /usr/bin:/bin
           BASE_SHA: ${{ github.event.pull_request.base.sha }}

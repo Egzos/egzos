@@ -141,6 +141,9 @@ def test_review_is_posted_by_a_model_free_step(job_id):
     assert 'git show "${BASE_SHA}:.github/scripts/post_review_comment.sh"' in run
     assert "mktemp" in run
     assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+    # Posted on failure too (a turn-capped review is still the Chief's to read), never when
+    # cancelled.
+    assert "!cancelled()" in post["if"] and "skipped" in post["if"]
 
 
 @pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
@@ -190,17 +193,33 @@ def test_forge_token_sessions_run_no_interpreter():
     assert "a6-adversary-nightly" in inspected
 
 
-def test_a6_sweep_suite_runs_before_the_forge_token_exists():
-    # The sweep's session runs no interpreter, so a plain step runs the adversarial suite and the
-    # model cites its file (Egzos/egzos#71 review, finding 3). It must precede the token mint, and
-    # hold no token of its own.
-    steps = [s for _, j, _, s in _steps() if j == "a6-adversary-nightly"]
-    names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
-    suite = steps[names.index("adversarial-suite")]
-    assert names.index("adversarial-suite") < names.index("forge")
-    assert "GH_TOKEN" not in suite.get("env", {})
-    assert "/tmp/adversarial-suite.txt" in suite["run"]
-    (model,) = [s for s in steps if s.get("uses", "").startswith(ACTION)]
+def _job(job_id):
+    for wf in WORKFLOWS:
+        jobs = _load(wf)["jobs"]
+        if job_id in jobs:
+            return jobs[job_id]
+    raise KeyError(job_id)
+
+
+def test_a6_suite_runs_in_a_job_holding_no_token():
+    # A process one step starts outlives the step, so step order inside the job that mints the
+    # forge token separates nothing: the suite runs in a job of its own (RD-005, #41 review).
+    suite = _job("a6-adversary-suite")
+    assert suite["permissions"] == {"contents": "read"}
+    blob = str(suite)
+    assert "secrets." not in blob and "create-github-app-token" not in blob
+    assert "GH_TOKEN" not in blob
+    (run,) = [s["run"] for s in suite["steps"] if s.get("id") == "suite"]
+    # The output delimiter is not guessable from the suite's own text.
+    assert "openssl rand" in run
+    assert "::warning::" in run and "::error::" in run
+    nightly = _job("a6-adversary-nightly")
+    assert nightly["needs"] == "a6-adversary-suite"
+    assert "!cancelled()" in nightly["if"]
+    names = [s.get("name") or s.get("id") for s in nightly["steps"]]
+    assert "adversarial-suite" not in names
+    assert names.index("suite-result") < names.index("forge")
+    (model,) = [s for s in nightly["steps"] if s.get("uses", "").startswith(ACTION)]
     assert "/tmp/adversarial-suite.txt" in model["with"]["prompt"]
 
 
@@ -212,6 +231,9 @@ def test_review_sessions_never_execute_the_tree(job_id):
     (args,) = [s["with"]["claude_args"] for _, j, _, s in _model_steps() if j == job_id]
     assert not any(i in args for i in INTERPRETERS)
     assert "Bash(gh pr checks:*)" in args
+    # gh pr checks resolves each check's workflow run, an Actions resource (#41 review).
+    perms = _job(job_id)["permissions"]
+    assert {perms.get(k) for k in ("checks", "statuses", "actions")} == {"read"}
 
 
 @pytest.mark.parametrize("job_id", ["a2-conformance", "a6-adversary"])

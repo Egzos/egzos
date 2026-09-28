@@ -35,8 +35,11 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      checks: read     # gh pr checks: the tests check's result, which the model reads instead of running the tree
+      # gh pr checks: the tests check's result, which the model reads instead of running the tree.
+      # It resolves each check's workflow run, an Actions resource, so actions: read is needed too.
+      checks: read
       statuses: read
+      actions: read
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -126,12 +129,16 @@ jobs:
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
-      # The session writes /tmp/review.md, and nothing it wrote decides what runs from here on: the
-      # comment script is read from the base commit by SHA after the session ends, into a fresh
-      # file, so a path the session could have rewritten is never executed; and PATH is pinned, so a
-      # binary planted earlier on it is never found (Egzos/egzos#71 review, round 3).
+      # The session writes /tmp/review.md; it does not choose the script that posts it. The comment
+      # script is read from the base commit by SHA after the session ends, into a fresh file (object
+      # storage is content-addressed, so tampering fails this step rather than changing it), and
+      # PATH is pinned, so a binary planted earlier on it is never found (Egzos/egzos#71 review,
+      # round 3). The session's Write is unscoped; RD-005 records that residual.
       - name: post-review
-        if: steps.review.outcome == 'success'
+        # On failure too: a review cut off by the turn cap is still on disk and still the Chief's to
+        # read (diagnose-failure says so); Verdict fails the check on its own. Not when cancelled: a
+        # superseded run must not post a stale review.
+        if: ${{ !cancelled() && steps.review.outcome != 'skipped' }}
         env:
           PATH: /usr/bin:/bin
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -304,9 +311,55 @@ jobs:
         run: echo "a6-adversary not applicable — 'security' label not present, or Dependabot bump. Passing."
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
+  # The adversarial suite runs in a job of its own, holding no token: a process one step starts
+  # outlives that step, so running code in the job that later mints the forge token is not
+  # separated by step order (RD-005). This job's result reaches the sweep as a job output.
+  a6-adversary-suite:
+    name: a6-adversary-suite
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.suite.outputs.result }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # The log carries the counts and the status only: detail stays in the output the sweep reads.
+      # Security regressions enter adversarial/ only in their fix PR, so main holds none still open.
+      - name: suite
+        id: suite
+        run: |
+          set -u
+          OUT="$(mktemp)"
+          {
+            pip install -q -e ".[dev]" && pytest -q -rxX adversarial
+            echo "exit status: $?"
+          } > "$OUT" 2>&1 || true
+          grep -E '^(=+ )?[0-9]+ (passed|failed|xfailed|xpassed|error)|no tests ran|^exit status' "$OUT" \
+            | tail -n 2 || true
+          STATUS="$(grep -oE '^exit status: [0-9]+' "$OUT" | tail -n 1 | grep -oE '[0-9]+$' || true)"
+          D="SUITE_$(openssl rand -hex 16)"
+          { echo "result<<$D"; tail -c 60000 "$OUT"; echo; echo "$D"; } >> "$GITHUB_OUTPUT"
+          case "${STATUS:-none}" in
+            0) ;;
+            5) echo "::warning::the adversarial suite collected no tests" ;;
+            *) echo "::error::the adversarial suite did not pass (exit status ${STATUS:-unknown})"; exit 1 ;;
+          esac
+
   a6-adversary-nightly:
     name: a6-adversary-nightly   # distinct from the required check name; only the PR job reports a6-adversary
-    if: github.event_name != 'pull_request'
+    needs: a6-adversary-suite
+    # Runs whether the suite passed or not: a failing suite is exactly what the sweep should read.
+    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60   # 120 turns at the observed ~11 s/turn, with headroom (#70 review)
     permissions:
@@ -319,25 +372,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The sweep holds the forge token, so its session runs no interpreter. This plain step runs the
-      # adversarial suite against the default branch BEFORE the token is minted, and the model cites
-      # the file instead of executing anything (Egzos/egzos#71 review, finding 3). The log carries
-      # the summary line only: the suite's detail stays in the file, like the PR job's counts-only
-      # verdict. Security regressions enter adversarial/ only in their fix PR, so main holds none
-      # that is still open.
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
-      - name: adversarial-suite
+      # The suite's result, from the job above; the session cites it and executes nothing.
+      - name: suite-result
+        env:
+          SUITE_RESULT: ${{ needs.a6-adversary-suite.outputs.result }}
         run: |
-          set -u
-          {
-            pip install -q -e ".[dev]" && pytest -q -rxX adversarial
-            echo "exit status: $?"
-          } > /tmp/adversarial-suite.txt 2>&1 || true
-          grep -E '^(=+ )?[0-9]+ (passed|failed|xfailed|xpassed|error)|no tests ran|^exit status' \
-            /tmp/adversarial-suite.txt | tail -n 2 || true
+          if [[ -n "$SUITE_RESULT" ]]; then
+            printf '%s\n' "$SUITE_RESULT" > /tmp/adversarial-suite.txt
+          else
+            echo "The adversarial-suite job produced no result this run." > /tmp/adversarial-suite.txt
+          fi
 
       # Builder identity (D6): a6 files private Security Advisories and non-security issues as egzos-forge.
       - id: forge
@@ -384,7 +428,7 @@ jobs:
 
             For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding with `gh issue create`, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**. This sweep writes nothing to the repository; it writes no file at all. This session holds no write tool, so the script it runs is the one this checkout holds.
 
-            This session holds the forge token, so it runs no interpreter. A plain step already ran the adversarial suite against main before any token existed in this job: read /tmp/adversarial-suite.txt and cite it for what the suite covers. Never claim a reachability the suite does not show; hand anything that needs new code run to build mode as a non-security issue (or, for a security finding, to the advisory).
+            This session holds the forge token, so it runs no interpreter. A separate job holding no token already ran the adversarial suite against main: read /tmp/adversarial-suite.txt and cite it for what the suite covers. Never claim a reachability the suite does not show; hand anything that needs new code run to build mode as a non-security issue (or, for a security finding, to the advisory).
 
             End your output with one line per finding: `filed <id>`, `updated <id>` or `matched <id>, skipped` — ids only.
           claude_args: >-

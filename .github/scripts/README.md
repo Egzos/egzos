@@ -85,7 +85,9 @@ The a6-adversary nightly sweep's only route to the repository-advisory API, whic
 ```bash
 bash .github/scripts/file_advisory.sh list                           # GHSA id, state, summary
 bash .github/scripts/file_advisory.sh create - <<'JSON'               # body on stdin; prints the new GHSA id
-bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx - <<'JSON'
+{"summary": "…", "description": "…", "severity": "high"}
+JSON
+# update takes its body the same way: file_advisory.sh update GHSA-xxxx-xxxx-xxxx - <<'JSON' …
 ```
 
 Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object, in a

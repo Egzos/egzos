@@ -197,11 +197,11 @@ Chief is knowingly living with it.
 **Reasoning.** A process started by one step of a job outlives that step, so there is no "safe
 moment" inside the job to run the PR's code. The only clean separation is a job that runs it and
 holds nothing to protect. The `tests` check is exactly that job, and it is required. So the reviewer
-reads its result (`gh pr checks`, with `checks: read` / `statuses: read`) and cites it, rather than
+reads its result (`gh pr checks`, with `checks`, `statuses` and `actions: read`) and cites it, rather than
 producing a second result in a job that holds the review token and the comment script. For the a6
-sweep, which holds the forge token and so runs no interpreter either, a plain step runs the
-adversarial suite against `main` before the token is minted. The sweep cites
-`/tmp/adversarial-suite.txt`; that step runs `main`'s reviewed code, never a PR's.
+sweep, which holds the forge token and so runs no interpreter either, a separate job holding no
+token runs the adversarial suite against `main`. Step order inside one job would not separate it,
+for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
 
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
@@ -210,6 +210,12 @@ script from the base commit by SHA into a fresh file, with `PATH` pinned. The a6
 write tool, and passes advisory bodies to `file_advisory.sh` on standard input. Every step after a
 review session runs with `PATH` pinned, and embedded Python runs with `-I`, so that a PR checkout
 in the working directory is not on `sys.path`.
+
+**Residual, named.** The review sessions' `Write` is unscoped. What runs after the session is
+covered: a pinned `PATH`, `-I` Python, and a script read by SHA. But a session that writes outside
+`/tmp` could still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
+silently stops every review from being posted.
 
 **Holds while.** The `tests` check runs the full suite (lint included) on every PR, and stays
 required. If it ever stops doing either, the reviewer is left with no executed result to cite, and

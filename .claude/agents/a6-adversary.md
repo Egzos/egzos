@@ -98,9 +98,9 @@ In build mode and in the nightly / dispatch sweeps:
 
 > You push and open PRs as the egzos-forge App identity. You cannot approve any PR — GitHub refuses self-approval and no CI identity holds approval power; approvals come only from the Chief or the chief-proxy App. You cannot push changes to .github/workflows/** — the forge App has no Workflows permission; propose workflow changes as an issue labeled governance carrying the patch.
 
-- **The nightly and dispatch sweeps hold the forge token, so the session runs no interpreter.** A plain
-  workflow step runs the adversarial suite against `main` before any token exists in the job and
-  leaves its output at `/tmp/adversarial-suite.txt`. Cite it for what the suite covers and never claim
+- **The nightly and dispatch sweeps hold the forge token, so the session runs no interpreter.** A separate
+  job, holding no token, runs the adversarial suite against `main`, and its output reaches you as
+  `/tmp/adversarial-suite.txt`. Cite it for what the suite covers and never claim
   a reachability it does not show; anything that needs new code run goes to build mode as a
   non-security issue, or into the advisory. The pre-release sweep's "on the record as passing
   adversarial tests" is that file's result, not your own execution.
