@@ -3,9 +3,15 @@ name: ownership-check
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    # labeled/unlabeled: applying or removing `size-exception` must re-decide the check without a
+    # push, since a push voids any approval (drift F19).
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 env:
   MODEL_OPUS: claude-opus-5
@@ -19,6 +25,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      pull-requests: read   # the label events that name who applied size-exception
+      issues: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,18 +54,38 @@ jobs:
           test -s /tmp/OWNERSHIP.base.yml
           echo "checker and OWNERSHIP.yml taken from origin/${BASE_REF}"
 
+      # The label proves only that someone holding issues: write applied it — egzos-forge does.
+      # The checker waives the cap only for an applier listed in OWNERSHIP.yml (drift F18); this
+      # step finds who applied it most recently.
+      - name: size-exception-applier
+        id: applier
+        if: contains(github.event.pull_request.labels.*.name, 'size-exception')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          LOGIN=$(gh api --paginate "repos/${REPO}/issues/${PR}/events?per_page=100" \
+            --jq '.[] | select(.event == "labeled" and .label.name == "size-exception") | .actor.login' \
+            | tail -n 1)
+          echo "login=${LOGIN}" >> "$GITHUB_OUTPUT"
+          echo "size-exception last applied by: ${LOGIN:-<none found>}"
+
       - name: check-ownership
         env:
           # Branch names and label names are both attacker-chosen text, and ${{ }}
-          # substitution happens before bash parses the line. egzos-forge holds
-          # issues: write, which covers creating a label and applying it to a PR.
+          # substitution happens before bash parses the line. Labels travel as a JSON array:
+          # a comma-joined string let a label name containing a comma spell a second label (#44).
+          # Both values are read from the environment, so a base checker that predates them
+          # still runs.
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          SIZE_EXCEPTION_APPLIER: ${{ steps.applier.outputs.login }}
         run: |
           python3 /tmp/check_ownership.py \
             --base "origin/${BASE_REF}" \
             --head HEAD \
             --branch "$HEAD_REF" \
-            --ownership /tmp/OWNERSHIP.base.yml \
-            --labels "$PR_LABELS"
+            --ownership /tmp/OWNERSHIP.base.yml
