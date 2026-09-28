@@ -328,7 +328,9 @@ jobs:
                   except ValueError:
                       pass
           results = [r for r in records if isinstance(r, dict) and r.get("type") == "result"]
-          data = results[-1].get("structured_output") if results else None
+          # Exactly one: the action appends the run's own result record, so a second means one was
+          # forged into the file (the session's Write is unscoped, RD-005) - red, never green.
+          data = results[0].get("structured_output") if len(results) == 1 else None
           if isinstance(data, str):
               try:
                   data = json.loads(data)
