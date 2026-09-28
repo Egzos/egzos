@@ -15,7 +15,7 @@ entry.
 
 The reciprocal gap is real and named rather than papered over: nothing in this file can prove
 `tests` is still in `testpaths`, because this file would be uncollected with it. That half belongs
-under `adversarial/`, which is a6-adversary's exclusive path.
+under `adversarial/`, which is a6-adversary's exclusive path — filed as #84.
 """
 
 import re
