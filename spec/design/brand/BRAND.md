@@ -1,10 +1,10 @@
 # BRAND.md — the egzos identity
 
 **Owner:** A2 (Taste)
-**Status:** v1.0 · 2026-09-22 · binding on commit. Direction **D · Orb, dither** — picked by the Chief on 2026-09-22 from direction board v0.2 (four marks; studio artifact, not a repo deliverable) after a first board of three the same day. This file, the masters under `spec/design/brand/**` and the pipeline under `pipeline/` are one deliverable: the masters are what the pipeline emits, byte for byte (`pipeline/check.py --regenerate`).
-**Tokens:** `tokens.css` v0.8 — a cross-PR pin: v0.8 is on PR #45 and not yet on `main`; every value this file bakes as a literal (§6) is unchanged since v0.3, which is the claim the pin turns on, re-checked here on 2026-09-22 and to be re-checked in the commit that lands after #45 merges.
-**Siblings:** `DESIGN-PRINCIPLES.md` (principle 7 is the one this file must not contradict; §2.3) · `lifeboat.md` · `step-up-tap-and-pending-approval.md` · `consent.md` (each decides *whether* it places the mark; this file decides *which file* and *how large*; §19). **Provenance:** `DESIGN-SOURCES.md` (reference; rows in §22, to be appended after #45 merges — that file is on #45's branch).
-**Consumers:** the Chief (GitHub uploads — org avatar, social preview, two App avatars, App badge colour; §8) · a5-dinghy (lifeboat favicon set and header mark) · a3-doorman (CLI splash, MCP icons) · a4s-atelier (flagship nav lockup, favicon set, PWA icons; catalogue: none) · a2-conformance (§16, `pipeline/check.py`) · a6-adversary (§15).
+**Status:** v1.1 · 2026-09-28 (v1.0: 2026-09-22) · binding on commit. Direction **D · Orb, dither** — picked by the Chief on 2026-09-22 from direction board v0.2 (four marks; studio artifact, not a repo deliverable) after a first board of three the same day. This file, the masters under `spec/design/brand/**` and the pipeline under `pipeline/` are one deliverable: the masters are what the pipeline emits, byte for byte (`pipeline/check.py --regenerate`).
+**Tokens:** `tokens.css` v0.12 — on `main` since #45 (merged 2026-09-28). Every value this file bakes as a literal (§6) is unchanged since v0.3 — re-checked against v0.12 on `main` on 2026-09-28: all five §6.2 literals, `--egz-shadow-ink` = `--egz-ink` in both schemes, and the violet canvas inheriting the dark ink. F-02a still reads the five values from `check.py`'s copy; reading them from `tokens.css` is a pipeline change, not made here.
+**Siblings:** `DESIGN-PRINCIPLES.md` (principle 7 is the one this file must not contradict; §2.3) · `lifeboat.md` · `step-up-tap-and-pending-approval.md` · `consent.md` (each decides *whether* it places the mark; this file decides *which file* and *how large*; §19). **Provenance:** `DESIGN-SOURCES.md` (reference; §22's rows are in it from its v2.17).
+**Consumers:** the Chief (GitHub uploads — org avatar, social preview, two App avatars, App badge colour; §8) · a5-dinghy (lifeboat favicon set and header mark) · a3-doorman (CLI splash, MCP icons) · a4s-atelier (flagship shell mark — `search-list.md` **D-S8**, favicon set, PWA icons; catalogue: none) · a2-conformance (§16, `pipeline/check.py`) · a6-adversary (§15).
 **Source:** the Chief's ink sketch of 2026-09-22 — a sphere with a quarter of its upper hemisphere removed, drawn from above-left; and, beside it, the onion. Reacted to and rebuilt as geometry with fixed numbers (§2), not vectorised.
 
 **Decisions taken by the Chief (board v0.2, 2026-09-22)** — each with the rejected alternative and its cost, so the record shows what was given up:
@@ -93,7 +93,7 @@ The mark is generated: `pipeline/orb.py` ray-casts the geometry into a face and 
 |---|---|---|---|---|---|
 | **64** | ≥ 160 | ≥ 190 | ≥ 2.5 px | `-64` | org avatar 512, icon-512, maskable 512 |
 | **32** | 48 – 159 | 57 – 189 | 1.5 – 5 px | `-32` | App avatars 200, apple-touch 180, icon-192, MCP 96, README header, social preview, horizontal lockups at F ≥ 56 |
-| **flat** | < 48 | < 57 | — | `-flat` | favicon (svg and every ICO frame), MCP 48, lifeboat header 20, nav lockup 22, minimum-size uses |
+| **flat** | < 48 | < 57 | — | `-flat` | favicon (svg and every ICO frame), MCP 48, lifeboat header 20, flagship shell mark 20 (D-S8), nav lockup 22 (reserved), minimum-size uses |
 
 A consumer that renders a master at a size outside its tier is non-conforming, with one accepted exception: a **single uploaded file GitHub displays at many sizes** (the org avatar, the App avatars) is the tier of its *uploaded* size; GitHub's downsampling to 20 px turns the field into tone, and that tone — a grey sphere with a lighter notch — is the intended small-size read of a dither (§8.1).
 
@@ -132,7 +132,7 @@ gradient (linear, radial, mesh) · specular highlight · glow, bloom or outer sh
 |---|---|---|---|
 | **horizontal** | mark box = ascender height (1.025 F), left; gap 0.36 × box; wordmark baseline-aligned so the box top meets the ascender line | F = 16 (box 16.4 px → flat tier) | `lockup/horizontal*.svg` |
 | **stacked** | mark box = 1.5 × ascender, centred; gap 0.45 × ascender; wordmark centred beneath | F = 20 | `lockup/stacked*.svg` |
-| **nav** | the horizontal lockup at **F = 22** with the flat mark (the flagship app-shell lockup) | fixed size | `lockup/inline/horizontal-nav.svg` |
+| **nav** | the horizontal lockup at **F = 22** with the flat mark — **reserved: no in-product consumer in v0.1.** `search-list.md` **D-S8** (Chief, 2026-09-24) places the flat mark beside the shell's live mono wordmark instead (§8.3) | fixed size | `lockup/inline/horizontal-nav.svg` |
 
 The mark in a lockup takes the tier of its own box (§3.1): flat below a 57 px box (horizontal F < 56), 32-field above. Lockup masters are emitted at F = 100 (32-field) and the nav lockup at F = 22 (flat); a consumer that needs another F regenerates through the pipeline rather than scaling the F = 100 master into the flat range.
 
@@ -240,7 +240,7 @@ GitHub does not document per-surface corner rounding for avatars; the badge is d
 | placement | master | size | tier | who | note | fixture |
 |---|---|---|---|---|---|---|
 | **lifeboat header mark** | `mark/inline/pending-flat.svg` | 20 px box | flat | a5-dinghy | **if** `lifeboat.md` places a mark in its header (that spec decides; §19); `aria-hidden="true"` beside the visible word `egzos`, or `role="img" aria-label="egzos"` when the word is absent | F-06 |
-| **flagship app-shell lockup** | `lockup/inline/horizontal-nav.svg` | F = 22 (28.6 px tall · 96.7 px wide) | flat | a4s-atelier | the search-list app shell's brand slot (`search-list.md`, platform repo); `role="img" aria-label="egzos"`; never a link target larger than the lockup's own box | F-06 |
+| **flagship shell mark** | `mark/inline/pending-flat.svg` | 20 px box | flat | a4s-atelier | `search-list.md` **D-S8** places it (Chief, 2026-09-24): `aria-hidden="true"`, immediately left of the visible word `egzos` — live mono text, that spec's `shell.wordmark` — gap `--egz-sp-2`; never a link, never a control, no hit target. **The nav lockup is not placed in v0.1** (§4.2) | F-06 |
 | **larger in-product marks** (empty states, about, sign-in) | `mark/inline/pending-32.svg` / `-64.svg` by §3.1 | ≥ 57 px box | 32 · 64 | either | only where a screen spec places one; none does today | F-06 |
 | **the proposal glyph** | `mark/inline/slice-*.svg` | by §3.1 | any | — | **reserved**: a later revision of `step-up-tap-and-pending-approval.md` may adopt the slice as the pending-item glyph; until it does, the slice appears nowhere in-product (§21) | F-06 |
 | tap page · consent page | — | — | — | a3-trust | those specs bind their own headers; if they place a mark it is `mark/inline/pending-flat.svg` at ≤ 24 px and nothing else (§19) | — |
@@ -439,12 +439,11 @@ Run: `python3 pipeline/render.py --fetch-fonts` (once) · `python3 pipeline/rend
 
 - **Struck from the set:** directions A · Survey, B · Stamp, C · Letter; textures contour and halftone. They exist on the board as record and must not be revived as "variants".
 - **Reserved:** the slice as the pending-item glyph — a later revision of `step-up-tap-and-pending-approval.md`, not this file.
-- **Owed after PR #45 merges:** the `spec/design/README.md` index row for this file and the §22 rows into `DESIGN-SOURCES.md`; both files are rewritten on #45's branch and are not touched here to avoid a conflict (D14: branches base on `main`, never on a PR).
 - **`TRADEMARKS.md`** is the Chief's document (D3); A2's draft accompanies this file for his edit.
 - Not bound here: OS file-type icons for `.xmb` archives; egzos.io marketing surfaces; a docs-site theme; any animated form of the mark (there is none; §3.4).
 - **Later:** if a platform lets a manifest declare a dark icon set, `pwa/maskable-dark.svg` and `badge/badge-dark.svg` are the masters; no consumer binds them today.
 
-## §22 Provenance — rows for `DESIGN-SOURCES.md` (to append after #45)
+## §22 Provenance — rows in `DESIGN-SOURCES.md` (appended at its v2.17)
 
 Typefaces table:
 
@@ -470,7 +469,10 @@ Considered and declined:
 | Paper Shaders · *dithering* | 21st.dev · `paper-design/dithering` | Apache-2.0 | 2026-09-22 | a WebGL surface, not an identity; anti-reference for §17 | `BRAND.md` at v1.0 |
 
 Tools (pipeline, not shipped): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) · numpy ≥ 2.0, < 3 (BSD-3; pinned in `pipeline/requirements.txt`) · matplotlib 3.9 (PSF-based) · Pillow 11 (MIT-CMU).
+**The pipeline and `tests/conformance/test_brand_pipeline.py` change together, on a `chief/` branch; an agent PR touching either alone is out of policy.** The pipeline is A2 studio's design tool, committed by the Chief, and its test sits in a path a different agent would own — so neither half may move without the other (F12, drift report #10; the Chief's decision, 2026-09-28).
+
 
 ## §23 Changelog
+- **v1.1 · 2026-09-28** — **§8.3's flagship row follows `search-list.md` D-S8** (the Chief's pick, 2026-09-24): the flat mark beside the shell's live wordmark, not the nav lockup, which §4.2 now marks reserved — v1.0 placed the lockup in a *brand slot* the shell spec never had, so two binding files answered one question two ways. **Tokens pin** v0.8 → v0.12 (on `main` since #45), values re-checked. **§22 states that the pipeline and its test change together** (F12, drift report #10; the Chief's decision, 2026-09-28). **The two items owed until #45 merged land with this revision:** the `spec/design/README.md` index row for this file, and §22's rows in `DESIGN-SOURCES.md` (its v2.17); §21 drops the item and §22's heading says where the rows are.
 
 - **v1.0 · 2026-09-22** — first binding revision. Direction D · Orb, dither (Chief, board v0.2). Studio decisions S1–S9. 59 masters, 17 rasters, 415 fixtures passing (331 on the font-free default path CI runs). Owed: index row and provenance rows after PR #45 merges (§21).
