@@ -377,8 +377,15 @@ class ClientRegistration(TypedDict):
 
 #: §11.1 — what the consent screen may read about a client: ONE entry, keyed by the request's
 #: `client_id`. There is no listing endpoint, page or parameter, and an unregistered `client_id`
-#: produces §2.5's uniform failure and no read at all — §7's enumeration rule, at the registry.
-AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(ClientRegistration.__annotations__)
+#: produces §5.3's uniform failure and no read at all — §7's enumeration rule, at the registry.
+#:
+#: Written out rather than derived from `ClientRegistration`. Deriving it would make the pin a
+#: tautology: a field added to the registration would reach the consent screen the moment this
+#: module imported, with no test failing. Written, a new registration field has to be added HERE
+#: too — a deliberate act, against a §11.1 clause — before any page may read it.
+AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
+    {"client_id", "client_name", "client_type", "redirect_uris", "registered_at"}
+)
 
 #: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
 #: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up

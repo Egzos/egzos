@@ -119,9 +119,19 @@ def test_the_registration_and_device_shapes():
 def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
     """§11.1: a keyed read of one entry, never a listing — §7's enumeration rule at the registry.
 
-    Pinned as a set equality rather than a subset so that a field added to `ClientRegistration`
-    without a contract clause cannot arrive at the consent screen by inheritance.
+    The five names are written out on BOTH sides of the first assertion's intent: the constant is a
+    literal in `_types`, and this test compares it to a literal here. The second assertion then
+    holds the constant against `ClientRegistration`, so a field added to the registration alone
+    fails here instead of reaching the consent screen by inheritance. Deriving either side would
+    make the pin a tautology that holds for every possible content of the registration.
     """
+    assert t.AS_CLIENT_REGISTRY_READ_FIELDS == {
+        "client_id",
+        "client_name",
+        "client_type",
+        "redirect_uris",
+        "registered_at",
+    }
     assert t.AS_CLIENT_REGISTRY_READ_FIELDS == set(t.ClientRegistration.__annotations__)
     # §11.3's existing-tokens read is a count and a timestamp: no id, no value, ever.
     assert not {"token_id", "token", "tokens", "client_secret"} & t.AS_CLIENT_REGISTRY_READ_FIELDS
