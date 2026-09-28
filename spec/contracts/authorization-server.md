@@ -103,9 +103,22 @@ security posture from a one-minute code, and both would satisfy every clause abo
 exist in this AS, are not advertised, and MUST be rejected. **a1p** — OAuth 2.1 removes both; said
 here because "we implement OAuth 2.1" is a claim a reader cannot test and this sentence is.
 
-**TLS.** Every AS endpoint is served over TLS, with the single exception of loopback origins on a
-developer's own machine (§5). `serve --tls` is a3-doorman's surface; the requirement is this
-document's. **a1p**.
+**TLS.** Every AS endpoint is served over TLS, and this document grants no exception to that.
+**a1p** — `serve --tls` is a3-doorman's surface; the requirement is this document's. §5's `http`
+allowance is **not** an exception to this clause: it governs a *client's* registered redirect URI —
+the client's own listener, on the same machine — and an AS endpoint is not a redirect URI. §5 says
+so in its own words, and the two sections are consistent only if read that way.
+
+`[OPEN→0.3]` **Whether a container on the user's own machine is exempt.** Read literally, the clause
+above requires a personal laptop container to serve its own AS over TLS: a certificate story for
+every local user, and a real requirement landing on `serve --tls`. TODO(a1p): **no source names
+it.** §K's Phase 0.2 freeze constraints cover metadata, registration, PKCE, device-code and
+revocation and say nothing about transport; build plan 5.3 gives Doorman `serve --tls` / ACME without
+saying when TLS is mandatory; 6.3 names "localhost + TLS" as a coverage matrix, not a rule. The
+review must pick one of three: TLS always; TLS except where the AS is bound to a loopback interface,
+for **any** user and not only a developer; or TLS except in an explicitly enabled developer mode.
+Until it does, this clause stands as written — failing closed, because a default that serves tokens
+in the clear is the wrong way to be wrong.
 
 ## 3 · CLI and headless — device code
 
@@ -203,7 +216,8 @@ from RFC 8252 §7.3: a native or dev client binds to an ephemeral port it cannot
 time, so the port is the one component that varies. The exception is bounded to:
 
 - host is the **literal loopback address** — `127.0.0.1` or `[::1]`;
-- scheme is `http` (this is the §2 TLS exception, and it is this and nothing else);
+- scheme is `http` — and this relaxes the **redirect URI**, never an AS endpoint: §2 requires TLS on
+  every AS endpoint and grants no exception to it;
 - **only the port is ignored.** Path, query, scheme and host are compared exactly, as above.
 
 **`localhost` as a hostname is permitted — as an exact registered string, including the port. a1p**,
@@ -229,7 +243,7 @@ container" as a category unless every container announces itself identically —
 **is** the interoperability surface, and the rest of this document is only reachable through it.
 
 **Endpoint:** `/.well-known/oauth-authorization-server`, at the container's own origin, served
-**unauthenticated** over TLS (§2's loopback exception applies). **a1p** — RFC 8414's location; §K
+**unauthenticated** over TLS (§2, whose `[OPEN→0.3]` governs any local exemption). **a1p** — RFC 8414's location; §K
 names the requirement and not the path.
 
 Unauthenticated is deliberate and is not a leak: the document describes the *protocol* a container
