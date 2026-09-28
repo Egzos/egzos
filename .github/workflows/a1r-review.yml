@@ -100,6 +100,7 @@ jobs:
             --model ${{ env.MODEL_OPUS }}
             --max-turns ${{ env.MAX_TURNS }}
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),StructuredOutput"
+            --disallowedTools "Read(//proc/**)"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
       # The session writes /tmp/review.md; it does not choose what posts it. The comment script is
@@ -124,6 +125,10 @@ jobs:
           # Everything env -i forwards is pinned here too, so $GITHUB_ENV cannot set it.
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # The credentials this job holds. A body that carries one is refused, never posted: the
+          # session's text reaches a PR comment verbatim (#79 review, RD-005). Masked in the log.
+          PROVIDER_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PROVIDER_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # The comment this job owns. The session does not choose it: a body opening with another
           # reviewer's marker would replace that reviewer's comment (all three post as one bot).
           MARKER: "## a1r-reviewer review"
@@ -137,6 +142,14 @@ jobs:
             echo "::error::the review body does not open with this job's marker; nothing posted"
             exit 1
           fi
+          BODY="$(cat /tmp/review.md)"
+          for CRED in "$PROVIDER_KEY" "$PROVIDER_OAUTH" "$GH_TOKEN"; do
+            if [[ -n "$CRED" && "$BODY" == *"$CRED"* ]]; then
+              echo "::error::the review body carries a credential this job holds; nothing posted"
+              exit 1
+            fi
+          done
+          unset BODY CRED PROVIDER_KEY PROVIDER_OAUTH
           export TMPDIR=/tmp
           H="$(mktemp -d)"
           S="$(mktemp)"

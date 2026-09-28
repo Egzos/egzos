@@ -154,6 +154,12 @@ def test_review_is_posted_by_a_model_free_step(job_id):
     assert post["env"]["GH_TOKEN"] == "${{ github.token }}"
     assert post["env"]["GITHUB_REPOSITORY"] == "${{ github.repository }}"
     assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
+    # A body carrying a credential the job holds is refused before anything is fetched or posted.
+    assert post["env"]["PROVIDER_KEY"] == "${{ secrets.ANTHROPIC_API_KEY }}"
+    assert post["env"]["PROVIDER_OAUTH"] == "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}"
+    assert run.index('"$BODY" == *"$CRED"*') < run.index("clean gh api")
+    for cred in ('"$PROVIDER_KEY"', '"$PROVIDER_OAUTH"', '"$GH_TOKEN"'):
+        assert cred in run.split("for CRED in", 1)[1].split(";", 1)[0]
     # Posted on failure too (a turn-capped review is still the Chief's to read), never when
     # cancelled.
     assert "!cancelled()" in post["if"] and "skipped" in post["if"]
@@ -207,6 +213,16 @@ def test_forge_token_sessions_run_no_interpreter():
             assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & set(tools), (wf, job_id)
     # Never vacuous: a renamed token step or a token moved to the job still reaches the sweep.
     assert "a6-adversary-nightly" in inspected
+
+
+def test_every_model_session_denies_the_process_environment():
+    # The provider credential lives in the session's own environment; Read(//proc/**) covers Read,
+    # Grep and Glob, so no session can read it and write it where it is posted (#79 review).
+    seen = 0
+    for wf, job_id, _, step in _model_steps():
+        assert '--disallowedTools "Read(//proc/**)"' in step["with"]["claude_args"], (wf, job_id)
+        seen += 1
+    assert seen >= 4
 
 
 def _job(job_id):

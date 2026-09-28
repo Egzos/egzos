@@ -217,7 +217,11 @@ anything the session appends to `$GITHUB_ENV`), and a comment script fetched fro
 than read from the checkout's `.git`, with the fetch and the post both run under `env -i` and an explicit
 allowlist (#79 and platform#42 reviews). What stays open: the session still writes `/tmp/review.md`, which `post-review` posts, so the review
 text is the session's by design; the step pins which comment it lands in (the job's own marker, never
-another reviewer's). Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+another reviewer's). That text is posted verbatim, from a job whose model session holds the provider
+credential, so two controls close the channel: every model session denies `Read(//proc/**)`, which
+covers Read, Grep and Glob and so the process environment the credential lives in, and `post-review`
+refuses a body carrying any credential the job holds (#79 review, a1r minor 3a). An encoded copy would
+pass the second control; the first is the one that keeps the credential out of reach. Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
 needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
 silently stops every review from being posted.
 
