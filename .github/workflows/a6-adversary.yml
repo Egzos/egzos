@@ -58,7 +58,7 @@ jobs:
             exit 0
           fi
           APPLICABLE=false
-          [[ "$HAS_SECURITY" == "true" ]] && APPLICABLE=true
+          if [[ "$HAS_SECURITY" == "true" ]]; then APPLICABLE=true; fi
           echo "applicable=${APPLICABLE}" >> "$GITHUB_OUTPUT"
           echo "Scope check — security label present: ${APPLICABLE}"
 
@@ -235,13 +235,11 @@ jobs:
           if verdict not in ("pass", "fail", "not_applicable"):
               print("::error::structured output carries no valid verdict ({!r}).".format(verdict))
               sys.exit(1)
-          summary  = data.get("summary", "")
           findings = data.get("findings", [])
 
           # Counts only. This log is public and a6's findings may be security-class: the summary,
           # paths and notes stay in the review comment and the advisory, never here (drift F15).
           # .get() on every key: a finding missing one must not die in a traceback (F16).
-          del summary
           sev = {}
           for f in findings:
               k = f.get("severity", "?") if isinstance(f, dict) else "?"
