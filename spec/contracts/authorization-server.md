@@ -257,50 +257,41 @@ none.
 ### 5.3 · The pre-trust uniform failure
 
 §5.1 requires the AS to **reject** a request whose `redirect_uri` is not byte-identical to a
-registered entry, and never says what a rejection looks like. This subsection says it, because every
-clause that leans on the answer is only as strong as the answer: §11.1's registry-enumeration rule,
-§11.4's re-submission handling and §12's entire row (d) each name this behaviour, and it lives here
-because §5 is where the first and commonest cause of it is required. (It is what §11.1 and §11.4
-formerly cited as "§2.5", a subsection that does not exist.)
+registered entry, and nothing said what a rejection *is*. §11.1's registry-enumeration rule, §11.4's
+re-submission handling and §12's whole row (d) each lean on the answer, and each cited a "§2.5" that
+does not exist. It is fixed here, where the commonest cause of it is required.
 
-**Two tiers, and only one of them may redirect. a1p:**
-
-- The **redirectable** (post-trust) tier is reached only when the request names a registered
-  `client_id` **and** a `redirect_uri` registered to that client under §5.1, and has passed §2's
-  PKCE requirement. There the AS has a destination it is entitled to send a browser to, and §7's
-  converging `access_denied` and §11.6's `{error, state}` govern.
-- Everything before that is **pre-trust**. The AS has no such destination — an unregistered
-  `redirect_uri` is an attacker's URL as readily as a client's — so it has nowhere to send an error
-  and does not invent one.
+**Two tiers, and only one may redirect. a1p.** The **redirectable** (post-trust) tier is reached only
+by a request naming a registered `client_id`, a `redirect_uri` registered to that client under §5.1,
+and §2's PKCE — there the AS has a destination it is entitled to send a browser to, and §7's
+converging `access_denied` with §11.6's `{error, state}` govern. Everything before it is
+**pre-trust**: an unregistered `redirect_uri` is an attacker's URL as readily as a client's, so the
+AS has nowhere to send an error and does not invent one.
 
 **A pre-trust failure MUST be a page the AS renders at its own origin, and MUST NOT be a redirect,
-under any cause.** Stated so an implementation can be tested against it:
+under any cause.** Testable as written:
 
-1. **One response, across every cause.** The same status and a byte-identical body for: an
-   unregistered `client_id` (§11.1); a registered client with a mismatched `redirect_uri` (§5.1); a
-   malformed request; a missing, `plain` or unparseable `code_challenge` (§2, which admits no
-   downgrade path, so a request without PKCE is not an authorization request this AS recognises and
-   never reaches the redirectable tier); a decided request re-submitted (§11.4); and a throttled
-   attempt (§11.0, where the throttle runs before either tier, so the AS has not yet determined which
-   tier the request would have reached). Those six are exactly §12's row (d). The page names no
-   client, echoes no request parameter, and tells the caller which of the six occurred.
-2. **One time budget.** The responses converge in time as much as in bytes. §7 requires this of the
-   post-trust redirect, and a pre-trust surface that leaked through timing what it withheld in its
-   body is the same oracle reached slowly. Specifically, §11.1's keyed read **happens or does not
-   happen** depending on whether the `client_id` is registered, and that difference must not be
-   observable — the one measurement that would otherwise turn §11.1's rule back into the enumeration
-   it exists to prevent.
-3. **It carries no `error` parameter and no `state`**, because it is not a redirect. §11.6 governs
-   the redirect and does not reach here.
-4. **It appends once**, §12's row (d), with the cause in `details`.
+1. **One response.** The same status and a byte-identical body across every cause — an unregistered
+   `client_id` (§11.1), a registered client with a mismatched `redirect_uri` (§5.1), a malformed
+   request, a missing or `plain` `code_challenge` (§2 admits no downgrade, so a request without PKCE
+   is not one this AS recognises and never reaches the redirectable tier), a decided request
+   re-submitted (§11.4), and a throttled attempt (§11.0, checked before either tier, so the AS has
+   not yet determined which tier the request would have reached). Those six are exactly row (d). The
+   page names no client, echoes no request parameter, and **reveals nothing about which occurred**.
+2. **One time budget.** The responses converge in time as much as in bytes, as §7 requires of the
+   post-trust redirect — a surface that leaks through timing what it withheld in its body is the same
+   oracle reached slowly. Specifically: §11.1's keyed read *happens or does not happen* according to
+   whether the `client_id` is registered, and that difference MUST NOT be observable. It is the one
+   measurement that would otherwise turn §11.1's rule back into the enumeration it prevents.
+3. **No `error`, no `state`** — it is not a redirect, and §11.6 does not reach here.
+4. **It appends once**, row (d), with the cause in `details` (§12.1 rule 1).
 
-**The owner's own record still separates the causes.** The uniformity above is owed to the caller,
-never to the owner's ledger: row (d)'s six causes are precisely the distinctions §12 records and this
-page hides.
+The uniformity is owed to the caller and never to the owner's ledger: row (d)'s six causes are
+exactly the distinctions §12 records and this page hides.
 
-`[OPEN→0.3]` **The status code, and the page's copy.** The convergence is the contract; the number
-and the words are `spec/design/consent.md`'s to render and the review's to confirm. A status that
-differed by cause would break clause 1 whatever the page said.
+`[OPEN→0.3]` **The status code and the page's copy** — the convergence is the contract; the number
+and the words are `consent.md`'s to render and the review's to confirm. A status that differed by
+cause breaks clause 1 whatever the page says.
 
 ## 6 · AS metadata discovery
 
@@ -792,49 +783,42 @@ Numbered **0** because that is its place in the order of evaluation: no clause b
 request this one has refused.
 
 **`/authorize`, `/login`, `/device` and — if §10's `[LEAN]` is taken — the tap are each throttled per
-caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between the two parts of
-this document. §14 item 2 asks for *"both throttled per caller as `/login` and `/device` are, the
-throttle checked before either"*, and routes itself to §5; §5 answers the redirect-URI matching rule
-and nothing about throttling. §11.7 fixed `/login` and §11.8 fixed device redemption, so `/authorize`
-— the surface §12's row (d) already gives a `throttled` cause — was the one left unstated.
+caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between this document's
+two parts: item 2 asks for *"both throttled per caller as `/login` and `/device` are, the throttle
+checked before either"* and routes itself to §5, which answers the matching rule and nothing about
+throttling. §11.7 fixed `/login` and §11.8 device redemption, leaving `/authorize` — the surface §12's
+row (d) already gives a `throttled` cause — stated nowhere.
 
 **The throttle is checked BEFORE either validation tier: before §5.3's pre-trust checks and before
-§7's post-trust ones.** The ordering is a requirement, not an implementation note, and this is why:
+§7's post-trust ones.** A requirement, not an implementation note, because an AS that ran the
+post-trust tier first would answer a throttled caller with a **redirect** where the
+`(client_id, redirect_uri)` pair is registered and with §5.3's page where it is not — a
+registered/unregistered distinguisher surviving the throttle, at the endpoint §7 spends a subsection
+silencing. Under this ordering a throttled `/authorize` request is **always** §5.3's page, which
+makes `consent.md` §20's *"the same uniform page, never a redirect"* true by construction; and it is
+why row (d) carries a `throttled` cause while row (f) cannot, a post-trust rejection being reachable
+only by a request the throttle let through.
 
-- An AS that ran the post-trust tier first would answer a throttled caller with a **redirect** when
-  the `(client_id, redirect_uri)` pair is registered, and with §5.3's page when it is not. That is a
-  registered/unregistered distinguisher that survives the throttle, at the very endpoint §7 spends a
-  subsection making silent — an implementation could satisfy every other clause here and still ship
-  the enumeration oracle.
-- Under this ordering a throttled request at `/authorize` is **always** §5.3's page, which is what
-  makes `consent.md` §20's *"a would-be post-trust rejection refused while the throttle holds — the
-  same uniform page, never a redirect"* true by construction rather than by care.
-- It is also why §12's row (d) carries a `throttled` cause and row (f) does not: a post-trust
-  rejection is only ever reached by a request the throttle already let through.
+**A throttle that holds does not evaluate, and MUST fail closed** — §12.1 rules 3 and 4, the same
+requirements seen from the ledger's side.
 
-**A throttle that holds does not evaluate, and MUST fail closed** — §12.1 rules 3 and 4, which are
-these same requirements seen from the ledger's side.
+`[OPEN→0.3]` **What a throttle keys on.** No source names it and it cannot be left unsaid: §12.1
+rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
+two containers keying differently have different bounds on an append-only log the owner cannot prune,
+and §12.2's pairing key is derived from whatever this is. The floor any answer must clear is **not**
+open:
 
-`[OPEN→0.3]` **What a throttle keys on.** No source names it, and it cannot be left unsaid, because
-§12.1 rule 3 makes the throttle the **only** bound on the audit chain's growth from unauthenticated
-callers — two containers that key differently have different bounds on an append-only log the owner
-cannot prune — and §12.2's pairing key is derived from whatever this is. What is **not** open, and is
-the floor any answer must clear:
+- **Never a value the caller supplies and can vary at no cost** — not a `client_id`, not a
+  `user_code`, not a form field, not a caller-chosen header. A throttle keyed on caller-supplied data
+  is no bound at all; the caller lifts it by changing the value.
+- **One surface's counter is one surface's**, so exhausting `/device` cannot lock the owner out of
+  `/login`.
 
-- **The key MUST NOT be a value the caller supplies and can vary at no cost** — not a `client_id`,
-  not a `user_code`, not a form field, not a caller-chosen request header. A throttle keyed on
-  caller-supplied data is not a bound at all: the caller lifts it by changing the value, and rule 3's
-  guarantee becomes a sentence with nothing under it.
-- **One surface's counter is one surface's**, so that exhausting `/device` cannot lock the owner out
-  of `/login`, and §12's `surface` word means what it says.
-
-a1p's reading, for the review to take or reject: **two buckets, both enforced** — an outer
-per-surface container-global bucket, which bounds the ledger absolutely, and an inner bucket keyed on
-the transport source address, which keeps one noisy source from spending the global budget. Either
-alone fails in a way the other covers: a source-keyed bucket alone is unbounded in aggregate, and a
-global bucket alone lets one caller deny the surface to the owner. Note the constraint §12.2 already
-carries whichever is picked — **the network identifier may key a throttle and may never enter the
-chain**, as `actor` or anywhere else.
+a1p's reading, to take or reject: **two buckets, both enforced** — an outer per-surface
+container-global one bounding the ledger absolutely, and an inner one keyed on the transport source
+address so a single noisy source cannot spend the global budget. Each alone fails where the other
+holds. Whichever is picked, §12.2's constraint stands: **a network identifier may key a throttle and
+may never enter the chain.**
 
 ### 11.1 · The client-registry read (§14 item 1)
 
@@ -1031,18 +1015,16 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 | **(e)** | a throttle releasing | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` · `expiry` |
 
-**A successfully rendered consent screen appends nothing, and that is deliberate. a1p.** The five
-above are four failures and a release; a screen that renders performs §11.1's keyed registry read and
-§11.3's existing-tokens read and produces no entry, which sits oddly beside `events.md` §4 invariant
-2 (*"Every read … is an event"*) until the reason is said: **both reads are the owner reading their
-own container's state, inside an interactive session §10 has already authenticated, to decide an act
-they are in the middle of performing.** They are not a caller's reads and they are not taxonomy
-reads — the entry that records the moment is the decision's own, which is §9's and #68's. The two
-reads are bounded by §11.1 (one keyed entry, never a listing) and §11.3 (a count and a timestamp, no
-ids, no values), so neither can carry anything out of the container that an unrecorded read would
-hide. `[OPEN→0.3]` **#86's sitting should confirm this reading**, because it is the one place in the
-document where invariant 2 is satisfied by an argument rather than by an append, and if the sitting
-disagrees the answer is a sixth row here, not a change to either read.
+**A successfully rendered consent screen appends nothing, deliberately. a1p.** The five above are
+four failures and a release; a screen that renders performs §11.1's registry read and §11.3's
+existing-tokens read and produces no entry, which sits oddly beside `events.md` §4 invariant 2
+(*"Every read … is an event"*) until the reason is said: **both are the owner reading their own
+container's state, inside an interactive session §10 has already authenticated, to decide an act they
+are performing.** Not a caller's reads, and not taxonomy reads — the entry recording the moment is
+the decision's own, §9's and #68's. Both are bounded (§11.1 one keyed entry, §11.3 a count and a
+timestamp), so neither carries anything out that an unrecorded read would hide. `[OPEN→0.3]` **#86's
+sitting should confirm this**: it is the one place here where invariant 2 is satisfied by an argument
+rather than an append, and if the sitting disagrees the answer is a sixth row, not a changed read.
 
 ### 12.1 · The rules, which are not open
 
@@ -1121,15 +1103,11 @@ would invent different ones and break the chain across them (`events.md` §3).
 ## 13 · What this document does not fix
 
 The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`, **including
-`consent.md` §14 item 10 — what `publish` renders as on the consent screen.** Naming it here rather
-than answering it in §11: the screen must render `publish` in the same `token ls` vocabulary as the
-other five (§11.2), so the string is only as true as the capability's boundary, and
-`capabilities.md` §1 marks that boundary open. A consent screen is a security surface, so it may not
-promise a boundary the capability contract has not drawn — this document will render whatever
-`capabilities.md` settles at the freeze and invents nothing in the meantime. That closes §14's list;
-Part B answers or routes every one of its items.
-
-Containers,
+`consent.md` §14 item 10 — what `publish` renders as on the consent screen** — routed rather than
+answered in §11 because the screen renders `publish` in the same vocabulary as the other five
+(§11.2), so the string is only as true as the capability's boundary and `capabilities.md` §1 marks
+that boundary open. A consent screen may not promise a boundary the capability contract has not
+drawn. That closes §14's list: Part B answers or routes every item on it. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
 exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1
