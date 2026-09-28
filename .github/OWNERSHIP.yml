@@ -15,6 +15,14 @@ size_cap:
     - "**/*.lock"
     - "tests/fixtures/**"
 
+# Who may lift the size cap. check_ownership.py honours `size-exception` only when the login that
+# last applied it is listed here: the label's presence proves only that someone holding issues:
+# write applied it, and egzos-forge holds issues: write (drift F18). The Chief directly, or
+# chief-proxy registering the Chief's reply — never an agent identity.
+size_exception_approvers:
+  - "Gond-ul"
+  - "chief-proxy[bot]"
+
 # Paths that ONLY the Chief may modify. Any agent branch touching these fails immediately.
 # The review register and this map are controls over the agents they govern — an agent that
 # could edit either could settle a finding, or widen its own reach, against itself.
@@ -43,6 +51,7 @@ agents:
       - "tests/conftest.py"
       - "tests/test_smoke.py"
       - "tests/_types/**"
+      - "tests/governance/**"
       - "src/egzos/__init__.py"
       - "src/egzos/_types.py"
       - "CHANGELOG.md"

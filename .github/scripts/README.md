@@ -17,15 +17,22 @@ and exits 0 (pass) or 1 (fail).
    agent's `paths:` globs.  If it does not, the check fails.
 5. **Exclusive paths** — if the file matches another agent's `exclusive:` glob,
    the check fails even if the file is also in the acting agent's `paths:`.
-6. **Chief-only paths** (`egzos-platform` only, `chief_only:` key) — any agent
-   branch touching a chief-only path fails immediately.
-7. **Governance notices** (`egzos` only, `governance_paths:` key) — touching
-   these paths emits a `::notice::` annotation for the Watcher; it is not a
-   failure when the file is otherwise owned by the agent.
+6. **Chief-only paths** (`chief_only:` key) — any agent branch touching a
+   chief-only path, on either side of a rename, fails immediately.
+7. **Governance notices** (`governance_paths:` key) — touching these paths
+   emits a `::notice::` annotation for the Watcher; it is not a failure when
+   the file is otherwise owned by the agent.
 8. **Size cap** — counts added+removed lines (excluding `size_cap.exclude`
    globs) and total non-excluded files.  Exceeding `size_cap.lines` (600) or
-   `size_cap.files` (30) is a failure on agent branches — a `::warning::` on human branches — unless the PR carries the `size-exception`
-   label.
+   `size_cap.files` (30) is a failure on agent branches — a `::warning::` on
+   human branches — unless the PR carries `size-exception` **and** the login
+   that last applied it is in `size_exception_approvers`. The workflow looks
+   the applier up from the PR's label events.
+9. **Fail closed** — a diff record the parser cannot interpret, or labels that
+   are not a JSON array, fail the check (exit 1). Nothing is skipped.
+
+Tests: `tests/governance/test_check_ownership.py`, fed by real `git diff
+--numstat -z` output from throwaway repositories.
 
 ### Glob syntax
 
@@ -47,20 +54,17 @@ pip install pyyaml
 python3 .github/scripts/check_ownership.py \
     --base origin/main \
     --head HEAD \
-    --branch "$(git rev-parse --abbrev-ref HEAD)" \
-    --labels ""
+    --branch "$(git rev-parse --abbrev-ref HEAD)"
 
 # With canned changed-files and numstat (for unit testing)
 python3 .github/scripts/check_ownership.py \
     --base unused \
     --head unused \
     --branch "agent/a3-store/issue-1" \
-    --labels "" \
     --changed-files /tmp/files.txt \
     --numstat /tmp/numstat.txt
 ```
 
 ### Running the self-tests
 
-The test suite in `/tmp/` is created by hand or CI during the validation run.
-See the `VALIDATION` section of the scaffold spec for the canonical test cases.
+`pytest -q tests/governance` — part of the required `tests` check.
