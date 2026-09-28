@@ -13,7 +13,7 @@ Per R10 (decisions log §N), the following are public open-core surfaces. Every 
 | `DESIGN-SOURCES.md` | 2.16 | 2026-09-24 | Provenance: theme seeds, typefaces, adopted conventions, every catalogue component picked by a spec (registry item · licence · date · the spec revision that picked it), the bespoke and none-on-this-screen decisions, considered-and-declined, corrections log. Versions in its tables are **records, not pointers** — see its *Pointers and records* section. **Every id it cites was probed on 2026-09-22** — 74 ids, 73 live, one delisted; see its *Id audit* section. |
 | `step-up-tap-and-pending-approval.md` | 1.34 | 2026-09-28 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
 | `lifeboat.md` | 1.22 | 2026-09-28 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
-| `consent.md` | 1.25 | 2026-09-28 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
+| `consent.md` | 1.26 | 2026-09-28 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
 
 **Version rule.** A file's own header is authoritative; this table is the index a builder checks first, and it is bumped in the same commit as the file.
 
