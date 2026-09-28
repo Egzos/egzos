@@ -191,8 +191,11 @@ sentence ("revocation is `token rm` like any client") from revocation to registr
 that were privileged at registration would be privileged, and §K's whole shape is that it is not.
 
 **Registration is an owner act.** A client entry `{client_id, client_name, client_type,
-redirect_uris}` enters container config through an owner-authenticated path. **a1p** — no source
-names the verb, and the CLI spelling belongs to a3-doorman, not to this document.
+redirect_uris, registered_at}` enters container config through an owner-authenticated path. **a1p**
+— no source names the verb, and the CLI spelling belongs to a3-doorman, not to this document.
+`registered_at` is **§11.1's addition to the four §K names**, recorded here because §5 is where a
+reader looks for the entry's shape: the consent screen renders the timestamp, and a field the screen
+renders is a field the registry has to carry.
 
 **Whether registering, amending or removing a client writes an audit event is `[OPEN→0.3]`, in §9's
 marking and in #68.** It is named here because §5 is where a reader looks for it: this section's
@@ -206,7 +209,7 @@ entry. The two pull in opposite directions and the review must settle which wins
 builds against either. The AS metadata's `registration_endpoint` (§6) is advertised only if the
 answer is yes.
 
-### The matching rule is exact string comparison
+### 5.1 · The matching rule is exact string comparison
 
 **A registered redirect URI matches by exact string comparison. a1p**, from OAuth 2.1, which
 requires it — and stated as a contract clause rather than left to "we implement OAuth 2.1", because
@@ -226,7 +229,7 @@ to a registered entry, and MUST NOT implement:
 A registered URI is absolute and `https`, with the loopback exception stated next: it relaxes the
 scheme to `http`, and — for the literal loopback address only — the port.
 
-### The exception: loopback redirect URIs
+### 5.2 · The exception: loopback redirect URIs
 
 **A registered loopback redirect URI matches with its port ignored and everything else exact. a1p**,
 from RFC 8252 §7.3: a native or dev client binds to an ephemeral port it cannot know at registration
@@ -250,6 +253,54 @@ not a §K decision, and it is the only part of this rule left open: A6 and the f
 only the literal loopback address is registrable and `localhost` entries are refused. The scheme,
 the port and the matching are settled above, because this is the difference between one hole and
 none.
+
+### 5.3 · The pre-trust uniform failure
+
+§5.1 requires the AS to **reject** a request whose `redirect_uri` is not byte-identical to a
+registered entry, and never says what a rejection looks like. This subsection says it, because every
+clause that leans on the answer is only as strong as the answer: §11.1's registry-enumeration rule,
+§11.4's re-submission handling and §12's entire row (d) each name this behaviour, and it lives here
+because §5 is where the first and commonest cause of it is required. (It is what §11.1 and §11.4
+formerly cited as "§2.5", a subsection that does not exist.)
+
+**Two tiers, and only one of them may redirect. a1p:**
+
+- The **redirectable** (post-trust) tier is reached only when the request names a registered
+  `client_id` **and** a `redirect_uri` registered to that client under §5.1, and has passed §2's
+  PKCE requirement. There the AS has a destination it is entitled to send a browser to, and §7's
+  converging `access_denied` and §11.6's `{error, state}` govern.
+- Everything before that is **pre-trust**. The AS has no such destination — an unregistered
+  `redirect_uri` is an attacker's URL as readily as a client's — so it has nowhere to send an error
+  and does not invent one.
+
+**A pre-trust failure MUST be a page the AS renders at its own origin, and MUST NOT be a redirect,
+under any cause.** Stated so an implementation can be tested against it:
+
+1. **One response, across every cause.** The same status and a byte-identical body for: an
+   unregistered `client_id` (§11.1); a registered client with a mismatched `redirect_uri` (§5.1); a
+   malformed request; a missing, `plain` or unparseable `code_challenge` (§2, which admits no
+   downgrade path, so a request without PKCE is not an authorization request this AS recognises and
+   never reaches the redirectable tier); a decided request re-submitted (§11.4); and a throttled
+   attempt (§11.0, where the throttle runs before either tier, so the AS has not yet determined which
+   tier the request would have reached). Those six are exactly §12's row (d). The page names no
+   client, echoes no request parameter, and tells the caller which of the six occurred.
+2. **One time budget.** The responses converge in time as much as in bytes. §7 requires this of the
+   post-trust redirect, and a pre-trust surface that leaked through timing what it withheld in its
+   body is the same oracle reached slowly. Specifically, §11.1's keyed read **happens or does not
+   happen** depending on whether the `client_id` is registered, and that difference must not be
+   observable — the one measurement that would otherwise turn §11.1's rule back into the enumeration
+   it exists to prevent.
+3. **It carries no `error` parameter and no `state`**, because it is not a redirect. §11.6 governs
+   the redirect and does not reach here.
+4. **It appends once**, §12's row (d), with the cause in `details`.
+
+**The owner's own record still separates the causes.** The uniformity above is owed to the caller,
+never to the owner's ledger: row (d)'s six causes are precisely the distinctions §12 records and this
+page hides.
+
+`[OPEN→0.3]` **The status code, and the page's copy.** The convergence is the contract; the number
+and the words are `spec/design/consent.md`'s to render and the review's to confirm. A status that
+differed by cause would break clause 1 whatever the page said.
 
 ## 6 · AS metadata discovery
 
@@ -745,7 +796,7 @@ Two rules, and they are the section's, not the design spec's:
 - **It is a read of one entry, keyed by the request's `client_id` — never a listing.** There is no
   endpoint, page or parameter that enumerates registered clients. A registry listing is an owner act
   on the owner's own surface, not something an authorization request can reach.
-- **A `client_id` that is not registered produces §2.5's uniform failure and no read at all** — the
+- **A `client_id` that is not registered produces §5.3's uniform failure and no read at all** — the
   same page, in the same time budget, as a registered client with a mismatched `redirect_uri`. This
   is §7's enumeration rule at the registry: a caller must not learn that a client id exists.
 
@@ -785,8 +836,19 @@ Two consequences:
 
 **A request that has been decided — authorized or denied — MUST NOT reach a second decision, and
 MUST NOT mint. a1p.** §2 makes the *code* single-use; this makes the *request* single-use, which is
-a different object and the one the back button re-submits. A re-submission renders §2.5's uniform
+a different object and the one the back button re-submits. A re-submission renders §5.3's uniform
 failure and appends once, §12's cause `replayed`.
+
+**A re-submission is recognised as one only on the deciding session. a1p** — a decided request is
+bound to the interactive session (§10) that decided it, and only that session's re-submission is
+§12.1 rule 6's unthrottled `replayed` path. The same request arriving on another session, or on
+none, is an **ordinary pre-trust failure**: §5.3's page, cause `replayed`, counted and refused by
+§11.0's throttle exactly like every other row (d). Without this binding, rule 6's exemption is an
+unbounded append any caller can drive at will, and it would not compose with §12.1 rule 3 — the
+clause that bounds the chain's growth. `consent.md` §15 carries the design half (*"CSRF on the acts
+— request bound to the session; form token"*); this is the contract clause underneath it, and §2's
+binding of the **code** to the initiating session does not supply it, because the code is a
+different object at a later moment.
 
 ### 11.5 · Expiry: the container's default and maximum, and the clamp rule (§14 item 6)
 
