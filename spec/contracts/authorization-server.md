@@ -367,7 +367,13 @@ container identity, and what happens to live tokens when the trust is withdrawn,
 review should either scope the collapse out of v1.0 explicitly or name the missing piece. It is not
 drafted here, because a half-specified identity bridge is worse than an absent one.
 
-## 9 · Revocation, rotation and expiry
+## 9 · Issuance, revocation, rotation and expiry
+
+**A token the AS issues writes `token.mint` (`events.md` §1), like any other mint. a1p** — §7 makes
+an AS token a `Token` per `capabilities.md` §5, and a mint is a mint whether it came from
+`token mint`, §2's code exchange or §3's device redemption. The event already exists, so this needs
+no freeze decision; it is stated because an implementation conforming to this document alone would
+otherwise complete an exchange and leave no trace in the chain.
 
 **Revocation is `token rm`, like any other client. §K.** The flagship's token is removed by the same
 verb, from the same list, with the same effect as a script's. There is no "sign out of egzos.io"
