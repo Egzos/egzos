@@ -782,8 +782,59 @@ answer. A container that reaches its consent screen through a hosted page is not
 **The *look* of these pages is `spec/design/consent.md`, and this section does not touch it.** That
 spec fixes the regions, states, copy and every string; this fixes what the pages must be *true
 about*. Its §14 lists what it needs from here, and the rest of this section answers that list in its
-order. Where the two disagree, the contract's clause stands and the spec's string is a spec revision
+order — beginning with §11.0, which takes item 2 out of turn because the order of *evaluation* puts
+it before every other clause here. Where the two disagree, the contract's clause stands and the spec's string is a spec revision
 — the terms §14's items 10, 12 and 13 already state for themselves.
+
+### 11.0 · Every surface here is throttled, and the throttle runs first (§14 item 2)
+
+Numbered **0** because that is its place in the order of evaluation: no clause below is reached on a
+request this one has refused.
+
+**`/authorize`, `/login`, `/device` and — if §10's `[LEAN]` is taken — the tap are each throttled per
+caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between the two parts of
+this document. §14 item 2 asks for *"both throttled per caller as `/login` and `/device` are, the
+throttle checked before either"*, and routes itself to §5; §5 answers the redirect-URI matching rule
+and nothing about throttling. §11.7 fixed `/login` and §11.8 fixed device redemption, so `/authorize`
+— the surface §12's row (d) already gives a `throttled` cause — was the one left unstated.
+
+**The throttle is checked BEFORE either validation tier: before §5.3's pre-trust checks and before
+§7's post-trust ones.** The ordering is a requirement, not an implementation note, and this is why:
+
+- An AS that ran the post-trust tier first would answer a throttled caller with a **redirect** when
+  the `(client_id, redirect_uri)` pair is registered, and with §5.3's page when it is not. That is a
+  registered/unregistered distinguisher that survives the throttle, at the very endpoint §7 spends a
+  subsection making silent — an implementation could satisfy every other clause here and still ship
+  the enumeration oracle.
+- Under this ordering a throttled request at `/authorize` is **always** §5.3's page, which is what
+  makes `consent.md` §20's *"a would-be post-trust rejection refused while the throttle holds — the
+  same uniform page, never a redirect"* true by construction rather than by care.
+- It is also why §12's row (d) carries a `throttled` cause and row (f) does not: a post-trust
+  rejection is only ever reached by a request the throttle already let through.
+
+**A throttle that holds does not evaluate, and MUST fail closed** — §12.1 rules 3 and 4, which are
+these same requirements seen from the ledger's side.
+
+`[OPEN→0.3]` **What a throttle keys on.** No source names it, and it cannot be left unsaid, because
+§12.1 rule 3 makes the throttle the **only** bound on the audit chain's growth from unauthenticated
+callers — two containers that key differently have different bounds on an append-only log the owner
+cannot prune — and §12.2's pairing key is derived from whatever this is. What is **not** open, and is
+the floor any answer must clear:
+
+- **The key MUST NOT be a value the caller supplies and can vary at no cost** — not a `client_id`,
+  not a `user_code`, not a form field, not a caller-chosen request header. A throttle keyed on
+  caller-supplied data is not a bound at all: the caller lifts it by changing the value, and rule 3's
+  guarantee becomes a sentence with nothing under it.
+- **One surface's counter is one surface's**, so that exhausting `/device` cannot lock the owner out
+  of `/login`, and §12's `surface` word means what it says.
+
+a1p's reading, for the review to take or reject: **two buckets, both enforced** — an outer
+per-surface container-global bucket, which bounds the ledger absolutely, and an inner bucket keyed on
+the transport source address, which keeps one noisy source from spending the global budget. Either
+alone fails in a way the other covers: a source-keyed bucket alone is unbounded in aggregate, and a
+global bucket alone lets one caller deny the surface to the owner. Note the constraint §12.2 already
+carries whichever is picked — **the network identifier may key a throttle and may never enter the
+chain**, as `actor` or anywhere else.
 
 ### 11.1 · The client-registry read (§14 item 1)
 
@@ -980,6 +1031,19 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 | **(e)** | a throttle releasing | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` · `expiry` |
 
+**A successfully rendered consent screen appends nothing, and that is deliberate. a1p.** The five
+above are four failures and a release; a screen that renders performs §11.1's keyed registry read and
+§11.3's existing-tokens read and produces no entry, which sits oddly beside `events.md` §4 invariant
+2 (*"Every read … is an event"*) until the reason is said: **both reads are the owner reading their
+own container's state, inside an interactive session §10 has already authenticated, to decide an act
+they are in the middle of performing.** They are not a caller's reads and they are not taxonomy
+reads — the entry that records the moment is the decision's own, which is §9's and #68's. The two
+reads are bounded by §11.1 (one keyed entry, never a listing) and §11.3 (a count and a timestamp, no
+ids, no values), so neither can carry anything out of the container that an unrecorded read would
+hide. `[OPEN→0.3]` **#86's sitting should confirm this reading**, because it is the one place in the
+document where invariant 2 is satisfied by an argument rather than by an append, and if the sitting
+disagrees the answer is a sixth row here, not a change to either read.
+
 ### 12.1 · The rules, which are not open
 
 **a1p**, and stated so the review can overturn them deliberately rather than lose them inside a
@@ -993,8 +1057,10 @@ naming decision:
    arrives at it by six different causes writes once each time, so no cause is distinguishable by the
    *number* of writes it makes.
 3. **A refused attempt is counted, not appended.** The attempt that *engages* a throttle appends once
-   under (a), (b) or (d) with cause `throttled`. Every further attempt refused while the throttle
-   holds is counted and not appended. This is the clause that bounds the chain: (a), (b), (d) and (f)
+   under (a), (b) or (d) with cause `throttled` — always (d) and never (f) at `/authorize`, because
+   §11.0 runs the throttle before either validation tier. Every further attempt refused while the
+   throttle holds is counted and not appended. This is the clause that bounds the chain: (a), (b),
+   (d) and (f)
    are all reachable by a caller who has authenticated nothing — a public client's id and registered
    redirect URI are not secrets — so without it an unauthenticated sweep grows an **append-only** log
    the owner cannot prune, at the caller's rate.
@@ -1007,10 +1073,15 @@ naming decision:
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
    `authorize` · `tap` (the step-up tap is the fourth surface; if §10's `[LEAN]` is not taken, the
    word is unused, not wrong) — and `refused`, an integer.
-6. **The deciding session's replay is never throttled.** Only the session that decided can re-submit
-   a decided request (§11.4), so the throttle neither counts nor refuses it: it is evaluated and
-   appends once, cause `replayed`, whatever the throttle's state. A replay after a decision is a fact
-   the owner has an interest in.
+6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
+   interactive session that decided it, and *that* session's re-submission is the one this rule
+   exempts: it is evaluated and appends once, cause `replayed`, whatever the throttle's state,
+   because a replay after a decision is a fact the owner has an interest in and the session it
+   arrives on is one §10 has already authenticated. **The exemption reaches no further.** A decided
+   request re-submitted on any other session, or on none, is an ordinary (d) under rules 2 and 3 —
+   §5.3's page, cause `replayed`, counted and refused like anything else. Read without §11.4's
+   binding this rule would be an unthrottled append reachable by any caller, which is exactly what
+   rule 3 exists to prevent.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
    the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one
@@ -1037,7 +1108,8 @@ request. The gap is real and it is this document's to raise, `events.md`'s to cl
   audit log into a surveillance record of everyone who ever touched the container's front door — a
   cost the owner never agreed to and cannot undo.
 - **The engage entry and the release entry are paired by an opaque throttle key in `details`** — a
-  per-container, per-window value derived from whatever the throttle keyed on, never the key itself,
+  per-container, per-window value derived from whatever the throttle keyed on (§11.0, where that is
+  `[OPEN→0.3]` above a stated floor), never the key itself,
   rotating with the window. It correlates the entries of one sweep and correlates nothing across
   time, which is the whole of what pairing needs.
 
@@ -1048,7 +1120,16 @@ would invent different ones and break the chain across them (`events.md` §3).
 
 ## 13 · What this document does not fix
 
-The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`. Containers,
+The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`, **including
+`consent.md` §14 item 10 — what `publish` renders as on the consent screen.** Naming it here rather
+than answering it in §11: the screen must render `publish` in the same `token ls` vocabulary as the
+other five (§11.2), so the string is only as true as the capability's boundary, and
+`capabilities.md` §1 marks that boundary open. A consent screen is a security surface, so it may not
+promise a boundary the capability contract has not drawn — this document will render whatever
+`capabilities.md` settles at the freeze and invents nothing in the meantime. That closes §14's list;
+Part B answers or routes every one of its items.
+
+Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
 exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1
