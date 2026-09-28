@@ -1117,7 +1117,9 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
-**before any token or session exists** — and the drafted taxonomy has no name for one of them.
+**before any token exists** — (a), (b) and (d)'s `throttled` cause before any session exists either,
+the rest inside a session §11.0's substep 3 has already required — and the drafted taxonomy has no
+name for one of them.
 `events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
 non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
 
@@ -1206,6 +1208,17 @@ closes `principal` to `interactive` · `client`. None of the five can satisfy th
 `/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before any
 token exists; and (e) fires on **no attempt at all** — a timer releasing, with no caller in any
 request. The gap is real and it is this document's to raise, `events.md`'s to close.
+
+**A consequence of §11.0's substep 3 that #86 must take with the rest. a1p** — the gap is narrower
+than "none of the five" for two of them. (d)'s five non-`throttled` causes and the whole of (f) are
+now reached only inside an interactive session, so an `interactive` principal is available and
+truthful there; the entries with no principal to carry are (a), (b), (d) with cause `throttled`, and
+(e). This document does not pick: a taxonomy that used `interactive` where it is known and the
+reading below where it is not is one answer, and a taxonomy that used the reading below uniformly
+across all five — so that a reader cannot infer from the principal which cause a uniform page had —
+is another, and the second may matter more than the first. **#86's sitting chooses**; §5.3's
+uniformity is owed to the caller and never to the owner's ledger (§12.1 rule 1), so neither reading
+is blocked by it.
 
 `[OPEN→0.3]` **a1p's reading, for #86 to take or reject:**
 
