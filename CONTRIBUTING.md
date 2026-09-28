@@ -38,7 +38,7 @@ Ruff is enforced; the CI `tests` check runs both. Add tests for any code you add
 
 `TODO(chief): choose DCO vs CLA before accepting outside PRs.` This has not been decided. Until then, outside PRs are reviewed case by case; the Chief will communicate what sign-off is required.
 
-All code in this repository is Apache-2.0 unless otherwise noted. By submitting a PR you confirm your contribution is yours to offer under that license (or whatever sign-off mechanism the Chief adopts).
+All code in this repository is Apache-2.0 unless otherwise noted. By submitting a PR you confirm your contribution is yours to offer under that license (or whatever sign-off mechanism the Chief adopts). The egzos name and mark (`spec/design/brand/`) are not covered by that grant — see `TRADEMARKS.md`.
 
 ## Design and contract questions
 
