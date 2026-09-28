@@ -31,7 +31,7 @@ client obtains a token; this document fixes only that, and neither overrides the
 **The container runs its own OAuth 2.1 authorization server. §K.** Not a delegated one, not a hosted
 one: the AS is in-process with the container, and its issuer identity is the container's own origin.
 A fork that reimplements the container reimplements this AS, and a UI that speaks to one container
-speaks to every other the same way — that is what the rest of §6 is for.
+speaks to every other the same way — what §6 is for.
 
 One AS serves three client types, and there are no others in v1.0:
 
@@ -294,10 +294,19 @@ contract.
 
 ## 7 · The grant is six capabilities and node ids — nothing else
 
-**The grant an AS token carries is expressed only in the frozen capability vocabulary.** No scope
+**The grant an AS token carries is expressed only in the frozen capability vocabulary. §K.** No scope
 string that is not a node id, no capability that is not one of the six. **The AS must not become a
 second, parallel permission system** — the one failure mode that would make every clause in
 `capabilities.md` and `container.md` advisory.
+
+The marking is **§K** and not **a1p** because the rule is carried, not proposed: §K's consent-screen
+paragraph decides that *"authorizing the flagship is indistinguishable from minting any other client
+token because it IS one"*, and if an AS token **is** a client token then its grant is a client token's
+grant, which `capabilities.md` fixes at six capabilities and node ids. There is no room left for a
+second vocabulary to be decided in. The *phrasing* above — the "second, parallel permission system"
+framing and the failure mode it names — is a1p's, and a reviewer may reword it; the rule underneath it
+is §K's and may not be changed here. Everything below in this section that binds the rule onto OAuth's
+`scope` parameter is marked **a1p** separately, because that part is a proposal.
 
 A token minted through the AS **is** a `Token` per `capabilities.md` §5. Same fields, same six
 capabilities, same node-id scopes, same coverage computed down the path at check time, same

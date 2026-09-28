@@ -60,8 +60,9 @@ the capabilities**, not the bundle name — a bundle's later redefinition cannot
 container enforces on it. **running**
 
 - `principal: interactive` — established, for browser sessions, by the login PKCE performs against
-  the container (`authorization-server` surface, issue #29). In the skeleton the interactive owner
-  token *is* the proof; the step-up tap arrives at Phase 2.2.
+  the container. The flow is `authorization-server.md` §2; **where in it the principal is established
+  is issue #61** (Part B, presence composition), as `container.md` §9 already says. In the skeleton
+  the interactive owner token *is* the proof; the step-up tap arrives at Phase 2.2.
 - `principal: client` — every machine client.
 - **`serve` refuses to run on an interactive token.** The door is not opened with the human's own
   credential. **running**
