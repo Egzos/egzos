@@ -258,8 +258,9 @@ none.
 
 §5.1 requires the AS to **reject** a request whose `redirect_uri` is not byte-identical to a
 registered entry, and nothing said what a rejection *is*. §11.1's registry-enumeration rule, §11.4's
-re-submission handling and §12's whole row (d) each lean on the answer, and each cited a "§2.5" that
-does not exist. It is fixed here, where the commonest cause of it is required.
+re-submission handling and §12's whole row (d) each lean on the answer, and each cited a "§2.5" — a
+number belonging to `consent.md`'s own validation section, never to a subsection of this document's
+§2. It is fixed here, where the commonest cause of it is required.
 
 **Two tiers, and only one may redirect. a1p.** The **redirectable** (post-trust) tier is reached only
 by a request naming a registered `client_id`, a `redirect_uri` registered to that client under §5.1,
@@ -420,6 +421,10 @@ The rule, stated so it is testable:
 
 This applies to the device flow (§3) identically: a rejected device authorization reveals no more
 than a rejected redirect does.
+
+**This subsection is the post-trust half only** — it converges the error *in a redirect*, which the
+AS may send only once the request has earned one. The pre-trust half, where there is no redirect to
+converge, is **§5.3**; §11.0 fixes that the throttle runs before both.
 
 ## 8 · Two authorities, deliberately separate
 
