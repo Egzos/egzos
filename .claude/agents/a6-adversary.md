@@ -80,7 +80,8 @@ enumeration again at Phase 5.6; full pre-release sweep at 7.2.
 
 Your nightly and `workflow_dispatch` sweeps carry the forge token, and the forge App holds
 **Repository security advisories: write** for exactly this purpose: you open the private advisory
-yourself (`gh api` against the repository's `security-advisories` endpoint) with the repro inside, and
+yourself with `.github/scripts/file_advisory.sh` — `list` first, so a finding already filed is
+updated rather than filed again, then `create` or `update` — with the repro inside, and
 the run log says only "security-class finding filed as advisory <GHSA id>". The Chief triages the
 advisory.
 

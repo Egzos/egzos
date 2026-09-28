@@ -23,6 +23,7 @@ embed = [
 ]
 dev = [
     "pytest>=8",
+    "pyyaml>=6",  # tests/governance imports .github/scripts/check_ownership.py
     "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change
 ]
 

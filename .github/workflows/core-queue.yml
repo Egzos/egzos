@@ -29,6 +29,14 @@ jobs:
     name: core-queue
     runs-on: ubuntu-latest
     timeout-minutes: 90  # tunable — builders may take long
+    # One run per agent at a time (#22): two labels for one agent in quick succession both read
+    # has_wip=false before either opened a PR, and raced on one branch with one token. Keyed on
+    # the agent, so different agents still dispatch in parallel. GitHub keeps one PENDING run per
+    # group and cancels an older pending one; that run shows as cancelled on the issue's label
+    # event, and re-applying the label re-queues it.
+    concurrency:
+      group: core-queue-${{ github.event_name == 'workflow_dispatch' && format('agent:{0}', inputs.agent) || github.event.label.name }}
+      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -91,17 +99,25 @@ jobs:
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
 
       # WIP cap: default token is sufficient for reading open PRs.
+      # --limit: gh pr list fetches 30 by default and the filter can only see what was fetched (#22).
+      # An open DRAFT on this issue's own branch is the checkpoint a killed run left behind
+      # (RD-004): it is exempt, so re-dispatch resumes it. Any other open PR of this agent's counts.
       - name: wip-check
         id: wip
         if: steps.resolve.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           AGENT: ${{ steps.resolve.outputs.agent }}
+          ISSUE: ${{ steps.resolve.outputs.issue }}
         run: |
-          COUNT=$(gh pr list --state open --json headRefName \
-            --jq "[.[] | select(.headRefName | startswith(\"agent/${AGENT}/\"))] | length")
+          set -euo pipefail
+          [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "::error::issue '$ISSUE' is not a number"; exit 1; }
+          COUNT=$(gh pr list --state open --limit 1000 --json headRefName,isDraft \
+            | jq --arg prefix "agent/${AGENT}/" --arg own "agent/${AGENT}/issue-${ISSUE}" \
+                '[.[] | select(.headRefName | startswith($prefix))
+                      | select((.isDraft and .headRefName == $own) | not)] | length')
           echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
-          echo "WIP PRs for ${AGENT}: ${COUNT}"
+          echo "WIP PRs for ${AGENT} (excluding this issue's own draft): ${COUNT}"
           if [[ "$COUNT" -ge 1 ]]; then
             echo "has_wip=true"  >> "$GITHUB_OUTPUT"
           else
@@ -117,7 +133,7 @@ jobs:
           AGENT: ${{ steps.resolve.outputs.agent }}
         run: |
           gh issue comment "$ISSUE" \
-            --body "WIP cap: \`${AGENT}\` already has an open PR. Re-apply the \`agent:${AGENT}\` label once it merges."
+            --body "WIP cap: \`${AGENT}\` already has an open PR on another issue. Once it merges — or is closed, if it is a stalled draft — re-apply the \`agent:${AGENT}\` label. (A draft on this same issue does not count: re-applying the label resumes it.)"
           echo "WIP cap reached — skipping dispatch."
 
       # Run the builder.  Works on branch agent/<name>/issue-<n>.
@@ -160,13 +176,16 @@ jobs:
             2. Respect OWNERSHIP.yml — touch only your owned paths. PR size cap: 600 changed lines or 30 files (lockfiles and tests/fixtures/** excluded).
             3. NEVER touch `.github/workflows/**` — the egzos-forge App has no Workflows permission; any workflow change must be proposed as a `governance`-labelled issue with the patch in the issue body.
             4. Add license headers (`# Copyright 2026 Ali Sasanian` / `# SPDX-License-Identifier: Apache-2.0`) to every new source file.
-            5. Push and open the PR as a draft the moment you have ANYTHING committed — do not wait until the
+            5. Commit with imperative subject lines referencing issue #${{ steps.resolve.outputs.issue }}.
+            6. Push and open the PR as a draft the moment you have ANYTHING committed — do not wait until the
                work is complete. Commit and push again as you make progress, not only once at the end: a run
-               killed by the turn budget must leave a recoverable draft PR, never nothing. Fill
-               `.github/PULL_REQUEST_TEMPLATE.md` completely (What / Why / Risk / Contract impact / Checks).
-            6. Mark the PR ready for review only once everything is done, then comment the PR URL on issue
+               killed by the turn budget must leave a recoverable draft PR, never nothing. If an open draft
+               PR already exists for this branch (an earlier run was killed), continue on it — do not open a
+               second PR. Fill `.github/PULL_REQUEST_TEMPLATE.md` completely (What / Why / Risk / Contract
+               impact / Checks).
+            7. Mark the PR ready for review only once everything is done, then comment the PR URL on issue
                #${{ steps.resolve.outputs.issue }}.
-            7. Stop.
+            8. Stop.
           claude_args: >-
             --append-system-prompt-file /tmp/charter.md
             --model ${{ steps.resolve.outputs.model }}
