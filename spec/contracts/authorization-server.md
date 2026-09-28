@@ -1108,32 +1108,71 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
 - **The login establishes an interactive session and mints no token.** §10's four bullets hold: the
   session is not a `Token`, appears in no `token ls`, and is accepted at no endpoint that accepts a
   `Token`.
-- **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** It is parsed
-  as a relative reference and MUST have **no scheme, no authority** (a leading `//` is rejected
-  before anything else) **and no fragment**; it is never an absolute URL, never reflected into the
-  page, and a value whose **path** does not match the allowlist is dropped silently for the
-  container's root — not reported. **a1p**: this is the open-redirect hole in the one place a human
-  has just typed a credential, and the allowlist is an allowlist rather than a validator because
-  every "validate a redirect" bug in the literature is a validator. The list itself is
-  `consent.md`'s D-C5.
+- **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** The rule is
+  `consent.md`'s **D-C5**, restated here as a requirement on the AS — and restated in full, because
+  the pre-parse half is the half an implementer skips. In D-C5's own order:
+  - **Step 1 — reject *before* parsing.** A value is rejected, unparsed, if it does not begin with
+    **exactly one `/`**, or begins **`//`** or **`/\`**, or contains a **backslash** anywhere, or
+    contains **any control character**. All five conditions are D-C5 step 1's and this clause carries
+    all five: the pre-parse rejection is the whole of that step, not the leading-`//` case alone.
+  - **Step 2 — compare the parsed *path component* only**, exactly, against D-C5's patterns
+    (`/authorize` · `/device` · `/pending` · `/pending/<id>` · `/` · `/items/<id>`, `<id>` on D-C5's
+    positive charset). The reference MUST have **no scheme and no authority**; it is never an
+    absolute URL; the **fragment is always dropped**.
+  - **Step 4 — a value failing any step is dropped silently for the container's root** — a 303 to
+    `/`, never reported, never echoed back as a reason.
+
+  **a1p**: this is the open-redirect hole in the one place a human has just typed a credential, and
+  the allowlist is an allowlist rather than a validator because every "validate a redirect" bug in
+  the literature is a validator.
+- **`continue` is never *rendered*, and it crosses the credential POST in exactly one position.
+  a1p.** The anti-reflection rule is a rule about **rendering**: the value MUST NOT be written as
+  visible page content, into any attribute of an element rendered *for* it, or into any script or
+  style on the page. It is **not** a prohibition on the login form's own carrier — the two-hop this
+  section requires (GET `/login?continue=…` → credential POST → 303 to `continue`) cannot complete
+  without one. The **one permitted position** is the login form's own `action` query or a single
+  hidden input the form posts, and there the value is carried **still percent-encoded and
+  contextually escaped for the position it occupies**, then read back only as a parameter of the
+  POST. Two bounds on that carrier: a value that failed step 1 or step 2 **never reaches it** — it
+  was dropped at the GET and the form carries nothing — and the value is re-matched against steps 1
+  and 2 on the POST before the 303 is issued, because a form field is caller-controlled input
+  whatever put it there. A form that round-trips an unvalidated value is the same hole one hop later.
 - **`continue` is also how the pending authorization request survives the login, and it is the only
   thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
   before anything about it has been validated, so the request has to reach the login *and come back*,
   or §2's browser flow cannot complete and the human is left at a container root having authorized
   nothing. Fixed as follows, and testable:
-  - **The allowlist matches the path; a query carried with that path rides along unparsed.** The AS
-    does not inspect it, does not render it, does not store it and does not validate it here. On a
-    successful login the browser is sent to the allowlisted path **with that query intact**, and that
-    path validates the request exactly as it would have validated the same request sent directly.
+  - **The query rides along only where `consent.md` D-C5 step 3 carries it: `/authorize` and `/`,
+    and nowhere else.** D-C5 step 3 carries the query string verbatim — **still percent-encoded,
+    never decoded before it is written to `Location`** — for exactly those two patterns, because
+    those are the two whose targets consume one (`/authorize`'s parameters *are* the request; `/`
+    carries the search the viewer was on), and **drops it** for `/device`, `/pending`,
+    `/pending/<id>` and `/items/<id>`. **This clause states D-C5's scope and does not widen it.
+    a1p** — an earlier draft here carried the query for every pattern, which would have been a new
+    attack-surface decision taken in a contract document over a committed design spec that had
+    already decided it, and taken as a side effect of an unrelated ordering fix. D-C5 step 3 is the
+    source; if the carry should be wider, that is a revision to D-C5, not a clause here.
+  - **Where it is carried, it rides unparsed.** The AS does not inspect it, does not render it, does
+    not store it and does not validate it at `/login`. On a successful login the browser is sent to
+    the allowlisted path **with that query intact**, and that path validates the request exactly as
+    it would have validated the same request sent directly.
   - **Two flows depend on it and both MUST complete without the client re-initiating**: §2's
     browser flow resumes at `/authorize` with the `client_id`, `redirect_uri`, `state`,
     `code_challenge` and `code_challenge_method` the client sent; and `consent.md` R3's device
     hand-off — *approved (code found)* is a `303 to /authorize?user_code=…` — resumes at the same
     path with its `user_code`, which is the case that fails silently if only a bare path survives.
+    **Both resume at `/authorize`**, which is one of step 3's two carrying patterns, so scoping the
+    carry to D-C5 costs neither flow: the four patterns that drop the query are the ones whose
+    targets consume none.
   - **Nothing is written to container state to make this work.** The request rides in the redirect,
     not in a server-side pending record. This is what keeps §11.0's substep 3 a step that appends
     nothing and stores nothing, and it is why an unauthenticated sweep cannot make the container
-    retain anything (§12.1 rule 3).
+    retain anything (§12.1 rule 3). **The login form's carrier is not an exception to this.** The
+    hidden field or `action` query named two bullets above lives in the response the AS renders and
+    comes back on the POST the browser sends; the AS retains nothing between the two, and a caller
+    that never posts leaves nothing behind. What this bullet forbids is a **server-side pending
+    record** — something the container holds, that a sweep could grow. A field in a page the caller
+    is holding is not one.
   - **A query changes no bound that the path did not already have.** Every value in it is the
     caller's own, handed back to the same caller, and the endpoint it is handed to is one the caller
     could have called directly — so the allowlist still bounds *where* a freshly authenticated
@@ -1267,8 +1306,8 @@ naming decision:
    not in one shared one** (§11.0 substep 2) — and that uniformity is owed to the caller, never to
    the owner's own ledger.
 2. **One append per path, however the path is reached.** (d)'s page is one page; a request that
-   arrives at it by six different causes writes once each time, so no cause is distinguishable by the
-   *number* of writes it makes.
+   arrives at it by any of the row's **seven** causes writes once each time, so no cause is
+   distinguishable by the *number* of writes it makes.
 3. **A refused attempt is counted, not appended.** The attempt that *engages* a throttle appends once
    under (a), (b) or (d) with cause `throttled` — always (d) and never (f) at `/authorize`, because
    §11.0 runs the throttle before either validation tier. Every further attempt refused while the
@@ -1287,7 +1326,12 @@ naming decision:
    undiminished, and this rule takes no position on what a caller knows — only on what an
    **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
    `/authorize` grows an **append-only** log the owner cannot prune, at the caller's rate; with it the
-   sweep's whole reach is one entry per throttle engagement.
+   sweep's whole reach is what §11.0's substep 3 already states: **one entry per throttle engagement,
+   plus one `token_presented` entry per attempt the throttle admits and (d) evaluates.** It is *not*
+   one entry per engagement flat — `token_presented` is decided inside substep 3 and appends per
+   evaluated attempt, so a sweep that presents bearer credentials appends as often as the throttle
+   lets it through. The bound is therefore **the throttle's own admitted rate**, which is the same
+   counter in both cases; the engagement entry is one more on top of it, not the whole of it.
 4. **A throttle that holds does not evaluate — a correct credential or a valid code included.** A
    throttle that evaluated the right answer while refusing wrong ones would bound the ledger and not
    the guessing, which is the opposite of what it is for. **A throttle MUST fail closed:** one that
