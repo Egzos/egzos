@@ -31,7 +31,7 @@ client obtains a token; this document fixes only that, and neither overrides the
 **The container runs its own OAuth 2.1 authorization server. §K.** Not a delegated one, not a hosted
 one: the AS is in-process with the container, and its issuer identity is the container's own origin.
 A fork that reimplements the container reimplements this AS, and a UI that speaks to one container
-speaks to every other the same way — that is what the rest of §6 is for.
+speaks to every other the same way — what §6 is for.
 
 One AS serves three client types, and there are no others in v1.0:
 
@@ -183,6 +183,12 @@ that were privileged at registration would be privileged, and §K's whole shape 
 redirect_uris}` enters container config through an owner-authenticated path. **a1p** — no source
 names the verb, and the CLI spelling belongs to a3-doorman, not to this document.
 
+**Whether registering, amending or removing a client writes an audit event is `[OPEN→0.3]`, in §9's
+marking and in #68.** It is named here because §5 is where a reader looks for it: this section's
+exact-match rule is only as strong as the allowlist it compares against, so a change to that
+allowlist is a change to the AS's security posture, and `events.md` §4 invariant 2 does not currently
+name an event for it.
+
 `[OPEN→0.3]` **Dynamic client registration** (RFC 7591) is what the MCP authorization spec expects
 (§4), and an **open** registration endpoint on a personal container lets any caller create a client
 entry. The two pull in opposite directions and the review must settle which wins before Phase 5
@@ -258,7 +264,7 @@ container-specific — no node ids, no client names, no owner identity — may b
 | `authorization_endpoint` | §2 |
 | `token_endpoint` | §2, §3 |
 | `device_authorization_endpoint` | §3 |
-| `revocation_endpoint` | §9 |
+| `revocation_endpoint` | §9 — `[OPEN→0.3]`; **advertised only if** the endpoint exists |
 | `registration_endpoint` | §5 — **advertised only if** dynamic registration is enabled |
 | `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
 | `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
@@ -271,6 +277,15 @@ method, grant or endpoint it does not implement, and MUST NOT implement one it d
 a fork's UI reads this document *through* the metadata, so a mismatch is a conformance failure and
 not a documentation bug.
 
+**Two of the eleven rows are therefore conditional, and the table says which: `revocation_endpoint`
+and `registration_endpoint`.** Both name an endpoint whose existence is an open question — §9's for
+revocation, §5's for dynamic registration — and the clause above forbids advertising either until
+the answer is yes. The other nine are unconditional: a container that omits one of them is
+non-conforming. **a1p** — the distinction is stated rather than left to the reader because the field
+list is what an implementation will copy, and copying a conditional row as an unconditional one is
+exactly the mismatch this paragraph forbids. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is the
+whole vocabulary of eleven; `AS_METADATA_CONDITIONAL_FIELDS` names these two.
+
 `[OPEN→0.3]` **Whether `scopes_supported` also advertises the `node:` form.** §7's node-scope
 strings are container-specific by construction; listing the *prefix* reveals nothing, listing any
 actual node id would break the "nothing container-specific" rule above. The review should say
@@ -279,10 +294,19 @@ contract.
 
 ## 7 · The grant is six capabilities and node ids — nothing else
 
-**The grant an AS token carries is expressed only in the frozen capability vocabulary.** No scope
+**The grant an AS token carries is expressed only in the frozen capability vocabulary. §K.** No scope
 string that is not a node id, no capability that is not one of the six. **The AS must not become a
 second, parallel permission system** — the one failure mode that would make every clause in
 `capabilities.md` and `container.md` advisory.
+
+The marking is **§K** and not **a1p** because the rule is carried, not proposed: §K's consent-screen
+paragraph decides that *"authorizing the flagship is indistinguishable from minting any other client
+token because it IS one"*, and if an AS token **is** a client token then its grant is a client token's
+grant, which `capabilities.md` fixes at six capabilities and node ids. There is no room left for a
+second vocabulary to be decided in. The *phrasing* above — the "second, parallel permission system"
+framing and the failure mode it names — is a1p's, and a reviewer may reword it; the rule underneath it
+is §K's and may not be changed here. Everything below in this section that binds the rule onto OAuth's
+`scope` parameter is marked **a1p** separately, because that part is a proposal.
 
 A token minted through the AS **is** a `Token` per `capabilities.md` §5. Same fields, same six
 capabilities, same node-id scopes, same coverage computed down the path at check time, same
@@ -298,6 +322,13 @@ space-delimited set drawn from exactly two forms:
 
 The AS expands the request into `{capabilities, scopes}` on the minted token. Anything else in the
 `scope` value is refused; the request is **not** silently narrowed to the part that parsed.
+
+**Pinned**, in `src/egzos/_types.py` and `tests/_types/test_as_shapes.py`: the bare-name half of the
+vocabulary is exactly `CAPABILITIES` and the node form is exactly `AS_SCOPE_NODE_PREFIX`
+(`AS_SCOPE_ALL_NODES` for `node:*`) — **two forms, no third** — and the collision below is exactly
+one word, `set(ROLE_BUNDLES) & set(CAPABILITIES) == {"admin"}`. There is no constant for a third
+form because there is no third form; a seventh capability or a sixth bundle named after a capability
+breaks a test rather than an implementation.
 
 Three consequences that are contract, not style:
 
@@ -383,6 +414,43 @@ A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and re
 **before** the capability set. `token.revoke` is written (`events.md` §1). **a1p** — the AS adds no
 second revocation semantics, which is the point.
 
+`[OPEN→0.3]` **Whether the AS exposes an RFC 7009 revocation endpoint at all.** §K names
+"revocation" as a Phase 0.2 freeze constraint and answers it with one verb — *"revocation is
+`token rm` like any client"* — which is an **owner** path, on the container's own CLI. §6 advertises
+a `revocation_endpoint` and §6 also forbids advertising an endpoint a container does not implement,
+so the metadata row and §9 cannot both stand as written. This is not cosmetic: **a browser or an MCP
+client cannot run `token rm`**, so an HTTP endpoint is the only revocation path those two of §1's
+three client types have. The review must pick one, and a1p does not pick for it:
+
+1. **Define the endpoint, per RFC 7009.** `POST` to `revocation_endpoint` with `token` and an
+   optional `token_type_hint`, over TLS (§2), with no client authentication because no client has a
+   secret (§1, §6's `["none"]`). Two clauses would have to come with it, and both are this
+   document's rather than the RFC's:
+   - **The silence rule.** The endpoint returns **200 for an unknown, malformed or already-revoked
+     token** — the same status, shape and time budget as for a token it really did revoke. RFC 7009
+     asks for 200 on an invalid token; §7's "the AS is not an enumeration oracle" is why it is a
+     MUST here, because an endpoint that answered differently would let any caller test whether a
+     token value exists without holding one.
+   - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
+     take or reject: **no** — the AS verifies the token was issued to the presenting `client_id`
+     and, when it was not, revokes nothing and returns the *same* 200, so a refusal is
+     indistinguishable from a success. A public client's `client_id` is an assertion and not proof
+     (§1), which is the argument for bounding the endpoint to "revoke what you already hold"
+     instead of trusting the claim: an unbounded endpoint plus a guessable token value is a
+     denial-of-service against every other client on the container.
+2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
+   pending the review.
+3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
+   owner is given in a browser by #61's surface. The cost is explicit: a client cannot revoke its
+   own token, and a UI's "log out" is a local forget, not a revocation — a stolen browser token
+   stays live until the owner removes it from `token ls`.
+
+**Until the review decides, this document takes (2).** `revocation_endpoint` is a conditional row in
+§6, advertised only if the endpoint exists, and **no endpoint is defined here** — a container that
+advertises one today is advertising something this contract does not specify. `token rm` is the
+revocation *semantics* under every option: whatever the transport, a revoked token is
+`capabilities.md` §5's and `token.revoke` is written.
+
 **Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
 
 1. A refresh token is **single-use**. Redeeming it issues a new access token **and** a new refresh
@@ -395,10 +463,20 @@ second revocation semantics, which is the point.
    refresh that could add either would be §7's second permission system arriving through the back
    door.
 
-`[OPEN→0.3]` **Whether rotation is an audit event**, and whether a denied or abandoned authorization
-is one at all. `events.md` §1 closes its vocabulary by construction and the AS produces five effects
-with only two events between them — filed as **#68** for the 0.3 batch, with a1p's recommendation
-there. Not answered in this document.
+`[OPEN→0.3]` **Whether rotation is an audit event, whether a denied or abandoned authorization is one
+at all, and whether client registration is one.** `events.md` §1 closes its vocabulary by
+construction — *"an appended event whose name is not in this list MUST be rejected"* — and §4
+invariant 2 closes the other side: *"a surface that produces an effect without a corresponding event
+is non-conforming."* The AS produces **six** effects with only two events between them.
+
+**Registration (§5) is the sixth, and this document adds it to the question.** It is an owner act
+that writes the redirect-URI allowlist — the one piece of container state that decides where an
+authorization code may be delivered — and it currently leaves no entry in the chain. An allowlist
+entry added quietly is §5's exact-match rule undone without a trace, and the chain is where that
+would otherwise be visible; a registration is also, by §4 invariant 2's own vocabulary, closer to an
+approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
+are settled together with one edit to `events.md` rather than four. a1p's recommendation is on the
+issue. **Not answered in this document.**
 
 `[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
 that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS

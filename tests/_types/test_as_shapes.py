@@ -30,6 +30,21 @@ def test_metadata_surface_is_exactly_the_contracts():
     assert t.AS_METADATA_ENDPOINT == "/.well-known/oauth-authorization-server"
 
 
+def test_only_the_two_open_endpoints_are_conditional():
+    """§6: advertising an endpoint the container does not implement is non-conforming.
+
+    `revocation_endpoint` is conditional because §9 leaves the endpoint's existence `[OPEN->0.3]`
+    (§K answers revocation with `token rm`, an owner path); `registration_endpoint` because §5
+    leaves dynamic registration open. The other nine rows are unconditional.
+    """
+    assert t.AS_METADATA_CONDITIONAL_FIELDS == {"revocation_endpoint", "registration_endpoint"}
+    # Conditional means "a row of the table that may be omitted", never "a row not in the table".
+    assert t.AS_METADATA_CONDITIONAL_FIELDS <= set(AS_METADATA_FIELDS)
+    unconditional = [f for f in AS_METADATA_FIELDS if f not in t.AS_METADATA_CONDITIONAL_FIELDS]
+    assert len(unconditional) == 9
+    assert "issuer" in unconditional and "token_endpoint" in unconditional
+
+
 def test_plain_is_never_advertised_and_code_is_the_only_response_type():
     """§2: `S256` only, no downgrade path; the implicit and password grants do not exist here."""
     v = t.AS_METADATA_CLOSED_VALUES
@@ -45,6 +60,38 @@ def test_plain_is_never_advertised_and_code_is_the_only_response_type():
     assert v["token_endpoint_auth_methods_supported"] == ("none",)
     assert t.AS_CLIENT_TYPES == ("browser", "cli", "mcp")
     assert "client_secret" not in t.ClientRegistration.__annotations__
+
+
+def test_the_scope_vocabulary_is_the_six_names_plus_the_node_form():
+    """§7: no scope string that is not a node id, no capability that is not one of the six.
+
+    The two forms are a bare capability name and `node:<node-id>`. A third form arriving is the
+    "second, parallel permission system" §7 exists to forbid, so the forms are written out here.
+    """
+    assert t.CAPABILITIES == ("fetch", "remember", "organize", "publish", "curate", "admin")
+    assert t.AS_SCOPE_NODE_PREFIX == "node:"
+    assert t.AS_SCOPE_ALL_NODES == t.AS_SCOPE_NODE_PREFIX + "*"
+    # §7 consequence 3: `node:*` is the owner's grant — `capabilities.md` §5's `["*"]`.
+    assert t.AS_SCOPE_ALL_NODES.removeprefix(t.AS_SCOPE_NODE_PREFIX) == "*"
+    # §7 consequence 1: bundle names are never scope strings. Four of the five would be a silent
+    # widening if an implementation accepted them as bare names; `admin` is covered below.
+    bundles_that_are_not_capabilities = set(t.ROLE_BUNDLES) - set(t.CAPABILITIES)
+    assert bundles_that_are_not_capabilities == {"reader", "contributor", "operator", "curator"}
+    assert not bundles_that_are_not_capabilities & set(t.CAPABILITIES)
+
+
+def test_admin_is_the_one_word_the_two_vocabularies_collide_on():
+    """§7 consequence 2: in a `scope` value `admin` is the capability, never the all-six bundle.
+
+    A reader who resolves the collision the other way grants five capabilities they did not mean
+    to, so the collision is pinned to exactly one word — a sixth bundle named after a capability,
+    or a seventh capability named after a bundle, breaks this test rather than an implementation.
+    """
+    assert set(t.ROLE_BUNDLES) & set(t.CAPABILITIES) == {"admin"}
+    # The two meanings of the word, and the distance between them: one capability vs. all six.
+    assert t.ROLE_BUNDLES["admin"] == frozenset(t.CAPABILITIES)
+    assert len(t.ROLE_BUNDLES["admin"]) == 6
+    assert "admin" in t.CAPABILITIES
 
 
 def test_the_registration_and_device_shapes():
