@@ -87,9 +87,9 @@ A component from any other source requires A2's explicit call in the spec. Third
 | GitHub avatar / social preview / `<picture>` / App badge requirements | docs.github.com (profile reference; social preview; writing on GitHub; App badge) | — | 2026-09-22 | Taken as constraints in BRAND.md §8 | `brand/BRAND.md` v1.0 |
 | Favicon set, maskable safe zone, theme-color | web.dev (adaptive favicon; maskable icon), MDN (manifest icons; theme-color), caniuse (SVG favicon) | — | 2026-09-22 | Taken: ICO-then-SVG order, 80 % safe circle, a separate maskable entry. Refused: `mask-icon` (archived) | `brand/BRAND.md` v1.0 |
 | MCP `Implementation.icons` | modelcontextprotocol.io · specification 2026-07-28 | — | 2026-09-22 | Taken: PNG MUST + SVG SHOULD, `theme` tags, data URIs | `brand/BRAND.md` v1.0 |
+| shadcn/ui CSS variable contract — the **key names** (`--background`, `--primary`, `--ring`, `--sidebar-*`, …), not one value | https://ui.shadcn.com (theming) | MIT | 2026-09-22 | Taken: the names, so a catalogue component re-themes by resolving against egzos values with no edit. Refused: every shipped value, the five `--chart-*` hues (egzos has two colours and both are reserved), and the `calc()`-derived radius ladder, which yields negative lengths at radius 0. | tokens.css v0.6 (D-T3) |
 
 Brand pipeline tools (not shipped; `brand/pipeline/requirements.txt`): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) · numpy ≥ 2.0, < 3 (BSD-3) · matplotlib 3.9 (PSF-based) · Pillow 11 (MIT-CMU) — `brand/BRAND.md` v1.0, 2026-09-22.
-| shadcn/ui CSS variable contract — the **key names** (`--background`, `--primary`, `--ring`, `--sidebar-*`, …), not one value | https://ui.shadcn.com (theming) | MIT | 2026-09-22 | Taken: the names, so a catalogue component re-themes by resolving against egzos values with no edit. Refused: every shipped value, the five `--chart-*` hues (egzos has two colours and both are reserved), and the `calc()`-derived radius ladder, which yields negative lengths at radius 0. | tokens.css v0.6 (D-T3) |
 
 ## Typefaces
 
