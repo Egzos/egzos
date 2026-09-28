@@ -988,15 +988,28 @@ would invent different ones and break the chain across them (`events.md` §3).
 
 The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
-`events.md`, plus **#68**. The MCP-specific surface → contract v1.1 at the Phase 5 boundary (§4).
-The *look* of §11's pages — regions, states, copy, every string — is `spec/design/consent.md`; this
-document fixes what they must be true about, never how they read.
+`events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
+exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1
+at the Phase 5 boundary (§4). The step-up tap's endpoints, token shape and window mechanics → Phase
+2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10's `[LEAN]` fixes none of them, and
+§10's backstop is written in terms of *a live presence window* so that it does not depend on how the
+tap is reached. The *look* of §11's pages — regions, states, copy, every string — is
+`spec/design/consent.md`; this document fixes what they must be true about, never how they read.
+
+**The flagship's permissions dashboard is not this document's surface**, and §11.9 is the boundary:
+the dashboard reaches this AS as a browser client from a separate origin, so it holds no session on
+the container's pages. What revocation it can offer depends on §9's pick and §11.9's, and until both
+are taken `consent.md` §19's revoke sentence has no transport under it.
 
 TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
-authorization codes, pending device authorizations and refresh-token chains are all durable state
-this document requires and `storage.md` §3 does not name a method group for — the same shape as
-`container.md` §8's open question about the config object, and the same reason it matters: state
-that Trust does not own is state that can be edited around Trust. a1p's reading is that all of it is
+authorization codes, pending device authorizations, refresh-token chains, §11.4's decided-request
+records, §12's throttle counters and §10's interactive sessions are all durable state this document
+requires and `storage.md` §3 does not name a method group for — the same shape as `container.md`
+§8's open question about the config object, and the same reason it matters: state that Trust does
+not own is state that can be edited around Trust. The last three are Part B's additions to the list
+and the sharpest cases, because a session store editable around Trust forges presence, a throttle
+counter editable around Trust removes §12's only bound on the chain, and a decided-request record
+editable around Trust un-decides an authorization. a1p's reading is that all of it is
 `ContainerState` by F3's rule (it is never delegated to a pluggable backend), but F3 was written
 before this surface existed and should be asked, not assumed. The 0.3 review or the #30
 consolidation pass should settle it.

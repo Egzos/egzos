@@ -361,12 +361,32 @@ class ClientRegistration(TypedDict):
     `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
     with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
     ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
+
+    `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
+    timestamp. `client_name` is owner-supplied DATA — the AS never verifies it and nothing in the AS
+    may branch on it; a name that imitates the product is a registration the owner made, and the
+    page's defence is showing the origin and the kind beside it.
     """
 
     client_id: str
     client_name: str
     client_type: ASClientType
     redirect_uris: list[str]
+    registered_at: str
+
+
+#: §11.1 — what the consent screen may read about a client: ONE entry, keyed by the request's
+#: `client_id`. There is no listing endpoint, page or parameter, and an unregistered `client_id`
+#: produces §2.5's uniform failure and no read at all — §7's enumeration rule, at the registry.
+AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(ClientRegistration.__annotations__)
+
+#: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
+#: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up
+#: tap's page; if §10's `[LEAN]` is not taken the word is unused, not wrong. The caller's network
+#: identifier is NEVER the actor: it would write surveillance into a chain the owner cannot prune.
+#: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
+#: is no constant for them here, deliberately.
+AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
 
 
 class DeviceAuthorization(TypedDict):
@@ -542,6 +562,7 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_CONDITIONAL_FIELDS",
@@ -549,6 +570,7 @@ __all__ = [
     "AS_METADATA_FIELDS",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
+    "AS_THROTTLE_SURFACES",
     "ASClientType",
     "ArtifactContent",
     "AudienceMember",

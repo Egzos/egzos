@@ -101,7 +101,7 @@ def test_admin_is_the_one_word_the_two_vocabularies_collide_on():
 
 
 def test_the_registration_and_device_shapes():
-    """§5's four keys, and §3's response with `verification_uri_complete` left `[OPEN->0.3]`."""
+    """§5's four keys plus §11.1's `registered_at`, and §3's `[OPEN->0.3]` completion URI."""
     assert is_typeddict(t.ClientRegistration)
     assert is_typeddict(t.DeviceAuthorization)
     assert set(t.ClientRegistration.__annotations__) == {
@@ -109,7 +109,32 @@ def test_the_registration_and_device_shapes():
         "client_name",
         "client_type",
         "redirect_uris",
+        "registered_at",
     }
     # `__required_keys__` cannot see through PEP 563's string annotations, so read the hints.
     hints = get_type_hints(t.DeviceAuthorization, include_extras=True)
     assert hints["verification_uri_complete"] == NotRequired[str]
+
+
+def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
+    """§11.1: a keyed read of one entry, never a listing — §7's enumeration rule at the registry.
+
+    Pinned as a set equality rather than a subset so that a field added to `ClientRegistration`
+    without a contract clause cannot arrive at the consent screen by inheritance.
+    """
+    assert t.AS_CLIENT_REGISTRY_READ_FIELDS == set(t.ClientRegistration.__annotations__)
+    # §11.3's existing-tokens read is a count and a timestamp: no id, no value, ever.
+    assert not {"token_id", "token", "tokens", "client_secret"} & t.AS_CLIENT_REGISTRY_READ_FIELDS
+
+
+def test_the_throttle_surfaces_are_four_closed_words():
+    """§12.1 rule 5 and §12.2: the release entry's `surface`, and what `actor` carries.
+
+    Written out rather than derived, because the point of the vocabulary is that it is closed: a
+    fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
+    §10's `[LEAN]` may be taken; an unused word is not a wrong one.
+    """
+    assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap")
+    assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
+    # §12.2: the caller's network identifier is never the actor, so no surface is one.
+    assert not any(s in {"ip", "remote_addr", "caller"} for s in t.AS_THROTTLE_SURFACES)
