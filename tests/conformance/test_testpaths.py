@@ -24,8 +24,10 @@ parked on a second line is still seen). Within that list it catches
   separate-token forms and path-normalised the same way;
 * a `-m` or `-k` expression that names the suite — `-m 'not adversarial'` deselects it, `-m
   adversarial` deselects everything else, and `adversarial` is a registered marker in
-  pyproject.toml, so both are live vectors. Quoted, unquoted and attached (`-k'not adversarial'`)
-  forms all reduce to the same token under `shlex`.
+  pyproject.toml, so both are live vectors. The quoted, escaped (`-m not\\ adversarial`) and
+  attached (`-k'not adversarial'`) forms all reduce to the same token under `shlex`; the wholly
+  unquoted `-m not adversarial` does not, and is caught instead by its bare `not` — the shell split
+  the expression and the suite name is landing as a collection target.
 
 Deliberately out of scope, so the invariant above is not read wider than it is:
 
@@ -72,9 +74,12 @@ VALUE_FLAGS = frozenset(
         "--import-mode", "--junitxml", "--log-file", "--maxfail", "--override-ini",
         "--rootdir", "--tb", "--timeout",
     }
-)  # fmt: skip
+)
 EXCLUDE_FLAGS = frozenset({"--ignore", "--ignore-glob", "--deselect"})
 EXPR_FLAGS = frozenset({"-m", "-k"})
+# A whole expression that is one bare operator means the rest of it was left unquoted and the shell
+# split it off: `-m not adversarial` hands pytest the markexpr `not` and the suite as a path.
+DANGLING_OPERATORS = frozenset({"not", "and", "or"})
 
 
 def _ini_options():
@@ -194,6 +199,8 @@ def _findings(workflow_path=TESTS_WORKFLOW):
                 findings.append(f"{name} excludes the {SUITE} suite: {line}")
             elif name in EXPR_FLAGS and expr.search(value):
                 findings.append(f"{name} expression names the {SUITE} suite: {line}")
+            elif name in EXPR_FLAGS and value.strip() in DANGLING_OPERATORS:
+                findings.append(f"{name} expression is the bare operator {value!r}: {line}")
         # Only an argument naming something real in the checkout is a collection target. No target
         # of its own means `testpaths` governs, which the tests above pin; with a target, the
         # invocation has to name the suite itself.
@@ -217,6 +224,10 @@ DESELECTIONS = [
     '        run: pytest -q -m "not adversarial"\n',
     "        run: pytest -q -m'not adversarial'\n",
     "        run: pytest -q -m not\\ adversarial\n",
+    # Left unquoted, the shell splits the expression: -m takes `not` and the suite name lands as a
+    # collection target, so the target rule alone reads this invocation as healthy.
+    "        run: pytest -q -m not adversarial\n",
+    "        run: pytest -q -k not adversarial\n",
     "        run: pytest -q -m adversarial\n",
     "        run: pytest -q -k 'not adversarial'\n",
     '        run: pytest -q -k "not adversarial"\n',
