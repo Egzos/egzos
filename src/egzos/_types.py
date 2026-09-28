@@ -417,8 +417,9 @@ AS_METADATA_CONDITIONAL_FIELDS: frozenset[str] = frozenset(
 #: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
 #: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
 #: `node:<node-id>`, which is how a `Token.scopes` entry is SPELLED in a `scope` value and not the
-#: entry itself — the AS strips the prefix, so `node:*` requests the whole container and lands on the
-#: token as `capabilities.md` §5's `["*"]`, the owner's grant (authorization-server.md §7 conseq. 3).
+#: entry itself — the AS strips the prefix, so `node:*` requests the whole container and lands on
+#: the token as `capabilities.md` §5's `["*"]`, the owner's grant (authorization-server.md §7,
+#: consequence 3).
 #: There is no third form, and no constant here for one. Role bundle NAMES are not scope strings: a
 #: bundle is expanded at mint time and the token carries capabilities, so a bundle in a grant would
 #: be a second vocabulary that can drift. The two vocabularies collide on exactly one word — `admin`
