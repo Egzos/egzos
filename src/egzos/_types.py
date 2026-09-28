@@ -10,9 +10,9 @@ Phase 1 builds against the frozen surface rather than the skeleton's.
 
 **Drafted, awaiting the Phase 0.3 freeze review** — A6 and the Chief declare the freeze, not a1p.
 
-Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26) and
-``storage.md`` (issue #27). Container and chain (#28) and the authorization-server surface (#29)
-land in their own PRs; the consolidation pass is #30.
+Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26),
+``storage.md`` (issue #27) and ``container.md`` (issue #28). The authorization-server surface (#29)
+lands in its own PR; the consolidation pass is #30.
 """
 
 from __future__ import annotations
@@ -215,6 +215,134 @@ class AuditEntry(TypedDict):
     hash: str
 
 
+# --- containers, the chain and the gate (spec/contracts/container.md) -----------------------
+
+ContainerType = Literal["inbox", "thread", "project", "team", "org", "exo", "uxo", "global"]
+#: Declaration order IS ring rank. `enterprise` is omitted from the vocabulary (v0.5 §A); `uxo`
+#: keeps rank 6 and is never instantiated (R11), so the ranks around it stay stable.
+CONTAINER_TYPES: tuple[ContainerType, ...] = get_args(ContainerType)
+#: An ATTRIBUTE — UI order and the gate's outward test — never the resolution order (container.md
+#: §1). The chain is the tree walk, and its ranks need not be monotonic.
+RING_RANK: dict[ContainerType, int] = {t: i for i, t in enumerate(CONTAINER_TYPES)}
+
+RootType = Literal["user", "global"]
+#: Tree roots. `user` is the personal tree (`user:self`) and is NOT a ring: it has no entry in
+#: RING_RANK and still rides along in every chain (container.md §2).
+ROOT_TYPES: tuple[RootType, ...] = get_args(RootType)
+
+ServingPolicy = Literal["serve-unverified", "verified-only"]
+#: Keyed by container type AND by the `user` root (F4). A type absent from this mapping MUST be
+#: treated as `verified-only`: the lookup fails closed, so a forgotten entry withholds, never leaks.
+SERVING_POLICY: dict[str, ServingPolicy] = {
+    "inbox": "serve-unverified",
+    "thread": "serve-unverified",
+    "project": "serve-unverified",
+    "team": "verified-only",
+    "org": "verified-only",
+    "exo": "verified-only",
+    "uxo": "verified-only",
+    "global": "verified-only",
+    "user": "verified-only",  # F4 — the personal root rides along everywhere: reach → verification
+}
+
+
+class Node(TypedDict):
+    """A container. `parent` is the ONLY location state; the path is computed from it, so moving a
+    node is a metadata update (v0.4 §16). `type` is a `ContainerType` or a `RootType`.
+    """
+
+    id: str
+    type: str
+    name: str
+    parent: str | None
+    created_at: str
+
+
+class AudienceMember(TypedDict):
+    """One live token whose coverage reaches a node — people AND agents, never a count."""
+
+    token: str
+    owner: str
+    client: str
+    principal: Principal
+    role: Role
+
+
+ProposalStatus = Literal["open", "executed", "denied", "stale"]
+#: `stale` is written when approval recomputes the manifest and it no longer matches — the TOCTOU
+#: close is contract, not an implementation detail (container.md §6).
+PROPOSAL_STATUSES: tuple[ProposalStatus, ...] = get_args(ProposalStatus)
+
+
+class Proposal(TypedDict):
+    """A move parked at the gate: nonzero audience delta, awaiting a human-only confirm. `manifest`
+    binds the approval to `{items, target, audience}`; `execute` recomputes it and refuses on
+    mismatch. `approved_by`/`executed_at` appear only once executed.
+    """
+
+    id: str
+    status: ProposalStatus
+    kind: Literal["move"]
+    items: list[str]
+    from_: str
+    to: str
+    from_path: str
+    to_path: str
+    audience: list[AudienceMember]
+    audience_delta: list[AudienceMember]
+    blast_radius: int
+    manifest: str
+    proposed_by: dict[str, Any]
+    reason: str
+    created_at: str
+    executed_at: NotRequired[str]
+    approved_by: NotRequired[str]
+
+
+#: The wire key is `from`, which is a Python keyword; `Proposal` spells it `from_` and every
+#: (de)serializer MUST map the two. Named here so no implementation invents a third spelling.
+PROPOSAL_WIRE_KEY_FROM: str = "from"
+
+StructureFloor = Literal["thread", "project", "team", "org", "exo"]
+#: F2: a per-node scope-policy floor, NOT a seventh capability. Creating a container strictly above
+#: the floor by ring rank, at that parent, needs `admin`. Keeps the vocabulary six wide.
+STRUCTURE_FLOORS: tuple[StructureFloor, ...] = get_args(StructureFloor)
+
+PersonalRootMode = Literal["between", "sovereign"]
+
+
+class ContainerConfig(TypedDict):
+    """The one config object F1, F2, F5 and R11 each needed (container.md §8).
+
+    *Decided, not running* — the skeleton has no config surface and every value below is a constant
+    in `model.py`. `CONTAINER_CONFIG_DEFAULTS` is exactly what it runs, so the shipped default and
+    the observed behaviour are the same thing.
+    """
+
+    #: F1 — `sovereign` puts the personal root before the org ancestors. Per container.
+    chain_personal_root: PersonalRootMode
+    #: F1 — an org forbids the inversion inside its own subtree. Per org node.
+    org_policy_sovereign_chain: Literal["allow", "deny"]
+    #: F2 — per node, inherited by the subtree.
+    node_policy_structure_floor: StructureFloor
+    #: F5 — at or below this, and `text/*` only, a fetch carries the bytes inline.
+    blobs_inline_max_bytes: int
+    #: R11 — staged blobs: 30 days cold, then purge.
+    blobs_staging_retention_days: int
+    #: R11 — per source→destination ring pair, manifest-shape bounded, org-configurable to ZERO.
+    step_up_window_seconds: int
+
+
+CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
+    "chain_personal_root": "between",
+    "org_policy_sovereign_chain": "allow",  # a1p's reading — TODO(chief), container.md §8
+    "node_policy_structure_floor": "project",
+    "blobs_inline_max_bytes": 64 * 1024,
+    "blobs_staging_retention_days": 30,
+    "step_up_window_seconds": 300,
+}
+
+
 # --- the storage boundary (spec/contracts/storage.md) ---------------------------------------
 #
 # F3 splits the skeleton's ONE wide `Backend` Protocol into `ItemStore` (pluggable, delegable) and
@@ -226,11 +354,9 @@ class AuditEntry(TypedDict):
 # These Protocols stay HERE when Phase 5 moves the implementations to Vault (R5): the seam is the
 # type, and the type sits above both modules, so Store/Trust/Ledger never import Vault for a name.
 
-#: TODO(a1p): `Node` and `Proposal` are issue #28's to define (container contract). The signatures
-#: that reference them are final — only the referent is outstanding — so they are aliased to the
-#: open mapping the skeleton passes rather than pre-empting #28's shapes. #30 removes both aliases.
-Node = dict[str, Any]
-Proposal = dict[str, Any]
+# `Node` and `Proposal` are defined above, with `container.md`. `storage.md` §3's signatures were
+# final before their referents existed and carried provisional `dict[str, Any]` aliases; issue #28
+# replaces the aliases, and no signature below changed.
 
 
 class ItemStore(Protocol):
@@ -317,13 +443,18 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 __all__ = [
     "ArtifactContent",
+    "AudienceMember",
     "AuditEntry",
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
+    "CONTAINER_CONFIG_DEFAULTS",
+    "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
+    "ContainerConfig",
     "ContainerState",
+    "ContainerType",
     "ContextItem",
     "EVENTS",
     "Event",
@@ -335,12 +466,23 @@ __all__ = [
     "Lifecycle",
     "Node",
     "PRINCIPALS",
+    "PROPOSAL_STATUSES",
+    "PROPOSAL_WIRE_KEY_FROM",
+    "PersonalRootMode",
     "Principal",
     "Proposal",
+    "ProposalStatus",
     "Provenance",
+    "RING_RANK",
     "ROLE_BUNDLES",
+    "ROOT_TYPES",
     "Role",
+    "RootType",
+    "SERVING_POLICY",
     "STORAGE_CONTRACTS",
+    "STRUCTURE_FLOORS",
+    "ServingPolicy",
+    "StructureFloor",
     "TRUST_STATUSES",
     "TextContent",
     "Token",
