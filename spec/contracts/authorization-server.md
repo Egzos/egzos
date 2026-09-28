@@ -283,7 +283,15 @@ under any cause.** Testable as written:
    post-trust redirect — a surface that leaks through timing what it withheld in its body is the same
    oracle reached slowly. Specifically: §11.1's keyed read *happens or does not happen* according to
    whether the `client_id` is registered, and that difference MUST NOT be observable. It is the one
-   measurement that would otherwise turn §11.1's rule back into the enumeration it prevents.
+   measurement that would otherwise turn §11.1's rule back into the enumeration it prevents. **The
+   budget covers §12.1 rule 3's append asymmetry too, and not only that read** — five of the six
+   causes append once each, while an attempt refused by a throttle that *already holds* is counted
+   and not appended, and an append to a hash-chained log is not free work. That asymmetry is not an
+   enumeration oracle in §7's sense, since a caller learning it is throttled has learned only its own
+   request rate; it is named because it is a second timing difference in the same response set, and
+   an implementer who pads the registry read alone has met this clause's rationale and missed its
+   rule. (§11.0's substep-1 replay is the same family seen from the other side: it appends where a
+   throttled attempt does not.)
 3. **No `error`, no `state`** — it is not a redirect, and §11.6 does not reach here.
 4. **It appends once**, row (d), with the cause in `details` (§12.1 rule 1).
 
@@ -785,7 +793,8 @@ it before every other clause here. Where the two disagree, the contract's clause
 ### 11.0 · Every surface here is throttled, and the throttle runs first (§14 item 2)
 
 Numbered **0** because that is its place in the order of evaluation: no clause below is reached on a
-request this one has refused.
+request this one has refused — with **exactly one exception, carved here** rather than only where it
+is used, because an exception to an ordering belongs where the ordering is fixed.
 
 **`/authorize`, `/login`, `/device` and — if §10's `[LEAN]` is taken — the tap are each throttled per
 caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between this document's
@@ -805,7 +814,27 @@ why row (d) carries a `throttled` cause while row (f) cannot, a post-trust rejec
 only by a request the throttle let through.
 
 **A throttle that holds does not evaluate, and MUST fail closed** — §12.1 rules 3 and 4, the same
-requirements seen from the ledger's side.
+requirements seen from the ledger's side; and §12.1 rule **6** for the single path that survives it,
+stated next so that the ordering and its one exception are read together.
+
+**The exception: the deciding session's replay, and where it sits inside this step. a1p.** §12.1
+rule 6 exempts one path from the throttle — a decided request re-submitted **on the session that
+decided it** (§11.4). That exemption is only implementable if it is evaluated *within* §11.0, before
+the counter, because recognising a re-submission means reading §11.4's decided-request record, and
+that read is evaluation of exactly the kind rule 4 forbids once a counter holds. So **§11.0 is two
+substeps, in this order**:
+
+1. **Is this the deciding session's first re-submission of this request?** A read keyed on the
+   interactive session of §10 — never on anything the request carries. If yes, the request is
+   evaluated and appends once, row (d) cause `replayed`, whatever the counter's state.
+2. **Otherwise, the counter.** If it holds, nothing below §11.0 is reached.
+
+Substep 1 does not reopen rule 3's bound, and the reason is the point of writing it here: it is
+unreachable without an authenticated interactive session, so an unauthenticated sweep never enters
+it; sessions are themselves bounded by §11.7's throttled `/login`; and the exemption is **once per
+decided request, not once per attempt** — a second re-submission of the same request, on the same
+session, falls to substep 2 and is an ordinary row (d). The owner's interest is in learning that the
+replay happened, which one entry states; a held-down back button is not a second fact.
 
 `[OPEN→0.3]` **What a throttle keys on.** No source names it and it cannot be left unsaid: §12.1
 rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
@@ -880,9 +909,11 @@ a different object and the one the back button re-submits. A re-submission rende
 failure and appends once, §12's cause `replayed`.
 
 **A re-submission is recognised as one only on the deciding session. a1p** — a decided request is
-bound to the interactive session (§10) that decided it, and only that session's re-submission is
-§12.1 rule 6's unthrottled `replayed` path. The same request arriving on another session, or on
-none, is an **ordinary pre-trust failure**: §5.3's page, cause `replayed`, counted and refused by
+bound to the interactive session (§10) that decided it, and only that session's **first**
+re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside §11.0's substep 1,
+which is where the ordering that exempts it is fixed. The same request arriving on another session,
+on none, or a second time on the deciding session, is an **ordinary pre-trust failure**: §5.3's
+page, cause `replayed`, counted and refused by
 §11.0's throttle exactly like every other row (d). Without this binding, rule 6's exemption is an
 unbounded append any caller can drive at will, and it would not compose with §12.1 rule 3 — the
 clause that bounds the chain's growth. `consent.md` §15 carries the design half (*"CSRF on the acts
@@ -998,6 +1029,14 @@ holds. **If the review takes (2) and declines (1), §19's sentence is a spec rev
 revokes on the container's page and the dashboard drops the act. The owner holds `token rm` under
 every outcome, so `consent.md` §13's `expiry.none` string stands as written either way.
 
+**Taking (2) opens a fifth surface, and the review should cost that in the same breath. a1p** — §12
+covers *the four pages*, §12.1 rule 5's `surface` is a closed four-word vocabulary and
+`AS_THROTTLE_SURFACES` pins the same four, so an owner-path revocation reached from §11's surface
+reopens all three together. It also needs an entry on the **refusal** path, not only the success one:
+`events.md`'s `token.revoke` records the revoke, but a viewer who does not own the token is refused
+under §7's silence rule, and a code path that can be exercised and leaves no trace is the shape §12
+exists to catch. Written down here so the freeze does not have to rediscover it.
+
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
@@ -1062,13 +1101,15 @@ naming decision:
    word is unused, not wrong) — and `refused`, an integer.
 6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
    interactive session that decided it, and *that* session's re-submission is the one this rule
-   exempts: it is evaluated and appends once, cause `replayed`, whatever the throttle's state,
-   because a replay after a decision is a fact the owner has an interest in and the session it
-   arrives on is one §10 has already authenticated. **The exemption reaches no further.** A decided
-   request re-submitted on any other session, or on none, is an ordinary (d) under rules 2 and 3 —
-   §5.3's page, cause `replayed`, counted and refused like anything else. Read without §11.4's
-   binding this rule would be an unthrottled append reachable by any caller, which is exactly what
-   rule 3 exists to prevent.
+   exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that
+   ordering is carved and the only place the read is reachable** — and appends once, cause
+   `replayed`, whatever the throttle's state, because a replay after a decision is a fact the owner
+   has an interest in and the session it arrives on is one §10 has already authenticated. **The
+   exemption reaches no further**: not to another session, not to none, and not to a second
+   re-submission of the same request, substep 1 being once per decided request. Each of those is an
+   ordinary (d) under rules 2 and 3 — §5.3's page, cause `replayed`, counted and refused like
+   anything else. Read without §11.4's binding and §11.0's substep this rule would be an unthrottled
+   append reachable by any caller, which is exactly what rule 3 exists to prevent.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
    the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one
