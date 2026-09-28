@@ -457,9 +457,22 @@ three client types have. The review must pick one, and a1p does not pick for it:
      caller proves per request and is therefore a change to every token this AS issues rather than
      to this endpoint; or no endpoint at all, which is option 3. The cost of entropy-only is
      bounded and should be stated as what it is: a token value that leaks can be revoked by
-     whoever holds it. That is a denial of service against *that* token's client and nothing
-     wider — a revocation cannot widen a grant, reach another token, or reveal whether the value
-     was live, which is what the silence rule above is for.
+     whoever holds it. For a leaked **access** token that is a denial of service against *that*
+     token and nothing wider — a revocation cannot widen a grant, reveal whether the value was
+     live (the silence rule above), or reach a token the value does not name. For a leaked
+     **refresh** token the blast radius is **the whole grant chain**, and not because of this
+     endpoint: RFC 7009 §2.1 has revoking a refresh token invalidate the access tokens of the same
+     grant, and rotation clause 2 below already gives the holder the same reach at the token
+     endpoint — replaying the value there revokes the entire chain descended from that grant. The
+     review should weigh option 1 against that chain, which it adds nothing to, and not against a
+     single token.
+
+     `[OPEN→0.3]` **The entropy this bound rests on is pinned nowhere.** No contract fixes how an
+     access or refresh token value is generated or how hard it must be to guess — `capabilities.md`
+     §5 and `Token` say nothing about it — while §3 mitigation 1 does exactly this work for the
+     `user_code`. If the review takes option 1, it takes this with it: name the requirement (a
+     floor on the value's unpredictability, from a cryptographically secure generator) in the
+     contract that mints tokens, or the bound stated above has nothing to be checked against.
 2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
    pending the review.
 3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
@@ -501,7 +514,8 @@ authorization code may be delivered — and it currently leaves no entry in the 
 entry added quietly is §5's exact-match rule undone without a trace, and the chain is where that
 would otherwise be visible; a registration is also, by §4 invariant 2's own vocabulary, closer to an
 approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
-are settled together with one edit to `events.md` rather than four. a1p's recommendation is on the
+are settled together with one edit to `events.md` rather than four (five, with device
+authorization below). a1p's recommendation is on the
 issue. **Not answered in this document.**
 
 **Device authorization (§3) is the seventh, and it is in #68's scope too — stated because a reader
