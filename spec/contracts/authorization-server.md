@@ -258,7 +258,7 @@ container-specific — no node ids, no client names, no owner identity — may b
 | `authorization_endpoint` | §2 |
 | `token_endpoint` | §2, §3 |
 | `device_authorization_endpoint` | §3 |
-| `revocation_endpoint` | §9 |
+| `revocation_endpoint` | §9 — `[OPEN→0.3]`; **advertised only if** the endpoint exists |
 | `registration_endpoint` | §5 — **advertised only if** dynamic registration is enabled |
 | `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
 | `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
@@ -270,6 +270,15 @@ container-specific — no node ids, no client names, no owner identity — may b
 method, grant or endpoint it does not implement, and MUST NOT implement one it does not advertise —
 a fork's UI reads this document *through* the metadata, so a mismatch is a conformance failure and
 not a documentation bug.
+
+**Two of the eleven rows are therefore conditional, and the table says which: `revocation_endpoint`
+and `registration_endpoint`.** Both name an endpoint whose existence is an open question — §9's for
+revocation, §5's for dynamic registration — and the clause above forbids advertising either until
+the answer is yes. The other nine are unconditional: a container that omits one of them is
+non-conforming. **a1p** — the distinction is stated rather than left to the reader because the field
+list is what an implementation will copy, and copying a conditional row as an unconditional one is
+exactly the mismatch this paragraph forbids. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is the
+whole vocabulary of eleven; `AS_METADATA_CONDITIONAL_FIELDS` names these two.
 
 `[OPEN→0.3]` **Whether `scopes_supported` also advertises the `node:` form.** §7's node-scope
 strings are container-specific by construction; listing the *prefix* reveals nothing, listing any
@@ -382,6 +391,43 @@ that is also a container revocation, and no container revocation that requires t
 A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and revocation is checked
 **before** the capability set. `token.revoke` is written (`events.md` §1). **a1p** — the AS adds no
 second revocation semantics, which is the point.
+
+`[OPEN→0.3]` **Whether the AS exposes an RFC 7009 revocation endpoint at all.** §K names
+"revocation" as a Phase 0.2 freeze constraint and answers it with one verb — *"revocation is
+`token rm` like any client"* — which is an **owner** path, on the container's own CLI. §6 advertises
+a `revocation_endpoint` and §6 also forbids advertising an endpoint a container does not implement,
+so the metadata row and §9 cannot both stand as written. This is not cosmetic: **a browser or an MCP
+client cannot run `token rm`**, so an HTTP endpoint is the only revocation path those two of §1's
+three client types have. The review must pick one, and a1p does not pick for it:
+
+1. **Define the endpoint, per RFC 7009.** `POST` to `revocation_endpoint` with `token` and an
+   optional `token_type_hint`, over TLS (§2), with no client authentication because no client has a
+   secret (§1, §6's `["none"]`). Two clauses would have to come with it, and both are this
+   document's rather than the RFC's:
+   - **The silence rule.** The endpoint returns **200 for an unknown, malformed or already-revoked
+     token** — the same status, shape and time budget as for a token it really did revoke. RFC 7009
+     asks for 200 on an invalid token; §7's "the AS is not an enumeration oracle" is why it is a
+     MUST here, because an endpoint that answered differently would let any caller test whether a
+     token value exists without holding one.
+   - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
+     take or reject: **no** — the AS verifies the token was issued to the presenting `client_id`
+     and, when it was not, revokes nothing and returns the *same* 200, so a refusal is
+     indistinguishable from a success. A public client's `client_id` is an assertion and not proof
+     (§1), which is the argument for bounding the endpoint to "revoke what you already hold"
+     instead of trusting the claim: an unbounded endpoint plus a guessable token value is a
+     denial-of-service against every other client on the container.
+2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
+   pending the review.
+3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
+   owner is given in a browser by #61's surface. The cost is explicit: a client cannot revoke its
+   own token, and a UI's "log out" is a local forget, not a revocation — a stolen browser token
+   stays live until the owner removes it from `token ls`.
+
+**Until the review decides, this document takes (2).** `revocation_endpoint` is a conditional row in
+§6, advertised only if the endpoint exists, and **no endpoint is defined here** — a container that
+advertises one today is advertising something this contract does not specify. `token rm` is the
+revocation *semantics* under every option: whatever the transport, a revoked token is
+`capabilities.md` §5's and `token.revoke` is written.
 
 **Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
 

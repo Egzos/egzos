@@ -387,8 +387,8 @@ class DeviceAuthorization(TypedDict):
 AS_METADATA_ENDPOINT: str = "/.well-known/oauth-authorization-server"
 
 #: The metadata document IS the interoperability surface: a container MUST NOT advertise what it
-#: does not implement, or implement what it does not advertise. `registration_endpoint` is
-#: advertised only if dynamic registration is enabled (`[OPEN->0.3]`, §5).
+#: does not implement, or implement what it does not advertise. This is the whole field vocabulary
+#: of eleven; two of them are CONDITIONAL, see `AS_METADATA_CONDITIONAL_FIELDS` below.
 AS_METADATA_FIELDS: tuple[str, ...] = (
     "issuer",
     "authorization_endpoint",
@@ -401,6 +401,17 @@ AS_METADATA_FIELDS: tuple[str, ...] = (
     "code_challenge_methods_supported",
     "token_endpoint_auth_methods_supported",
     "scopes_supported",
+)
+
+#: The two rows whose endpoint's very existence is `[OPEN->0.3]`, so §6's "MUST NOT advertise what
+#: it does not implement" forbids advertising either until the freeze says yes:
+#:   - `revocation_endpoint` — §9. §K answers revocation with `token rm`, an OWNER path; whether an
+#:     RFC 7009 endpoint exists (and its silence rule, and whether a client may revoke another
+#:     client's token) is the §9 `[OPEN->0.3]`. A browser or MCP client cannot run `token rm`.
+#:   - `registration_endpoint` — §5. Advertised only if dynamic registration (RFC 7591) is enabled.
+#: The other nine are unconditional: omitting one of those is non-conforming.
+AS_METADATA_CONDITIONAL_FIELDS: frozenset[str] = frozenset(
+    {"revocation_endpoint", "registration_endpoint"}
 )
 
 #: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
@@ -519,6 +530,7 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 __all__ = [
     "AS_CLIENT_TYPES",
     "AS_METADATA_CLOSED_VALUES",
+    "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
     "ASClientType",

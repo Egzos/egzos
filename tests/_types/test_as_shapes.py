@@ -30,6 +30,21 @@ def test_metadata_surface_is_exactly_the_contracts():
     assert t.AS_METADATA_ENDPOINT == "/.well-known/oauth-authorization-server"
 
 
+def test_only_the_two_open_endpoints_are_conditional():
+    """§6: advertising an endpoint the container does not implement is non-conforming.
+
+    `revocation_endpoint` is conditional because §9 leaves the endpoint's existence `[OPEN->0.3]`
+    (§K answers revocation with `token rm`, an owner path); `registration_endpoint` because §5
+    leaves dynamic registration open. The other nine rows are unconditional.
+    """
+    assert t.AS_METADATA_CONDITIONAL_FIELDS == {"revocation_endpoint", "registration_endpoint"}
+    # Conditional means "a row of the table that may be omitted", never "a row not in the table".
+    assert t.AS_METADATA_CONDITIONAL_FIELDS <= set(AS_METADATA_FIELDS)
+    unconditional = [f for f in AS_METADATA_FIELDS if f not in t.AS_METADATA_CONDITIONAL_FIELDS]
+    assert len(unconditional) == 9
+    assert "issuer" in unconditional and "token_endpoint" in unconditional
+
+
 def test_plain_is_never_advertised_and_code_is_the_only_response_type():
     """§2: `S256` only, no downgrade path; the implicit and password grants do not exist here."""
     v = t.AS_METADATA_CLOSED_VALUES
