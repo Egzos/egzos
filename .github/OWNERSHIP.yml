@@ -23,6 +23,12 @@ size_exception_approvers:
   - "Gond-ul"
   - "chief-proxy[bot]"
 
+# GitHub identities that open agent PRs. A PR one of these opens is judged by agent rules whatever
+# its branch is called: a branch outside branch_prefix fails the check instead of reading as the
+# Chief's. The branch name is the agent's choice; the PR author is not.
+agent_identities:
+  - "egzos-forge[bot]"
+
 # Paths that ONLY the Chief may modify. Any agent branch touching these fails immediately.
 # The review register and this map are controls over the agents they govern — an agent that
 # could edit either could settle a finding, or widen its own reach, against itself.

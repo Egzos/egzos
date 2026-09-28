@@ -8,7 +8,9 @@ and exits 0 (pass) or 1 (fail).
 ### How it works
 
 1. **Branch classification** — branches starting with `agent/` are agent
-   branches; all others are human (Chief) branches.
+   branches; all others are human (Chief) branches. The branch name is the
+   agent's choice, so it cannot make a PR the Chief's: a PR opened by an
+   identity in `agent_identities` (the forge App) from outside `agent/` fails.
 2. **Human branches** — print "human branch — Chief owns everything" and pass.
    The size cap is a warning, not a failure, on human branches (the Chief is the gate); governance path notices are still emitted.
 3. **Agent branches** — derive the agent name from the second path segment
@@ -33,6 +35,12 @@ and exits 0 (pass) or 1 (fail).
 
 Tests: `tests/governance/test_check_ownership.py`, fed by real `git diff
 --numstat -z` output from throwaway repositories.
+
+The `tests` check runs this suite from the tree under review, not from the base, and that is
+deliberate: it tests the change itself, so a PR that edits a checker or workflow has to carry tests
+that pass against its own edit. It is not a gate a PR could loosen by editing it. The gate is
+`check_ownership.py` and `OWNERSHIP.yml` resolved from the base by `ownership-check.yml`, and
+`tests/governance/**` is a1p-planner's path, so any other agent branch touching it fails.
 
 ### Glob syntax
 
@@ -84,7 +92,8 @@ Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be 
 file; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
 only — never a reproduction. `update` is append-only: it reads the filed advisory and appends the new
 `description` under a dated heading (adding any new `vulnerabilities`), because the advisory is the
-only copy of an unfixed reproduction and a plain PATCH would replace it. `list` comes first on every sweep, so a finding already filed is
+only copy of an unfixed reproduction and a plain PATCH would replace it. Filed and new vulnerabilities alike are cut down to the fields a PATCH
+accepts before they are merged, so the read shape a GET returns is never echoed back. `list` comes first on every sweep, so a finding already filed is
 updated rather than filed again.
 
 ## post_review_comment.sh

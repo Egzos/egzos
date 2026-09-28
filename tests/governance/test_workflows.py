@@ -67,15 +67,18 @@ def test_every_charter_comes_from_the_base():
 
 @pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
 def test_review_jobs_take_control_inputs_from_the_base(job_id):
-    step_names, allowed = [], ""
+    step_names, allowed, action_at = [], "", None
     for _, jid, _, step in _steps():
         if jid != job_id:
             continue
-        step_names.append(step.get("name", ""))
         if step.get("uses", "").startswith(ACTION):
             allowed = step["with"]["claude_args"]
+            action_at = len(step_names)
+        step_names.append(step.get("name", ""))
     assert "control-inputs-from-base" in step_names
-    assert step_names.index("control-inputs-from-base") < step_names.index("Verdict")
+    # Before the model runs, not merely before the verdict is read (#40 review).
+    assert action_at is not None
+    assert step_names.index("control-inputs-from-base") < action_at
     assert "Bash(bash /tmp/post_review_comment.sh:*)" in allowed
     assert ".github/scripts/post_review_comment.sh" not in allowed
 
@@ -97,7 +100,9 @@ def test_control_inputs_cover_everything_claude_code_loads():
         if step.get("name") != "control-inputs-from-base":
             continue
         run = step["run"]
-        for needle in ("-name CLAUDE.md", "CLAUDE.local.md", "rm -rf .claude .mcp.json",
+        # At any depth, not only the root (#40 review): Claude Code loads nested ones too.
+        for needle in ("-name CLAUDE.md", "CLAUDE.local.md", "-name .mcp.json",
+                       "-name .claude -type d -prune", r"(^|/)\.claude/",
                        "REVIEW-DECISIONS.md", "post_review_comment.sh"):
             assert needle in run, (wf, job_id, needle)
 

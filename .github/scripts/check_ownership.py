@@ -261,6 +261,12 @@ def main():
         help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
     )
     parser.add_argument(
+        "--pr-author",
+        dest="pr_author",
+        default=os.environ.get("PR_AUTHOR", ""),
+        help="Login that opened the PR (default: $PR_AUTHOR)",
+    )
+    parser.add_argument(
         "--ownership",
         default=".github/OWNERSHIP.yml",
         help="Path to OWNERSHIP.yml",
@@ -292,6 +298,9 @@ def main():
     governance_paths = ownership.get("governance_paths", [])
     chief_only = ownership.get("chief_only", [])
     approvers = ownership.get("size_exception_approvers", [])
+    # A PR opened by one of these is always judged by agent rules. The default is the forge App, so
+    # a base OWNERSHIP.yml without the key still fails closed rather than open.
+    agent_identities = ownership.get("agent_identities", ["egzos-forge[bot]"])
 
     agents_cfg = ownership.get("agents", {})
 
@@ -341,6 +350,16 @@ def main():
     # ---- Determine if human or agent branch ----------------------------------
     branch = args.branch
     is_agent_branch = branch.startswith(branch_prefix)
+
+    # The branch name is the agent's own choice, so it cannot be what makes a PR the Chief's: an
+    # agent identity opening a PR outside the prefix would otherwise skip chief_only, every
+    # per-agent rule and the hard size cap (#40 review). Its rules need the agent's name from the
+    # branch, so there is nothing to judge it by here, and the check fails closed.
+    if not is_agent_branch and args.pr_author in agent_identities:
+        print(f"::error::OWNERSHIP: {args.pr_author} is an agent identity and opened this PR "
+              f"from '{branch}', outside '{branch_prefix}'. Agent PRs must come from "
+              f"'{branch_prefix}<agent>/<slug>'.")
+        sys.exit(1)
 
     failures = []
     notices = []

@@ -230,7 +230,7 @@ OWNERSHIP = {
 def _run_main(repo, branch, env_extra=None):
     own = repo.parent / "OWNERSHIP.yml"
     own.write_text(json.dumps(OWNERSHIP))  # JSON is YAML
-    env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON",
+    env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON", "PR_AUTHOR",
                                                             "SIZE_EXCEPTION_APPLIER")}
     env.update(env_extra or {})
     return subprocess.run(
@@ -301,6 +301,36 @@ def test_main_size_cap_warns_on_human_branch(repo):
     res = _run_main(repo, "chief/x")
     assert res.returncode == 0
     assert "::warning::SIZE" in res.stdout
+
+
+def _owned_change(repo):
+    _write(repo, "docs/a.md", "x\n")
+    _commit(repo, "base")
+    _branch_diff(repo, lambda r: _write(r, "docs/a.md", "y\n"))
+
+
+def test_main_fails_forge_pr_outside_the_agent_prefix(repo):
+    # The branch name is the agent's choice; without this, naming it chief/x read as the Chief's.
+    # OWNERSHIP here has no agent_identities key, so this also pins the fail-closed default.
+    _owned_change(repo)
+    res = _run_main(repo, "chief/x", {"PR_AUTHOR": "egzos-forge[bot]"})
+    assert res.returncode == 1
+    assert "agent identity" in res.stdout
+    assert "Human branch" not in res.stdout
+
+
+def test_main_judges_forge_pr_on_agent_branch_normally(repo):
+    _owned_change(repo)
+    res = _run_main(repo, "agent/a1p-planner/x", {"PR_AUTHOR": "egzos-forge[bot]"})
+    assert res.returncode == 0, res.stdout
+
+
+@pytest.mark.parametrize("author", ["Gond-ul", ""])
+def test_main_human_branch_still_passes_for_non_agent_authors(repo, author):
+    _owned_change(repo)
+    res = _run_main(repo, "chief/x", {"PR_AUTHOR": author})
+    assert res.returncode == 0, res.stdout
+    assert "Human branch" in res.stdout
 
 
 def test_main_fails_closed_on_malformed_labels(repo):

@@ -18,7 +18,14 @@ FILED = {
     "state": "draft",
     "summary": "s",
     "description": "ORIGINAL REPRO",
-    "vulnerabilities": [{"package": {"ecosystem": "other", "name": "egzos"}}],
+    # The read shape: GET carries fields and nulls a PATCH body does not take back.
+    "vulnerabilities": [{
+        "package": {"ecosystem": "other", "name": "egzos", "purl": None},
+        "vulnerable_version_range": "< 0.1",
+        "patched_versions": None,
+        "vulnerable_functions": [],
+        "cvss": None,
+    }],
 }
 
 STUB = """#!/usr/bin/env bash
@@ -73,6 +80,13 @@ def test_update_appends_and_keeps_the_filed_reproduction(stub):
     assert sent["description"].endswith("second vector")
     assert {v["package"]["name"] for v in sent["vulnerabilities"]} == {"egzos", "egzos-platform"}
     assert set(sent) == {"description", "vulnerabilities"}
+    writable = {"package", "vulnerable_version_range", "patched_versions", "vulnerable_functions"}
+    for v in sent["vulnerabilities"]:
+        assert set(v) <= writable, v
+        assert set(v["package"]) == {"ecosystem", "name"}
+        assert None not in v.values()
+    (filed,) = [v for v in sent["vulnerabilities"] if v["package"]["name"] == "egzos"]
+    assert filed["vulnerable_version_range"] == "< 0.1"
 
 
 def test_update_without_a_description_is_refused(stub):

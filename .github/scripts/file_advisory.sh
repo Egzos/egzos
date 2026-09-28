@@ -12,7 +12,9 @@
 # update is append-only. The advisory body is the only copy of an unfixed reproduction, and the API's
 # PATCH replaces each field it is given, so the script reads the filed advisory itself: the new
 # file's `description` (required) is appended under a dated heading, its `vulnerabilities` are
-# added to the filed ones, and `severity` is replaced only if given. Nothing else is sent.
+# added to the filed ones, and `severity` is replaced only if given. Nothing else is sent. Every
+# vulnerability, filed or new, is cut down to the fields PATCH accepts before the union: a GET
+# returns the read shape, and echoing it back verbatim is what a PATCH may refuse.
 #
 # Requires GH_TOKEN (the forge token) and GITHUB_REPOSITORY. Prints ids and summaries only: the
 # body carrying a reproduction goes to the API from the file and never to stdout.
@@ -48,11 +50,15 @@ case "${1:-}" in
       || { echo "file_advisory.sh: update needs a non-empty description to append" >&2; exit 2; }
     CURRENT="$(gh api "repos/${REPO}/security-advisories/$2")"
     jq -n --argjson cur "$CURRENT" --slurpfile new "$3" --arg day "$(date -u +%F)" '
+        def writable: {package: {ecosystem: .package.ecosystem, name: .package.name}}
+          + ({vulnerable_version_range, patched_versions, vulnerable_functions}
+             | with_entries(select(.value != null)));
         $new[0] as $n
         | {description: (($cur.description // "") + "\n\n### Update " + $day + "\n\n" + $n.description)}
         + (if $n.severity then {severity: $n.severity} else {} end)
         + (if $n.vulnerabilities
-             then {vulnerabilities: ((($cur.vulnerabilities // []) + $n.vulnerabilities) | unique)}
+             then {vulnerabilities: ([($cur.vulnerabilities // [])[], $n.vulnerabilities[]]
+                                     | map(writable) | unique)}
              else {} end)' \
       | gh api -X PATCH "repos/${REPO}/security-advisories/$2" --input - --jq '.ghsa_id'
     ;;

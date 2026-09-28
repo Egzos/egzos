@@ -77,10 +77,11 @@ jobs:
           # Branch names and label names are both attacker-chosen text, and ${{ }}
           # substitution happens before bash parses the line. Labels travel as a JSON array:
           # a comma-joined string let a label name containing a comma spell a second label (#44).
-          # Both values are read from the environment, so a base checker that predates them
-          # still runs.
+          # Every value is read from the environment, so a base checker that predates one of
+          # them still runs. PR_AUTHOR is GitHub's record of who opened the PR, not the PR's text.
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           SIZE_EXCEPTION_APPLIER: ${{ steps.applier.outputs.login }}
         run: |

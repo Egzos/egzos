@@ -66,11 +66,13 @@ jobs:
           B="origin/${BASE_REF}"
           git show "${B}:.github/scripts/post_review_comment.sh" > /tmp/post_review_comment.sh
           test -s /tmp/post_review_comment.sh
-          find . -path ./.git -prune -o -type f \( -name CLAUDE.md -o -name CLAUDE.local.md \) -print0 \
-            | xargs -0 -r rm -f
-          rm -rf .claude .mcp.json
+          # At any depth: Claude Code discovers nested CLAUDE.md files and .claude directories too.
+          find . -path ./.git -prune \
+            -o -name .claude -type d -prune -print0 \
+            -o \( -name CLAUDE.md -o -name CLAUDE.local.md -o -name .mcp.json \) ! -type d -print0 \
+            | xargs -0 -r rm -rf --
           { git ls-tree -r -z --name-only "$B" \
-              | grep -z -E '(^|/)CLAUDE(\.local)?\.md$|^\.claude/|^\.mcp\.json$' || true; } \
+              | grep -z -E '(^|/)(CLAUDE(\.local)?\.md|\.mcp\.json)$|(^|/)\.claude/' || true; } \
             | xargs -0 -r git checkout "$B" --
           test -s CLAUDE.md
           mkdir -p docs/build
