@@ -216,13 +216,23 @@ def test_forge_token_sessions_run_no_interpreter():
 
 
 def test_every_model_session_denies_the_process_environment():
-    # The provider credential lives in the session's own environment; Read(//proc/**) covers Read,
-    # Grep and Glob, so no session can read it and write it where it is posted (#79 review).
+    # The provider credential lives in the session's own environment. Read(//proc/**) denies Read,
+    # Grep and Glob there, which closes it for the review sessions (their Bash is gh pr only). The
+    # builders keep the deny but hold interpreters, so it does not close them (RD-005).
     seen = 0
     for wf, job_id, _, step in _model_steps():
         assert '--disallowedTools "Read(//proc/**)"' in step["with"]["claude_args"], (wf, job_id)
         seen += 1
     assert seen >= 4
+
+
+def test_a6_pr_mode_disclosure_phrase_matches_the_charter():
+    # The workflow prompt comes from the PR head; the charter from the base. The one sentence a6 may
+    # post on a security-class finding must read the same in both (platform#42 a6 review).
+    charter = (ROOT / ".claude" / "agents" / "a6-adversary.md").read_text()
+    (phrase,) = set(re.findall(r'"(security-class finding — awaiting [^"]+)"', charter))
+    (step,) = [s for _, j, _, s in _model_steps() if j == "a6-adversary"]
+    assert phrase in step["with"]["prompt"]
 
 
 def _job(job_id):
@@ -330,15 +340,22 @@ def test_a6_verdict_prints_no_finding_prose():
     assert 'print("Summary' not in run
 
 
-def test_a6_structured_output_never_reaches_a_step_env():
-    # GitHub prints a step's env in its log; a6's structured output carries notes and paths, so
-    # the verdict reads it from the execution file (Egzos/egzos#79, Egzos/egzos-platform#42).
-    steps = [s for _, j, _, s in _steps() if j == "a6-adversary"]
-    assert steps
-    for s in steps:
-        assert "outputs.structured_output" not in json.dumps(s.get("env", {})), s.get("name")
-    (verdict,) = [s for s in steps if s.get("name") == "Verdict"]
-    assert verdict["env"]["EXEC_FILE"] == "${{ steps.review.outputs.execution_file }}"
+EXEC_FILE_EXPR = "${{ steps.review.outputs.execution_file }}"
+
+
+def test_structured_output_never_reaches_a_step_env():
+    # GitHub prints a step's env in its log. Review output carries notes and paths, so every
+    # Verdict reads it from the execution file (Egzos/egzos#79, Egzos/egzos-platform#42).
+    seen = 0
+    for wf in WORKFLOWS:
+        for job_id, job in _load(wf)["jobs"].items():
+            for s in job.get("steps", []):
+                where = (wf.name, job_id, s.get("name"))
+                assert "outputs.structured_output" not in json.dumps(s.get("env", {})), where
+                if s.get("name") == "Verdict":
+                    assert s["env"]["EXEC_FILE"] == EXEC_FILE_EXPR, where
+                    seen += 1
+    assert seen == len(REVIEW_JOBS)
 
 
 def test_turn_budget_is_one_number_where_it_is_diagnosed():
