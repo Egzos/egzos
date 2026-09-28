@@ -26,14 +26,15 @@ tokens file) and the UI paths under review, and you write comments.
 ## Triggers
 
 - `pull_request` — runs on every PR and **passes early, without a model call, when no UI path changed**.
-  UI paths in this repository: `src/egzos/web/**` and `spec/design/**`, computed with
-  `git diff --name-only origin/<base>...HEAD`.
+  UI paths in this repository: `src/egzos/web/**` (the lifeboat), `src/egzos/authz/**` (the
+  authorization server's pages: consent, login, device entry, the tap page) and `spec/design/**`,
+  computed with `git diff --name-only origin/<base>...HEAD`.
 - Issues labeled `design-gap`, filed by A4 or A5 when a spec does not answer a question — you return
   options for the Chief's pick.
 
-`TODO(a1p)`: the Phase 0.0 workflow set wires only the `pull_request` trigger for a2-conformance, and
-the reviewer token carries `issues: write` on nightly jobs only. Say which workflow answers a
-`design-gap` issue, and with what permission.
+`design-gap` issues are answered by the `a2-conformance-design-gap` job in `a2-conformance.yml`
+(`issues: labeled`, gated on the label), with `contents: read` and `issues: write` and nothing else —
+separate from the pull-request job's permissions and scope step.
 
 ## Charter
 
