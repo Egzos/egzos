@@ -183,6 +183,12 @@ that were privileged at registration would be privileged, and §K's whole shape 
 redirect_uris}` enters container config through an owner-authenticated path. **a1p** — no source
 names the verb, and the CLI spelling belongs to a3-doorman, not to this document.
 
+**Whether registering, amending or removing a client writes an audit event is `[OPEN→0.3]`, in §9's
+marking and in #68.** It is named here because §5 is where a reader looks for it: this section's
+exact-match rule is only as strong as the allowlist it compares against, so a change to that
+allowlist is a change to the AS's security posture, and `events.md` §4 invariant 2 does not currently
+name an event for it.
+
 `[OPEN→0.3]` **Dynamic client registration** (RFC 7591) is what the MCP authorization spec expects
 (§4), and an **open** registration endpoint on a personal container lets any caller create a client
 entry. The two pull in opposite directions and the review must settle which wins before Phase 5
@@ -441,10 +447,20 @@ revocation *semantics* under every option: whatever the transport, a revoked tok
    refresh that could add either would be §7's second permission system arriving through the back
    door.
 
-`[OPEN→0.3]` **Whether rotation is an audit event**, and whether a denied or abandoned authorization
-is one at all. `events.md` §1 closes its vocabulary by construction and the AS produces five effects
-with only two events between them — filed as **#68** for the 0.3 batch, with a1p's recommendation
-there. Not answered in this document.
+`[OPEN→0.3]` **Whether rotation is an audit event, whether a denied or abandoned authorization is one
+at all, and whether client registration is one.** `events.md` §1 closes its vocabulary by
+construction — *"an appended event whose name is not in this list MUST be rejected"* — and §4
+invariant 2 closes the other side: *"a surface that produces an effect without a corresponding event
+is non-conforming."* The AS produces **six** effects with only two events between them.
+
+**Registration (§5) is the sixth, and this document adds it to the question.** It is an owner act
+that writes the redirect-URI allowlist — the one piece of container state that decides where an
+authorization code may be delivered — and it currently leaves no entry in the chain. An allowlist
+entry added quietly is §5's exact-match rule undone without a trace, and the chain is where that
+would otherwise be visible; a registration is also, by §4 invariant 2's own vocabulary, closer to an
+approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
+are settled together with one edit to `events.md` rather than four. a1p's recommendation is on the
+issue. **Not answered in this document.**
 
 `[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
 that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS
