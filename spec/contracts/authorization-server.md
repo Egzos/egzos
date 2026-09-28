@@ -432,12 +432,30 @@ three client types have. The review must pick one, and a1p does not pick for it:
      MUST here, because an endpoint that answered differently would let any caller test whether a
      token value exists without holding one.
    - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
-     take or reject: **no** — the AS verifies the token was issued to the presenting `client_id`
-     and, when it was not, revokes nothing and returns the *same* 200, so a refusal is
-     indistinguishable from a success. A public client's `client_id` is an assertion and not proof
-     (§1), which is the argument for bounding the endpoint to "revoke what you already hold"
-     instead of trusting the claim: an unbounded endpoint plus a guessable token value is a
-     denial-of-service against every other client on the container.
+     take or reject: the AS compares the presented token's `client` (`capabilities.md` §5) against
+     the presenting `client_id` and, when they differ, revokes nothing and returns the *same* 200 —
+     a refusal indistinguishable from a success.
+
+     **Said plainly, because the comparison reads stronger than it is: it is not a boundary.** No
+     client on this AS authenticates — §1 has three public client types and §6 advertises
+     `["none"]` — so `client_id` is a string the caller chooses, and any caller can send another
+     client's. **With no client authentication available, this endpoint is bounded by the entropy
+     of the token value alone:** whoever can produce a token's value can revoke it, whatever
+     `client_id` they send with it. The comparison is worth keeping as defence-in-depth — it makes
+     an accidental cross-client revocation impossible and keeps the chain's actor truthful — and it
+     must not be recorded anywhere as the thing that stops one client from revoking another's
+     token, because it does not.
+
+     **What a real bound would require**, if the review wants one instead of entropy: proof that
+     the caller holds the *grant*, not the string. Three shapes, none of them free — a
+     confidential client, which §1 forbids in v1.0 and which downloadable software cannot be
+     anyway; a **sender-constrained** token (DPoP, RFC 9449), which binds revocation to a key the
+     caller proves per request and is therefore a change to every token this AS issues rather than
+     to this endpoint; or no endpoint at all, which is option 3. The cost of entropy-only is
+     bounded and should be stated as what it is: a token value that leaks can be revoked by
+     whoever holds it. That is a denial of service against *that* token's client and nothing
+     wider — a revocation cannot widen a grant, reach another token, or reveal whether the value
+     was live, which is what the silence rule above is for.
 2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
    pending the review.
 3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
