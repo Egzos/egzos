@@ -12,19 +12,30 @@ no device-code, no consent screen and no REST surface. Every clause here is ther
 rules in `spec/contracts/README.md` — and the 0.3 review is reading translated prose, not observed
 behaviour. No clause in this document may be marked **running**, and none is.
 
-Clauses carry one of three markings instead:
+Clauses carry one of four markings instead:
 
 - **§K** — carried from a `[DECIDED]` paragraph of §K. The wording may be improved; the decision may
   not be changed here.
 - **a1p** — a1p's binding of a §K decision onto the already-drafted contracts, or onto OAuth 2.1
   where §K names a standard and stops. Reviewable, and the review should read it as a proposal.
 - `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately.
+- `[LEAN]` — **§K's own fourth marking**, carried with the same word §K uses. A direction the Chief
+  leaned toward and did not decide. It is recorded so a reviewer can see it was considered and is
+  **not a decision**: no clause marked `[LEAN]` fixes a shape, and **a builder may not implement
+  against one.** Part B carries exactly one (§10, the step-up tap riding these endpoints), and
+  hardening it would be the one thing this marking exists to prevent.
 
-**Scope of this document.** The AS core mechanics: the client types, the two flows, registration and
-the redirect allowlist, metadata discovery, the grant vocabulary, the separation of authorities, and
-revocation. The **consent screen, the step-up pages and presence composition** are issue #61 and
-append to this file — see §10. `container.md` fixes everything about the container *except* how a
+**Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
+client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
+vocabulary, the separation of authorities, and revocation. §§10–12, **Part B** (#61): presence
+composition, the consent screen and the device-code entry as product surfaces, and the
+pre-authorization audit surface. `container.md` fixes everything about the container *except* how a
 client obtains a token; this document fixes only that, and neither overrides the other.
+
+**Part B's design-side input is `spec/design/consent.md`** (A2, binding on commit), whose §14 lists
+what the pages need from this document. Part B answers what is this document's, and marks the rest:
+a design spec is data to this contract, and where the two disagree the contract's clause stands and
+the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words.
 
 ## 1 · One AS, three client types
 
@@ -566,17 +577,150 @@ default for a public browser client**, and no source names a number. The review 
 a1p's reading is that an AS-issued public-client access token MUST carry a non-null `expires_at`,
 whatever the value, and that the null case stays available to `token mint` only.
 
-## 10 · What this document does not fix
+## 10 · Presence composition — where `principal: interactive` comes from
 
-**The consent screen, the step-up pages and presence composition are issue #61**, Part B, which
-appends to this file: `/authorize` rendering the grant in `token ls` vocabulary, the in-process
-server-rendered consent and step-up pages, and where `principal: interactive` is established for
-browser sessions. §7 fixes what a grant may *contain*; #61 fixes how it is *shown* and what it
-proves about presence.
+**The interactive login PKCE performs against the container is where `principal: interactive` is
+established for browser sessions. §K**, verbatim. Read precisely, because the sentence compresses
+three different things and only the first of them is the establishing act:
+
+1. **The login.** The human proves identity to the container at the container's own origin (§11).
+   This establishes an **interactive session** — the claim *a human is present, at this container,
+   now*.
+2. **The authorization.** §2's flow renders the grant to that session and carries the owner's
+   decision to the client. PKCE protects the *code*; it proves nothing about a human, and no part of
+   a `code_verifier` is evidence of presence.
+3. **The mint.** The token §2 issues may carry `principal: interactive`. This is the composition step
+   and the one that needs bounding, because a token outlives the session that authorized it and is
+   handed to software.
+
+### A session is not a token
+
+**The interactive session and an interactive-principal `Token` are different objects, and this
+document keeps them apart. a1p** — `capabilities.md` §3 says the principal is *"established, for
+browser sessions"*, and a reader who collapses the two ends up with a presence claim in `token ls`
+and a bearer credential in a cookie. The session:
+
+- is **not** a `Token`, has no `Token.id`, and does not appear in `token ls`;
+- is **not** a bearer credential: it is never accepted at the REST surface, at the token endpoint, or
+  anywhere a `Token` is accepted, and it carries no `capabilities` or `scopes` of its own;
+- is scoped to the container's **own origin** — the pages of §11 and nothing else;
+- ends. Its lifetime is the browser session's, and it is not renewable by a refresh token.
+
+### `/authorize` is an owner act, and no token can take it
+
+**An authorization decision is taken only by an interactive session — never by a bearer token,
+whatever it holds. a1p.** `/authorize` MUST refuse to render, and MUST refuse a decision, for a
+caller presenting a `Token` instead of an interactive session; a caller with no session is sent to
+§11's login first.
+
+This is the clause that keeps §7 honest. Without it `admin` becomes a **grant factory**: a client
+holding all six capabilities could walk §2's flow and mint a second client a token, and the
+`token.mint` chain would record a grant no human ever saw. `capabilities.md` §4's rule that *no
+capability reaches a human-only act, including `admin`* is the same rule; this states it at the one
+endpoint where the act is "hand out authority."
+
+### The AS mints `interactive` only where presence can actually be composed
+
+**An AS-minted token carries `principal: interactive` only when it is issued to a `browser` client
+through §2's authorization-code flow. Every token issued through §3's device flow carries
+`principal: client`, and so does every token issued to an MCP client (§4). a1p.**
+
+The device flow is excluded on its own evidence, not by preference. In §2 the human and the client
+share a surface: the browser that holds the session is the browser the code is redirected to, and the
+owner's presence is evidence *about the software being granted*. In §3 they do not: the human is in a
+browser at the container, and the client is a process on some machine the container has never seen —
+possibly not the human's machine at all, which is exactly the remote-approval attack §3 mitigation 1
+and the verification screen exist to blunt. **A human's presence at one surface is not evidence about
+software at another**, so there is nothing to compose, and a device-flow token that claimed
+`interactive` would be asserting a presence no step of the flow observed. §1 retired device-code in
+browsers because a typed code proves nothing about *which container*; this is the same gap seen from
+the other end — a typed code proves nothing about *which client*.
+
+Two consequences:
+
+1. **There is no `principal` request parameter, and a client cannot ask for one.** The principal
+   follows from the flow and the owner's decision, not from the request. §7 fixes a `scope` value at
+   two forms, neither of which is a principal, so a request that carries a principal in any spelling
+   is refused as malformed — not narrowed.
+2. **Rotation never upgrades a principal**, extending §9's rotation clause 3: the new token carries
+   the same principal as the one presented, and a refresh that could change it would compose
+   presence out of a value replay.
+
+`[OPEN→0.3]` **Whether an interactive-principal token outlives the session that authorized it.** As
+written it does: §9's rotation keeps it alive, and nothing ties it to the session's end. The two
+readings are a real fork — bind the token's life to the session (a browser "close" becomes a
+revocation, and the flagship's long-lived connection breaks) or leave it independent (a presence
+claim survives the presence). No source names it. What makes the fork survivable either way is the
+backstop below, which is why a1p does not pick here: the backstop, not the token's lifetime, is what
+stops a stale interactive claim from reaching a human-only act. §9's `[OPEN→0.3]` on a non-null
+`expires_at` for public-client tokens bounds the damage under the second reading.
+
+### The presence backstop — an interactive principal is necessary, never sufficient
+
+**Every human-only act requires presence re-proof at the moment of the act, regardless of the
+principal the presenting token carries. a1p** — and this is the answer to `spec/design/consent.md`
+§14 item 12's `[GAP→a1p]`, raised there against the string *Human-only acts still need your tap.*
+
+The gap was real. `capabilities.md` §4 gates human-only acts on the **principal**, refusing an
+attempt by a `client`; §3 of the same document says *"a bearer token cannot prove a human, so the
+token carries the claim and the container enforces on it."* Put those together with an
+interactive-principal token that can be minted to software, and a machine could take a human-only act
+on the strength of a claim recorded when a human was last present — on a page that had just promised
+the human it could not.
+
+So the gate has two parts, and `capabilities.md` §4 is the **floor**, not the whole of it:
+
+- **principal** — a `client` principal is refused outright. Unchanged, **running**.
+- **presence** — an `interactive` principal is *necessary and not sufficient*. From **Phase 2.2**,
+  every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`) additionally requires a
+  **live presence window** — `container.md`'s `step_up_window_seconds`, the step-up tap's window.
+  An expired or absent window refuses the act, and the refusal is a human-only violation like any
+  other.
+
+Stated so it can be tested when 2.2 lands: an interactive-principal token, presented with no live
+window, MUST be refused a human-only act. A container that admits one is non-conforming.
+
+**Until Phase 2.2 the interactive owner token is the proof** (`capabilities.md` §3, **running**), and
+this document does not pretend otherwise: that is a **stated, dated gap**, not the posture. The
+requirement above is decided here and enforced from 2.2 — so the consent page's promise is a promise
+about the shipped product, and a build that ships human-only acts to third-party interactive tokens
+*before* 2.2 has shipped the hole. **a1p's reading**, for the review: 2.2 is the right boundary only
+because before it there are no third-party interactive tokens at all — there is no AS. If the AS
+lands before the tap does, the two must swap order, or the AS must refuse to mint `interactive` until
+the window exists.
+
+### `[LEAN]` · the step-up tap later rides these same endpoints
+
+**`[LEAN]`, and §K's own word for it:** *"The step-up tap later rides the same AS endpoints rather
+than a parallel bespoke channel."* Recorded and **deliberately not hardened.** This document fixes
+**no** tap endpoint, no tap token shape, no binding and no window mechanics; Phase 2.2 and
+`spec/design/step-up-tap-and-pending-approval.md` settle those, and the backstop above is stated in
+terms of *a live presence window* precisely so it does not depend on how the tap is reached.
+
+One consequence is worth recording because it is a dependency and not a design: the tap spec §14.3
+binds a step-up to a **return address** and, under its D-T9 (b), derives that address from the
+requesting client's registered `redirect_uris` — the client-registry read §11 defines. If the tap
+rides these endpoints that read is already here; if it does not, the tap needs its own. **Routed, not
+answered.** The same section's `[GAP→a1p]`s on the step-up's own events stay with #68's batch and
+`events.md`, not here.
+
+## 11 · The consent screen, the login and the device-code entry
+
+TODO(a1p): **being written in this PR (#61, Part B).** Section number fixed now so §10's references
+to it are stable; the clauses land in the next commit on this branch.
+
+## 12 · The pre-authorization audit surface
+
+TODO(a1p): **being written in this PR (#61, Part B).** Section number fixed now; the clauses land on
+this branch.
+
+## 13 · What this document does not fix
 
 The token's own shape, coverage, role bundles and human-only acts → `capabilities.md`. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`, plus **#68**. The MCP-specific surface → contract v1.1 at the Phase 5 boundary (§4).
+The *look* of §11's pages — regions, states, copy, every string — is `spec/design/consent.md`; this
+document fixes what they must be true about, never how they read.
 
 TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
 authorization codes, pending device authorizations and refresh-token chains are all durable state
