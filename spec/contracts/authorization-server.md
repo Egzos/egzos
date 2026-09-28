@@ -706,8 +706,195 @@ answered.** The same section's `[GAP→a1p]`s on the step-up's own events stay w
 
 ## 11 · The consent screen, the login and the device-code entry
 
-TODO(a1p): **being written in this PR (#61, Part B).** Section number fixed now so §10's references
-to it are stable; the clauses land in the next commit on this branch.
+**The consent screen is a product surface: `/authorize` renders the requested grant in `token ls`
+vocabulary — scopes, capabilities, expiry, principal. Authorizing the flagship is indistinguishable
+from minting any other client token because it IS one. §K**, verbatim.
+
+The second sentence is the load-bearing one, and it is the same rule §7 carries from the other end:
+§7 says an AS token *is* a `Token`, so §11 says the screen that authorizes one is the screen that
+mints one. A container that rendered the flagship's request differently — fewer blocks, a shorter
+path, a remembered decision — would have made the flagship privileged at the surface after §5 made
+sure it was not privileged at registration.
+
+Stated so it can be tested: **every clause in this section applies identically to the flagship, a
+fork's UI, a CLI and (from Phase 5) an MCP client.** There is no client-specific rendering path, no
+pre-approved client, and no configuration key that skips the screen for one. A container that ships
+one is non-conforming.
+
+**Consent and step-up pages are lifeboat-adjacent server-rendered Python, in-process with the
+container: no new surface. §K.** The pages are served by the container's own origin — the §6
+`issuer`, the origin §2's TLS clause governs — from the process that serves everything else. **a1p**,
+binding what "no new surface" has to mean to be checkable: no second listener, no second port, no
+separate auth app, and nothing a deployment has to run beside the container for `/authorize` to
+answer. A container that reaches its consent screen through a hosted page is not this AS.
+
+**The *look* of these pages is `spec/design/consent.md`, and this section does not touch it.** That
+spec fixes the regions, states, copy and every string; this fixes what the pages must be *true
+about*. Its §14 lists what it needs from here, and the rest of this section answers that list in its
+order. Where the two disagree, the contract's clause stands and the spec's string is a spec revision
+— the terms §14's items 10, 12 and 13 already state for themselves.
+
+### 11.1 · The client-registry read (§14 item 1)
+
+**The pages read one client entry: `{client_id, client_name, client_type, redirect_uris,
+registered_at}`. a1p** — §5 fixes the first four as the registered entry; `registered_at` is added
+here because the page renders it and §5 named no timestamp.
+
+Two rules, and they are the section's, not the design spec's:
+
+- **It is a read of one entry, keyed by the request's `client_id` — never a listing.** There is no
+  endpoint, page or parameter that enumerates registered clients. A registry listing is an owner act
+  on the owner's own surface, not something an authorization request can reach.
+- **A `client_id` that is not registered produces §2.5's uniform failure and no read at all** — the
+  same page, in the same time budget, as a registered client with a mismatched `redirect_uri`. This
+  is §7's enumeration rule at the registry: a caller must not learn that a client id exists.
+
+**The entry's `client_name` is data.** It is owner-supplied at registration (§5) and the AS neither
+verifies it nor gives it meaning; a name that imitates the product is a registration the owner made,
+and the page's defence is showing the origin and the kind beside it, which is the design spec's.
+Nothing in the AS may branch on a client name.
+
+### 11.2 · The screen renders what will be minted, after any clamp
+
+**The grant the screen renders MUST equal the grant the mint produces. a1p** — this is the one
+clause that makes the screen a security surface rather than a courtesy. §7 expands a `scope` value
+into `{capabilities, scopes}`; the screen renders the *expansion*, not the request string, so a
+bundle name displays as the capabilities it became (§7 consequence 1), `node:*` displays as the whole
+container (§7 consequence 3), and a clamped expiry (§11.5) displays clamped.
+
+Two consequences:
+
+1. **The AS MUST NOT mint anything the screen did not render.** No scope, capability or lifetime is
+   added between the decision and the mint.
+2. **A request the AS would narrow is refused, not narrowed** — §7 already says so of the `scope`
+   value, and it is restated here because a screen that rendered a narrowed grant would be honest
+   about a request the owner never made.
+
+### 11.3 · The existing-tokens read (§14 item 9)
+
+**The screen may read, for the pair (viewer, client), a count of live tokens and the most recent
+`created_at`. a1p.** Bounded exactly:
+
+- **live** means not revoked and not expired, by `capabilities.md` §5's own fields;
+- **viewer-scoped** — it counts tokens the viewer owns and nothing else, which is `container.md`'s
+  silence rule and not a display choice;
+- **no ids and no values leave this read.** A count and a timestamp; never a `Token.id`, never a
+  token value, never another client's total.
+
+### 11.4 · An authorization request reaches a decision exactly once (§14 item 11)
+
+**A request that has been decided — authorized or denied — MUST NOT reach a second decision, and
+MUST NOT mint. a1p.** §2 makes the *code* single-use; this makes the *request* single-use, which is
+a different object and the one the back button re-submits. A re-submission renders §2.5's uniform
+failure and appends once, §12's cause `replayed`.
+
+### 11.5 · Expiry: the container's default and maximum, and the clamp rule (§14 item 6)
+
+**A container carries an AS-issued-token default lifetime and a maximum lifetime in its own config,
+and a request for a longer expiry is clamped to the maximum — never silently granted, never refused
+for that reason alone. a1p**, answering `consent.md` §14.6's `[OPEN→a1p]` on the rule.
+
+Clamping rather than refusing, for a stated reason: a refusal here is an error shape a caller can
+probe for the container's maximum, and §7 spent a subsection making sure the AS is not that. A clamp
+reveals the same fact **to the owner, on the screen, in the value being minted** — §11.2 requires the
+screen to render the clamped expiry — and reveals it to the client only in the token it receives,
+which it is entitled to know. A client that needs longer asks the owner, not the AS.
+
+`[OPEN→0.3]` **The two numbers, and the config keys that carry them.** No source names either, and
+§9's `[OPEN→0.3]` on a non-null `expires_at` for public-client tokens is the same question seen from
+the default's side — the review should settle them together. What is not open is the clamp rule
+above, or that the maximum exists: a container with no maximum grants `expires_at: null` to any
+client that asks for it, which §9 already calls wrong as an AS default.
+
+### 11.6 · A standard error redirect carries no description, at all (§14 item 4)
+
+**An error redirect from `/authorize` carries exactly `error` and the request's `state`. The AS MUST
+NOT emit `error_description` or `error_uri`, with any value, under any cause. a1p** — §7 fixes that
+the *code* is identical across causes, and `consent.md` §14.4 is right that a uniform constant
+description would satisfy §7 while leaving a field every implementation will eventually fill with the
+cause it already computed. The field is removed rather than constrained.
+
+Testable as written: the redirect's query is `{error, state}` and nothing else; the body is empty;
+and the response is byte-identical across §7's three converging causes.
+
+### 11.7 · Login (§14 item 7)
+
+What is fixed here, and it is the §10 boundary said as a requirement on the page:
+
+- **The login establishes an interactive session and mints no token.** §10's four bullets hold: the
+  session is not a `Token`, appears in no `token ls`, and is accepted at no endpoint that accepts a
+  `Token`.
+- **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** It is never
+  an absolute URL, never a protocol-relative one (a leading `//` is rejected before anything else),
+  never reflected into the page, and a value that does not match the allowlist is dropped silently
+  for the container's root — not reported. **a1p**: this is the open-redirect hole in the one place a
+  human has just typed a credential, and the allowlist is an allowlist rather than a validator
+  because every "validate a redirect" bug in the literature is a validator. The list itself is
+  `consent.md`'s D-C5.
+- **The login is throttled per caller**, on §12's terms, and its failures are uniform: wrong
+  credential, unknown user and a throttled attempt produce one message, one status and one timing
+  class. A login page that distinguishes *unknown* from *wrong* has published the container's user
+  list.
+
+`[OPEN→0.3 / Chief]` **The credential mechanism itself.** No source names it, and the skeleton has
+none: `init` mints an owner token and there is no login. The review must name what the human presents
+— a container secret, an OS keychain unlock, a local passkey, or an IdP under §8's opt-in collapse —
+and it is a Chief decision as much as a review one, because it is the product's front door.
+`consent.md` §2.1 renders a single *Container secret* field as its stated default and says the
+contract owns the choice; if the review picks otherwise, that region is a spec revision. Everything
+above holds whichever is picked.
+
+### 11.8 · The device-code entry (§14 item 5)
+
+§3 fixes the flow, the endpoints and the three mitigations. This fixes what the entry page needs:
+
+- **The `user_code`'s length and alphabet are the contract's, not the page's** — they set the
+  brute-force floor §3 mitigation 1 bounds from the other side, and a page that chose them could
+  weaken the flow by rendering it. `consent.md` renders eight characters in two groups of four.
+  `[OPEN→0.3]`: the review should pin the length and the alphabet (a1p's reading: eight characters
+  from an alphabet with no visually ambiguous pairs, which is what makes a short code typable and is
+  the reason it is short). §9's entropy clause covers the *source*; this covers the *size*.
+- **Redemption is single-use and throttled**, per §3 mitigation 1 and §12: a code that has been
+  redeemed is spent whether or not the authorization it belongs to was approved.
+- **The requester hint is client-supplied, unverified data.** A device client MAY report a device or
+  host name for the client block. **The AS MUST NOT verify it, MUST NOT branch on it, and MUST NOT
+  record it anywhere that reads as verified. a1p** — it is a phishing-relevant string a remote
+  attacker controls, and the honest handling is to carry it as untrusted, bounded and escaped, the
+  same posture `item.add` takes toward content (`unverified-by-default`, applied to a page).
+
+`[OPEN→0.3]` **`/device?user_code=…` — the prefilled entry, and §3's `verification_uri_complete`.**
+`consent.md` §14.5 makes a point §3 did not: **the decision bites on what `/device` accepts, not only
+on whether the AS issues the field**, because the CLI can build the link itself from a code it was
+given. §3's marker is therefore read as covering both halves, and the review must answer both:
+
+- if the review declines the code in a URL, the AS does not issue `verification_uri_complete`
+  **and** `/device` ignores a `user_code` query parameter — the CLI's home-made link then does
+  nothing, which is the only version of "declined" that holds;
+- if it accepts, both stand, and `consent.md` R3's prefilled row and its §20 fixture stand with them.
+
+### 11.9 · Revocation the owner can reach from a browser (§14 item 13)
+
+`[OPEN→0.3]` **An owner-path revocation keyed on `Token.id`.** `consent.md` §14 item 13 raises a hole
+§9 does not cover, and it is a real one: §9's three options are all about an **RFC 7009 endpoint,
+keyed on the token *value***, and the browser never sees a token value. So no §9 option serves the
+one act the owner most obviously wants from a browser — *revoke that token in the list* — and under
+option 3 the flagship dashboard's revoke act is **dead**, not merely unsupported.
+
+The two questions are separate, and the review should take them separately:
+
+1. **§9's question** — does a *client* get a value-keyed endpoint to revoke its own token.
+2. **This one** — does the *owner* get an id-keyed revocation on the container's own pages (§11's
+   surface), authenticated by the interactive session of §10, refusing a token the viewer does not
+   own with §7's silence rule and `events.md`'s `token.revoke` on success.
+
+**a1p's reading, for the review to take or reject: yes to (2), independently of (1).** It needs no
+new authority — it is `token rm` reached from the page instead of the CLI, by a session that has
+already proved presence — and it never handles a value, so it does not reopen what §9's option 1
+opens. What it does *not* do is serve `consent.md` §19: the flagship dashboard is a separate origin
+reaching this AS as a browser client, and a session on the container's pages is not a session it
+holds. **If the review takes (2) and declines (1), §19's sentence is a spec revision** — the owner
+revokes on the container's page and the dashboard drops the act. The owner holds `token rm` under
+every outcome, so `consent.md` §13's `expiry.none` string stands as written either way.
 
 ## 12 · The pre-authorization audit surface
 
