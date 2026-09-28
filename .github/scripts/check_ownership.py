@@ -12,7 +12,8 @@ Usage:
         --base origin/<base-ref> \\
         --head HEAD \\
         --branch "<head-ref>" \\
-        --labels "<comma-separated PR labels>" \\
+        [--labels-json '["label", ...]']        # default: $PR_LABELS_JSON \\
+        [--size-exception-applier <login>]    # default: $SIZE_EXCEPTION_APPLIER \\
         [--ownership .github/OWNERSHIP.yml] \\
         [--changed-files /path/to/list.txt]  # one file per line; skips git \\
         [--numstat /path/to/numstat.txt]      # git diff --numstat output; skips git
@@ -26,10 +27,23 @@ three NUL-separated fields (counts, old path, new path) and a plain entry as two
 nothing is guessed. The size cap charges the post-image path; the ownership rules are
 applied to BOTH sides, because moving a file out of a `chief_only` or `exclusive` tree is
 a change to that tree.
+
+Every record the parser cannot interpret is a failure, never a skip: a required gate that
+drops a line it does not understand has let that file past the ownership rules and the size
+cap without saying so (#69).
+
+Labels arrive as a JSON array, never a comma-joined string: a label name may itself contain a
+comma, so splitting on one let a label spell a second label (#44). `size-exception` lifts the
+cap only when whoever last applied it is in OWNERSHIP.yml's `size_exception_approvers` — the
+label's presence proves only that someone with issues: write applied it, and egzos-forge holds
+issues: write (drift F18). Both values come from the environment the workflow sets, so a
+workflow that passes them runs against a checker that predates them without an argument error.
 """
 
 import argparse
 import fnmatch
+import json
+import os
 import subprocess
 import sys
 
@@ -110,41 +124,51 @@ def git_numstat_z(base, head):
     return result.stdout
 
 
+class UnparseableNumstat(ValueError):
+    """A numstat record the checker cannot interpret. The gate fails on it (#69)."""
+
+
 def _counts(added_s, removed_s):
-    """Turn the two numstat columns into ints; binary files ('-') count zero lines."""
-    if added_s == "-" or removed_s == "-":
+    """Turn the two numstat columns into ints; binary files ('-' in both) count zero lines."""
+    if added_s == "-" and removed_s == "-":
         return 0, 0
     try:
-        return int(added_s), int(removed_s)
+        added, removed = int(added_s), int(removed_s)
     except ValueError:
-        return 0, 0
+        msg = f"line counts {added_s!r}/{removed_s!r} are not integers"
+        raise UnparseableNumstat(msg) from None
+    if added < 0 or removed < 0:
+        raise UnparseableNumstat(f"negative line count {added_s!r}/{removed_s!r}")
+    return added, removed
 
 
 def parse_numstat_z(raw):
     """Parse `git diff --numstat -z` output.
 
     Returns a list of (added, removed, path, old_path) tuples. `path` is the post-image
-    path; `old_path` is the pre-image path for a rename/copy and None otherwise.
+    path; `old_path` is the pre-image path for a rename/copy and None otherwise. Raises
+    UnparseableNumstat on any record it cannot interpret; the only field it skips is the
+    empty one after the final NUL terminator.
     """
     entries = []
     fields = raw.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
     i = 0
     while i < len(fields):
         rec = fields[i]
-        if not rec.strip():
-            i += 1
-            continue
         parts = rec.split("\t", 2)
         if len(parts) < 3:
-            i += 1
-            continue
+            raise UnparseableNumstat(f"record {i} has {len(parts)} tab-separated field(s), not 3")
         added_s, removed_s, path = parts
         added, removed = _counts(added_s, removed_s)
         if path == "":
             # Rename/copy: the next two fields are the old and new paths.
             if i + 2 >= len(fields):
-                break
+                raise UnparseableNumstat(f"rename record {i} is missing its old/new path fields")
             old_path, new_path = fields[i + 1], fields[i + 2]
+            if not old_path or not new_path:
+                raise UnparseableNumstat(f"rename record {i} has an empty path")
             entries.append((added, removed, new_path, old_path))
             i += 3
         else:
@@ -156,23 +180,44 @@ def parse_numstat_z(raw):
 def parse_numstat(lines):
     """Parse plain (non -z) numstat lines into (added, removed, path) tuples.
 
-    Kept for the `--numstat <file>` test path and for callers that already hold line
-    output. It does NOT interpret rename display strings — see the module docstring
-    for why that is impossible to do safely; use `parse_numstat_z` on `-z` output
-    instead. Binary files have '-' in both columns and count as a file with no lines.
+    Kept for the `--numstat <file>` test path. A rename in this format is a display string
+    (`old => new`, `dir/{old => new}`) that cannot be resolved safely — see the module
+    docstring — so any path containing ` => ` is refused rather than matched whole, which
+    had let a chief-only source pass as an owned `docs/**` string (#69). Feed renames
+    through `parse_numstat_z` instead. Blank lines are skipped; any other line the parser
+    cannot interpret raises UnparseableNumstat.
     """
     entries = []
-    for line in lines:
-        line = line.strip()
-        if not line:
+    for n, line in enumerate(lines, 1):
+        if not line.strip():
             continue
-        parts = line.split("\t", 2)
+        parts = line.rstrip("\n").split("\t", 2)
         if len(parts) < 3:
-            continue
+            raise UnparseableNumstat(f"numstat line {n} has {len(parts)} tab-separated field(s)")
         added_s, removed_s, path = parts
+        if " => " in path:
+            raise UnparseableNumstat(
+                f"numstat line {n} is a rename display string; feed renames through -z"
+            )
         added, removed = _counts(added_s, removed_s)
         entries.append((added, removed, path))
     return entries
+
+
+def parse_labels_json(raw):
+    """Parse the PR's labels from a JSON array of names. Anything else is an error."""
+    try:
+        labels = json.loads(raw or "[]")
+    except ValueError as exc:
+        raise ValueError(f"labels are not JSON: {exc}") from None
+    if not isinstance(labels, list) or not all(isinstance(x, str) for x in labels):
+        raise ValueError("labels must be a JSON array of strings")
+    return set(labels)
+
+
+def size_exception_waives(labels_set, applier, approvers):
+    """True only when `size-exception` is present AND its last applier is an approver."""
+    return "size-exception" in labels_set and bool(applier) and applier in set(approvers)
 
 # ---------------------------------------------------------------------------
 # Size cap
@@ -203,7 +248,18 @@ def main():
     parser.add_argument("--base", required=True, help="Base ref for diff")
     parser.add_argument("--head", default="HEAD", help="Head ref (default: HEAD)")
     parser.add_argument("--branch", required=True, help="Head branch name")
-    parser.add_argument("--labels", default="", help="Comma-separated PR label names")
+    parser.add_argument(
+        "--labels-json",
+        dest="labels_json",
+        default=os.environ.get("PR_LABELS_JSON", "[]"),
+        help="JSON array of PR label names (default: $PR_LABELS_JSON)",
+    )
+    parser.add_argument(
+        "--size-exception-applier",
+        dest="size_exception_applier",
+        default=os.environ.get("SIZE_EXCEPTION_APPLIER", ""),
+        help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
+    )
     parser.add_argument(
         "--ownership",
         default=".github/OWNERSHIP.yml",
@@ -232,32 +288,42 @@ def main():
     cap_files = size_cap.get("files", 30)
     cap_exclude = size_cap.get("exclude", [])
 
-    # Schema variant: egzos has governance_paths; platform has chief_only
+    # Either key, or both: governance_paths only annotates; chief_only fails agent branches.
     governance_paths = ownership.get("governance_paths", [])
     chief_only = ownership.get("chief_only", [])
+    approvers = ownership.get("size_exception_approvers", [])
 
     agents_cfg = ownership.get("agents", {})
 
-    labels_set = {label.strip() for label in args.labels.split(",") if label.strip()}
+    try:
+        labels_set = parse_labels_json(args.labels_json)
+    except ValueError as exc:
+        print(f"::error::OWNERSHIP: {exc}")
+        sys.exit(1)
 
     # ---- Determine changed files and numstat ---------------------------------
     # One git call, -z, feeds both halves of the check so they see one set of files.
     # A rename contributes its post-image path to the size cap and BOTH of its paths
     # to the ownership rules: the source side is a change to the tree it left.
-    rename_sources = {}   # new_path -> old_path, for the table's Note column
-    if args.numstat:
-        with open(args.numstat) as fh:
-            numstat_entries = parse_numstat(fh.read().splitlines())
-        derived_changed = [p for _, _, p in numstat_entries]
-    else:
-        z_entries = parse_numstat_z(git_numstat_z(args.base, args.head))
-        numstat_entries = [(a, r, p) for a, r, p, _ in z_entries]
-        derived_changed = []
-        for _, _, new_path, old_path in z_entries:
-            derived_changed.append(new_path)
-            if old_path is not None and old_path != new_path:
-                derived_changed.append(old_path)
-                rename_sources[new_path] = old_path
+    old_path_of = {}   # post-image path -> pre-image path, for the table's Note column
+    try:
+        if args.numstat:
+            with open(args.numstat) as fh:
+                numstat_entries = parse_numstat(fh.read().splitlines())
+            derived_changed = [p for _, _, p in numstat_entries]
+        else:
+            z_entries = parse_numstat_z(git_numstat_z(args.base, args.head))
+            numstat_entries = [(a, r, p) for a, r, p, _ in z_entries]
+            derived_changed = []
+            for _, _, new_path, old_path in z_entries:
+                derived_changed.append(new_path)
+                if old_path is not None and old_path != new_path:
+                    derived_changed.append(old_path)
+                    old_path_of[new_path] = old_path
+    except UnparseableNumstat as exc:
+        print(f"::error::OWNERSHIP: unparseable diff record — {exc}. "
+              "A required gate does not pass on a line it cannot read.")
+        sys.exit(1)
 
     if args.changed_files:
         with open(args.changed_files) as fh:
@@ -270,7 +336,7 @@ def main():
                 seen.add(p)
                 changed.append(p)
 
-    moved_from = {old: new for new, old in rename_sources.items()}
+    new_path_of = {old: new for new, old in old_path_of.items()}
 
     # ---- Determine if human or agent branch ----------------------------------
     branch = args.branch
@@ -306,17 +372,17 @@ def main():
         status = "OK"
         notes_for_file = []
 
-        if path in moved_from:
-            notes_for_file.append(f"moved to {moved_from[path]}")
-        elif path in rename_sources:
-            notes_for_file.append(f"moved from {rename_sources[path]}")
+        if path in new_path_of:
+            notes_for_file.append(f"moved to {new_path_of[path]}")
+        elif path in old_path_of:
+            notes_for_file.append(f"moved from {old_path_of[path]}")
 
-        # -- governance_paths notices (egzos schema) --------------------------
+        # -- governance_paths notices -----------------------------------------
         if matches_any(governance_paths, path):
             notices.append(path)
             notes_for_file.append("governance path")
 
-        # -- chief_only check (platform schema) --------------------------------
+        # -- chief_only check -------------------------------------------------
         if chief_only and matches_any(chief_only, path):
             if is_agent_branch:
                 failures.append((path, "chief-only path — agent branches may not touch this"))
@@ -348,7 +414,9 @@ def main():
                         break
 
         note_str = "; ".join(notes_for_file) if notes_for_file else ""
-        print(f"{path[:58]:<60} {status:<10} {note_str[:30]:<10}")
+        # The note is never truncated: on a passing run this table is the only record
+        # that a move happened (#59).
+        print(f"{path[:58]:<60} {status:<10} {note_str}")
 
     print("-" * 90)
 
@@ -373,8 +441,13 @@ def main():
     if file_count > cap_files:
         over_cap.append(f"{file_count} changed files exceeds cap of {cap_files}")
 
-    if "size-exception" in labels_set:
-        print("size-exception label present — cap waived by Chief.")
+    waived = size_exception_waives(labels_set, args.size_exception_applier, approvers)
+    if "size-exception" in labels_set and not waived:
+        who = args.size_exception_applier or "an unknown applier"
+        print(f"::warning::size-exception was applied by {who}, who is not in "
+              "size_exception_approvers — the cap stands.")
+    if waived:
+        print(f"size-exception applied by {args.size_exception_applier} — cap waived.")
     elif over_cap and not is_agent_branch:
         for msg in over_cap:
             print(f"::warning::SIZE: {msg} — human branch, Chief's call")

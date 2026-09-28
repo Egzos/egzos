@@ -19,17 +19,18 @@ jobs:
   nightly-integration:
     name: nightly-integration
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60   # 120 turns at the observed ~18 s/turn fits 36 min; 40 left no headroom (#70 review)
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: read   # reads PRs for the report; the drift issue is its only write (drift F5)
       issues: write
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          # One source of truth with the charter step below, which already reads this value (#44).
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -79,4 +80,4 @@ jobs:
             --append-system-prompt-file /tmp/charter-a1r-reviewer.md
             --model ${{ env.MODEL_OPUS }}
             --max-turns 120
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
+            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
