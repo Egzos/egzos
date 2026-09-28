@@ -6,6 +6,7 @@ Each of these was established by a fix and, until now, held only as long as the 
 remembered it. Parsing the workflow files moves them into the required `tests` check.
 """
 
+import json
 import re
 import textwrap
 from pathlib import Path
@@ -311,6 +312,17 @@ def test_a6_verdict_prints_no_finding_prose():
     run = _verdict("a6-adversary")
     assert 'f.get("note"' not in run and 'f.get("path"' not in run
     assert 'print("Summary' not in run
+
+
+def test_a6_structured_output_never_reaches_a_step_env():
+    # GitHub prints a step's env in its log; a6's structured output carries notes and paths, so
+    # the verdict reads it from the execution file (Egzos/egzos#79, Egzos/egzos-platform#42).
+    steps = [s for _, j, _, s in _steps() if j == "a6-adversary"]
+    assert steps
+    for s in steps:
+        assert "outputs.structured_output" not in json.dumps(s.get("env", {})), s.get("name")
+    (verdict,) = [s for s in steps if s.get("name") == "Verdict"]
+    assert verdict["env"]["EXEC_FILE"] == "${{ steps.review.outputs.execution_file }}"
 
 
 def test_turn_budget_is_one_number_where_it_is_diagnosed():

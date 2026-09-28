@@ -292,19 +292,38 @@ jobs:
           BASH_ENV: ""
           ENV: ""
           LD_PRELOAD: ""
-          STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
+          # The verdict is read from the execution file, never passed as an env value: GitHub prints
+          # a step's env in its log, which put a6's structured output, notes and paths included,
+          # into a log this step keeps counts-only (Egzos/egzos#79, Egzos/egzos-platform#42).
+          EXEC_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
           python3 -I - <<'EOF'
           import json, os, sys
 
-          raw = os.environ.get("STRUCTURED_OUTPUT", "").strip()
-          if not raw:
-              print("::error::No structured output from the review step — a required check does not pass on silence.")
-              sys.exit(1)
           try:
-              data = json.loads(raw)
-          except json.JSONDecodeError as exc:
-              print("::error::Could not parse structured output: {}".format(exc))
+              raw = open(os.environ.get("EXEC_FILE", "")).read()
+          except OSError:
+              raw = ""
+          try:
+              parsed = json.loads(raw)
+              records = parsed if isinstance(parsed, list) else [parsed]
+          except ValueError:
+              records = []
+              for line in raw.splitlines():
+                  try:
+                      records.append(json.loads(line))
+                  except ValueError:
+                      pass
+          results = [r for r in records if isinstance(r, dict) and r.get("type") == "result"]
+          data = results[-1].get("structured_output") if results else None
+          if isinstance(data, str):
+              try:
+                  data = json.loads(data)
+              except ValueError:
+                  data = None
+          if not isinstance(data, dict):
+              # Shape only: nothing from the file is echoed here.
+              print("::error::No structured output from the review step — a required check does not pass on silence.")
               sys.exit(1)
 
           # An absent or unknown verdict fails: the schema requires one, and a required check
