@@ -120,3 +120,14 @@ def test_no_model_step_holds_raw_gh_api():
         and "Bash(gh api:*)" in step["with"].get("claude_args", "")
     ]
     assert bad == []
+
+
+def test_core_queue_wip_cap_cannot_read_zero_while_a_pr_is_open():
+    # #22: the default `gh pr list` page is 30, and two dispatches for one agent raced.
+    job = _load(ROOT / ".github" / "workflows" / "core-queue.yml")["jobs"]["core-queue"]
+    group = job["concurrency"]["group"]
+    assert "inputs.agent" in group and "github.event.label.name" in group
+    assert job["concurrency"]["cancel-in-progress"] is False
+    (wip,) = [s["run"] for s in job["steps"] if s.get("name") == "wip-check"]
+    assert "--limit" in wip
+    assert "isDraft" in wip  # a killed run's own draft resumes rather than blocks (RD-004)
