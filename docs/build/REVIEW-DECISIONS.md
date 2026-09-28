@@ -218,10 +218,15 @@ than read from the checkout's `.git`, with the fetch and the post both run under
 allowlist (#79 and platform#42 reviews). What stays open: the session still writes `/tmp/review.md`, which `post-review` posts, so the review
 text is the session's by design; the step pins which comment it lands in (the job's own marker, never
 another reviewer's). That text is posted verbatim, from a job whose model session holds the provider
-credential, so two controls close the channel: every model session denies `Read(//proc/**)`, which
-covers Read, Grep and Glob and so the process environment the credential lives in, and `post-review`
+credential, so two controls close the channel for the review sessions: every model session denies
+`Read(//proc/**)`, which denied Read, Grep and Glob alike on `/proc/self` when checked against the CLI
+locally (2.1.283; not yet re-checked in a CI run), and a review session holds no other way to read its
+own environment; and `post-review`
 refuses a body carrying any credential the job holds (#79 review, a1r minor 3a). An encoded copy would
-pass the second control; the first is the one that keeps the credential out of reach. Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+pass the second control; the first is the one that keeps the credential out of reach. The deny stays on
+the builder sessions too, but it does not close them: a builder holds an interpreter (`python`, `git`),
+and any interpreter reads its own process environment. That case stays open (Egzos/egzos-platform#42
+review). Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
 needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
 silently stops every review from being posted.
 

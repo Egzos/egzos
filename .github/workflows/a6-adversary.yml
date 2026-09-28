@@ -450,7 +450,10 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The suite's result, from the job above; the session cites it and executes nothing.
+      # The suite's result, from the job above; the session cites it and executes nothing. Its env
+      # value is printed in this log: acceptable only because it is main's suite, and a security
+      # regression test enters adversarial/ only in its fix PR, so main holds no open reproduction.
+      # Moving it to an artifact needs a SHA-pinned upload/download action (follow-up).
       - name: suite-result
         env:
           SUITE_RESULT: ${{ needs.a6-adversary-suite.outputs.result }}
