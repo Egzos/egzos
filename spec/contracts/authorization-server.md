@@ -27,9 +27,14 @@ Clauses carry one of four markings instead:
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
 client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
-vocabulary, the separation of authorities, and revocation. §§10–12, **Part B** (#61): presence
-composition, the consent screen and the device-code entry as product surfaces, and the
-pre-authorization audit surface. `container.md` fixes everything about the container *except* how a
+vocabulary, the separation of authorities, and revocation. **Part B** (#61) is §§10–13 *and* **§5.3**:
+presence composition, the consent screen and the device-code entry as product surfaces, the
+pre-authorization audit surface, and what this document does not fix (§13). §5.3 — the pre-trust
+uniform failure — is Part B's, written back in §5 because that is where §5.1's "reject" needed an
+answer; §11.0, §11.1, §11.4, §7's closing line and the whole of §12's row (d) route to it, and a
+reader mapping the document from this paragraph would otherwise place it in Part A. §5's subsection
+numbering (§5.1, §5.2) is Part B's too, headings only.
+`container.md` fixes everything about the container *except* how a
 client obtains a token; this document fixes only that, and neither overrides the other.
 
 **Part B's design-side input is `spec/design/consent.md`** (A2, binding on commit), whose §14 lists
@@ -269,6 +274,19 @@ converging `access_denied` with §11.6's `{error, state}` govern. Everything bef
 **pre-trust**: an unregistered `redirect_uri` is an attacker's URL as readily as a client's, so the
 AS has nowhere to send an error and does not invent one.
 
+**Neither tier is reached at `/authorize` without an interactive session. a1p.** §11.0's substep 3
+sends a session-less request to §11.7's `/login` **before** the pre-trust checks below and before
+§7's post-trust ones, so this section's responses — the `throttled` cause excepted, substep 2 running
+ahead of substep 3 — are answers to a caller §10 has already authenticated. The redirect is not a
+member of the response set clause 1 converges, because it is decided before any of these causes has
+been evaluated: it reads nothing, names nothing, and is byte-identical for every request that
+reaches it. That ordering is load-bearing for this section rather than incidental to it. Were
+validation to run first, a session-less request naming a registered `(client_id, redirect_uri)` pair
+would answer with a redirect and one naming an unregistered `client_id` with the page below — a
+registered/unregistered distinguisher needing no credential, and one **clause 1 would not catch**,
+since clause 1 converges the failures and that leak is a success. §11.0 fixes the order; this clause
+records why this section depends on it.
+
 **A pre-trust failure MUST be a page the AS renders at its own origin, and MUST NOT be a redirect,
 under any cause.** Testable as written:
 
@@ -279,6 +297,10 @@ under any cause.** Testable as written:
    re-submitted (§11.4), and a throttled attempt (§11.0, checked before either tier, so the AS has
    not yet determined which tier the request would have reached). Those six are exactly row (d). The
    page names no client, echoes no request parameter, and **reveals nothing about which occurred**.
+   Five of the six are answers to an authenticated session by the paragraph above; `throttled` is the
+   one an unauthenticated caller can reach, and it is uniform with the other five here for the same
+   reason it is bounded in §12.1 rule 3 — the counter refuses before the AS has determined which tier
+   the request would have reached, so there is nothing tier-specific for it to reveal.
 2. **One time budget.** The responses converge in time as much as in bytes, as §7 requires of the
    post-trust redirect — a surface that leaks through timing what it withheld in its body is the same
    oracle reached slowly. Specifically: §11.1's keyed read *happens or does not happen* according to
@@ -668,6 +690,14 @@ whatever it holds. a1p.** `/authorize` MUST refuse to render, and MUST refuse a 
 caller presenting a `Token` instead of an interactive session; a caller with no session is sent to
 §11's login first.
 
+**"First" is an ordering, and §11.0's substep 3 is where it is fixed.** The session check runs after
+§11.0's throttle and **before either validation tier** — before §5.3's pre-trust checks and before
+§7's post-trust ones. A session-less `/authorize` request that survives the counter is therefore a
+303 to §11.7's `/login` and nothing else: no registry read, no decision about the request, and the
+same response whatever `client_id` and `redirect_uri` it names. Read the reasoning there, not here;
+the consequence to carry into §12 is that rows (d) and (f) are out of an unauthenticated caller's
+reach except for (d)'s `throttled` cause, which is what §12.1 rule 3 is written on.
+
 This is the clause that keeps §7 honest. Without it `admin` becomes a **grant factory**: a client
 holding all six capabilities could walk §2's flow and mint a second client a token, and the
 `token.mint` chain would record a grant no human ever saw. `capabilities.md` §4's rule that *no
@@ -790,11 +820,13 @@ order — beginning with §11.0, which takes item 2 out of turn because the orde
 it before every other clause here. Where the two disagree, the contract's clause stands and the spec's string is a spec revision
 — the terms §14's items 10, 12 and 13 already state for themselves.
 
-### 11.0 · Every surface here is throttled, and the throttle runs first (§14 item 2)
+### 11.0 · Every surface here is throttled, the throttle runs first, and the login redirect runs before either validation tier (§14 item 2)
 
 Numbered **0** because that is its place in the order of evaluation: no clause below is reached on a
-request this one has refused — with **exactly one exception, carved here** rather than only where it
-is used, because an exception to an ordering belongs where the ordering is fixed.
+request this one has refused. **This section fixes the whole of the order that precedes validation** —
+the throttle, its one exception, and where `/authorize`'s session check sits — rather than leaving
+any part of it to the clauses that use it, because an ordering, and an exception to an ordering,
+belong where the ordering is fixed. The substep list below is that order, and it is normative.
 
 **`/authorize`, `/login`, `/device` and — if §10's `[LEAN]` is taken — the tap are each throttled per
 caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between this document's
@@ -821,13 +853,52 @@ stated next so that the ordering and its one exception are read together.
 rule 6 exempts one path from the throttle — a decided request re-submitted **on the session that
 decided it** (§11.4). That exemption is only implementable if it is evaluated *within* §11.0, before
 the counter, because recognising a re-submission means reading §11.4's decided-request record, and
-that read is evaluation of exactly the kind rule 4 forbids once a counter holds. So **§11.0 is two
-substeps, in this order**:
+that read is evaluation of exactly the kind rule 4 forbids once a counter holds. **§10's login
+redirect has the same property from the other side** — it is an ordering, so it belongs where the
+ordering is fixed, and it is the step that decides whether §5.3's tier is reachable at all. So
+**§11.0 is three substeps, in this order**:
 
-1. **Is this the deciding session's first re-submission of this request?** A read keyed on the
-   interactive session of §10 — never on anything the request carries. If yes, the request is
-   evaluated and appends once, row (d) cause `replayed`, whatever the counter's state.
-2. **Otherwise, the counter.** If it holds, nothing below §11.0 is reached.
+1. **Is this the deciding session's first re-submission of this request?** Two halves, and the
+   document means them separately. The read is **keyed on the interactive session of §10 — never on
+   anything the request carries**, because a key the caller can vary at no cost is no bound, which is
+   this section's own `[OPEN→0.3]` floor below. The **match** is then against the decided request
+   *that session's record names*: one interactive session can decide more than one authorization
+   request — a second client, a second tab, a re-authorization after an expiry — so the session does
+   not by itself identify a decided request, and the once-per-decided-request accounting below is per
+   request rather than per session. A session-keyed read alone does not carry that state; the key
+   bounds who may ask, the match decides what was asked. If the record names *this* request and its
+   first re-submission has not been seen, the request is evaluated and appends once, row (d) cause
+   `replayed`, whatever the counter's state. A caller with no interactive session matches nothing
+   here and falls through.
+2. **Otherwise, the counter.** If it holds, nothing below §11.0 is reached: the response is §5.3's
+   page with cause `throttled`, for a caller with a session and a caller without one alike.
+3. **At `/authorize` only: is there an interactive session?** If there is none, the response is a
+   **303 to §11.7's `/login`** carrying a `continue` under that section's allowlist — §10's
+   *"a caller with no session is sent to §11's login first"*, stated here as its place in the order.
+   **This substep runs before either validation tier**: before §5.3's pre-trust checks and before
+   §7's post-trust ones. A caller presenting a `Token` instead of a session is refused by §10 and is
+   not sent to `/login`. `/login` and `/device` have no substep 3 — `/login` is where a session is
+   obtained, and §3's device redemption is not an owner act.
+
+**Why substep 3 sits after the counter and before validation, and what the alternative cost. a1p**,
+deciding the ordering a1r and A2 both found unfixed. Validating before the redirect would mean an
+unauthenticated `GET /authorize` answers a **303** where the `(client_id, redirect_uri)` pair is
+registered and §5.3's **page** where the `client_id` is not — a registered/unregistered
+distinguisher, reachable with no credential, at the endpoint §11.1 states *"a caller must not learn
+that a client id exists"* for. §5.3 clause 1 would not catch it, because clause 1 converges the
+*failures* and that leak is a success. Under this ordering the redirect carries no registry
+knowledge at all: **every session-less `/authorize` request that survives the counter gets the same
+303, whatever it names**, because nothing has been validated when it is sent. Substep 3 sits *after*
+substep 2 so the redirect is itself throttled — an unauthenticated sweep is bounded by the counter
+like any other, not amplified into free redirects.
+
+**The redirect of substep 3 appends nothing**, and that is deliberate rather than an omission from
+§12's table: it performs no read — not §11.1's keyed entry, not §11.3's — decides nothing about the
+request, and changes no container state, so there is no effect for `events.md` §4 invariant 2 to
+require an entry of. What the sweep does produce is the counter's increment, and the attempt that
+engages the throttle appends once under §12.1 rule 3 as row (d) cause `throttled`. That single entry
+is the whole of an unauthenticated caller's reach into the chain at `/authorize`, which is what
+rule 3 is now written on.
 
 Substep 1 does not reopen rule 3's bound, and the reason is the point of writing it here: it is
 unreachable without an authenticated interactive session, so an unauthenticated sweep never enters
@@ -835,6 +906,12 @@ it; sessions are themselves bounded by §11.7's throttled `/login`; and the exem
 decided request, not once per attempt** — a second re-submission of the same request, on the same
 session, falls to substep 2 and is an ordinary row (d). The owner's interest is in learning that the
 replay happened, which one entry states; a held-down back button is not a second fact.
+
+**Consequence recorded, not acted on here.** Making substeps 1 and 3 precede validation puts rows (d)
+and (f) out of an unauthenticated caller's reach except for (d)'s `throttled` cause, which is the
+direct negation of `consent.md` D-C6's premise that *the post-trust tier is as reachable as the
+pre-trust one*. That premise is the design side's to revise; this document does not edit it. `[OPEN→0.3]`
+the freeze review should confirm the two documents were reconciled rather than left disagreeing.
 
 `[OPEN→0.3]` **What a throttle keys on.** No source names it and it cannot be left unsaid: §12.1
 rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
@@ -1085,11 +1162,18 @@ naming decision:
 3. **A refused attempt is counted, not appended.** The attempt that *engages* a throttle appends once
    under (a), (b) or (d) with cause `throttled` — always (d) and never (f) at `/authorize`, because
    §11.0 runs the throttle before either validation tier. Every further attempt refused while the
-   throttle holds is counted and not appended. This is the clause that bounds the chain: (a), (b),
-   (d) and (f)
-   are all reachable by a caller who has authenticated nothing — a public client's id and registered
-   redirect URI are not secrets — so without it an unauthenticated sweep grows an **append-only** log
-   the owner cannot prune, at the caller's rate.
+   throttle holds is counted and not appended. This is the clause that bounds the chain, and what it
+   bounds is **exactly the part of the table an unauthenticated caller can reach**: (a) and (b), which
+   must be reachable unauthenticated because they are the surfaces at which authentication is
+   *attempted*; and (d) with cause `throttled` alone, which §11.0's substep 2 produces ahead of its
+   substep 3. **(d)'s other five causes and the whole of (f) are not reachable unauthenticated** — a
+   session-less `/authorize` is a 303 to `/login` before either validation tier, and the redirect
+   appends nothing. Nothing here says a client id or a registered redirect URI may be learned: §11.1's
+   *"a caller must not learn that a client id exists"* and §5.3 clause 2's time budget hold
+   undiminished, and this rule takes no position on what a caller knows — only on what an
+   **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
+   `/authorize` grows an **append-only** log the owner cannot prune, at the caller's rate; with it the
+   sweep's whole reach is one entry per throttle engagement.
 4. **A throttle that holds does not evaluate — a correct credential or a valid code included.** A
    throttle that evaluated the right answer while refusing wrong ones would bound the ledger and not
    the guessing, which is the opposite of what it is for. **A throttle MUST fail closed:** one that
