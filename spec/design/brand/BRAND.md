@@ -2,7 +2,7 @@
 
 **Owner:** A2 (Taste)
 **Status:** v1.1 · 2026-09-28 (v1.0: 2026-09-22) · binding on commit. Direction **D · Orb, dither** — picked by the Chief on 2026-09-22 from direction board v0.2 (four marks; studio artifact, not a repo deliverable) after a first board of three the same day. This file, the masters under `spec/design/brand/**` and the pipeline under `pipeline/` are one deliverable: the masters are what the pipeline emits, byte for byte (`pipeline/check.py --regenerate`).
-**Tokens:** `tokens.css` v0.12 — on `main` since #45 (merged 2026-09-28). Every value this file bakes as a literal (§6) is unchanged since v0.3 — re-checked against v0.12 on `main` on 2026-09-28: all five §6.2 literals, `--egz-shadow-ink` = `--egz-ink` in both schemes, and the violet canvas inheriting the dark ink. F-02a still reads the five values from `check.py`'s copy; reading them from `tokens.css` is a pipeline change, not made here.
+**Tokens:** `tokens.css` (the token file; unversioned by the Version rule's *reference* class — §6.2 carries the version of the claim) (consumed; never forked). F-02a still reads the five values from `check.py`'s copy; reading them from `tokens.css` is a pipeline change, not made here.
 **Siblings:** `DESIGN-PRINCIPLES.md` (principle 7 is the one this file must not contradict; §2.3) · `lifeboat.md` · `step-up-tap-and-pending-approval.md` · `consent.md` (each decides *whether* it places the mark; this file decides *which file* and *how large*; §19). **Provenance:** `DESIGN-SOURCES.md` (reference; §22's rows are in it from its v2.17).
 **Consumers:** the Chief (GitHub uploads — org avatar, social preview, two App avatars, App badge colour; §8) · a5-dinghy (lifeboat favicon set and header mark) · a3-doorman (CLI splash, MCP icons) · a4s-atelier (flagship shell mark — `search-list.md` **D-S8**, favicon set, PWA icons; catalogue: none) · a2-conformance (§16, `pipeline/check.py`) · a6-adversary (§15).
 **Source:** the Chief's ink sketch of 2026-09-22 — a sphere with a quarter of its upper hemisphere removed, drawn from above-left; and, beside it, the onion. Reacted to and rebuilt as geometry with fixed numbers (§2), not vectorised.
@@ -179,6 +179,8 @@ A file master is a fixed file and cannot read a CSS variable, so it carries thes
 | `#F4F4F0` | `--egz-ink` (= `--egz-shadow-ink`) | dark | dark file masters |
 | `#0B0B0B` | `--egz-canvas` | dark · neutral | dark flat faces, dark badge card, README dark header, maskable dark |
 | `#0B0716` | `--egz-canvas` | dark · violet | `badge/badge-dark-violet.svg` only |
+
+All five literals, `--egz-shadow-ink` = `--egz-ink` in both schemes, and the violet canvas inheriting the dark ink — unchanged since v0.3, re-checked against **v0.12** on `main` on 2026-09-28.
 
 `--egz-paper` is not used by any identity asset: the badge card is canvas, not paper, so the mark never sits on the secondary surface.
 
@@ -469,8 +471,8 @@ Considered and declined:
 | Paper Shaders · *dithering* | 21st.dev · `paper-design/dithering` | Apache-2.0 | 2026-09-22 | a WebGL surface, not an identity; anti-reference for §17 | `BRAND.md` at v1.0 |
 
 Tools (pipeline, not shipped): resvg-py 0.3.2 (MPL-2.0) · fonttools 4.60 (MIT) · numpy ≥ 2.0, < 3 (BSD-3; pinned in `pipeline/requirements.txt`) · matplotlib 3.9 (PSF-based) · Pillow 11 (MIT-CMU).
-**The pipeline and `tests/conformance/test_brand_pipeline.py` change together, on a `chief/` branch; an agent PR touching either alone is out of policy.** The pipeline is A2 studio's design tool, committed by the Chief, and its test sits in a path a different agent would own — so neither half may move without the other (F12, drift report #10; the Chief's decision, 2026-09-28).
 
+**The pipeline and `tests/conformance/test_brand_pipeline.py` change together, on a `chief/` branch; an agent PR touching either alone is out of policy.** The pipeline is A2 studio's design tool, committed by the Chief, and its test sits in a path a different agent would own — so neither half may move without the other (F12, drift report #10; the Chief's decision, 2026-09-28).
 
 ## §23 Changelog
 - **v1.1 · 2026-09-28** — **§8.3's flagship row follows `search-list.md` D-S8** (the Chief's pick, 2026-09-24): the flat mark beside the shell's live wordmark, not the nav lockup, which §4.2 now marks reserved — v1.0 placed the lockup in a *brand slot* the shell spec never had, so two binding files answered one question two ways. **Tokens pin** v0.8 → v0.12 (on `main` since #45), values re-checked. **§22 states that the pipeline and its test change together** (F12, drift report #10; the Chief's decision, 2026-09-28). **The two items owed until #45 merged land with this revision:** the `spec/design/README.md` index row for this file, and §22's rows in `DESIGN-SOURCES.md` (its v2.17); §21 drops the item and §22's heading says where the rows are.
