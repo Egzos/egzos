@@ -227,12 +227,17 @@ def test_every_model_session_denies_the_process_environment():
 
 
 def test_a6_pr_mode_disclosure_phrase_matches_the_charter():
-    # The workflow prompt comes from the PR head; the charter from the base. The one sentence a6 may
-    # post on a security-class finding must read the same in both (platform#42 a6 review).
+    # The one sentence a6 may post on a security-class finding must read the same in the workflow
+    # prompt and the charter, so the two cannot drift apart in the tree (platform#42 a6 review).
     charter = (ROOT / ".claude" / "agents" / "a6-adversary.md").read_text()
     (phrase,) = set(re.findall(r'"(security-class finding — awaiting [^"]+)"', charter))
     (step,) = [s for _, j, _, s in _model_steps() if j == "a6-adversary"]
     assert phrase in step["with"]["prompt"]
+
+
+def test_verdict_requires_exactly_one_result_record():
+    for job_id in sorted(REVIEW_JOBS):
+        assert "if len(results) == 1 else None" in _verdict(job_id)
 
 
 def _job(job_id):
