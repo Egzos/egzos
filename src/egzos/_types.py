@@ -11,8 +11,9 @@ Phase 1 builds against the frozen surface rather than the skeleton's.
 **Drafted, awaiting the Phase 0.3 freeze review** — A6 and the Chief declare the freeze, not a1p.
 
 Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26),
-``storage.md`` (issue #27) and ``container.md`` (issue #28). The authorization-server surface (#29)
-lands in its own PR; the consolidation pass is #30.
+``storage.md`` (issue #27), ``container.md`` (issue #28) and the authorization server's core
+mechanics (``authorization-server.md``, issue #29; its consent half is #61). The consolidation pass
+is #30.
 """
 
 from __future__ import annotations
@@ -343,6 +344,80 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
 }
 
 
+# --- the authorization server (spec/contracts/authorization-server.md) ----------------------
+#
+# The one contract with NO running shape: the skeleton mints the owner token at `init` and has no
+# login, device-code or consent screen. Prose-derived (#29, part A); the consent half is #61.
+
+ASClientType = Literal["browser", "cli", "mcp"]
+#: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
+#: confidential type, which is why no registration below carries a `client_secret`.
+AS_CLIENT_TYPES: tuple[ASClientType, ...] = get_args(ASClientType)
+
+
+class ClientRegistration(TypedDict):
+    """A client entry in container config (§5); registration is an owner act.
+
+    `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
+    with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
+    ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
+    """
+
+    client_id: str
+    client_name: str
+    client_type: ASClientType
+    redirect_uris: list[str]
+
+
+class DeviceAuthorization(TypedDict):
+    """RFC 8628's device-authorization response (§3) — CLI and headless only; browsers are retired.
+
+    `verification_uri_complete` is `[OPEN->0.3]`, so it is optional here, not absent or mandatory.
+    """
+
+    device_code: str
+    user_code: str
+    verification_uri: str
+    expires_in: int
+    interval: int
+    verification_uri_complete: NotRequired[str]
+
+
+#: RFC 8414's location, at the container's own origin, unauthenticated (§6).
+AS_METADATA_ENDPOINT: str = "/.well-known/oauth-authorization-server"
+
+#: The metadata document IS the interoperability surface: a container MUST NOT advertise what it
+#: does not implement, or implement what it does not advertise. `registration_endpoint` is
+#: advertised only if dynamic registration is enabled (`[OPEN->0.3]`, §5).
+AS_METADATA_FIELDS: tuple[str, ...] = (
+    "issuer",
+    "authorization_endpoint",
+    "token_endpoint",
+    "device_authorization_endpoint",
+    "revocation_endpoint",
+    "registration_endpoint",
+    "response_types_supported",
+    "grant_types_supported",
+    "code_challenge_methods_supported",
+    "token_endpoint_auth_methods_supported",
+    "scopes_supported",
+)
+
+#: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
+#: MUST be rejected; every client is public, so `none` is the only auth method. `scopes_supported`
+#: is absent: it is the six capability names, and whether `node:` joins them is `[OPEN->0.3]`.
+AS_METADATA_CLOSED_VALUES: dict[str, tuple[str, ...]] = {
+    "response_types_supported": ("code",),
+    "grant_types_supported": (
+        "authorization_code",
+        "refresh_token",
+        "urn:ietf:params:oauth:grant-type:device_code",
+    ),
+    "code_challenge_methods_supported": ("S256",),
+    "token_endpoint_auth_methods_supported": ("none",),
+}
+
+
 # --- the storage boundary (spec/contracts/storage.md) ---------------------------------------
 #
 # F3 splits the skeleton's ONE wide `Backend` Protocol into `ItemStore` (pluggable, delegable) and
@@ -442,6 +517,11 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_CLIENT_TYPES",
+    "AS_METADATA_CLOSED_VALUES",
+    "AS_METADATA_ENDPOINT",
+    "AS_METADATA_FIELDS",
+    "ASClientType",
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
@@ -452,10 +532,12 @@ __all__ = [
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
+    "ClientRegistration",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
     "ContextItem",
+    "DeviceAuthorization",
     "EVENTS",
     "Event",
     "GENESIS_HASH",
