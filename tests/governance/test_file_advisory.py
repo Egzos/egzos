@@ -96,6 +96,29 @@ def test_update_appends_and_keeps_the_filed_reproduction(stub):
     assert filed["vulnerable_version_range"] == "< 0.1"
 
 
+def _nulls(v):
+    if isinstance(v, dict):
+        return any(_nulls(x) for x in v.values())
+    if isinstance(v, list):
+        return any(_nulls(x) for x in v)
+    return v is None
+
+
+def test_update_drops_an_empty_package_rather_than_sending_nulls(stub):
+    # A new vulnerability with no package must not become {"package": {"ecosystem": null, ...}}
+    # (#41 review, minor 3).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"vulnerable_version_range": "< 2"}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert not _nulls(sent)
+    assert {"vulnerable_version_range": "< 2"} in sent["vulnerabilities"]
+
+
 def test_update_without_a_description_is_refused(stub):
     d, env = stub
     new = d / "new.json"

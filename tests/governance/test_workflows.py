@@ -136,10 +136,11 @@ def test_review_is_posted_by_a_model_free_step(job_id):
     assert after[0].get("name") == "post-review"
     post = after[0]
     run = post["run"]
-    # From the base commit by SHA, into a fresh file, after the session: never a path it could
-    # have rewritten.
-    assert 'git show "${BASE_SHA}:.github/scripts/post_review_comment.sh"' in run
-    assert "mktemp" in run
+    # From the API at the base commit, under a fresh HOME, after the session: never a path or a
+    # .git it could have reached (#79 review).
+    assert "contents/.github/scripts/post_review_comment.sh?ref=${BASE_SHA}" in run
+    assert 'export HOME="$(mktemp -d)"' in run
+    assert "git show" not in run
     assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     # Posted on failure too (a turn-capped review is still the Chief's to read), never when
     # cancelled.
@@ -212,6 +213,8 @@ def test_a6_suite_runs_in_a_job_holding_no_token():
     (run,) = [s["run"] for s in suite["steps"] if s.get("id") == "suite"]
     # The output delimiter is not guessable from the suite's own text.
     assert "openssl rand" in run
+    # The log line is pytest's own last line, not the first match anywhere in captured output.
+    assert 'tail -n 2 "$OUT" | head -n 1' in run
     assert "::warning::" in run and "::error::" in run
     nightly = _job("a6-adversary-nightly")
     assert nightly["needs"] == "a6-adversary-suite"
@@ -252,6 +255,29 @@ def test_a2_scope_fails_closed_when_git_fails():
     assert 'if ! CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD"' in run
     assert "|| true" not in run
     assert "2>/dev/null" not in run
+
+
+REVIEW_TOOLS = {
+    "Read", "Write", "Grep", "Glob", "StructuredOutput",
+    "Bash(gh pr view:*)", "Bash(gh pr diff:*)", "Bash(gh pr checks:*)",
+}
+
+
+@pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
+def test_review_sessions_hold_exactly_the_review_tools(job_id):
+    # An allowlist, not a denylist of interpreters: Bash(node:*), Bash(sh ...) or a widened
+    # Bash(gh:*) would each pass a denylist (#79 review).
+    (args,) = [s["with"]["claude_args"] for _, j, _, s in _model_steps() if j == job_id]
+    tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+    assert set(tools) == REVIEW_TOOLS
+
+
+def test_the_tests_check_runs_what_rd005_relies_on():
+    # RD-005 half 2 is accepted only while `tests` runs this; an echo would keep every other test
+    # green (Egzos/egzos-platform#41 review).
+    runs = " ".join(s.get("run", "") for s in _job("tests")["steps"])
+    for cmd in ("ruff check .", "pytest -q",):
+        assert cmd in runs, cmd
 
 
 def _verdict(job_id):

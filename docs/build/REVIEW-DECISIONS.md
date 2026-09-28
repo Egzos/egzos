@@ -205,15 +205,16 @@ for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
 
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
-reviewers write `/tmp/review.md`, and a model-free `post-review` step posts it. That step reads the
-script from the base commit by SHA into a fresh file, with `PATH` pinned. The a6 sweep holds no
+reviewers write `/tmp/review.md`, and a model-free `post-review` step posts it. That step fetches the
+script from the API at the base commit, under a fresh `HOME` and with `PATH` pinned. The a6 sweep holds no
 write tool, and passes advisory bodies to `file_advisory.sh` on standard input. Every step after a
 review session runs with `PATH` pinned, and embedded Python runs with `-I`, so that a PR checkout
 in the working directory is not on `sys.path`.
 
 **Residual, named.** The review sessions' `Write` is unscoped. What runs after the session is
-covered: a pinned `PATH`, `-I` Python, and a script read by SHA. But a session that writes outside
-`/tmp` could still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+covered: a pinned `PATH`, `-I` Python, a fresh `HOME`, and a comment script fetched from the API
+rather than read from the checkout's `.git`, whose object lookup a session with `Write` could redirect
+(#79 review). What stays open is that such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
 needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
 silently stops every review from being posted.
 
@@ -222,7 +223,7 @@ required. If it ever stops doing either, the reviewer is left with no executed r
 half 2 has to be reopened.
 
 **Paths in scope.** `.github/workflows/a1r-review.yml`, `.github/workflows/a2-conformance.yml`,
-`.github/workflows/a6-adversary.yml`, `.claude/agents/a1r-reviewer.md`,
+`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`, `.claude/agents/a1r-reviewer.md`,
 `.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
 `.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.
 

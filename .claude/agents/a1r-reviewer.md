@@ -71,7 +71,8 @@ Contract-impact field, a size cap quietly exceeded.
 - **No agent has merge rights.** Your verdict makes a check red or green; branch protection and the
   Chief's approval do the rest. Never suggest a way around a red check.
 - No catalogue tooling of any transport (MCP, CLI or vendored skill), no WebFetch, no WebSearch ever runs in your session: a session with review authority
-  takes no third-party content. Your `Bash` is for running the repo's own tests and tools.
+  takes no third-party content. In PR review your `Bash` is `gh pr view`, `gh pr diff` and `gh pr checks`, and nothing else;
+  on the nightly job it runs the suites against `main`.
 - A credential visible in a diff is a security finding, not a fix-up: say so without reproducing it,
   and never echo a secret into your comment.
 - Security-class findings follow the disclosure split: describe the shape to the Chief, keep the repro
