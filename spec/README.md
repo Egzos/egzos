@@ -9,7 +9,7 @@ contracts and design surfaces to be inspectable.
 ```
 spec/
   contracts/   — the container contract and related schemas
-  design/      — design system, principles, tokens, lifeboat spec, step-up tap + pending-approval specs
+  design/      — design system, tokens, principles, provenance, and the open-core screen specs
 ```
 
 ### contracts/
@@ -25,20 +25,27 @@ and a6-adversary).
 
 ### design/
 
-Design specs and principles that are open-core surfaces:
+Design specs and principles that are open-core surfaces (owner: A2 Taste; committed by the Chief —
+the commit is the approval act). See `design/README.md` for the version table and how to read a spec.
 
-- `DESIGN-PRINCIPLES.md` — the principles both UIs obey (owner: A2; drafted from direction sessions)
+- `tokens.css` — the ONE code artifact A2 ships; consumed by both the lifeboat and the flagship
+- `DESIGN-PRINCIPLES.md` — the principles both UIs obey
 - `DESIGN-SOURCES.md` — component provenance (registry item, license, date, the spec that picked it)
-- The tokens file — the ONE code artifact A2 ships; consumed by both the lifeboat and the flagship
-- The lifeboat spec — egzos/spec/design (public; see R10)
-- The step-up tap + pending-approval page spec — public because the tap spec being public is good
-  for trust (R10)
+- `step-up-tap-and-pending-approval.md` — the step-up tap page and the pending-approval page; public
+  because the tap spec being public is good for trust (R10)
+- `lifeboat.md` — the server-rendered in-process UI: home/search, item detail, pending parity (A5's
+  build target)
+- `consent.md` — the authorization server's own pages: `/login`, `/device`, `/authorize` (the consent
+  screen in `token ls` vocabulary), outcomes, and the uniform failure page (A3-Trust's build target)
 
 Flagship screen specs live in the sibling `Egzos/egzos-platform/spec/design` — closed
 product, closed specs (R10). The tokens file is the shared dependency across repos; the platform
 consumes it, never forks it.
 
-A2's first deliverable is the step-up tap + pending-approval page spec.
+Every spec carries the same sections, including a region × state matrix, a canonical copy table, what
+it needs from the contract (`[OPEN→a1p]` / `[GAP→a1p]` raised, never invented), and one test fixture
+per state. A state not listed for a region cannot occur there; a case a spec does not answer is a
+defect in the spec — file a `design-gap` issue and take the next item, never improvise.
 
 ## How a contract changes
 
