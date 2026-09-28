@@ -18,14 +18,27 @@ FILED = {
     "state": "draft",
     "summary": "s",
     "description": "ORIGINAL REPRO",
-    "vulnerabilities": [{"package": {"ecosystem": "other", "name": "egzos"}}],
+    # The read shape: GET carries fields and nulls a PATCH body does not take back.
+    "vulnerabilities": [{
+        "package": {"ecosystem": "other", "name": "egzos", "purl": None},
+        "vulnerable_version_range": "< 0.1",
+        "patched_versions": None,
+        "vulnerable_functions": [],
+        "cvss": None,
+    }],
 }
 
 STUB = """#!/usr/bin/env bash
-# Records every call; answers GET with the filed advisory, PATCH/POST with the id.
+# Records every call; answers GET with the filed advisory, PATCH/POST with the id, and keeps the
+# body it was sent, from --input's file or from stdin.
 printf '%s\\n' "$*" >> "$STUB_DIR/calls"
+input=""
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  [[ "${args[i]}" == "--input" ]] && input="${args[i+1]}"
+done
 if [[ "$*" == *"-X PATCH"* || "$*" == *"-X POST"* ]]; then
-  cat > "$STUB_DIR/sent.json"
+  if [[ -n "$input" && "$input" != "-" ]]; then cat "$input"; else cat; fi > "$STUB_DIR/sent.json"
   echo "$GHSA"
 else
   cat "$STUB_DIR/filed.json"
@@ -52,9 +65,10 @@ def stub(tmp_path):
     return tmp_path, env
 
 
-def _run(env, *args):
+def _run(env, *args, stdin=None):
     return subprocess.run(
-        ["bash", str(SCRIPT), *args], capture_output=True, text=True, env=env, check=False
+        ["bash", str(SCRIPT), *args], input=stdin, capture_output=True, text=True, env=env,
+        check=False,
     )
 
 
@@ -73,6 +87,63 @@ def test_update_appends_and_keeps_the_filed_reproduction(stub):
     assert sent["description"].endswith("second vector")
     assert {v["package"]["name"] for v in sent["vulnerabilities"]} == {"egzos", "egzos-platform"}
     assert set(sent) == {"description", "vulnerabilities"}
+    writable = {"package", "vulnerable_version_range", "patched_versions", "vulnerable_functions"}
+    for v in sent["vulnerabilities"]:
+        assert set(v) <= writable, v
+        assert set(v["package"]) == {"ecosystem", "name"}
+        assert None not in v.values()
+    (filed,) = [v for v in sent["vulnerabilities"] if v["package"]["name"] == "egzos"]
+    assert filed["vulnerable_version_range"] == "< 0.1"
+
+
+def _nulls(v):
+    if isinstance(v, dict):
+        return any(_nulls(x) for x in v.values())
+    if isinstance(v, list):
+        return any(_nulls(x) for x in v)
+    return v is None
+
+
+def test_update_drops_an_empty_package_rather_than_sending_nulls(stub):
+    # A new vulnerability with no package must not become {"package": {"ecosystem": null, ...}}
+    # (#41 review, minor 3).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"vulnerable_version_range": "< 2"}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert not _nulls(sent)
+    assert {"vulnerable_version_range": "< 2"} in sent["vulnerabilities"]
+
+
+def test_update_drops_a_package_without_an_ecosystem(stub):
+    # The API requires ecosystem whenever package is present (platform#42 review).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"package": {"name": "egzos"}}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert all("ecosystem" in v["package"] for v in sent["vulnerabilities"] if "package" in v)
+
+
+def test_update_keeps_an_ecosystem_only_package(stub):
+    # name is optional in the advisory API; this repository's own code publishes no package
+    # (platform#42 review).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"package": {"ecosystem": "other"}}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert {"package": {"ecosystem": "other"}} in sent["vulnerabilities"]
 
 
 def test_update_without_a_description_is_refused(stub):
@@ -99,6 +170,32 @@ def test_create_sends_the_file_and_prints_only_the_id(stub):
     assert res.returncode == 0
     assert res.stdout.strip() == GHSA
     assert "REPRO" not in res.stdout + res.stderr
+
+
+def test_create_takes_the_body_on_stdin(stub):
+    # The sweep's session holds no write tool, so `-` is how it hands over a body (#71 round 3).
+    d, env = stub
+    res = _run(env, "create", "-", stdin=json.dumps({"summary": "s", "description": "REPRO"}))
+    assert res.returncode == 0, res.stderr
+    assert res.stdout.strip() == GHSA
+    assert "REPRO" not in res.stdout + res.stderr
+    assert json.loads((d / "sent.json").read_text())["description"] == "REPRO"
+
+
+def test_update_takes_the_body_on_stdin_and_still_appends(stub):
+    d, env = stub
+    res = _run(env, "update", GHSA, "-", stdin=json.dumps({"description": "third vector"}))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert sent["description"].startswith("ORIGINAL REPRO\n\n### Update ")
+    assert sent["description"].endswith("third vector")
+
+
+@pytest.mark.parametrize("stdin", ["", "not json", "[1, 2]"])
+def test_stdin_body_must_be_a_json_object(stub, stdin):
+    d, env = stub
+    assert _run(env, "create", "-", stdin=stdin).returncode == 2
+    assert not (d / "sent.json").exists()
 
 
 def test_unknown_verb_is_refused(stub):
