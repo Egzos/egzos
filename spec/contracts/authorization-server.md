@@ -1053,10 +1053,19 @@ failure and appends once, §12's cause `replayed`.
 **A re-submission is recognised as one only on the deciding session. a1p** — a decided request is
 bound to the interactive session (§10) that decided it, and only that session's **first**
 re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside §11.0's substep 1,
-which is where the ordering that exempts it is fixed. The same request arriving on another session,
-on none, or a second time on the deciding session, is an **ordinary pre-trust failure**: §5.3's
+which is where the ordering that exempts it is fixed. The same request arriving on **another**
+session, or a second time on the deciding session, is an **ordinary pre-trust failure**: §5.3's
 page, cause `replayed`, counted and refused by
-§11.0's throttle exactly like every other row (d). Without this binding, rule 6's exemption is an
+§11.0's throttle exactly like every other row (d).
+
+**A re-submission carrying no session at all is not one this section ever sees. a1p** — it is
+substep 3's redirect like any other session-less `/authorize` request, and nothing here applies to
+it. Substep 1 falls through, because the read is keyed on the interactive session and a caller
+without one matches nothing; substep 3 then sends the request to `/login` before either validation
+tier, so §5.3's page is never reached and **this section's decided-request record is never read for a
+caller with no session**. `replayed` is therefore one of the five row-(d) causes that answer an
+authenticated session (§5.3 clause 1), and §12.1 rule 3's bound does not have to carry it. Without
+this binding, rule 6's exemption is an
 unbounded append any caller can drive at will, and it would not compose with §12.1 rule 3 — the
 clause that bounds the chain's growth. `consent.md` §15 carries the design half (*"CSRF on the acts
 — request bound to the session; form token"*); this is the contract clause underneath it, and §2's
@@ -1099,13 +1108,40 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
 - **The login establishes an interactive session and mints no token.** §10's four bullets hold: the
   session is not a `Token`, appears in no `token ls`, and is accepted at no endpoint that accepts a
   `Token`.
-- **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** It is never
-  an absolute URL, never a protocol-relative one (a leading `//` is rejected before anything else),
-  never reflected into the page, and a value that does not match the allowlist is dropped silently
-  for the container's root — not reported. **a1p**: this is the open-redirect hole in the one place a
-  human has just typed a credential, and the allowlist is an allowlist rather than a validator
-  because every "validate a redirect" bug in the literature is a validator. The list itself is
+- **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** It is parsed
+  as a relative reference and MUST have **no scheme, no authority** (a leading `//` is rejected
+  before anything else) **and no fragment**; it is never an absolute URL, never reflected into the
+  page, and a value whose **path** does not match the allowlist is dropped silently for the
+  container's root — not reported. **a1p**: this is the open-redirect hole in the one place a human
+  has just typed a credential, and the allowlist is an allowlist rather than a validator because
+  every "validate a redirect" bug in the literature is a validator. The list itself is
   `consent.md`'s D-C5.
+- **`continue` is also how the pending authorization request survives the login, and it is the only
+  thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
+  before anything about it has been validated, so the request has to reach the login *and come back*,
+  or §2's browser flow cannot complete and the human is left at a container root having authorized
+  nothing. Fixed as follows, and testable:
+  - **The allowlist matches the path; a query carried with that path rides along unparsed.** The AS
+    does not inspect it, does not render it, does not store it and does not validate it here. On a
+    successful login the browser is sent to the allowlisted path **with that query intact**, and that
+    path validates the request exactly as it would have validated the same request sent directly.
+  - **Two flows depend on it and both MUST complete without the client re-initiating**: §2's
+    browser flow resumes at `/authorize` with the `client_id`, `redirect_uri`, `state`,
+    `code_challenge` and `code_challenge_method` the client sent; and `consent.md` R3's device
+    hand-off — *approved (code found)* is a `303 to /authorize?user_code=…` — resumes at the same
+    path with its `user_code`, which is the case that fails silently if only a bare path survives.
+  - **Nothing is written to container state to make this work.** The request rides in the redirect,
+    not in a server-side pending record. This is what keeps §11.0's substep 3 a step that appends
+    nothing and stores nothing, and it is why an unauthenticated sweep cannot make the container
+    retain anything (§12.1 rule 3).
+  - **A query changes no bound that the path did not already have.** Every value in it is the
+    caller's own, handed back to the same caller, and the endpoint it is handed to is one the caller
+    could have called directly — so the allowlist still bounds *where* a freshly authenticated
+    browser can be sent, which is the whole of what it is for.
+
+  `[OPEN→0.3]` **A length bound on `continue`.** No source names one, and a carrier that accepts an
+  unbounded query is a cheap way to make a redirect large; the review should pin a ceiling, above
+  which the value is dropped for the container's root like any other non-matching value.
 - **The login is throttled per caller**, on §12's terms, and its failures are uniform: wrong
   credential, unknown user and a throttled attempt produce one message, one status and one timing
   class. A login page that distinguishes *unknown* from *wrong* has published the container's user
@@ -1130,7 +1166,13 @@ above holds whichever is picked.
   from an alphabet with no visually ambiguous pairs, which is what makes a short code typable and is
   the reason it is short). §9's entropy clause covers the *source*; this covers the *size*.
 - **Redemption is single-use and throttled**, per §3 mitigation 1 and §12: a code that has been
-  redeemed is spent whether or not the authorization it belongs to was approved.
+  redeemed is spent whether or not the authorization it belongs to was approved. **Its failures are
+  uniform**, on §11.7's terms and for §11.7's reason: §12 row (b)'s five causes — `invalid`,
+  `expired`, `used`, `malformed` and `throttled` — produce one message, one status and one timing
+  class, the cause reaching `details` and never the page (§12.1 rule 1). A page that distinguished
+  `used` from `invalid` would tell an attacker sweeping codes which of its guesses had ever been
+  issued. This is the response §11.0's substep 2 means at `/device`; §5.3's page is `/authorize`'s
+  and is not this surface's.
 - **The requester hint is client-supplied, unverified data.** A device client MAY report a device or
   host name for the client block. **The AS MUST NOT verify it, MUST NOT branch on it, and MUST NOT
   record it anywhere that reads as verified. a1p** — it is a phishing-relevant string a remote
@@ -1182,9 +1224,9 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
-**before any token exists** — (a), (b) and (d)'s `throttled` cause before any session exists either,
-the rest inside a session §11.0's substep 3 has already required — and the drafted taxonomy has no
-name for one of them.
+**before any token exists** — (a), (b) and (d)'s `throttled` and `token_presented` causes before any
+session exists either, the rest inside a session §11.0's substep 3 has already required — and the
+drafted taxonomy has no name for one of them.
 `events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
 non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
 
@@ -1199,7 +1241,7 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 |---|---|---|---|
 | **(a)** | a login attempt at `/login` | `established` · `failed` | `wrong` · `unknown` · `throttled` |
 | **(b)** | a device-code redemption at `/device` | `found` · `failed` | `invalid` · `expired` · `used` · `malformed` · `throttled` |
-| **(d)** | a pre-trust uniform failure at `/authorize` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` |
+| **(d)** | a pre-trust uniform failure at `/authorize` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` · `token_presented` |
 | **(e)** | a throttle releasing | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` · `expiry` |
 
@@ -1220,9 +1262,10 @@ rather than an append, and if the sitting disagrees the answer is a sixth row, n
 naming decision:
 
 1. **One append per *evaluated* attempt, success and failure alike** — the same shape `events.md`
-   invariant 2 already requires of a read. The cause lives in `details` and never on the page: §11.7
-   and §7 make the surfaces uniform to the *caller*, and that uniformity is owed to the caller, never
-   to the owner's own ledger.
+   invariant 2 already requires of a read. The cause lives in `details` and never on the page: §5.3,
+   §7, §11.7 and §11.8 make the four surfaces uniform to the *caller* — **each in its own response,
+   not in one shared one** (§11.0 substep 2) — and that uniformity is owed to the caller, never to
+   the owner's own ledger.
 2. **One append per path, however the path is reached.** (d)'s page is one page; a request that
    arrives at it by six different causes writes once each time, so no cause is distinguishable by the
    *number* of writes it makes.
@@ -1232,10 +1275,14 @@ naming decision:
    throttle holds is counted and not appended. This is the clause that bounds the chain, and what it
    bounds is **exactly the part of the table an unauthenticated caller can reach**: (a) and (b), which
    must be reachable unauthenticated because they are the surfaces at which authentication is
-   *attempted*; and (d) with cause `throttled` alone, which §11.0's substep 2 produces ahead of its
-   substep 3. **(d)'s other five causes and the whole of (f) are not reachable unauthenticated** — a
+   *attempted*; and (d) with two of its seven causes — `throttled`, which §11.0's substep 2 produces
+   ahead of its substep 3, and `token_presented`, which substep 3 produces for a caller presenting a
+   bearer credential (§10). Both are bounded by the same counter, because both are decided after it:
+   a sweep presenting credentials is throttled exactly as a sweep presenting none is, and neither
+   reaches a response that depends on the registry. **(d)'s other five causes and the whole of (f)
+   are not reachable unauthenticated** — a
    session-less `/authorize` is a 303 to `/login` before either validation tier, and the redirect
-   appends nothing. Nothing here says a client id or a registered redirect URI may be learned: §11.1's
+   appends nothing and stores nothing. Nothing here says a client id or a registered redirect URI may be learned: §11.1's
    *"a caller must not learn that a client id exists"* and §5.3 clause 2's time budget hold
    undiminished, and this rule takes no position on what a caller knows — only on what an
    **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
@@ -1256,10 +1303,14 @@ naming decision:
    ordering is carved and the only place the read is reachable** — and appends once, cause
    `replayed`, whatever the throttle's state, because a replay after a decision is a fact the owner
    has an interest in and the session it arrives on is one §10 has already authenticated. **The
-   exemption reaches no further**: not to another session, not to none, and not to a second
+   exemption reaches no further**: not to another session, and not to a second
    re-submission of the same request, substep 1 being once per decided request. Each of those is an
    ordinary (d) under rules 2 and 3 — §5.3's page, cause `replayed`, counted and refused like
-   anything else. Read without §11.4's binding and §11.0's substep this rule would be an unthrottled
+   anything else. A re-submission carrying **no** session reaches neither the exemption nor the page:
+   substep 1 falls through, substep 3 redirects it to `/login` before either validation tier, and
+   §11.4's decided-request record is not read for it at all — which is why rule 3 does not have to
+   carry `replayed` among the causes an unauthenticated caller can reach.
+   Read without §11.4's binding and §11.0's substep this rule would be an unthrottled
    append reachable by any caller, which is exactly what rule 3 exists to prevent.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
@@ -1275,10 +1326,15 @@ token exists; and (e) fires on **no attempt at all** — a timer releasing, with
 request. The gap is real and it is this document's to raise, `events.md`'s to close.
 
 **A consequence of §11.0's substep 3 that #86 must take with the rest. a1p** — the gap is narrower
-than "none of the five" for two of them. (d)'s five non-`throttled` causes and the whole of (f) are
+than "none of the five" for two of them. (d)'s five causes that are neither `throttled` nor
+`token_presented`, and the whole of (f), are
 now reached only inside an interactive session, so an `interactive` principal is available and
-truthful there; the entries with no principal to carry are (a), (b), (d) with cause `throttled`, and
-(e). This document does not pick: a taxonomy that used `interactive` where it is known and the
+truthful there; the entries with no principal to carry are (a), (b), (d) with cause `throttled` or
+`token_presented`, and
+(e). A `token_presented` entry is the sharpest case of the second reading's point: the caller held a
+credential, the AS deliberately did not look at it (§10), and a principal derived from it would be
+asserting exactly what that clause refuses to determine.
+This document does not pick: a taxonomy that used `interactive` where it is known and the
 reading below where it is not is one answer, and a taxonomy that used the reading below uniformly
 across all five — so that a reader cannot infer from the principal which cause a uniform page had —
 is another, and the second may matter more than the first. **#86's sitting chooses**; §5.3's
