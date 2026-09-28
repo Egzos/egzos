@@ -193,9 +193,10 @@ to a registered entry, and MUST NOT implement:
 - **scheme or host normalisation** beyond the URI's own case rules — no "http where https was
   registered", no trailing-slash equivalence.
 
-A registered URI is absolute and `https`, with one exception, next.
+A registered URI is absolute and `https`, with the loopback exception stated next: it relaxes the
+scheme to `http`, and — for the literal loopback address only — the port.
 
-### The one exception: loopback ports
+### The exception: loopback redirect URIs
 
 **A registered loopback redirect URI matches with its port ignored and everything else exact. a1p**,
 from RFC 8252 §7.3: a native or dev client binds to an ephemeral port it cannot know at registration
@@ -205,14 +206,19 @@ time, so the port is the one component that varies. The exception is bounded to:
 - scheme is `http` (this is the §2 TLS exception, and it is this and nothing else);
 - **only the port is ignored.** Path, query, scheme and host are compared exactly, as above.
 
-TODO(a1p): **`localhost` as a hostname is not covered by that exception, and §K says "localhost dev
-origins".** RFC 8252 §8.3 prefers the literal IP precisely because `localhost` resolves through a
-name — and a name is something a resolver, a hosts file or a hostile network can move. a1p's
-reading, for A6 and the freeze to confirm or overrule: a `http://localhost:<port>/…` entry is
-permitted, but **only as an exact registered string including the port** — it gets no port
-exception, so a developer registers the port they will actually bind. That keeps §K's "localhost dev
-origins" working without extending a wildcard to a resolvable name. If the review disagrees it
-should say so in the document, because this is the difference between one hole and none.
+**`localhost` as a hostname is permitted — as an exact registered string, including the port. a1p**,
+binding §K's "localhost dev origins". RFC 8252 §8.3 prefers the literal IP precisely because
+`localhost` resolves through a name, and a name is something a resolver, a hosts file or a hostile
+network can move — so the name form gets the scheme relaxation and **no port exception**:
+`http://localhost:<port>/…` matches only the exact string registered, port included, and a developer
+registers the port they will actually bind. The port relaxation above stays bounded to `127.0.0.1`
+and `[::1]`.
+
+`[OPEN→0.3]` **Whether the hostname form is dropped entirely.** The clause above is a1p's binding,
+not a §K decision, and it is the only part of this rule left open: A6 and the freeze may rule that
+only the literal loopback address is registrable and `localhost` entries are refused. The scheme,
+the port and the matching are settled above, because this is the difference between one hole and
+none.
 
 ## 6 · AS metadata discovery
 
