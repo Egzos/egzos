@@ -116,6 +116,14 @@ def test_forge_token_sessions_run_no_interpreter():
         assert not any(i in step["with"]["claude_args"] for i in interpreters), (wf, job_id)
 
 
+@pytest.mark.parametrize("job_id", ["a2-conformance", "a6-adversary"])
+def test_not_applicable_waits_for_a_successful_scope(job_id):
+    (cond,) = [
+        s["if"] for _, j, _, s in _steps() if j == job_id and s.get("name") == "not-applicable"
+    ]
+    assert "steps.scope.outcome == 'success'" in cond
+
+
 def _verdict(job_id):
     (run,) = [s["run"] for _, j, _, s in _steps() if j == job_id and s.get("name") == "Verdict"]
     return run

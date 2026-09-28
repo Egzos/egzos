@@ -7,7 +7,12 @@
 #
 #   file_advisory.sh list                          existing advisories: GHSA id, state, summary
 #   file_advisory.sh create <json-file>            file one; prints its GHSA id
-#   file_advisory.sh update <GHSA-id> <json-file>  add to one already filed; prints its GHSA id
+#   file_advisory.sh update <GHSA-id> <json-file>  append to one already filed; prints its GHSA id
+#
+# update is append-only. The advisory body is the only copy of an unfixed reproduction, and the API's
+# PATCH replaces each field it is given, so the script reads the filed advisory itself: the new
+# file's `description` (required) is appended under a dated heading, its `vulnerabilities` are
+# added to the filed ones, and `severity` is replaced only if given. Nothing else is sent.
 #
 # Requires GH_TOKEN (the forge token) and GITHUB_REPOSITORY. Prints ids and summaries only: the
 # body carrying a reproduction goes to the API from the file and never to stdout.
@@ -39,7 +44,17 @@ case "${1:-}" in
     [[ $# -eq 3 ]] || usage
     [[ "$2" =~ ^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$ ]] || { echo "file_advisory.sh: not a GHSA id: $2" >&2; exit 2; }
     body_file "$3"
-    gh api -X PATCH "repos/${REPO}/security-advisories/$2" --input "$3" --jq '.ghsa_id'
+    jq -e '(.description | type) == "string" and (.description | length) > 0' "$3" >/dev/null \
+      || { echo "file_advisory.sh: update needs a non-empty description to append" >&2; exit 2; }
+    CURRENT="$(gh api "repos/${REPO}/security-advisories/$2")"
+    jq -n --argjson cur "$CURRENT" --slurpfile new "$3" --arg day "$(date -u +%F)" '
+        $new[0] as $n
+        | {description: (($cur.description // "") + "\n\n### Update " + $day + "\n\n" + $n.description)}
+        + (if $n.severity then {severity: $n.severity} else {} end)
+        + (if $n.vulnerabilities
+             then {vulnerabilities: ((($cur.vulnerabilities // []) + $n.vulnerabilities) | unique)}
+             else {} end)' \
+      | gh api -X PATCH "repos/${REPO}/security-advisories/$2" --input - --jq '.ghsa_id'
     ;;
   *)
     usage

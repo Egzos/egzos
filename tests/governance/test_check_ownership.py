@@ -220,6 +220,9 @@ OWNERSHIP = {
     "agents": {
         "a1p-planner": {"paths": ["docs/**", "spec/**"], "exclusive": []},
         "a6-adversary": {"paths": ["adversarial/**"], "exclusive": ["adversarial/**"]},
+        # The real overlap shape: one agent's paths contain another's exclusive tree.
+        "a4s-atelier": {"paths": ["apps/**"], "exclusive": []},
+        "a4g-atelier": {"paths": ["apps/bespoke/**"], "exclusive": ["apps/bespoke/**"]},
     },
 }
 
@@ -233,7 +236,7 @@ def _run_main(repo, branch, env_extra=None):
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--base", "main", "--head", "HEAD",
          "--branch", branch, "--ownership", str(own)],
-        cwd=repo, capture_output=True, text=True, env=env,
+        cwd=repo, capture_output=True, text=True, env=env, check=False,
     )
 
 
@@ -248,10 +251,15 @@ def test_main_fails_a_chief_only_rename_source(repo):
 
 
 def test_main_fails_another_agents_exclusive_path(repo):
-    _write(repo, "adversarial/t.py", "x\n")
+    # a4s owns apps/**, which contains a4g's exclusive apps/bespoke/**: the path is owned, so only
+    # the exclusive rule can fail it.
+    _write(repo, "apps/bespoke/g.tsx", "x\n")
     _commit(repo, "base")
-    _branch_diff(repo, lambda r: _write(r, "adversarial/t.py", "y\n"))
-    assert _run_main(repo, "agent/a1p-planner/x").returncode == 1
+    _branch_diff(repo, lambda r: _write(r, "apps/bespoke/g.tsx", "y\n"))
+    res = _run_main(repo, "agent/a4s-atelier/x")
+    assert res.returncode == 1
+    assert "exclusive to a4g-atelier" in res.stdout
+    assert "not in a4s-atelier's owned paths" not in res.stdout
 
 
 def test_main_passes_owned_change(repo):
@@ -311,7 +319,7 @@ def test_main_fails_closed_on_unparseable_numstat_file(repo, tmp_path):
     res = subprocess.run(
         [sys.executable, str(SCRIPT), "--base", "x", "--branch", "agent/a1p-planner/x",
          "--ownership", str(own), "--numstat", str(ns)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, check=False,
     )
     assert res.returncode == 1
     assert "unparseable" in res.stdout

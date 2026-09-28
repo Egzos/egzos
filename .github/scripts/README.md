@@ -82,7 +82,9 @@ bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx /tmp/advisory.j
 
 Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object in a
 file; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
-only — never a reproduction. `list` comes first on every sweep, so a finding already filed is
+only — never a reproduction. `update` is append-only: it reads the filed advisory and appends the new
+`description` under a dated heading (adding any new `vulnerabilities`), because the advisory is the
+only copy of an unfixed reproduction and a plain PATCH would replace it. `list` comes first on every sweep, so a finding already filed is
 updated rather than filed again.
 
 ## post_review_comment.sh

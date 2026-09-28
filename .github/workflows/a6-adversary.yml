@@ -266,7 +266,8 @@ jobs:
         run: echo "Draft PR — no model review. Mark ready for review to dispatch the reviewers. Passing."
 
       - name: not-applicable
-        if: always() && steps.scope.outputs.applicable != 'true' && github.event.pull_request.draft != true
+        # Only after a scope step that succeeded, as in a2-conformance (#44).
+        if: always() && steps.scope.outcome == 'success' && steps.scope.outputs.applicable != 'true' && github.event.pull_request.draft != true
         run: echo "a6-adversary not applicable — 'security' label not present, or Dependabot bump. Passing."
 
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
@@ -324,7 +325,7 @@ jobs:
 
             You are a6-adversary running your nightly sweep against main. Execute your standing targets: injected --yes / echo-y; TOCTOU vs manifest binding AND vs the branch-protection configuration; enumeration via error shapes; proposal-target probing; staging abuse; token-sweep gaps; the OAuth surface (PKCE downgrade, redirect allowlist, consent phishing); Herald's distillation pipeline (poisoned PR to misleading digest); catalogue-content injection.
 
-            BEFORE FILING ANYTHING, list what is already filed: `bash .github/scripts/file_advisory.sh list` and `gh issue list --state all --limit 200 --json number,title,labels`. A fresh checkout has no memory of earlier sweeps, so without this check you re-file the same defect every night. If a finding is already filed, do not file it again; if this run adds materially new information (a new vector, a corrected impact, confirmed reachability), update that advisory with `bash .github/scripts/file_advisory.sh update <GHSA id> /tmp/advisory.json` or comment on that issue instead.
+            BEFORE FILING ANYTHING, list what is already filed: `bash .github/scripts/file_advisory.sh list` and `gh issue list --state all --limit 200 --json number,title,labels`. A fresh checkout has no memory of earlier sweeps, so without this check you re-file the same defect every night. If a finding is already filed, do not file it again; if this run adds materially new information (a new vector, a corrected impact, confirmed reachability), update that advisory with `bash .github/scripts/file_advisory.sh update <GHSA id> /tmp/advisory.json` — write only what this run adds; the script appends it under a dated heading and never replaces the reproduction already filed — or comment on that issue instead.
 
             For SECURITY findings: write the advisory body as JSON (summary, description carrying the full reproduction, severity, vulnerabilities/affected paths) to /tmp/advisory.json, then file it with `bash .github/scripts/file_advisory.sh create /tmp/advisory.json`, which prints the GHSA id — the egzos-forge identity holds that permission, and that script is your only route to the advisory API. In this run's output write ONLY "security-class finding filed as advisory <GHSA id>". Actions logs on this public repository are public: never write a repro, payload, affected path, or detailed description anywhere but inside the advisory.
 
