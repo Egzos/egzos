@@ -265,7 +265,7 @@ container-specific — no node ids, no client names, no owner identity — may b
 | `token_endpoint` | §2, §3 |
 | `device_authorization_endpoint` | §3 |
 | `revocation_endpoint` | §9 — `[OPEN→0.3]`; **advertised only if** the endpoint exists |
-| `registration_endpoint` | §5 — **advertised only if** dynamic registration is enabled |
+| `registration_endpoint` | §5 — `[OPEN→0.3]`; **advertised only if** dynamic registration is enabled |
 | `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
 | `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
 | `code_challenge_methods_supported` | `["S256"]` — `plain` is never advertised (§2) |
@@ -318,7 +318,8 @@ is the spelling, and the freeze may change it as long as the rule survives. A `s
 space-delimited set drawn from exactly two forms:
 
 - **a bare capability name** — one of `fetch remember organize publish curate admin`;
-- **`node:<node-id>`** — a scope entry of `Token.scopes`. `node:*` is the whole container.
+- **`node:<node-id>`** — the `scope`-parameter spelling *of* a `Token.scopes` entry, not the entry
+  itself: the AS strips the prefix when it mints (consequence 3). `node:*` is the whole container.
 
 The AS expands the request into `{capabilities, scopes}` on the minted token. Anything else in the
 `scope` value is refused; the request is **not** silently narrowed to the part that parsed.
@@ -340,9 +341,12 @@ Three consequences that are contract, not style:
    exactly this word — `admin` is a capability and `admin` is the all-six bundle — and a reader who
    guesses wrong grants five capabilities they did not mean to. Stated here so no implementation
    resolves the collision the other way.
-3. **`node:*` is the owner's grant.** `capabilities.md` §5 says `["*"]` is the owner's token; a
-   client asking for `node:*` is asking for the whole container, and the consent screen must render
-   it as that (#61).
+3. **`node:*` is the owner's grant, and the prefix does not survive the mint.** `capabilities.md` §5
+   says `["*"]` is the owner's token; a client asking for `node:*` is asking for the whole container,
+   and the consent screen must render it as that (#61). The `node:` prefix exists only in the
+   `scope` parameter — **`Token.scopes` carries bare node ids**, so `node:*` in a request becomes
+   `["*"]` on the token, and a token that stored the prefixed form would not match
+   `capabilities.md` §5 or the coverage check that reads it.
 
 ### The AS is not an enumeration oracle
 
@@ -485,7 +489,11 @@ revocation *semantics* under every option: whatever the transport, a revoked tok
 at all, and whether client registration is one.** `events.md` §1 closes its vocabulary by
 construction — *"an appended event whose name is not in this list MUST be rejected"* — and §4
 invariant 2 closes the other side: *"a surface that produces an effect without a corresponding event
-is non-conforming."* The AS produces **six** effects with only two events between them.
+is non-conforming."* The AS produces **seven** effects with only two events between them, and they
+are enumerated here so a reader can count them instead of trusting the number: a token is **issued**
+(`token.mint`); a token is **revoked** (`token.revoke`); the owner **grants** consent (§2, §3); the
+owner **denies** it, or the request is rejected; a refresh token is **rotated**; a client is
+**registered** (§5); a **device authorization is requested** (§3). Only the first two have an event.
 
 **Registration (§5) is the sixth, and this document adds it to the question.** It is an owner act
 that writes the redirect-URI allowlist — the one piece of container state that decides where an
@@ -495,6 +503,18 @@ would otherwise be visible; a registration is also, by §4 invariant 2's own voc
 approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
 are settled together with one edit to `events.md` rather than four. a1p's recommendation is on the
 issue. **Not answered in this document.**
+
+**Device authorization (§3) is the seventh, and it is in #68's scope too — stated because a reader
+counting §9's effects could not otherwise tell.** A device authorization request mints a `device_code`
+and a `user_code` and stores the pending authorization bound to them (§3, mitigation 3) — durable
+container state, created by a caller that holds no token and, since every client here is public
+(§1, §6's `["none"]`), authenticates nothing when it asks. An **initiated-then-abandoned** device
+authorization therefore leaves nothing in the chain at all: the same invisible-probe shape as a
+denied `/authorize`, and reachable with less, because it needs no registered redirect URI. Whether
+it is an event or is explicitly stated not to be is #68's to settle with the other four; a1p does
+**not** pick here, and does not read #68's option (b) as already covering it — (b) keys on a
+granted-or-denied *decision*, and an abandoned authorization never reaches one. Recorded as a
+comment on #68 rather than an edit to its body, the convention #73 used.
 
 `[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
 that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS
