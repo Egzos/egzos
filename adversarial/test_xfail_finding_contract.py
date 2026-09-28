@@ -8,6 +8,7 @@ pytest's import-mode configuration or collide with pytest's own loaded copy of t
 """
 
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
@@ -118,14 +119,18 @@ def test_multiple_violations_are_all_reported_together():
 def test_hook_is_actually_wired_into_a_real_pytest_run(tmp_path):
     """Proves the wiring, not just the predicate (issue #75).
 
-    The seven tests above call ``pytest_collection_modifyitems`` directly — they'd stay green
-    even if ``conftest.py`` were renamed, moved somewhere pytest doesn't load it from, or if
-    ``adversarial`` fell out of ``testpaths`` in pyproject.toml. This test instead runs a real,
-    separate ``pytest`` process against an isolated copy of the actual pyproject.toml and the
-    actual conftest.py, collecting a deliberately bare ``@pytest.mark.xfail_finding`` test placed
-    next to that copied conftest. A real hook, really wired in, is required for this to fail
-    collection; renaming/moving the hook or dropping ``adversarial`` from testpaths would make
-    the child process exit 0, which the assertions below would catch.
+    The seven tests above call ``pytest_collection_modifyitems`` directly against an in-process
+    fake item list; they never ask pytest itself to discover and load ``conftest.py``. This test
+    instead runs a real, separate ``pytest`` process against an isolated copy of the actual
+    pyproject.toml and the actual conftest.py, collecting a deliberately bare
+    ``@pytest.mark.xfail_finding`` test placed next to that copied conftest. The hook is
+    registered as a pytest hook in a conftest that a real collection loads, and it fires: only
+    that makes the child process reject the bare marker and exit non-zero.
+
+    This test does not cover a ``testpaths`` guard — if ``adversarial`` fell out of
+    ``pyproject.toml``'s ``testpaths``, this probe's own conftest and test file would go
+    uncollected too, and the child would exit 5 (no tests collected), not 0. A ``testpaths``
+    guard has to live in a directory that stays collected regardless; that's #81, a1r's file.
 
     The bad test lives only in a subprocess's isolated tmp_path copy, never inside this
     repository's own adversarial/ tree, so it can't ever poison this suite's own collection.
@@ -147,6 +152,8 @@ def test_hook_is_actually_wired_into_a_real_pytest_run(tmp_path):
         cwd=tmp_path,
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTEST_ADDOPTS": ""},
+        timeout=60,
     )
 
     assert result.returncode != 0
