@@ -68,3 +68,25 @@ python3 .github/scripts/check_ownership.py \
 ### Running the self-tests
 
 `pytest -q tests/governance` — part of the required `tests` check.
+
+## file_advisory.sh
+
+The a6-adversary nightly sweep's only route to the repository-advisory API, which replaced a raw
+`gh api` grant (drift F17). Three verbs, this repository only:
+
+```bash
+bash .github/scripts/file_advisory.sh list                           # GHSA id, state, summary
+bash .github/scripts/file_advisory.sh create /tmp/advisory.json      # prints the new GHSA id
+bash .github/scripts/file_advisory.sh update GHSA-xxxx-xxxx-xxxx /tmp/advisory.json
+```
+
+Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be a JSON object in a
+file; it goes to the API from that file and is never echoed, so a run log carries ids and summaries
+only — never a reproduction. `list` comes first on every sweep, so a finding already filed is
+updated rather than filed again.
+
+## post_review_comment.sh
+
+Creates or updates the one review comment per reviewer on a PR, matched by its first line and by
+author. The review jobs run it from `/tmp`, extracted from the base ref, never from the tree under
+review.

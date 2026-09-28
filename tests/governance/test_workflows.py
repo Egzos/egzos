@@ -7,6 +7,7 @@ remembered it. Parsing the workflow files moves them into the required `tests` c
 """
 
 import re
+import textwrap
 from pathlib import Path
 
 import pytest
@@ -77,6 +78,42 @@ def test_review_jobs_take_control_inputs_from_the_base(job_id):
     assert step_names.index("control-inputs-from-base") < step_names.index("Verdict")
     assert "Bash(bash /tmp/post_review_comment.sh:*)" in allowed
     assert ".github/scripts/post_review_comment.sh" not in allowed
+
+
+def test_embedded_python_compiles():
+    # A syntax error in a heredoc would pass every text assertion here and surface only as a red
+    # required check at runtime.
+    heredoc = re.compile(r"python3 - <<'(\w+)'\n(.*?)\n\1\n", re.DOTALL)
+    blocks = 0
+    for wf, _, _, step in _steps():
+        for m in heredoc.finditer(step.get("run", "") + "\n"):
+            compile(textwrap.dedent(m.group(2)), f"{wf}:{step.get('name')}", "exec")
+            blocks += 1
+    assert blocks >= 6
+
+
+def test_control_inputs_cover_everything_claude_code_loads():
+    for wf, job_id, _, step in _steps():
+        if step.get("name") != "control-inputs-from-base":
+            continue
+        run = step["run"]
+        for needle in ("-name CLAUDE.md", "CLAUDE.local.md", "rm -rf .claude .mcp.json",
+                       "REVIEW-DECISIONS.md", "post_review_comment.sh"):
+            assert needle in run, (wf, job_id, needle)
+
+
+def test_forge_token_sessions_run_no_interpreter():
+    # A model step holding the forge token as GH_TOKEN must not also hold an interpreter: with one,
+    # a narrowed gh grant is narrow only on paper (#71 review, finding 1).
+    interpreters = ("Bash(python:*)", "Bash(python3:*)", "Bash(pytest:*)", "Bash(pip:*)")
+    for wf, job_id, _, step in _steps():
+        if not step.get("uses", "").startswith(ACTION):
+            continue
+        if "forge" not in str(step.get("env", {}).get("GH_TOKEN", "")):
+            continue
+        if "Bash(git:*)" in step["with"].get("claude_args", ""):
+            continue  # builders push code by design; their reach is bounded by ownership and review
+        assert not any(i in step["with"]["claude_args"] for i in interpreters), (wf, job_id)
 
 
 def _verdict(job_id):
