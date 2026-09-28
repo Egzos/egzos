@@ -25,13 +25,17 @@ with a repro in a public repository is a zero-day disclosure.
 
 ## The xfail pattern
 
+The paired `xfail`'s `reason` must name the public issue it's linked to — a bare `#` followed by
+digits (e.g. `#123`) somewhere in the string. The pairing hook in `conftest.py` enforces this at
+collection time and rejects a reason that only carries a placeholder like `#<N>`.
+
 Mark a known non-security finding like this:
 
 ```python
 import pytest
 
 @pytest.mark.xfail_finding
-@pytest.mark.xfail(reason="known finding — see issue #<N>", strict=True)
+@pytest.mark.xfail(reason="known finding — see issue #123", strict=True)
 def test_enumeration_through_404_shape():
     # Demonstrates that a missing item returns a distinguishable error shape.
     # Fix PR will flip strict=True xfail to a passing test.
