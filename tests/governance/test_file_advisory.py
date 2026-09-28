@@ -119,6 +119,19 @@ def test_update_drops_an_empty_package_rather_than_sending_nulls(stub):
     assert {"vulnerable_version_range": "< 2"} in sent["vulnerabilities"]
 
 
+def test_update_drops_a_package_without_an_ecosystem(stub):
+    # The API requires ecosystem whenever package is present (platform#42 review).
+    d, env = stub
+    new = d / "new.json"
+    new.write_text(json.dumps(
+        {"description": "x", "vulnerabilities": [{"package": {"name": "egzos"}}]}
+    ))
+    res = _run(env, "update", GHSA, str(new))
+    assert res.returncode == 0, res.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert all("ecosystem" in v["package"] for v in sent["vulnerabilities"] if "package" in v)
+
+
 def test_update_without_a_description_is_refused(stub):
     d, env = stub
     new = d / "new.json"

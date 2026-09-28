@@ -65,9 +65,9 @@ case "${1:-}" in
       || { echo "file_advisory.sh: update needs a non-empty description to append" >&2; exit 2; }
     CURRENT="$(gh api "repos/${REPO}/security-advisories/$2")"
     jq -n --argjson cur "$CURRENT" --slurpfile new "$BODY" --arg day "$(date -u +%F)" '
-        def writable: ({package: ({ecosystem: .package.ecosystem, name: .package.name}
-                                   | with_entries(select(.value != null)))}
-                       | with_entries(select(.value != {})))
+        def writable: (if (.package.ecosystem and .package.name)
+                       then {package: {ecosystem: .package.ecosystem, name: .package.name}}
+                       else {} end)
           + ({vulnerable_version_range, patched_versions, vulnerable_functions}
              | with_entries(select(.value != null)));
         $new[0] as $n

@@ -102,11 +102,12 @@ jobs:
             --allowedTools "Read,Write,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),StructuredOutput"
             --json-schema '{"type":"object","required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail","not_applicable"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","required":["severity","path","note"],"properties":{"severity":{"type":"string","enum":["blocker","major","minor"]},"path":{"type":"string"},"note":{"type":"string"}}}}}}'
 
-      # The session writes /tmp/review.md; it does not choose what posts it. Nothing it could have
-      # reached is read here: the comment script comes from the API at the base commit, not from
-      # the checkout's .git (whose object lookup a session with Write could redirect); HOME is
-      # fresh, so no ~/.config/gh, ~/.gitconfig or ~/.jq it left is read; PATH is pinned, so no
-      # binary it planted is found (Egzos/egzos#71 round 3, #79 review).
+      # The session writes /tmp/review.md; it does not choose what posts it. The comment script is
+      # fetched from the API at the base commit, not read from the checkout's .git (whose object
+      # lookup a session with Write could redirect). Both the fetch and the post run under env -i
+      # with an explicit allowlist - PATH, a fresh HOME, TMPDIR, GH_HOST, the token and the repo -
+      # so nothing the session put in $GITHUB_ENV, ~/.config/gh, ~/.gitconfig or ~/.jq is read
+      # (Egzos/egzos#71 round 3; Egzos/egzos#79 and Egzos/egzos-platform#42 reviews).
       - name: post-review
         # On failure too: a review cut off by the turn cap is still on disk and still the Chief's to
         # read (diagnose-failure says so); Verdict fails the check on its own. Not when cancelled: a
@@ -114,6 +115,10 @@ jobs:
         if: ${{ !cancelled() && steps.review.outcome != 'skipped' }}
         env:
           PATH: /usr/bin:/bin
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR: ${{ github.event.pull_request.number }}
         run: |
@@ -122,12 +127,17 @@ jobs:
             echo "::warning::the review session wrote no /tmp/review.md, so there is nothing to post"
             exit 0
           fi
-          export HOME="$(mktemp -d)"
+          export TMPDIR=/tmp
+          H="$(mktemp -d)"
           S="$(mktemp)"
-          gh api -H "Accept: application/vnd.github.raw" \
+          clean() {
+            env -i PATH=/usr/bin:/bin HOME="$H" TMPDIR=/tmp GH_HOST=github.com \
+              GH_TOKEN="$GH_TOKEN" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" "$@"
+          }
+          clean gh api -H "Accept: application/vnd.github.raw" \
             "repos/${GITHUB_REPOSITORY}/contents/.github/scripts/post_review_comment.sh?ref=${BASE_SHA}" > "$S"
           test -s "$S"
-          bash "$S" "$PR" /tmp/review.md
+          clean bash --noprofile --norc "$S" "$PR" /tmp/review.md
 
       # Three different faults all surface as "did not return structured_output", and the number
       # that separates them lives only in the login-gated run log. #35, the tier cap and #47 each
@@ -136,6 +146,10 @@ jobs:
         if: failure() && steps.review.outputs.execution_file != ''
         env:
           PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
           EXEC_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
           python3 -I - <<'PYEOF'
@@ -225,6 +239,10 @@ jobs:
         if: cancelled()
         env:
           PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
         run: |
           echo "::error::DIAGNOSIS: the job was cancelled before a verdict. Either a newer push superseded this run (nothing to do), or it hit timeout-minutes while the model was still running - then re-run, and if it recurs, raise the job's timeout-minutes."
 
@@ -232,6 +250,10 @@ jobs:
         if: github.actor != 'dependabot[bot]' && github.event.pull_request.draft == false
         env:
           PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
           STRUCTURED_OUTPUT: ${{ steps.review.outputs.structured_output }}
         run: |
           python3 -I - <<'EOF'
@@ -277,4 +299,8 @@ jobs:
         if: always() && (github.actor == 'dependabot[bot]' || github.event.pull_request.draft == true)
         env:
           PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
         run: echo "a1r-review not applicable — Dependabot pin bump (Dependabot runs carry no secrets); the Chief reviews the diff directly. Passing."

@@ -139,7 +139,8 @@ def test_review_is_posted_by_a_model_free_step(job_id):
     # From the API at the base commit, under a fresh HOME, after the session: never a path or a
     # .git it could have reached (#79 review).
     assert "contents/.github/scripts/post_review_comment.sh?ref=${BASE_SHA}" in run
-    assert 'export HOME="$(mktemp -d)"' in run
+    assert "env -i PATH=/usr/bin:/bin" in run
+    assert "clean gh api" in run and 'clean bash --noprofile --norc "$S"' in run
     assert "git show" not in run
     assert post["env"]["BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     # Posted on failure too (a turn-capped review is still the Chief's to read), never when
@@ -152,7 +153,10 @@ def test_steps_after_the_model_run_pinned_and_isolated(job_id):
     # Anything the session planted on PATH, or in the checkout that `python3 -` would import from,
     # must not run with the job's token after it.
     for step in _after_model(job_id):
-        assert step.get("env", {}).get("PATH") == "/usr/bin:/bin", step.get("name")
+        env = step.get("env", {})
+        assert env.get("PATH") == "/usr/bin:/bin", step.get("name")
+        # $GITHUB_ENV is writable by the session; a step's own env wins over it.
+        assert all(env.get(k) == "" for k in ("BASH_ENV", "ENV", "LD_PRELOAD")), step.get("name")
         assert "python3 - " not in step.get("run", ""), step.get("name")
 
 
@@ -275,9 +279,9 @@ def test_review_sessions_hold_exactly_the_review_tools(job_id):
 def test_the_tests_check_runs_what_rd005_relies_on():
     # RD-005 half 2 is accepted only while `tests` runs this; an echo would keep every other test
     # green (Egzos/egzos-platform#41 review).
-    runs = " ".join(s.get("run", "") for s in _job("tests")["steps"])
-    for cmd in ("ruff check .", "pytest -q",):
-        assert cmd in runs, cmd
+    runs = [s.get("run", "").strip() for s in _job("tests")["steps"]]
+    # Bound to the invocation itself, so an echo of the command does not satisfy it.
+    assert "ruff check ." in runs and "pytest -q" in runs
 
 
 def _verdict(job_id):

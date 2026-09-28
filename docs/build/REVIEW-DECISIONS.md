@@ -206,15 +206,16 @@ for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
 reviewers write `/tmp/review.md`, and a model-free `post-review` step posts it. That step fetches the
-script from the API at the base commit, under a fresh `HOME` and with `PATH` pinned. The a6 sweep holds no
+script from the API at the base commit and posts, both under `env -i` with an explicit allowlist. The a6 sweep holds no
 write tool, and passes advisory bodies to `file_advisory.sh` on standard input. Every step after a
 review session runs with `PATH` pinned, and embedded Python runs with `-I`, so that a PR checkout
 in the working directory is not on `sys.path`.
 
 **Residual, named.** The review sessions' `Write` is unscoped. What runs after the session is
-covered: a pinned `PATH`, `-I` Python, a fresh `HOME`, and a comment script fetched from the API
-rather than read from the checkout's `.git`, whose object lookup a session with `Write` could redirect
-(#79 review). What stays open is that such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+covered: a pinned `PATH`, `-I` Python, blanked `BASH_ENV` / `ENV` / `LD_PRELOAD` (a step's own env wins over
+anything the session appends to `$GITHUB_ENV`), and a comment script fetched from the API rather
+than read from the checkout's `.git`, with the fetch and the post both run under `env -i` and an explicit
+allowlist (#79 and platform#42 reviews). What stays open is that such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
 needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
 silently stops every review from being posted.
 
