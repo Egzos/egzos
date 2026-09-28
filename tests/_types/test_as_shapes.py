@@ -77,7 +77,13 @@ def test_the_scope_vocabulary_is_the_six_names_plus_the_node_form():
     # widening if an implementation accepted them as bare names; `admin` is covered below.
     bundles_that_are_not_capabilities = set(t.ROLE_BUNDLES) - set(t.CAPABILITIES)
     assert bundles_that_are_not_capabilities == {"reader", "contributor", "operator", "curator"}
-    assert not bundles_that_are_not_capabilities & set(t.CAPABILITIES)
+    # The claim, written out so it can fail: none of the four is a bare capability name, and none is
+    # spelled in the node form either — the two forms of a `scope` value are all there is. The names
+    # are literals on purpose; `bundles_that_are_not_capabilities & set(CAPABILITIES)` cannot state
+    # the first claim, because the difference above has already removed anything that would break
+    # it.
+    assert not {"reader", "contributor", "operator", "curator"} & set(t.CAPABILITIES)
+    assert not any(b.startswith(t.AS_SCOPE_NODE_PREFIX) for b in t.ROLE_BUNDLES)
 
 
 def test_admin_is_the_one_word_the_two_vocabularies_collide_on():

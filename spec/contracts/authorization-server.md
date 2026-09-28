@@ -265,7 +265,7 @@ container-specific — no node ids, no client names, no owner identity — may b
 | `token_endpoint` | §2, §3 |
 | `device_authorization_endpoint` | §3 |
 | `revocation_endpoint` | §9 — `[OPEN→0.3]`; **advertised only if** the endpoint exists |
-| `registration_endpoint` | §5 — **advertised only if** dynamic registration is enabled |
+| `registration_endpoint` | §5 — `[OPEN→0.3]`; **advertised only if** dynamic registration is enabled |
 | `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
 | `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
 | `code_challenge_methods_supported` | `["S256"]` — `plain` is never advertised (§2) |
@@ -318,7 +318,8 @@ is the spelling, and the freeze may change it as long as the rule survives. A `s
 space-delimited set drawn from exactly two forms:
 
 - **a bare capability name** — one of `fetch remember organize publish curate admin`;
-- **`node:<node-id>`** — a scope entry of `Token.scopes`. `node:*` is the whole container.
+- **`node:<node-id>`** — the `scope`-parameter spelling *of* a `Token.scopes` entry, not the entry
+  itself: the AS strips the prefix when it mints (consequence 3). `node:*` is the whole container.
 
 The AS expands the request into `{capabilities, scopes}` on the minted token. Anything else in the
 `scope` value is refused; the request is **not** silently narrowed to the part that parsed.
@@ -340,9 +341,12 @@ Three consequences that are contract, not style:
    exactly this word — `admin` is a capability and `admin` is the all-six bundle — and a reader who
    guesses wrong grants five capabilities they did not mean to. Stated here so no implementation
    resolves the collision the other way.
-3. **`node:*` is the owner's grant.** `capabilities.md` §5 says `["*"]` is the owner's token; a
-   client asking for `node:*` is asking for the whole container, and the consent screen must render
-   it as that (#61).
+3. **`node:*` is the owner's grant, and the prefix does not survive the mint.** `capabilities.md` §5
+   says `["*"]` is the owner's token; a client asking for `node:*` is asking for the whole container,
+   and the consent screen must render it as that (#61). The `node:` prefix exists only in the
+   `scope` parameter — **`Token.scopes` carries bare node ids**, so `node:*` in a request becomes
+   `["*"]` on the token, and a token that stored the prefixed form would not match
+   `capabilities.md` §5 or the coverage check that reads it.
 
 ### The AS is not an enumeration oracle
 
@@ -432,12 +436,43 @@ three client types have. The review must pick one, and a1p does not pick for it:
      MUST here, because an endpoint that answered differently would let any caller test whether a
      token value exists without holding one.
    - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
-     take or reject: **no** — the AS verifies the token was issued to the presenting `client_id`
-     and, when it was not, revokes nothing and returns the *same* 200, so a refusal is
-     indistinguishable from a success. A public client's `client_id` is an assertion and not proof
-     (§1), which is the argument for bounding the endpoint to "revoke what you already hold"
-     instead of trusting the claim: an unbounded endpoint plus a guessable token value is a
-     denial-of-service against every other client on the container.
+     take or reject: the AS compares the presented token's `client` (`capabilities.md` §5) against
+     the presenting `client_id` and, when they differ, revokes nothing and returns the *same* 200 —
+     a refusal indistinguishable from a success.
+
+     **Said plainly, because the comparison reads stronger than it is: it is not a boundary.** No
+     client on this AS authenticates — §1 has three public client types and §6 advertises
+     `["none"]` — so `client_id` is a string the caller chooses, and any caller can send another
+     client's. **With no client authentication available, this endpoint is bounded by the entropy
+     of the token value alone:** whoever can produce a token's value can revoke it, whatever
+     `client_id` they send with it. The comparison is worth keeping as defence-in-depth — it makes
+     an accidental cross-client revocation impossible and keeps the chain's actor truthful — and it
+     must not be recorded anywhere as the thing that stops one client from revoking another's
+     token, because it does not.
+
+     **What a real bound would require**, if the review wants one instead of entropy: proof that
+     the caller holds the *grant*, not the string. Three shapes, none of them free — a
+     confidential client, which §1 forbids in v1.0 and which downloadable software cannot be
+     anyway; a **sender-constrained** token (DPoP, RFC 9449), which binds revocation to a key the
+     caller proves per request and is therefore a change to every token this AS issues rather than
+     to this endpoint; or no endpoint at all, which is option 3. The cost of entropy-only is
+     bounded and should be stated as what it is: a token value that leaks can be revoked by
+     whoever holds it. For a leaked **access** token that is a denial of service against *that*
+     token and nothing wider — a revocation cannot widen a grant, reveal whether the value was
+     live (the silence rule above), or reach a token the value does not name. For a leaked
+     **refresh** token the blast radius is **the whole grant chain**, and not because of this
+     endpoint: RFC 7009 §2.1 has revoking a refresh token invalidate the access tokens of the same
+     grant, and rotation clause 2 below already gives the holder the same reach at the token
+     endpoint — replaying the value there revokes the entire chain descended from that grant. The
+     review should weigh option 1 against that chain, which it adds nothing to, and not against a
+     single token.
+
+     `[OPEN→0.3]` **The entropy this bound rests on is pinned nowhere.** No contract fixes how an
+     access or refresh token value is generated or how hard it must be to guess — `capabilities.md`
+     §5 and `Token` say nothing about it — while §3 mitigation 1 does exactly this work for the
+     `user_code`. If the review takes option 1, it takes this with it: name the requirement (a
+     floor on the value's unpredictability, from a cryptographically secure generator) in the
+     contract that mints tokens, or the bound stated above has nothing to be checked against.
 2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
    pending the review.
 3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
@@ -467,7 +502,11 @@ revocation *semantics* under every option: whatever the transport, a revoked tok
 at all, and whether client registration is one.** `events.md` §1 closes its vocabulary by
 construction — *"an appended event whose name is not in this list MUST be rejected"* — and §4
 invariant 2 closes the other side: *"a surface that produces an effect without a corresponding event
-is non-conforming."* The AS produces **six** effects with only two events between them.
+is non-conforming."* The AS produces **seven** effects with only two events between them, and they
+are enumerated here so a reader can count them instead of trusting the number: a token is **issued**
+(`token.mint`); a token is **revoked** (`token.revoke`); the owner **grants** consent (§2, §3); the
+owner **denies** it, or the request is rejected; a refresh token is **rotated**; a client is
+**registered** (§5); a **device authorization is requested** (§3). Only the first two have an event.
 
 **Registration (§5) is the sixth, and this document adds it to the question.** It is an owner act
 that writes the redirect-URI allowlist — the one piece of container state that decides where an
@@ -475,8 +514,21 @@ authorization code may be delivered — and it currently leaves no entry in the 
 entry added quietly is §5's exact-match rule undone without a trace, and the chain is where that
 would otherwise be visible; a registration is also, by §4 invariant 2's own vocabulary, closer to an
 approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
-are settled together with one edit to `events.md` rather than four. a1p's recommendation is on the
+are settled together with one edit to `events.md` rather than four (five, with device
+authorization below). a1p's recommendation is on the
 issue. **Not answered in this document.**
+
+**Device authorization (§3) is the seventh, and it is in #68's scope too — stated because a reader
+counting §9's effects could not otherwise tell.** A device authorization request mints a `device_code`
+and a `user_code` and stores the pending authorization bound to them (§3, mitigation 3) — durable
+container state, created by a caller that holds no token and, since every client here is public
+(§1, §6's `["none"]`), authenticates nothing when it asks. An **initiated-then-abandoned** device
+authorization therefore leaves nothing in the chain at all: the same invisible-probe shape as a
+denied `/authorize`, and reachable with less, because it needs no registered redirect URI. Whether
+it is an event or is explicitly stated not to be is #68's to settle with the other four; a1p does
+**not** pick here, and does not read #68's option (b) as already covering it — (b) keys on a
+granted-or-denied *decision*, and an abandoned authorization never reaches one. Recorded as a
+comment on #68 rather than an edit to its body, the convention #73 used.
 
 `[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
 that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS
