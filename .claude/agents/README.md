@@ -72,9 +72,12 @@ Every workflow strips the frontmatter and appends the body to the system prompt:
 
 ```yaml
 - name: charter-a3-store
-  run: awk 'f{print} /^---$/{c++; if(c==2){f=1}}' .claude/agents/a3-store.md > /tmp/charter-a3-store.md
+  run: |
+    # From the base, never the tree under review (#39); awk strips the frontmatter.
+    git show "origin/${BASE_REF:-$DEFAULT_BRANCH}:.claude/agents/a3-store.md" \
+      | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a3-store.md
 # then, on the claude-code-action step:
-claude_args: --append-system-prompt-file /tmp/charter-a3-store.md --model ${{ env.MODEL_SONNET }} --max-turns 60
+claude_args: --append-system-prompt-file /tmp/charter-a3-store.md --model ${{ env.MODEL_SONNET }} --max-turns 120
 ```
 
 Phase 0.0 verified the alternative, `--agent <name>`, and rejected it: the flag makes the session take on
