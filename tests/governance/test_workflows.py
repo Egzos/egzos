@@ -240,6 +240,20 @@ def test_verdict_requires_exactly_one_result_record():
         assert "if len(results) == 1 else None" in _verdict(job_id)
 
 
+def test_builders_can_keep_their_pr_body_current():
+    # CLAUDE.md requires the template filled completely and Herald distills the body, so a builder
+    # that revises a PR must be able to revise its body (#93). Reviewers stay without it.
+    seen = 0
+    for wf, job_id, _, step in _model_steps():
+        args = step["with"].get("claude_args", "")
+        if "Bash(gh pr create:*)" in args:
+            assert "Bash(gh pr edit:*)" in args, (wf.name, job_id)
+            seen += 1
+        else:
+            assert "gh pr edit" not in args, (wf.name, job_id)
+    assert seen >= 2
+
+
 def _job(job_id):
     for wf in WORKFLOWS:
         jobs = _load(wf)["jobs"]
