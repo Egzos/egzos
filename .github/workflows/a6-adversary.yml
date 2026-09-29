@@ -110,7 +110,7 @@ jobs:
           mkdir -p docs/build
           git show "${B}:docs/build/REVIEW-DECISIONS.md" > docs/build/REVIEW-DECISIONS.md
 
-      - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
+      - uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
@@ -490,7 +490,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
-      - uses: anthropics/claude-code-action@4036a180cf690f49529f5d8c79c998855287f590 # v1
+      - uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:
