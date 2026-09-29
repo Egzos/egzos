@@ -975,8 +975,10 @@ replay happened, which one entry states; a held-down back button is not a second
 and (f) out of an unauthenticated caller's reach except for (d)'s `throttled` and `token_presented`
 causes, which is the
 direct negation of `consent.md` D-C6's premise that *the post-trust tier is as reachable as the
-pre-trust one*. That premise is the design side's to revise; this document does not edit it. `[OPEN→0.3]`
-the freeze review should confirm the two documents were reconciled rather than left disagreeing.
+pre-trust one*. That premise is the design side's to revise; this document does not edit it, and the
+revision is filed as **#98** (`design-gap`), which names the affected regions and states the options
+for the Chief's pick. `[OPEN→0.3]` the freeze review should confirm the two documents were reconciled
+rather than left disagreeing — #98's pick recorded, not merely raised.
 
 `[OPEN→0.3]` **What a throttle keys on.** No source names it and it cannot be left unsaid: §12.1
 rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
@@ -1137,6 +1139,24 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
   was dropped at the GET and the form carries nothing — and the value is re-matched against steps 1
   and 2 on the POST before the 303 is issued, because a form field is caller-controlled input
   whatever put it there. A form that round-trips an unvalidated value is the same hole one hop later.
+
+  Three clauses of that carrier are **not** settled by the text above, and each is marked rather than
+  written, because every available answer is a new requirement and this document is at its narrowing
+  round:
+
+  `[OPEN→0.3]` **What the POST-hop re-match covers.** It names D-C5 steps 1 and 2 and is silent on
+  **step 3**, so whether the query the GET carried is re-scoped to step 3's two carrying patterns on
+  the POST hop as well, or is whatever the form posts back, is undecided here.
+
+  `[OPEN→0.3]` **Step 4's disposition on a POST-hop failure.** Step 4 fixes what a value failing *at
+  the GET* gets — dropped for the container's root — and this document does not say whether a value
+  failing the POST-hop re-match takes that same 303 with the login otherwise completed, or fails the
+  POST itself.
+
+  `[OPEN→0.3]` **Two response shapes are named for the same failure at the GET.** Step 4 requires a
+  value failing any step to be dropped silently for a 303 to `/`, while this bullet's first bound
+  describes a login page that renders with its form carrying nothing — both cannot be what
+  `/login?continue=<a failing value>` returns, and which one it returns is undecided here.
 - **`continue` is also how the pending authorization request survives the login, and it is the only
   thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
   before anything about it has been validated, so the request has to reach the login *and come back*,
@@ -1263,9 +1283,9 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
-**before any token exists** — (a), (b) and (d)'s `throttled` and `token_presented` causes before any
-session exists either, the rest inside a session §11.0's substep 3 has already required — and the
-drafted taxonomy has no name for one of them.
+**before any token exists** — (a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
+any session exists either, (e) on no request at all (§12.2), the rest inside a session §11.0's
+substep 3 has already required — and the drafted taxonomy has no name for one of them.
 `events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
 non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
 
@@ -1294,6 +1314,14 @@ the decision's own, §9's and #68's. Both are bounded (§11.1 one keyed entry, �
 timestamp), so neither carries anything out that an unrecorded read would hide. `[OPEN→0.3]` **#86's
 sitting should confirm this**: it is the one place here where invariant 2 is satisfied by an argument
 rather than an append, and if the sitting disagrees the answer is a sixth row, not a changed read.
+
+`[OPEN→0.3]` **The argument above holds only where a decision follows, and a rendered screen the
+owner abandons is the case where none does — §11.1's registry read and §11.3's existing-tokens read
+happen, no decision entry ever arrives to be the entry that records them, and a client can drive the
+case at will by initiating `/authorize` and never being answered. Routed to #86's sitting with the
+rest of this section**, which decides it as it decides the naming: either the render is itself a
+sixth row, or the decision entry covers the decided case and the abandoned one is named and justified
+separately. **This document does not decide it and states no clause for it. a1p.**
 
 ### 12.1 · The rules, which are not open
 

@@ -148,8 +148,3 @@ def test_the_throttle_surfaces_are_four_closed_words():
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
     # §12.2: the caller's network identifier is never the actor, so no surface is one.
     assert not any(s in {"ip", "remote_addr", "caller"} for s in t.AS_THROTTLE_SURFACES)
-
-
-# EgzosLead, 2026-09-29: no-op touch (comment only, no assertions changed) to force a fresh
-# `synchronize` event on this PR — a1r-review's automatic trigger never fired on `a2df8fb`
-# (~17h with no review posted, confirmed against three separate checks).
