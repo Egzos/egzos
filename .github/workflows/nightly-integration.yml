@@ -81,3 +81,4 @@ jobs:
             --model ${{ env.MODEL_OPUS }}
             --max-turns 120
             --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
+            --disallowedTools "Read(//proc/**)"

@@ -176,3 +176,105 @@ spend and the trade is worth revisiting.
 
 **Paths in scope.** `.github/workflows/a1p-planner.yml`, `.github/workflows/core-queue.yml`, and any
 workflow that runs a builder.
+
+---
+
+## RD-005 · Review sessions never execute the tree under review
+
+**Status:** LIVE (half 1) · ACCEPTED (half 2) — raised on #71
+
+**The findings a reviewer would raise.**
+
+> 1. This PR-review model step grants `Bash(python:*)` / `pytest` / `pip` / `ruff`. Running the
+>    tree's suite executes the tree's code in the review job, where it can rewrite the controls
+>    that `control-inputs-from-base` restored before the model reads or runs them.
+> 2. The reviewer cannot run the tests, so its review of test changes rests on reading alone.
+
+**Disposition.** Half 1 is LIVE: a PR-review model step that can execute the tree under review is a
+finding whenever it appears. Raise it. Half 2 is ACCEPTED: this is the cost of half 1, and the
+Chief is knowingly living with it.
+
+**Reasoning.** A process started by one step of a job outlives that step, so there is no "safe
+moment" inside the job to run the PR's code. The only clean separation is a job that runs it and
+holds nothing to protect. The `tests` check is exactly that job, and it is required. So the reviewer
+reads its result (`gh pr checks`, with `checks`, `statuses` and `actions: read`) and cites it, rather than
+producing a second result in a job that holds the review token and the comment script. For the a6
+sweep, which holds the forge token and so runs no interpreter either, a separate job holding no
+token runs the adversarial suite against `main`. Step order inside one job would not separate it,
+for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
+
+The same rule covers scripts (#71 review, round 3). A session that can write files never also
+holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
+reviewers write `/tmp/review.md`, and a model-free `post-review` step posts it. That step fetches the
+script from the API at the base commit and posts, both under `env -i` with an explicit allowlist. The a6 sweep holds no
+write tool, and passes advisory bodies to `file_advisory.sh` on standard input. Every step after a
+review session runs with `PATH` pinned, and embedded Python runs with `-I`, so that a PR checkout
+in the working directory is not on `sys.path`.
+
+**Residual, named.** The review sessions' `Write` is unscoped. What runs after the session is
+covered: a pinned `PATH`, `-I` Python, blanked `BASH_ENV` / `ENV` / `LD_PRELOAD` (a step's own env wins over
+anything the session appends to `$GITHUB_ENV`), and a comment script fetched from the API rather
+than read from the checkout's `.git`, with the fetch and the post both run under `env -i` and an explicit
+allowlist (#79 and platform#42 reviews). What stays open: the session still writes `/tmp/review.md`, which `post-review` posts, so the review
+text is the session's by design; the step pins which comment it lands in (the job's own marker, never
+another reviewer's). That text is posted verbatim, from a job whose model session holds the provider
+credential, so two controls close the channel for the review sessions: every model session denies
+`Read(//proc/**)`, which denied Read, Grep and Glob alike on `/proc/self` when checked against the CLI
+locally (2.1.283; not yet re-checked in a CI run), and a review session holds no other way to read its
+own environment; and `post-review`
+refuses a body carrying any credential the job holds (#79 review, a1r minor 3a). An encoded copy would
+pass the second control; the first is the one that keeps the credential out of reach. The deny stays on
+the builder sessions too, but it does not close them: a builder holds an interpreter (`python`, `git`),
+and any interpreter reads its own process environment. That case stays open (Egzos/egzos-platform#42
+review). Beyond that, such a session can still leave files that nothing runs yet. Scoping it to the one output path, `/tmp/review.md`,
+needs the pinned CLI's path-rule syntax verified in a real run first, because getting it wrong
+silently stops every review from being posted.
+
+**Holds while.** The `tests` check runs the full suite (lint included) on every PR, and stays
+required. If it ever stops doing either, the reviewer is left with no executed result to cite, and
+half 2 has to be reopened.
+
+**Paths in scope.** `.github/workflows/a1r-review.yml`, `.github/workflows/a2-conformance.yml`,
+`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`, `.claude/agents/a1r-reviewer.md`,
+`.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
+`.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.
+
+---
+
+## RD-006 · A pull request's checks run from the workflow file in its own tree
+
+**Status:** ACCEPTED — raised on #40 (a1r), tracked as #44 item 3
+
+**The finding a reviewer would raise.**
+
+> The charter and the control inputs come from the base, but everything else a check does — its
+> `prompt:`, `--allowedTools`, `--model`, its Verdict step, the ownership step itself — is read
+> from the workflow file in the tree under review. A PR that edits a review workflow is judged by
+> its own edit.
+
+**Disposition.** ACCEPTED. The observation is exactly right. There is no configuration that fixes it
+without something worse.
+
+**Reasoning.** GitHub runs a `pull_request` workflow from the PR's merge ref. The one event that
+runs the base's file, `pull_request_target`, does so with the base's secrets, and checking out the
+PR's tree under it is the textbook way to hand those secrets to untrusted code. The compensating
+controls are identity controls:
+
+- **Agent PRs cannot carry a workflow edit.** The `egzos-forge` App holds no Workflows permission,
+  so GitHub itself rejects any agent push that touches `.github/workflows/**`.
+- **The Chief's own branches** are gated by the Chief by definition.
+- **A fork PR is the residue.** It carries no secrets, so its model steps cannot run. But the fork
+  controls the workflow file its checks run from, so **every required check on a fork PR is
+  forgeable by that PR**, the ownership check included.
+
+On a fork PR the checks are therefore advisory. The gate is the Chief's approval of the diff, and a
+diff touching `.github/workflows/**` is the tell. The stronger control is a setting, not a file:
+Settings → Actions → *Fork pull request workflows* → require approval for all outside
+collaborators. With it, no fork workflow runs, and so no check reports, until the Chief allows it.
+
+**Holds while.** The forge App holds no Workflows permission, fork runs stay secret-less, and no
+other identity with `contents: write` opens pull requests. If any of those changes, this entry is
+wrong, and the finding should be raised as it stands.
+
+**Paths in scope.** `.github/workflows/**`.
+
