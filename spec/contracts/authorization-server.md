@@ -343,7 +343,12 @@ under any cause.** Testable as written:
    argued against by name and no source asks a builder to bear, so it is marked **a1p** rather than
    left to read as a restatement.
 3. **No `error`, no `state`** — it is not a redirect, and §11.6 does not reach here.
-4. **It appends once**, row (d), with the cause in `details` (§12.1 rule 1).
+4. **It appends once per evaluated attempt**, row (d), with the cause in `details` (§12.1 rule 1) —
+   **except** the one cause this page can carry that clause 2 and §12.1 rule 3 already except:
+   an attempt refused by a throttle that *already holds* is **counted, not appended**, whatever it
+   would otherwise have been. Stated here too, rather than left for clause 2 alone to carry,
+   because this clause sits under "Testable as written" and an implementer who turns it into an
+   assertion without the exception has built exactly the unbounded append D-C6 rejected by name.
 
 The uniformity is owed to the caller and never to the owner's ledger: row (d)'s seven causes are
 exactly the distinctions §12 records and this page hides.
@@ -1313,10 +1318,12 @@ every outcome, so `consent.md` §13's `expiry.none` string stands as written eit
 
 **Taking (2) opens a fifth surface, and the review should cost that in the same breath. a1p** —
 §12.1 rule 5's `surface` is a closed four-word vocabulary (`login` · `device` · `authorize` ·
-`tap`) and `AS_THROTTLE_SURFACES` pins the same four, even though §12 itself covers only the first
-three plus a timer, so an owner-path revocation reached from §11's surface reopens all three of
-§12's covered surfaces together. It also needs an entry on the **refusal** path, not only the
-success one:
+`tap`; §12 itself covers only the first three plus a timer, the fourth being out of this section's
+scope) and `AS_THROTTLE_SURFACES` pins the same four. An owner-path revocation reached from §11's
+own page is none of the four, so taking (2) reopens the closed vocabulary at both places that pin
+it — rule 5 and the constant — and, if §12.2's `actor`-from-`surface` reading is taken alongside
+it, `actor`'s vocabulary too. It also needs an entry on the **refusal** path, not only the success
+one:
 `events.md`'s `token.revoke` records the revoke, but a viewer who does not own the token is refused
 under §7's silence rule, and a code path that can be exercised and leaves no trace is the shape §12
 exists to catch. Written down here so the freeze does not have to rediscover it.
