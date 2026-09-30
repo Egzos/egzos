@@ -407,23 +407,22 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
-#: effect appends under. Written out rather than derived, for the same reason `AS_THROTTLE_SURFACES`
-#: is: the point of a closed cause list is that it is closed, and a cause arriving that is not in
-#: the tuple should break a test, not append quietly. Row (d)'s `token_presented` is this Part's own
-#: addition over `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not
-#: silently absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because
-#: §11.5 clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s
-#: own paragraph). These four tuples are never open — unlike the event *names* these causes travel
-#: under, which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
-AS_LOGIN_CAUSES: tuple[str, ...] = ("wrong", "unknown", "throttled")
-AS_DEVICE_REDEMPTION_CAUSES: tuple[str, ...] = (
-    "invalid",
-    "expired",
-    "used",
-    "malformed",
-    "throttled",
-)
-AS_AUTHORIZE_PRETRUST_CAUSES: tuple[str, ...] = (
+#: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
+#: `Capability`/`CAPABILITIES`, `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES`
+#: already use above: a typo at a call site that writes `details.cause` is a type error, not a
+#: string `str` would accept silently. Row (d)'s `token_presented` is this Part's own addition over
+#: `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not silently
+#: absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because §11.5
+#: clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s own
+#: paragraph). These four are never open — unlike the event *names* these causes travel under,
+#: which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
+LoginCause = Literal["wrong", "unknown", "throttled"]
+AS_LOGIN_CAUSES: tuple[LoginCause, ...] = get_args(LoginCause)
+
+DeviceRedemptionCause = Literal["invalid", "expired", "used", "malformed", "throttled"]
+AS_DEVICE_REDEMPTION_CAUSES: tuple[DeviceRedemptionCause, ...] = get_args(DeviceRedemptionCause)
+
+AuthorizePretrustCause = Literal[
     "unknown_client",
     "redirect_mismatch",
     "malformed",
@@ -431,8 +430,13 @@ AS_AUTHORIZE_PRETRUST_CAUSES: tuple[str, ...] = (
     "throttled",
     "replayed",
     "token_presented",
+]
+AS_AUTHORIZE_PRETRUST_CAUSES: tuple[AuthorizePretrustCause, ...] = get_args(AuthorizePretrustCause)
+
+AuthorizePosttrustCause = Literal["vocabulary", "scope"]
+AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[AuthorizePosttrustCause, ...] = get_args(
+    AuthorizePosttrustCause
 )
-AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[str, ...] = ("vocabulary", "scope")
 
 
 class DeviceAuthorization(TypedDict):
@@ -625,6 +629,8 @@ __all__ = [
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
+    "AuthorizePosttrustCause",
+    "AuthorizePretrustCause",
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
@@ -638,6 +644,7 @@ __all__ = [
     "ContainerType",
     "ContextItem",
     "DeviceAuthorization",
+    "DeviceRedemptionCause",
     "EVENTS",
     "Event",
     "GENESIS_HASH",
@@ -646,6 +653,7 @@ __all__ = [
     "KINDS",
     "Kind",
     "Lifecycle",
+    "LoginCause",
     "Node",
     "PRINCIPALS",
     "PROPOSAL_STATUSES",
