@@ -60,7 +60,7 @@ parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` r
 fixture list — none of which invites the narrowing, so this document names all five rather than
 one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
 silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a throttle-refused
-attempt — **five** places, R12 being the `/authorize` row the clause itself governs — named there
+attempt — **six** places, R12 being the `/authorize` row the clause itself governs — named there
 for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **five**
 places — §14 item 8's cause list itself (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust
 tier ("expiry within config → else redirect"), §20's fixture requiring an over-long expiry to
@@ -356,13 +356,13 @@ under any cause.** Testable as written:
    an implementer who pads the registry read alone has met this clause's rationale and missed its
    rule. (§11.0's substep-1 replay is the same family seen from the other side: it appends where a
    throttled attempt does not.) **This is a named spec revision, not a rule this document merely
-   restates.** `consent.md` states the opposite in five places, deliberately and with a reason —
+   restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), §10's pre-trust silence
    bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
-   and R2, R3 **and R12's** refused rows ("the timing class is the throttle's own") — R12 being the
-   `/authorize` row, the surface this clause itself governs, and so the most on-point of the five,
-   not an afterthought to the other four. This clause is the stricter
+   and R2, R3 **and R12's** refused rows ("the timing class is the throttle's own"), each a distinct
+   site — R12 being the `/authorize` row, the surface this clause itself governs, and so the most
+   on-point of the six, not an afterthought to the other five. This clause is the stricter
    of the two on purpose — padding the refusal closes a real, if narrow, timing channel the spec
    accepted rather than closed — and the stricter reading stands, but it is a cost `consent.md`
    argued against by name and no source asks a builder to bear, so it is marked **a1p** rather than
@@ -1447,8 +1447,12 @@ found elsewhere**: §11.0 substep 1's match against §11.4's decided-request rec
 counter to recognise the deciding session's own re-submission. It is bounded the same way (one
 record, keyed on the interactive session) and read for the same reason — the owner's own session,
 deciding whether the act in front of it was already decided — so where it matches, `replayed`'s
-append is the entry that records the read; where it falls through, substep 2 governs and the read
-leaves no trace of its own, the same shape as the two reads above. `[OPEN→0.3]` **#86's
+append is the entry that records the read; where it falls through, the read itself leaves no trace
+of its own either way, and the request it accompanies is decided on its own terms — the ordinary
+case, every authenticated request that is not this session's first re-submission, is evaluated and
+appends once under rule 1, whatever cause it earns; only where a throttle already holds does rule 3's
+exception govern instead, counted and not appended. Neither entry is the read's own, the same shape
+as the two reads above. `[OPEN→0.3]` **#86's
 sitting should confirm this**: it is the one place here where invariant 2 is satisfied by an argument
 rather than an append, and if the sitting disagrees the answer is a sixth row, not a changed read.
 
@@ -1591,9 +1595,15 @@ than "none of the five" for two of them. (d)'s five causes that are neither `thr
 now reached only inside an interactive session, so an `interactive` principal is available and
 truthful there; the entries with no principal to carry are (a), (b), (d) with cause `throttled` or
 `token_presented`, and
-(e). A `token_presented` entry is the sharpest case of the second reading's point: the caller held a
+(e) — and the two (d) causes reach "no principal to carry" for different reasons, not one. A
+`token_presented` entry is the sharpest case of the second reading's point: the caller held a
 credential, the AS deliberately did not look at it (§10), and a principal derived from it would be
-asserting exactly what that clause refuses to determine.
+asserting exactly what that clause refuses to determine — its reason is **availability**, and there
+genuinely is none. `throttled` is not the same: §11.0 substep 2 gives that response "for a caller
+with a session and a caller without one alike," so an `interactive` principal is sometimes available
+and truthful there, exactly as it is for (d)'s other five causes. What governs `throttled` is
+**uniformity**, not availability — a principal that varied would tell a throttled caller whether it
+held a session, the same distinguisher §5.3's page is already built to refuse the caller.
 This document does not pick: a taxonomy that used `interactive` where it is known and the
 reading below where it is not is one answer, and a taxonomy that used the reading below uniformly
 across all five — so that a reader cannot infer from the principal which cause a uniform page had —
