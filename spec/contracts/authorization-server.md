@@ -705,7 +705,10 @@ holding no session is sent to §11's login first.
 a1p.** A request to `/authorize` that presents a bearer credential — in an `Authorization` header or
 any other position the surface would have to look at — while holding no interactive session is
 refused with **§5.3's uniform page**, and appends once as **§12 row (d) with cause
-`token_presented`**. Two bounds on that check, both load-bearing:
+`token_presented`**. A request holding both a session and a credential is decided on the session
+and never reaches this refusal — §11.0 substep 3 branches on session presence before the credential
+is looked at, so `token_presented` fires only for a credential presented *in place of* a session,
+never beside one. Two bounds on that check, both load-bearing:
 
 - **The AS MUST NOT validate the presented credential.** No `Token` lookup, no signature check, no
   expiry check: the refusal turns on the credential's *presence*, never on its validity. A check that
@@ -942,9 +945,12 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    stated here as its place in the order. **This substep runs before either validation tier**: before
    §5.3's pre-trust checks and before §7's post-trust ones. A caller presenting a `Token` instead of
    a session is **not** sent to `/login`: §10 refuses it with §5.3's page, cause `token_presented`,
-   on the presence of the credential and never on its validity. `/login` and `/device` have no
-   substep 3 — `/login` is where a session is obtained, and §3's device redemption is not an owner
-   act.
+   on the presence of the credential and never on its validity. **A request holding both** — an
+   interactive session *and* a bearer credential in the same `Authorization` header or position —
+   is decided on the session alone; substep 3 branches on session presence first, so the credential
+   is never reached and `token_presented` never fires. §10's refusal is for a credential presented
+   in place of a session, not beside one. `/login` and `/device` have no substep 3 — `/login` is
+   where a session is obtained, and §3's device redemption is not an owner act.
 
 **Why substep 3 sits after the counter and before validation, and what the alternative cost. a1p**,
 deciding the ordering a1r and A2 both found unfixed. Validating before the redirect would mean an
@@ -1371,12 +1377,15 @@ naming decision:
    undiminished, and this rule takes no position on what a caller knows — only on what an
    **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
    `/authorize` grows an **append-only** log the owner cannot prune, at the caller's rate; with it the
-   sweep's whole reach is what §11.0's substep 3 already states: **one entry per throttle engagement,
-   plus one `token_presented` entry per attempt the throttle admits and (d) evaluates.** It is *not*
-   one entry per engagement flat — `token_presented` is decided inside substep 3 and appends per
-   evaluated attempt, so a sweep that presents bearer credentials appends as often as the throttle
-   lets it through. The bound is therefore **the throttle's own admitted rate**, which is the same
-   counter in both cases; the engagement entry is one more on top of it, not the whole of it.
+   sweep's whole reach **at `/authorize`** is what §11.0's substep 3 already states there: **one
+   entry per throttle engagement, plus one `token_presented` entry per attempt the throttle admits
+   and (d) evaluates.** (a) and (b) append under their own cause per rule 1 on an admitted attempt,
+   never under `token_presented` — this rule's bound applies to the endpoint where that cause is
+   possible.  It is *not* one entry per engagement flat at `/authorize` — `token_presented` is
+   decided inside substep 3 and appends per evaluated attempt, so a sweep that presents bearer
+   credentials there appends as often as the throttle lets it through. The bound is therefore **the
+   throttle's own admitted rate**, which is the same counter in both cases; the engagement entry is
+   one more on top of it, not the whole of it.
 4. **A throttle that holds does not evaluate — a correct credential or a valid code included.** A
    throttle that evaluated the right answer while refusing wrong ones would bound the ledger and not
    the guessing, which is the opposite of what it is for. **A throttle MUST fail closed:** one that

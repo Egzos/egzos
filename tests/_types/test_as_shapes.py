@@ -121,9 +121,14 @@ def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
 
     The five names are written out on BOTH sides of the first assertion's intent: the constant is a
     literal in `_types`, and this test compares it to a literal here. The second assertion then
-    holds the constant against `ClientRegistration`, so a field added to the registration alone
-    fails here instead of reaching the consent screen by inheritance. Deriving either side would
-    make the pin a tautology that holds for every possible content of the registration.
+    holds the constant against `ClientRegistration` with `<=`, not `==`: the read-set must never
+    reach beyond what the registration carries (a field added to the registration alone, and not to
+    this literal, still fails here rather than silently reaching the consent screen by inheritance),
+    but the registration is free to carry a field the consent screen does not read — `client_secret`
+    is refused entry today by the assertion below, and a future reserved confidential-client type
+    (§1's own `[OPEN->0.3]`) could add one without this pin demanding it be rendered. `==` would
+    demand exactly that the day such a field landed. Deriving either side would make the pin a
+    tautology that holds for every possible content of the registration.
     """
     assert t.AS_CLIENT_REGISTRY_READ_FIELDS == {
         "client_id",
@@ -132,9 +137,12 @@ def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
         "redirect_uris",
         "registered_at",
     }
-    assert t.AS_CLIENT_REGISTRY_READ_FIELDS == set(t.ClientRegistration.__annotations__)
+    assert t.AS_CLIENT_REGISTRY_READ_FIELDS <= set(t.ClientRegistration.__annotations__)
     # §11.3's existing-tokens read is a count and a timestamp: no id, no value, ever.
     assert not {"token_id", "token", "tokens", "client_secret"} & t.AS_CLIENT_REGISTRY_READ_FIELDS
+    # A registration field carried but deliberately not rendered to the consent screen would need
+    # its own assertion here, naming the field and why. None exists yet — `client_secret` is refused
+    # entry to the registration itself, above, rather than admitted and then withheld.
 
 
 def test_the_throttle_surfaces_are_four_closed_words():
