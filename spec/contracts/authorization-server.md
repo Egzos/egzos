@@ -1,4 +1,4 @@
-<mcp-tool-result vendor="github"># Contract · the container's authorization server (core mechanics)
+# Contract · the container's authorization server (core mechanics)
 
 **Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
 A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
@@ -1773,4 +1773,3 @@ editable around Trust un-decides an authorization. a1p's reading is that all of 
 `ContainerState` by F3's rule (it is never delegated to a pluggable backend), but F3 was written
 before this surface existed and should be asked, not assumed. The 0.3 review or the #30
 consolidation pass should settle it.
-</mcp-tool-result>
