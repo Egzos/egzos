@@ -799,7 +799,7 @@ So the gate has two parts, and `capabilities.md` §4 is the **floor**, not the w
   rather than that no window is required. That reading is not a choice made here: it is
   `spec/design/step-up-tap-and-pending-approval.md`'s own answer for the zero case — §2.2 item 7
   (*"Signing proves you are here. No window opens."*), item 8 (the *Approve without a window* act is
-  absent when policy is zero), R9, R11's *ready (policy zero)* row, and the `presence.zero` copy key
+  absent when policy is zero), R9, R8's *ready (policy zero)* row, and the `presence.zero` copy key
   all describe the same state: at policy zero, the tap itself is the proof, which is the
   **strictest** setting this backstop can take, not the backstop switched off. An expired window,
   or an absent one where the configured window is nonzero, refuses the act, and the refusal is a
