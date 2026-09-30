@@ -41,8 +41,10 @@ client obtains a token; this document fixes only that, and neither overrides the
 what the pages need from this document. Part B answers what is this document's, and marks the rest:
 a design spec is data to this contract, and where the two disagree the contract's clause stands and
 the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words, and
-item 8's unbounded-replay parenthetical is narrowed by §12.1 rule 6 below without its own invitation
-to differ, so this document says so instead.
+§12.1 rule 6 below narrows a decision `consent.md` states in **five** places — §14 item 8's
+parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` row, and §20's
+fixture list — none of which invites the narrowing, so this document names all five rather than
+one.
 
 ## 1 · One AS, three client types
 
@@ -1414,12 +1416,14 @@ naming decision:
    carry `replayed` among the causes an unauthenticated caller can reach.
    Read without §11.4's binding and §11.0's substep this rule would be an unthrottled
    append reachable by any caller, which is exactly what rule 3 exists to prevent. **This narrows
-   `consent.md` §14.8's parenthetical, and is named as the spec revision it is** (this document's
-   opening provenance rule): that parenthetical describes the deciding session's replay as unbounded — "the
-   throttle neither counts nor refuses it" — with no limit on how many times. Rule 6 exempts only
-   the first re-submission; a second on the same session is an ordinary (d), counted and refused
-   like any other. The contract's bound is the better of the two, for the reason rule 3 exists, and
-   wins under §11's own preamble.
+   the same decision `consent.md` states in five places, and is named as the spec revision it is**
+   (this document's opening provenance rule): §14 item 8's parenthetical, **D-C6** itself, R11's
+   `stale` row, R12's `back after decision` row, and §20's fixture list all describe the deciding
+   session's replay as unbounded — "whatever the throttle's state," with no limit on how many
+   times. Rule 6 exempts only the first re-submission; a second on the same session is an ordinary
+   (d), counted and refused like any other. The contract's bound is the better of the two, for the
+   reason rule 3 exists, and wins under §11's own preamble — over every one of the five, not only
+   the one this section happened to quote.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
    the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one
