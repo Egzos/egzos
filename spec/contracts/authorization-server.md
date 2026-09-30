@@ -33,7 +33,13 @@ pre-authorization audit surface, and what this document does not fix (§13). §5
 uniform failure — is Part B's, written back in §5 because that is where §5.1's "reject" needed an
 answer; §11.0, §11.1, §11.4, §7's closing line and the whole of §12's row (d) route to it, and a
 reader mapping the document from this paragraph would otherwise place it in Part A. §5's subsection
-numbering (§5.1, §5.2) is Part B's too, headings only.
+numbering (§5.1, §5.2) is Part B's too, headings only. **Three more of Part B's additions land in
+§§1–9 and are named here for the same reason**, so the freeze review does not read any of them as
+already-ratified Part A text: §5's `registered_at` key on the registration entry (§11.1's addition,
+carried back because §5 is where a registration's shape lives); §7's closing paragraph, which
+states what routes to §5.3 but is itself new prose, not a description of existing text; and §9's
+*"Every value this AS issues is unguessable — unconditionally"* subsection, a fresh normative
+requirement this PR adds, not a restatement of anything #67, #73 or #78 reviewed.
 `container.md` fixes everything about the container *except* how a
 client obtains a token; this document fixes only that, and neither overrides the other.
 
@@ -958,9 +964,15 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    - at **`/device`**, §11.8's uniform failure across §12 row (b)'s causes, so `throttled` is
      indistinguishable from `invalid`, `expired`, `used` and `malformed`.
 
-   In every case the cause reaches the **ledger** and never the page, which is §12.1 rule 1 and not a
-   per-surface choice. §5.3's page is `/authorize`'s answer and is not the other two surfaces' answer
-   to anything.
+   In every case the cause reaches the **ledger** and never the page, and that is a per-surface
+   constant, not a per-surface choice — but this substep governs a throttle that *already holds*,
+   so the ledger entry it reaches is §12.1 rule 3's, not rule 1's: rule 1 is one append per
+   *evaluated* attempt, and rule 4 states plainly that a throttle which holds does not evaluate.
+   Every attempt refused while the throttle holds is **counted, not appended**, whatever its cause
+   would otherwise have been — the engaging attempt above appended once under `throttled`; every
+   attempt after it, at every surface, adds to the count that rides on the throttle's eventual
+   release entry (§12.1 rule 5) and appends nothing of its own. §5.3's page is `/authorize`'s
+   answer and is not the other two surfaces' answer to anything.
 3. **At `/authorize` only: is there an interactive session?** If there is none and the request
    presents no bearer credential, the response is a **303 to §11.7's `/login`** carrying a `continue`
    under that section's allowlist — §10's *"a caller with no session is sent to §11's login first"*,
@@ -1272,10 +1284,14 @@ above holds whichever is picked.
   redeemed is spent whether or not the authorization it belongs to was approved. **Its failures are
   uniform**, on §11.7's terms and for §11.7's reason: §12 row (b)'s five causes — `invalid`,
   `expired`, `used`, `malformed` and `throttled` — produce one message, one status and one timing
-  class, the cause reaching `details` and never the page (§12.1 rule 1). A page that distinguished
-  `used` from `invalid` would tell an attacker sweeping codes which of its guesses had ever been
-  issued. This is the response §11.0's substep 2 means at `/device`; §5.3's page is `/authorize`'s
-  and is not this surface's.
+  class, the cause reaching `details` and never the page for the attempt that is *evaluated*
+  (§12.1 rule 1) — which is every one of the five for an attempt the throttle admits, and only the
+  first `throttled` one once the throttle holds: rule 4 states a held throttle does not evaluate,
+  so every further attempt at this page while it holds is counted, not appended (§12.1 rule 3), the
+  same exception §5.3 clause 4 states for `/authorize`. A page that distinguished `used` from
+  `invalid` would tell an attacker sweeping codes which of its guesses had ever been issued. This is
+  the response §11.0's substep 2 means at `/device`; §5.3's page is `/authorize`'s and is not this
+  surface's.
 - **The requester hint is client-supplied, unverified data.** A device client MAY report a device or
   host name for the client block. **The AS MUST NOT verify it, MUST NOT branch on it, and MUST NOT
   record it anywhere that reads as verified. a1p** — it is a phishing-relevant string a remote
@@ -1406,9 +1422,13 @@ naming decision:
    §7, §11.7 and §11.8 make the four surfaces uniform to the *caller* — **each in its own response,
    not in one shared one** (§11.0 substep 2) — and that uniformity is owed to the caller, never to
    the owner's own ledger.
-2. **One append per path, however the path is reached.** (d)'s page is one page; a request that
-   arrives at it by any of the row's **seven** causes writes once each time, so no cause is
-   distinguishable by the *number* of writes it makes.
+2. **One append per** ***evaluated*** **path, however the path is reached.** (d)'s page is one page;
+   a request the throttle *evaluates* — every cause but the ones rule 3 excepts — writes once each
+   time, so among evaluated attempts no cause is distinguishable by the *number* of writes it makes.
+   Rule 3, next, is this rule's one exception, not a separate rule that happens to sit beside it:
+   `throttled` writes once only for the attempt that engages the throttle, and zero times for every
+   attempt refused while it already holds — that difference is real, and it is rule 3's, not this
+   one's, to state and bound.
 3. **A refused attempt is counted, not appended.** The attempt that *engages* a throttle appends once
    under (a), (b) or (d) with cause `throttled` — always (d) and never (f) at `/authorize`, because
    §11.0 runs the throttle before either validation tier. Every further attempt refused while the
