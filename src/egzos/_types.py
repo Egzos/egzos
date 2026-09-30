@@ -416,7 +416,13 @@ AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
 #: own paragraph). These four tuples are never open — unlike the event *names* these causes travel
 #: under, which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
 AS_LOGIN_CAUSES: tuple[str, ...] = ("wrong", "unknown", "throttled")
-AS_DEVICE_REDEMPTION_CAUSES: tuple[str, ...] = ("invalid", "expired", "used", "malformed", "throttled")
+AS_DEVICE_REDEMPTION_CAUSES: tuple[str, ...] = (
+    "invalid",
+    "expired",
+    "used",
+    "malformed",
+    "throttled",
+)
 AS_AUTHORIZE_PRETRUST_CAUSES: tuple[str, ...] = (
     "unknown_client",
     "redirect_mismatch",
@@ -602,8 +608,12 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_AUTHORIZE_POSTTRUST_CAUSES",
+    "AS_AUTHORIZE_PRETRUST_CAUSES",
     "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
+    "AS_DEVICE_REDEMPTION_CAUSES",
+    "AS_LOGIN_CAUSES",
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",

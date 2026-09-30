@@ -168,9 +168,10 @@ def test_the_throttle_surfaces_are_four_closed_words():
 def test_the_pre_token_cause_vocabularies_are_closed_per_row():
     """§12's table, rows (a), (b), (d) and (f) — four closed `details.cause` vocabularies.
 
-    Written out rather than derived, for the same reason `test_the_throttle_surfaces_are_four_closed_words`
-    is: a cause arriving at one of these rows that is not in its tuple should break a test, not
-    append quietly. Round 24's own major on egzos#85 was exactly this — a seventh cause,
+    Written out rather than derived, for the same reason
+    `test_the_throttle_surfaces_are_four_closed_words` is: a cause arriving at one of these rows
+    that is not in its tuple should break a test, not append quietly. Round 24's own major on
+    egzos#85 was exactly this — a seventh cause,
     `token_presented`, arriving at row (d) with nothing to catch it, caught only by hand on a later
     reading of the table. `throttled` recurs across (a), (b) and (d) on purpose: §11.0 substep 2
     gives each surface its own uniform failure, one throttle per surface, so the word is not shared
