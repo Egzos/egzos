@@ -406,6 +406,28 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: is no constant for them here, deliberately.
 AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
 
+#: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
+#: effect appends under. Written out rather than derived, for the same reason `AS_THROTTLE_SURFACES`
+#: is: the point of a closed cause list is that it is closed, and a cause arriving that is not in
+#: the tuple should break a test, not append quietly. Row (d)'s `token_presented` is this Part's own
+#: addition over `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not
+#: silently absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because
+#: §11.5 clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s
+#: own paragraph). These four tuples are never open — unlike the event *names* these causes travel
+#: under, which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
+AS_LOGIN_CAUSES: tuple[str, ...] = ("wrong", "unknown", "throttled")
+AS_DEVICE_REDEMPTION_CAUSES: tuple[str, ...] = ("invalid", "expired", "used", "malformed", "throttled")
+AS_AUTHORIZE_PRETRUST_CAUSES: tuple[str, ...] = (
+    "unknown_client",
+    "redirect_mismatch",
+    "malformed",
+    "missing_pkce",
+    "throttled",
+    "replayed",
+    "token_presented",
+)
+AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[str, ...] = ("vocabulary", "scope")
+
 
 class DeviceAuthorization(TypedDict):
     """RFC 8628's device-authorization response (§3) — CLI and headless only; browsers are retired.

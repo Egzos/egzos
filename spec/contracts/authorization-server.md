@@ -61,13 +61,17 @@ fixture list — none of which invites the narrowing, so this document names all
 one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
 silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a throttle-refused
 attempt — **six** places, R12 being the `/authorize` row the clause itself governs — named there
-for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **five**
+for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **six**
 places — §14 item 8's cause list itself (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust
 tier ("expiry within config → else redirect"), §20's fixture ("clamped (R9) or `access_denied`, per
-§14.6" — conditional on §14.6, the same condition as §10's clause below, not an unconditional
-append under (f)), R12's `rejected (post-trust)` row, and §10's post-trust clause (also stated only
-conditionally there) — two of the five conditional on the very question §11.5 answers, not one, and
-§11.5's clamp rule decides the opposite for all five, named at row (f) itself.
+§14.6" — conditional on §14.6, the same condition as §10's clause and R9's row below, not an
+unconditional append under (f)), R12's `rejected (post-trust)` row, §10's post-trust clause (also
+stated only conditionally there), and R9's `ready (beyond container max)` row itself ("the server
+clamps or refuses per config (§14.6)") — three of the six conditional on the very question §11.5
+answers, not one, and §11.5's clamp rule decides the opposite for all six, named at row (f) itself.
+Row (d)'s `token_presented` is a fourth divergence, an **addition** rather than a narrowing — named
+at row (d) itself, in the same shape, since this paragraph's "name every site" standard applies to
+what this Part diverges on, additions included, not to narrowings alone.
 
 ## 1 · One AS, three client types
 
@@ -1104,6 +1108,17 @@ verifies it nor gives it meaning; a name that imitates the product is a registra
 and the page's defence is showing the origin and the kind beside it, which is the design spec's.
 Nothing in the AS may branch on a client name.
 
+**`client_type`'s literal and the kind word the page renders are not the same string, and this is
+the one divergence from `consent.md` this document has not previously named.** `AS_CLIENT_TYPES`
+(§1, Part A) is `browser` · `cli` · `mcp`; `consent.md`'s own rendered kind vocabulary (§14 item 1,
+R4's client block, the `kind.*` copy keys) is `browser` · `device` · `mcp` — `device` where this
+document's own type predates Part B as `cli`, because the design names the client by its flow
+(device-code) rather than its category. §11.1 is the clause that binds the page to read
+`client_type` and render the kind beside the name, so this is where the mapping belongs: a page
+rendering this entry's `client_type` renders `cli` as the copy key `kind.device`, never as
+`kind.cli`, which does not exist. The AS-internal literal does not change; only its display name
+does, at the one place a display name is rendered.
+
 ### 11.2 · The screen renders what will be minted, after any clamp
 
 **The grant the screen renders MUST equal the grant the mint produces. a1p** — this is the one
@@ -1393,10 +1408,11 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
 two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page,
 which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover: its
-endpoint, token shape, binding and window mechanics are §13's to route to Phase 2.2; its own audit
-entries are a different pointer, §10's `[LEAN]` closing line's, which keeps them with #68's batch
-and `events.md` rather than here — and the effects those three pages produce **before any token
-exists** —
+endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10's `[LEAN]`
+paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
+carries); its own audit entries are a different pointer, §10's `[LEAN]` closing line's, which
+keeps them with #68's batch and `events.md` rather than here — and the effects those three pages
+produce **before any token exists** —
 (a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
 any session exists either, (e) on no request at all (§12.2), the rest inside a session §11.0's
 substep 3 has already required — and the drafted taxonomy has no name for one of them.
@@ -1432,14 +1448,15 @@ and has no signal that one is owed. §20 does not carry this cause; whether it o
 freeze review, not decided here.
 
 **Row (f) has two closed causes, not three — a narrowing of a decision `consent.md` states in
-**five** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
+**six** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
 (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust tier ("expiry within config → else
 redirect"), §20's fixture ("clamped (R9) or `access_denied`, per §14.6" — conditional on §14.6, not
-an unconditional append under (f)), R12's `rejected (post-trust)` row, and §10's post-trust clause
-(also stated only conditionally there) all name a third post-trust rejection cause: an expiry
-request beyond the container's maximum. Two of the five — §20's fixture and §10's clause — are
-conditional on the same question, §14.6, not one; §11.5, answering `consent.md` §14.6's own
-`[OPEN→a1p]`, decides the
+an unconditional append under (f)), R12's `rejected (post-trust)` row, §10's post-trust clause
+(also stated only conditionally there), and R9's own `ready (beyond container max)` row ("the
+server clamps or refuses per config (§14.6)") all name a third post-trust rejection cause: an
+expiry request beyond the container's maximum. Three of the six — §20's fixture, §10's clause and
+R9's row — are conditional on the same question, §14.6, not one; §11.5, answering `consent.md`
+§14.6's own `[OPEN→a1p]`, decides the
 opposite for that one cause: an over-long expiry is **clamped to the maximum, never refused for that
 reason alone** — the same probe-oracle reasoning §7 closes for `scope`, and §11.2 consequence 2
 already names the clamp as its one exception to the refuse-don't-narrow rule. Row (f)'s cause list
@@ -1451,6 +1468,13 @@ one that is **not one of the six capability names** — the same error code, the
 because both are a fact about the vocabulary in this document and neither reveals anything about the
 container. `scope` carries §7's `access_denied` half at this endpoint: a node the viewer does not
 cover or one that does not exist.
+
+**Rows (a), (b), (d) and (f)'s cause vocabularies are pinned, not left to be caught by hand.**
+`AS_LOGIN_CAUSES`, `AS_DEVICE_REDEMPTION_CAUSES`, `AS_AUTHORIZE_PRETRUST_CAUSES` and
+`AS_AUTHORIZE_POSTTRUST_CAUSES` in `src/egzos/_types.py` fix the four tuples this table states,
+the same way `AS_THROTTLE_SURFACES` already fixes rule 5's — so a cause arriving that is not in
+its row's tuple breaks a test rather than appending quietly, which is exactly the gap this Part's
+own row (d) addition sat in until this review caught it by hand.
 
 **A successfully rendered consent screen appends nothing, deliberately. a1p.** The five above are
 four failures and a release; a screen that renders performs §11.1's registry read and §11.3's

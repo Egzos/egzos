@@ -163,3 +163,46 @@ def test_the_throttle_surfaces_are_four_closed_words():
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
     # §12.2: the caller's network identifier is never the actor, so no surface is one.
     assert not any(s in {"ip", "remote_addr", "caller"} for s in t.AS_THROTTLE_SURFACES)
+
+
+def test_the_pre_token_cause_vocabularies_are_closed_per_row():
+    """§12's table, rows (a), (b), (d) and (f) — four closed `details.cause` vocabularies.
+
+    Written out rather than derived, for the same reason `test_the_throttle_surfaces_are_four_closed_words`
+    is: a cause arriving at one of these rows that is not in its tuple should break a test, not
+    append quietly. Round 24's own major on egzos#85 was exactly this — a seventh cause,
+    `token_presented`, arriving at row (d) with nothing to catch it, caught only by hand on a later
+    reading of the table. `throttled` recurs across (a), (b) and (d) on purpose: §11.0 substep 2
+    gives each surface its own uniform failure, one throttle per surface, so the word is not shared
+    state between the tuples, only the same English word used three times.
+    """
+    assert t.AS_LOGIN_CAUSES == ("wrong", "unknown", "throttled")
+    assert t.AS_DEVICE_REDEMPTION_CAUSES == ("invalid", "expired", "used", "malformed", "throttled")
+    assert t.AS_AUTHORIZE_PRETRUST_CAUSES == (
+        "unknown_client",
+        "redirect_mismatch",
+        "malformed",
+        "missing_pkce",
+        "throttled",
+        "replayed",
+        "token_presented",
+    )
+    # Row (f): two causes, not three — `expiry` is clamped (§11.5), never rejected for that reason
+    # alone, so it is not a closed cause here even though `consent.md` names it as one of three.
+    assert t.AS_AUTHORIZE_POSTTRUST_CAUSES == ("vocabulary", "scope")
+    assert "expiry" not in t.AS_AUTHORIZE_POSTTRUST_CAUSES
+    for causes in (
+        t.AS_LOGIN_CAUSES,
+        t.AS_DEVICE_REDEMPTION_CAUSES,
+        t.AS_AUTHORIZE_PRETRUST_CAUSES,
+        t.AS_AUTHORIZE_POSTTRUST_CAUSES,
+    ):
+        assert len(set(causes)) == len(causes)
+    # §12.1 rule 7: no cause is a credential, a `user_code`, a token value or a `code_verifier`.
+    all_causes = {
+        *t.AS_LOGIN_CAUSES,
+        *t.AS_DEVICE_REDEMPTION_CAUSES,
+        *t.AS_AUTHORIZE_PRETRUST_CAUSES,
+        *t.AS_AUTHORIZE_POSTTRUST_CAUSES,
+    }
+    assert not any(c in {"token", "user_code", "code_verifier"} for c in all_causes)
