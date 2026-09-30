@@ -60,7 +60,9 @@ parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` r
 fixture list — none of which invites the narrowing, so this document names all five rather than
 one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
 silence bullet, §14 item 8 and R2/R3's refused rows all state for a throttle-refused attempt,
-named there for the same reason.
+named there for the same reason; and §12's row (f) below narrows R12's `rejected (post-trust)` row
+and its own §10 post-trust clause, both of which name an over-long expiry as a rejection cause —
+§11.5's clamp rule decides the opposite, named at row (f) itself.
 
 ## 1 · One AS, three client types
 
@@ -1029,8 +1031,10 @@ thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. What the
 the counter's increment, and the attempt that
 engages the throttle appends once under §12.1 rule 3 as row (d) cause `throttled`. That entry, and
 one row (d) `token_presented` entry per evaluated attempt that presents a bearer credential (§10,
-bounded by the same counter), are the whole of an unauthenticated caller's reach into the chain at
-`/authorize`, which is what rule 3 is now written on.
+bounded by the same counter), are the whole of an unauthenticated *caller's* reach into the chain at
+`/authorize`, which is what rule 3 is now written on — rule 5's release entry is not a third addition
+to this reach: the throttle's own timer writes it once per engagement, on no request at all (§12.2),
+not the caller.
 
 Substep 1 does not reopen rule 3's bound, and the reason is the point of writing it here: it is
 unreachable without an authenticated interactive session, so an unauthenticated sweep never enters
@@ -1396,7 +1400,19 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 | **(b)** | a device-code redemption at `/device` | `found` · `failed` | `invalid` · `expired` · `used` · `malformed` · `throttled` |
 | **(d)** | a pre-trust uniform failure at `/authorize` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` · `token_presented` |
 | **(e)** | a throttle releasing | `released` | — (see below) |
-| **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` · `expiry` |
+| **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` |
+
+**Row (f) has two closed causes, not three — a narrowing of `consent.md`'s own list, named as the
+spec revision it is.** `consent.md` R12's `rejected (post-trust)` row and its §10 post-trust
+validation clause both name three post-trust rejection causes, the third being an expiry request
+beyond the container's maximum. §11.5, answering `consent.md` §14.6's own `[OPEN→a1p]`, decides the
+opposite for that one cause: an over-long expiry is **clamped to the maximum, never refused for that
+reason alone** — the same probe-oracle reasoning §7 closes for `scope`, and §11.2 consequence 2
+already names the clamp as its one exception to the refuse-don't-narrow rule. Row (f)'s cause list
+did not carry the same correction until now. `expiry` is not a closed cause of (f): every over-long
+expiry is clamped, not rejected, and no clause in this Part rejects one for `expiry` alone — the two
+that remain, `vocabulary` (an unknown capability word) and `scope` (a node the viewer does not cover
+or one that does not exist), are the whole of what a post-trust request can be rejected for.
 
 **A successfully rendered consent screen appends nothing, deliberately. a1p.** The five above are
 four failures and a release; a screen that renders performs §11.1's registry read and §11.3's
@@ -1445,9 +1461,12 @@ naming decision:
 
 1. **One append per *evaluated* attempt, success and failure alike** — the same shape `events.md`
    invariant 2 already requires of a read. The cause lives in `details` and never on the page: §5.3,
-   §7, §11.7 and §11.8 make the four surfaces uniform to the *caller* — **each in its own response,
-   not in one shared one** (§11.0 substep 2) — and that uniformity is owed to the caller, never to
-   the owner's own ledger.
+   §7, §11.7 and §11.8 — four sections making **three** surfaces uniform to the *caller*, §5.3 and §7
+   being `/authorize`'s two tiers and not two surfaces of their own, matching §12's own "three pages
+   and a timer" — **each in its own response, not in one shared one** (§11.0 substep 2) — and that
+   uniformity is owed to the caller, never to the owner's own ledger. Not `surface`: rule 5's closed
+   four-word vocabulary below, which the tap belongs to and this rule's three do not, since this rule
+   covers only the pages that render a uniform *failure*.
 2. **One append per** ***evaluated*** **path, however the path is reached.** (d)'s page is one page;
    a request the throttle *evaluates* — every cause but the ones rule 3 excepts — writes once each
    time, so among evaluated attempts no cause is distinguishable by the *number* of writes it makes.
@@ -1475,7 +1494,10 @@ naming decision:
    `/authorize` grows an **append-only** log the owner cannot prune, at the caller's rate; with it the
    sweep's whole reach **at `/authorize`** is what §11.0's substep 3 already states there: **one
    entry per throttle engagement, plus one `token_presented` entry per attempt the throttle admits
-   and (d) evaluates.** (a) and (b) append under their own cause per rule 1 on an admitted attempt,
+   and (d) evaluates.** Rule 5's release entry is not a third figure this bound omits: it is written
+   once per engagement by the throttle's own timer, on no request at all (§12.2) — never a caller's
+   own attempt reaching the chain — so it is not part of what an unauthenticated *caller* can make the
+   chain do, though it is part of what an engagement costs the chain overall. (a) and (b) append under their own cause per rule 1 on an admitted attempt,
    never under `token_presented` — this rule's bound applies to the endpoint where that cause is
    possible.  It is *not* one entry per engagement flat at `/authorize` — `token_presented` is
    decided inside substep 3 and appends per evaluated attempt, so a sweep that presents bearer
