@@ -170,12 +170,12 @@ def test_the_pre_token_cause_vocabularies_are_closed_per_row():
 
     Written out rather than derived, for the same reason
     `test_the_throttle_surfaces_are_four_closed_words` is: a cause arriving at one of these rows
-    that is not in its tuple should break a test, not append quietly. Round 24's own major on
-    egzos#85 was exactly this — a seventh cause,
-    `token_presented`, arriving at row (d) with nothing to catch it, caught only by hand on a later
-    reading of the table. `throttled` recurs across (a), (b) and (d) on purpose: §11.0 substep 2
-    gives each surface its own uniform failure, one throttle per surface, so the word is not shared
-    state between the tuples, only the same English word used three times.
+    that is not in its tuple should break a test, not append quietly. #61's own history has an
+    instance: a seventh cause, `token_presented`, arrived at row (d) with nothing to catch it,
+    caught only by hand on a later reading of the table. `throttled` recurs across (a), (b) and (d)
+    on purpose: §11.0 substep 2 gives each surface its own uniform failure, one throttle per
+    surface, so the word is not shared state between the tuples, only the same English word used
+    three times.
     """
     assert t.AS_LOGIN_CAUSES == ("wrong", "unknown", "throttled")
     assert t.AS_DEVICE_REDEMPTION_CAUSES == ("invalid", "expired", "used", "malformed", "throttled")

@@ -820,6 +820,16 @@ holding all six capabilities could walk §2's flow and mint a second client a to
 capability reaches a human-only act, including `admin`* is the same rule; this states it at the one
 endpoint where the act is "hand out authority."
 
+`[OPEN→0.3]` **The session this endpoint decides on carries no stated maximum age, idle timeout or
+re-authentication point.** §10.1 bounds it only as far as *"ends. Its lifetime is the browser
+session's"* — `consent.md` §2.1 names no sign-out act either. §10.4's presence backstop requires
+re-proof within a live window for `HUMAN_ONLY_ACTS`, but `/authorize` is not among those three acts,
+so the endpoint this document itself calls "hand out authority" carries a weaker presence guarantee
+than `approve.pending` does. Not decided here — a maximum age, an idle timeout, and the stance that
+the browser session's own lifetime is the correct and only bound are all live options — but it
+belongs among this document's `[OPEN→0.3]` markers and was missing from them until now. §13's
+`TODO(a1p)` on §10.1's session storage is the durable-state half of this question, not this one.
+
 ### 10.3 · The AS mints `interactive` only where presence can actually be composed
 
 **An AS-minted token carries `principal: interactive` only when it is issued to a `browser` client
@@ -897,6 +907,15 @@ written, because this document is at its narrowing round:
 for one shape of act does not cover another. `gate.confirm` is plausibly ring-pair shaped;
 whether `approve.pending` and `yes.consume` are ring-pair-scoped, manifest-shape-bounded, or bound
 some other way is undecided here.
+
+`[OPEN→0.3]` **This backstop adds a second, mandatory gate to `capabilities.md` §4's human-only-act
+rule, and `capabilities.md` §4 carries no pointer to it.** §4 is marked **running** and states only
+the principal gate; §13 routes "human-only acts" to `capabilities.md` by name, so a builder following
+this document's own pointer arrives at a clause that ships half the gate. §12 meets the identical
+situation for `events.md` §4 invariant 2 and routes an explicit amendment ask rather than settling the
+reconciliation locally; the fix here is the same shape, not a new one. Routed to the freeze review:
+`capabilities.md` §4 needs an explicit amendment naming this backstop, not only a second document that
+states it exists.
 
 **Until Phase 2.2 the interactive owner token is the proof** (`capabilities.md` §3, **running**), and
 this document does not pretend otherwise: that is a **stated, dated gap**, not the posture. The
