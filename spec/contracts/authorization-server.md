@@ -341,9 +341,12 @@ under any cause.** Testable as written:
    oracle reached slowly. Specifically: §11.1's keyed read *happens or does not happen* according to
    whether the `client_id` is registered, and that difference MUST NOT be observable. It is the one
    measurement that would otherwise turn §11.1's rule back into the enumeration it prevents. **The
-   budget covers §12.1 rule 3's append asymmetry too, and not only that read** — six of the seven
-   causes append once each, while an attempt refused by a throttle that *already holds* is counted
-   and not appended, and an append to a hash-chained log is not free work. That asymmetry is not an
+   budget covers §12.1 rule 3's append asymmetry too, and not only that read** — the asymmetry is a
+   state, not a cause: every cause appends once when evaluated, the engaging attempt included under
+   `throttled`, while **every** cause — `throttled` among them — is counted and not appended for any
+   further attempt while the throttle *already holds*, whatever that attempt's cause would otherwise
+   have been (§11.0 substep 2, §12.1 rules 3 and 6), and an append to a hash-chained log is not free
+   work. That asymmetry is not an
    enumeration oracle in §7's sense, since a caller learning it is throttled has learned only its own
    request rate; it is named because it is a second timing difference in the same response set, and
    an implementer who pads the registry read alone has met this clause's rationale and missed its
@@ -496,7 +499,8 @@ The rule, stated so it is testable:
   same time budget. `access_denied` is the one to use.
 - `invalid_scope` is reserved for a scope value that is **malformed or not one of the six capability
   names** — a fact about the vocabulary in this document, identical for every container, revealing
-  nothing about any of them.
+  nothing about any of them. §12's row (f) carries both halves of this reservation under its one
+  closed cause `vocabulary`, never split into two.
 
 This applies to the device flow (§3) identically: a rejected device authorization reveals no more
 than a rejected redirect does.
@@ -977,14 +981,16 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    - at **`/device`**, §11.8's uniform failure across §12 row (b)'s causes, so `throttled` is
      indistinguishable from `invalid`, `expired`, `used` and `malformed`.
 
-   In every case the cause reaches the **ledger** and never the page, and that is a per-surface
-   constant, not a per-surface choice — but this substep governs a throttle that *already holds*,
-   so the ledger entry it reaches is §12.1 rule 3's, not rule 1's: rule 1 is one append per
-   *evaluated* attempt, and rule 4 states plainly that a throttle which holds does not evaluate.
-   Every attempt refused while the throttle holds is **counted, not appended**, whatever its cause
-   would otherwise have been — the engaging attempt above appended once under `throttled`; every
-   attempt after it, at every surface, adds to the count that rides on the throttle's eventual
-   release entry (§12.1 rule 5) and appends nothing of its own. §5.3's page is `/authorize`'s
+   The cause never reaches the page, at any surface — that much is a per-surface constant, not a
+   per-surface choice. Whether it reaches the **ledger** depends on this substep's own state: this
+   substep governs a throttle that *already holds*, so the ledger entry it reaches is §12.1 rule 3's,
+   not rule 1's — rule 1 is one append per *evaluated* attempt, and rule 4 states plainly that a
+   throttle which holds does not evaluate. Every attempt refused while the throttle holds is
+   **counted, not appended**, whatever its cause would otherwise have been — the engaging attempt
+   above appended once under `throttled`, cause and all; every attempt after it, at every surface,
+   is discarded and reaches **neither** the page nor the ledger, adding only to the causeless count
+   that rides on the throttle's eventual release entry (§12.1 rule 5, `surface` and `refused`, no
+   cause) and appending nothing of its own. §5.3's page is `/authorize`'s
    answer and is not the other two surfaces' answer to anything.
 3. **At `/authorize` only: is there an interactive session?** If there is none and the request
    presents no bearer credential, the response is a **303 to §11.7's `/login`** carrying a `continue`
@@ -1411,8 +1417,12 @@ reason alone** — the same probe-oracle reasoning §7 closes for `scope`, and �
 already names the clamp as its one exception to the refuse-don't-narrow rule. Row (f)'s cause list
 did not carry the same correction until now. `expiry` is not a closed cause of (f): every over-long
 expiry is clamped, not rejected, and no clause in this Part rejects one for `expiry` alone — the two
-that remain, `vocabulary` (an unknown capability word) and `scope` (a node the viewer does not cover
-or one that does not exist), are the whole of what a post-trust request can be rejected for.
+that remain are the whole of what a post-trust request can be rejected for. **`vocabulary` carries
+both halves of §7's `invalid_scope` reservation, not one**: a scope value that is **malformed**, and
+one that is **not one of the six capability names** — the same error code, the same closed cause,
+because both are a fact about the vocabulary in this document and neither reveals anything about the
+container. `scope` carries §7's `access_denied` half at this endpoint: a node the viewer does not
+cover or one that does not exist.
 
 **A successfully rendered consent screen appends nothing, deliberately. a1p.** The five above are
 four failures and a release; a screen that renders performs §11.1's registry read and §11.3's
