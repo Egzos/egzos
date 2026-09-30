@@ -37,17 +37,19 @@ numbering (§5.1, §5.2) is Part B's too, headings only. **Three more of Part B'
 §§1–9 and are named here for the same reason**, so the freeze review does not read any of them as
 already-ratified Part A text: §5's `registered_at` key on the registration entry (§11.1's addition,
 carried back because §5 is where a registration's shape lives); §7's closing paragraph, which
-states what routes to §5.3 but is itself new prose, not a description of existing text; and §9's
-*"Every value this AS issues is unguessable — unconditionally"* subsection, a fresh normative
+states what routes to §5.3 but is itself new prose, not a description of existing text; and §9.1,
+*"Every value this AS issues is unguessable — unconditionally,"* a fresh normative
 requirement this PR adds, not a restatement of anything #67, #73 or #78 reviewed. **This Part also
 *modifies* ratified §9 text, which is a stronger reason to name it than an addition, not a weaker
 one:** §9 option 1's blast-radius argument is rewritten — RFC 7009 §2.1 is demoted from a premise
 to a corroborating, conditional SHOULD; rotation clause 2 is named as carrying the chain-reach
 argument on its own; and the `[OPEN→0.3]` on entropy that #67/#73/#78 left in option 1's own prose
-is removed from there and relocated into the new unguessable-values subsection as the broader
+is removed from there and relocated into §9.1 as the broader
 marker it became. The relocation is not asked back — it is a defensible edit — but a freeze reader
 of §9 option 1 at this head is reading Part B's reasoning, not #67/#73/#78's, and nothing in this
-paragraph said so until now.
+paragraph said so until now. **§9.2's heading is the same class of structural edit as §5.1/§5.2's,
+named two sentences above:** it adds no text and moves none, grouping the pre-existing ratified §9
+body under a heading so §9.1 no longer reads as if it preceded that body.
 `container.md` fixes everything about the container *except* how a
 client obtains a token; this document fixes only that, and neither overrides the other.
 
@@ -58,14 +60,14 @@ the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in 
 §12.1 rule 6 below narrows a decision `consent.md` states in **five** places — §14 item 8's
 parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` row, and §20's
 fixture list — none of which invites the narrowing, so this document names all five rather than
-one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
-silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a throttle-refused
+one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, `consent.md`'s §10
+pre-trust silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a throttle-refused
 attempt — **six** places, R12 being the `/authorize` row the clause itself governs — named there
 for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **six**
 places — §14 item 8's cause list itself (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust
 tier ("expiry within config → else redirect"), §20's fixture ("clamped (R9) or `access_denied`, per
-§14.6" — conditional on §14.6, the same condition as §10's clause and R9's row below, not an
-unconditional append under (f)), R12's `rejected (post-trust)` row, §10's post-trust clause (also
+§14.6" — conditional on §14.6, the same condition as `consent.md`'s §10 clause and R9's row below, not an
+unconditional append under (f)), R12's `rejected (post-trust)` row, `consent.md`'s §10 post-trust clause (also
 stated only conditionally there), and R9's `ready (beyond container max)` row itself ("the server
 clamps or refuses per config (§14.6)") — three of the six conditional on the very question §11.5
 answers, not one, and §11.5's clamp rule decides the opposite for all six, named at row (f) itself.
@@ -380,8 +382,8 @@ under any cause.** Testable as written:
    "Testable as written" silent about it, is what makes it testable. **This is a named spec revision, not a rule this document merely
    restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
-   attempt's timing class is the throttle's own, which is not a secret"), §10's pre-trust silence
-   bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
+   attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
+   pre-trust silence bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
    and R2, R3 **and R12's** refused rows ("the timing class is the throttle's own"), each a distinct
    site — R12 being the `/authorize` row, the surface this clause itself governs, and so the most
    on-point of the six, not an afterthought to the other five. This clause is the stricter
@@ -753,7 +755,7 @@ three different things and only the first of them is the establishing act:
    and the one that needs bounding, because a token outlives the session that authorized it and is
    handed to software.
 
-### A session is not a token
+### 10.1 · A session is not a token
 
 **The interactive session and an interactive-principal `Token` are different objects, and this
 document keeps them apart. a1p** — `capabilities.md` §3 says the principal is *"established, for
@@ -766,7 +768,7 @@ and a bearer credential in a cookie. The session:
 - is scoped to the container's **own origin** — the pages of §11 and nothing else;
 - ends. Its lifetime is the browser session's, and it is not renewable by a refresh token.
 
-### `/authorize` is an owner act, and no token can take it
+### 10.2 · `/authorize` is an owner act, and no token can take it
 
 **An authorization decision is taken only by an interactive session — never by a bearer token,
 whatever it holds. a1p.** `/authorize` MUST refuse to render, and MUST refuse a decision, for a
@@ -788,7 +790,7 @@ never beside one. Two bounds on that check, both load-bearing:
   make a live `Token` distinguishable from a forged one at an endpoint that accepts neither.
 - **It is refused, not redirected.** Sending it to `/login` would answer a caller that supplied
   something with the same response as a caller that supplied nothing, which is the only case where
-  the two are worth telling apart *in the owner's ledger* — §10's grant-factory concern is precisely
+  the two are worth telling apart *in the owner's ledger* — §10.2's grant-factory concern is precisely
   software trying to spend a token on an owner act, and an entry is the whole of what the owner gets.
   The caller learns nothing either way: §5.3's page is uniform, and the distinction it can observe is
   between two things it sent itself.
@@ -815,7 +817,7 @@ holding all six capabilities could walk §2's flow and mint a second client a to
 capability reaches a human-only act, including `admin`* is the same rule; this states it at the one
 endpoint where the act is "hand out authority."
 
-### The AS mints `interactive` only where presence can actually be composed
+### 10.3 · The AS mints `interactive` only where presence can actually be composed
 
 **An AS-minted token carries `principal: interactive` only when it is issued to a `browser` client
 through §2's authorization-code flow. Every token issued through §3's device flow carries
@@ -851,7 +853,7 @@ backstop below, which is why a1p does not pick here: the backstop, not the token
 stops a stale interactive claim from reaching a human-only act. §9's `[OPEN→0.3]` on a non-null
 `expires_at` for public-client tokens bounds the damage under the second reading.
 
-### The presence backstop — an interactive principal is necessary, never sufficient
+### 10.4 · The presence backstop — an interactive principal is necessary, never sufficient
 
 **Every human-only act requires presence re-proof at the moment of the act, regardless of the
 principal the presenting token carries. a1p** — and this is the answer to `spec/design/consent.md`
@@ -902,7 +904,7 @@ because before it there are no third-party interactive tokens at all — there i
 lands before the tap does, the two must swap order, or the AS must refuse to mint `interactive` until
 the window exists.
 
-### `[LEAN]` · the step-up tap later rides these same endpoints
+### 10.5 · `[LEAN]` · the step-up tap later rides these same endpoints
 
 **`[LEAN]`, and §K's own word for it:** *"The step-up tap later rides the same AS endpoints rather
 than a parallel bespoke channel."* Recorded and **deliberately not hardened.** This document fixes
@@ -958,7 +960,7 @@ belong where the ordering is fixed. The substep list below is that order, and it
 
 **`/authorize`, `/login` and `/device` are each throttled per caller by this section; the tap is
 throttled per caller unconditionally too, by `consent.md`'s **D-C6** rather than by this document —
-§10's `[LEAN]` governs only whether the tap rides *these* AS endpoints or a channel of its own, not
+§10.5's `[LEAN]` governs only whether the tap rides *these* AS endpoints or a channel of its own, not
 whether it is throttled at all. a1p**, closing the half of `consent.md` §14 item 2 that had fallen
 between this document's two parts: item 2 asks for *"both throttled per caller as `/login` and
 `/device` are, the throttle checked before either"* and routes itself to §5, which answers the
@@ -984,7 +986,7 @@ stated next so that the ordering and its one exception are read together.
 rule 6 exempts one path from the throttle — a decided request re-submitted **on the session that
 decided it** (§11.4). That exemption is only implementable if it is evaluated *within* §11.0, before
 the counter, because recognising a re-submission means reading §11.4's decided-request record, and
-that read is evaluation of exactly the kind rule 4 forbids once a counter holds. **§10's login
+that read is evaluation of exactly the kind rule 4 forbids once a counter holds. **§10.2's login
 redirect has the same property from the other side** — it is an ordering, so it belongs where the
 ordering is fixed, and it is the step that decides whether §5.3's tier is reachable at all. So
 **§11.0 is three substeps, in this order**:
@@ -1032,7 +1034,7 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    on the presence of the credential and never on its validity. **A request holding both** — an
    interactive session *and* a bearer credential in the same `Authorization` header or position —
    is decided on the session alone; substep 3 branches on session presence first, so the credential
-   is never reached and `token_presented` never fires. §10's refusal is for a credential presented
+   is never reached and `token_presented` never fires. §10.2's refusal is for a credential presented
    in place of a session, not beside one. `/login` and `/device` have no substep 3 — `/login` is
    where a session is obtained, and §3's device redemption is not an owner act.
 
@@ -1242,7 +1244,7 @@ and the response is byte-identical across §7's three converging causes.
 
 What is fixed here, and it is the §10 boundary said as a requirement on the page:
 
-- **The login establishes an interactive session and mints no token.** §10's four bullets hold: the
+- **The login establishes an interactive session and mints no token.** §10.1's four bullets hold: the
   session is not a `Token`, appears in no `token ls`, and is accepted at no endpoint that accepts a
   `Token`.
 - **`continue` is a relative path, matched against a fixed allowlist of parsed paths.** The rule is
@@ -1430,9 +1432,9 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
 two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page,
 which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover: its
-endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10's `[LEAN]`
+endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10.5's `[LEAN]`
 paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
-carries); its own audit entries are a different pointer, §10's `[LEAN]` closing line's, which
+carries); its own audit entries are a different pointer, §10.5's `[LEAN]` closing line's, which
 keeps them with #68's batch and `events.md` rather than here — and the effects those three pages
 produce **before any token exists** —
 (a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
@@ -1461,9 +1463,9 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 left for the freeze review to discover.** `consent.md` §14.8 (d) closes at six causes —
 `unknown_client`, `redirect_mismatch`, `malformed`, `missing_pkce`, `replayed`, `throttled` — and
 §20's Failures fixture list enumerates exactly those six. `token_presented` is this Part's own
-addition: it is introduced by §10's refusal of a bearer credential presented in place of a session,
+addition: it is introduced by §10.2's refusal of a bearer credential presented in place of a session,
 and threaded through §5.3 clause 1, §11.0 substep 3, §12.1 rule 3 and §12.2. The addition is sound —
-§10's reasoning for refusing a presented credential at this endpoint is not in question — but it is
+§10.2's reasoning for refusing a presented credential at this endpoint is not in question — but it is
 the same kind of divergence the narrowings below are named for, and it carries a cost a narrowing
 does not: a builder working from §20's six-cause fixture list produces no `token_presented` fixture
 and has no signal that one is owed. §20 does not carry this cause; whether it owes one is for the
@@ -1473,10 +1475,10 @@ freeze review, not decided here.
 **six** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
 (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust tier ("expiry within config → else
 redirect"), §20's fixture ("clamped (R9) or `access_denied`, per §14.6" — conditional on §14.6, not
-an unconditional append under (f)), R12's `rejected (post-trust)` row, §10's post-trust clause
+an unconditional append under (f)), R12's `rejected (post-trust)` row, `consent.md`'s §10 post-trust clause
 (also stated only conditionally there), and R9's own `ready (beyond container max)` row ("the
 server clamps or refuses per config (§14.6)") all name a third post-trust rejection cause: an
-expiry request beyond the container's maximum. Three of the six — §20's fixture, §10's clause and
+expiry request beyond the container's maximum. Three of the six — §20's fixture, `consent.md`'s §10 clause and
 R9's row — are conditional on the same question, §14.6, not one; §11.5, answering `consent.md`
 §14.6's own `[OPEN→a1p]`, decides the
 opposite for that one cause: an over-long expiry is **clamped to the maximum, never refused for that
@@ -1517,8 +1519,12 @@ case, every authenticated request that is not this session's first re-submission
 appends once under rule 1, whatever cause it earns; only where a throttle already holds does rule 3's
 exception govern instead, counted and not appended. Neither entry is the read's own, the same shape
 as the two reads above. `[OPEN→0.3]` **#86's
-sitting should confirm this**: it is the one place here where invariant 2 is satisfied by an argument
-rather than an append, and if the sitting disagrees the answer is a sixth row, not a changed read.
+sitting should record an explicit amendment to `events.md` §4 invariant 2**, naming the
+owner-inside-an-authenticated-session read exception and its three instances by name — confirming
+this document's argument is not the same act as amending the invariant it carves an exception into,
+and as the two documents stand today a builder reading `events.md` alone and a builder reading this
+document write different things for the same read. If the sitting disagrees the answer is a sixth
+row, not a changed read.
 
 `[OPEN→0.3]` **The argument above holds only where a decision follows, and a rendered screen the
 owner abandons is the case where none does — §11.1's registry read and §11.3's existing-tokens read
@@ -1609,7 +1615,7 @@ naming decision:
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
    `authorize` · `tap` (the step-up tap is the fourth surface, throttled unconditionally by
-   `consent.md`'s D-C6; if §10's `[LEAN]` is not taken the tap rides a channel of its own rather
+   `consent.md`'s D-C6; if §10.5's `[LEAN]` is not taken the tap rides a channel of its own rather
    than these AS endpoints, but the word is still used there — D-C6's release entry is
    `consent.md` §14.8 (e), the same event this rule pins, and the tap spec §14.5 binds to it **by
    citing the decision, not by restating it in an entry of its own** — never unused, only ridden
@@ -1711,8 +1717,8 @@ the chain, serving policy and the gate → `container.md`. The event list and th
 `events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
 exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1
 at the Phase 5 boundary (§4). The step-up tap's endpoints, token shape and window mechanics → Phase
-2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10's `[LEAN]` fixes none of them, and
-§10's backstop is written in terms of *a live presence window* so that it does not depend on how the
+2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10.5's `[LEAN]` fixes none of them, and
+§10.4's backstop is written in terms of *a live presence window* so that it does not depend on how the
 tap is reached. The *look* of §11's pages — regions, states, copy, every string — is
 `spec/design/consent.md`; this document fixes what they must be true about, never how they read.
 
