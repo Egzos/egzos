@@ -74,7 +74,13 @@ at row (d) itself, in the same shape, since this paragraph's "name every site" s
 what this Part diverges on, additions included, not to narrowings alone. A fifth: §11.1's
 `client_type`'s AS-internal literal (`cli`, Part A's own) is not the string `consent.md` renders
 for it (`device`) — named at §11.1 itself, and named here because this paragraph's standard reaches
-every divergence this Part states, not only the ones already listed above it.
+every divergence this Part states, not only the ones already listed above it. A sixth, the widest:
+§11.0's login-first ordering — substeps 1 and 3 preceding validation — puts row (d) and row (f) out
+of an unauthenticated caller's reach except for (d)'s `throttled` and `token_presented` causes, the
+direct negation of D-C6's premise that *the post-trust tier is as reachable as the pre-trust one*.
+Named at §11.0's own "Consequence recorded, not acted on here" clause; named here for the same
+reason as the other five. This document does not revise the premise — the revision is filed as
+**#98** (`design-gap`), which names the affected regions and states the options for the Chief's pick.
 
 ## 1 · One AS, three client types
 
@@ -600,6 +606,8 @@ than 128 bits of entropy per value, from the platform CSPRNG) and say which docu
 a1p's reading is `capabilities.md`, because that is the document that mints tokens and the
 requirement is not the AS's alone. **What is not open is whether the requirement exists.**
 
+### 9.2 · Revocation, rotation and expiry
+
 **Revocation is `token rm`, like any other client. §K.** The flagship's token is removed by the same
 verb, from the same list, with the same effect as a script's. There is no "sign out of egzos.io"
 that is also a container revocation, and no container revocation that requires the flagship.
@@ -1119,8 +1127,9 @@ verifies it nor gives it meaning; a name that imitates the product is a registra
 and the page's defence is showing the origin and the kind beside it, which is the design spec's.
 Nothing in the AS may branch on a client name.
 
-**`client_type`'s literal and the kind word the page renders are not the same string, and this is
-the one divergence from `consent.md` this document has not previously named.** `AS_CLIENT_TYPES`
+**`client_type`'s literal and the kind word the page renders are not the same string** — named in
+the opening provenance register above, and stated here at the clause that binds the page to the
+read. `AS_CLIENT_TYPES`
 (§1, Part A) is `browser` · `cli` · `mcp`; `consent.md`'s own rendered kind vocabulary (§14 item 1,
 R4's client block, the `kind.*` copy keys) is `browser` · `device` · `mcp` — `device` where this
 document's own type predates Part B as `cli`, because the design names the client by its flow
@@ -1130,13 +1139,15 @@ rendering this entry's `client_type` renders `cli` as the copy key `kind.device`
 `kind.cli`, which does not exist. The AS-internal literal does not change; only its display name
 does, at the one place a display name is rendered.
 
-### 11.2 · The screen renders what will be minted, after any clamp
+### 11.2 · The screen renders what will be minted, after any clamp (§14 item 3)
 
 **The grant the screen renders MUST equal the grant the mint produces. a1p** — this is the one
 clause that makes the screen a security surface rather than a courtesy. §7 expands a `scope` value
 into `{capabilities, scopes}`; the screen renders the *expansion*, not the request string, so a
 bundle name displays as the capabilities it became (§7 consequence 1), `node:*` displays as the whole
-container (§7 consequence 3), and a clamped expiry (§11.5) displays clamped.
+container (§7 consequence 3), and a clamped expiry (§11.5) displays clamped. This clause carries
+item 3's render half; §7's scope-expansion paragraph, cited throughout this section, carries the
+vocabulary half — what the expansion contains, not that the screen must show it unaltered.
 
 Two consequences:
 
@@ -1694,7 +1705,8 @@ The token's own shape, coverage, role bundles and human-only acts → `capabilit
 answered in §11 because the screen renders `publish` in the same vocabulary as the other five
 (§11.2), so the string is only as true as the capability's boundary and `capabilities.md` §1 marks
 that boundary open. A consent screen may not promise a boundary the capability contract has not
-drawn. That closes §14's list: Part B answers or routes every item on it. Containers,
+drawn. That closes §14's list: every item is now cited by number somewhere in Part B — §11.2 above
+carries item 3's render half, §7 its vocabulary half — and Part B answers or routes each. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
 exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1

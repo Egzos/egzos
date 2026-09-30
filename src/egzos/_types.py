@@ -11,9 +11,9 @@ Phase 1 builds against the frozen surface rather than the skeleton's.
 **Drafted, awaiting the Phase 0.3 freeze review** — A6 and the Chief declare the freeze, not a1p.
 
 Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26),
-``storage.md`` (issue #27), ``container.md`` (issue #28) and the authorization server's core
-mechanics (``authorization-server.md``, issue #29; its consent half is #61). The consolidation pass
-is #30.
+``storage.md`` (issue #27), ``container.md`` (issue #28) and the authorization server, both its
+core mechanics (``authorization-server.md`` Part A, issue #29) and its consent, login and
+device-code half (Part B, issue #61). The consolidation pass is #30.
 """
 
 from __future__ import annotations
@@ -347,7 +347,8 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
 # --- the authorization server (spec/contracts/authorization-server.md) ----------------------
 #
 # The one contract with NO running shape: the skeleton mints the owner token at `init` and has no
-# login, device-code or consent screen. Prose-derived (#29, part A); the consent half is #61.
+# login, device-code or consent screen. Prose-derived — core mechanics from #29 (Part A), the
+# consent, login and device-code half from #61 (Part B), both covered as of this module.
 
 ASClientType = Literal["browser", "cli", "mcp"]
 #: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
