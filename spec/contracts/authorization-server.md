@@ -1,4 +1,4 @@
-# Contract · the container's authorization server (core mechanics)
+<mcp-tool-result vendor="github"># Contract · the container's authorization server (core mechanics)
 
 **Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
 A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
@@ -381,9 +381,14 @@ under any cause.** Testable as written:
    oracle either, for the same reason the append asymmetry isn't one: a caller measuring an early
    exit learns only a fact about its own request — that it was throttled, or that it carried a
    credential — never a fact about the registry. Padding the registry read and the append asymmetry
-   alone still leaves this difference open; naming it here, rather than leaving a clause marked
-   "Testable as written" silent about it, is what makes it testable. **This is a named spec revision, not a rule this document merely
-   restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
+   alone still leaves this difference open, and unlike the first two this clause gives it no
+   disposition: whether it too must be padded to the full validation budget — a real cost, since
+   padding a cheap refusal to the price of a validated one gives up part of what a throttle is
+   for — or stands as a narrower, justified exception, is not decided here. `[OPEN→0.3]` **the
+   freeze review settles the third difference's disposition**; naming it here keeps this clause
+   honest about what "Testable as written" actually covers today, rather than leaving a reader to
+   infer a disposition the clause does not state. **The first two differences' padding is a named
+   spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
    pre-trust silence bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
@@ -1631,10 +1636,13 @@ naming decision:
    credentials there appends as often as the throttle lets it through. The bound is therefore **the
    throttle's own admitted rate**, which is the same counter in both cases; the engagement entry is
    one more on top of it, not the whole of it.
-4. **A throttle that holds does not evaluate — a correct credential or a valid code included.** A
-   throttle that evaluated the right answer while refusing wrong ones would bound the ledger and not
-   the guessing, which is the opposite of what it is for. **A throttle MUST fail closed:** one that
-   fails open turns the audit chain into a write amplifier.
+4. **A throttle that holds does not evaluate — a correct credential or a valid code included, with
+   one exception, rule 6's.** A throttle that evaluated the right answer while refusing wrong ones
+   would bound the ledger and not the guessing, which is the opposite of what it is for. **A
+   throttle MUST fail closed:** one that fails open turns the audit chain into a write amplifier.
+   Rule 6's deciding-session replay is the one case this rule does not reach: it is read inside
+   §11.0 substep 1, ahead of the counter this rule governs, which is the ordering rule 6 states and
+   this rule's own wording does not point to.
 5. **The release appends whenever an engage did, `refused: 0` included.** (e) is the only entry that
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
@@ -1765,3 +1773,4 @@ editable around Trust un-decides an authorization. a1p's reading is that all of 
 `ContainerState` by F3's rule (it is never delegated to a pluggable backend), but F3 was written
 before this surface existed and should be asked, not assumed. The 0.3 review or the #30
 consolidation pass should settle it.
+</mcp-tool-result>

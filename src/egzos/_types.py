@@ -366,7 +366,7 @@ class ClientRegistration(TypedDict):
     `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
     timestamp. It is the fifth `*_at: str` timestamp in this module and the first not spelled
     `created_at` — deliberately: `created_at` is generic across every other TypedDict here, but
-    `Token.created_at` (a mint) and this registration's timestamp (an owner act at `/5`, not a
+    `Token.created_at` (a mint) and this registration's timestamp (an owner act at §5, not a
     mint) are two different events that can appear on the same consent screen at once (§11.1's
     client entry beside §11.3's existing-tokens read), and one screen showing two `created_at`
     values for two different things would be the confusion the domain word avoids. `client_name`
@@ -395,17 +395,21 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 )
 
 #: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
-#: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up
-#: tap's page, throttled unconditionally by `consent.md`'s D-C6 rather than by this contract; if
-#: §10.5's `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints,
-#: but the word is still used there — D-C6's release entry is `consent.md` §14.8 (e), the same
-#: event this vocabulary pins, and the tap spec §14.5 binds to it by citing the decision rather
-#: than restating it in an entry of its own — never unused, only ridden elsewhere. The caller's
-#: network identifier is NEVER the actor: it would write
+#: a1p's reading of what `actor` carries on every pre-authorization append, as a `Literal` alias
+#: read back with `get_args`, matching the pattern `Capability`/`CAPABILITIES`,
+#: `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES` already use above: a typo at a
+#: call site that writes `details.surface` is a type error, not a string `str` would accept
+#: silently. `tap` is the step-up tap's page, throttled unconditionally by `consent.md`'s D-C6
+#: rather than by this contract; if §10.5's `[LEAN]` is not taken the tap rides a channel of its
+#: own instead of these AS endpoints, but the word is still used there — D-C6's release entry is
+#: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
+#: by citing the decision rather than restating it in an entry of its own — never unused, only
+#: ridden elsewhere. The caller's network identifier is NEVER the actor: it would write
 #: surveillance into a chain the owner cannot prune.
 #: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
-#: is no constant for them here, deliberately.
-AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
+#: is no constant for the event name itself, deliberately.
+ThrottleSurface = Literal["login", "device", "authorize", "tap"]
+AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
 #: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
@@ -674,6 +678,7 @@ __all__ = [
     "STRUCTURE_FLOORS",
     "ServingPolicy",
     "StructureFloor",
+    "ThrottleSurface",
     "TRUST_STATUSES",
     "TextContent",
     "Token",
