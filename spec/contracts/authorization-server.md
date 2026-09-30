@@ -912,11 +912,14 @@ the throttle, its one exception, and where `/authorize`'s session check sits —
 any part of it to the clauses that use it, because an ordering, and an exception to an ordering,
 belong where the ordering is fixed. The substep list below is that order, and it is normative.
 
-**`/authorize`, `/login`, `/device` and — if §10's `[LEAN]` is taken — the tap are each throttled per
-caller. a1p**, closing the half of `consent.md` §14 item 2 that had fallen between this document's
-two parts: item 2 asks for *"both throttled per caller as `/login` and `/device` are, the throttle
-checked before either"* and routes itself to §5, which answers the matching rule and nothing about
-throttling. §11.7 fixed `/login` and §11.8 device redemption, leaving `/authorize` — the surface §12's
+**`/authorize`, `/login` and `/device` are each throttled per caller by this section; the tap is
+throttled per caller unconditionally too, by `consent.md`'s **D-C6** rather than by this document —
+§10's `[LEAN]` governs only whether the tap rides *these* AS endpoints or a channel of its own, not
+whether it is throttled at all. a1p**, closing the half of `consent.md` §14 item 2 that had fallen
+between this document's two parts: item 2 asks for *"both throttled per caller as `/login` and
+`/device` are, the throttle checked before either"* and routes itself to §5, which answers the
+matching rule and nothing about throttling. §11.7 fixed `/login` and §11.8 device redemption,
+leaving `/authorize` — the surface §12's
 row (d) already gives a `throttled` cause — stated nowhere.
 
 **The throttle is checked BEFORE either validation tier: before §5.3's pre-trust checks and before
@@ -1087,9 +1090,16 @@ Two consequences:
 
 1. **The AS MUST NOT mint anything the screen did not render.** No scope, capability or lifetime is
    added between the decision and the mint.
-2. **A request the AS would narrow is refused, not narrowed** — §7 already says so of the `scope`
-   value, and it is restated here because a screen that rendered a narrowed grant would be honest
-   about a request the owner never made.
+2. **A `scope` value the AS would narrow is refused, not narrowed** — §7 (line 448) refuses an
+   **unparseable** `scope` rather than silently minting the part that parsed, and it is restated
+   here because a screen that rendered a narrowed `scope` would be honest about a request the owner
+   never made. **The clamped expiry above is this clause's one named exception, not an
+   oversight**: §11.5 clamps rather than refuses precisely so a caller cannot probe the container's
+   maximum lifetime by requesting past it and reading the refusal as an answer — the same probe-
+   oracle concern §7 spent a subsection closing for `scope`. `scope` has no equivalent probe to
+   close by clamping, so it stays refused; expiry does, so it stays clamped. Both are the AS
+   refusing to mint anything the screen did not render — the paragraph above is the invariant, and
+   this consequence is `scope`'s instance of it, not the general rule.
 
 ### 11.3 · The existing-tokens read (§14 item 9)
 
@@ -1113,9 +1123,13 @@ failure and appends once, §12's cause `replayed`.
 bound to the interactive session (§10) that decided it, and only that session's **first**
 re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside §11.0's substep 1,
 which is where the ordering that exempts it is fixed. The same request arriving on **another**
-session, or a second time on the deciding session, is an **ordinary pre-trust failure**: §5.3's
-page, cause `replayed`, counted and refused by
-§11.0's throttle exactly like every other row (d).
+session, or a second time on the deciding session, is an **ordinary pre-trust failure**, subject to
+§11.0's throttle exactly like every other row (d) cause: §5.3's page, cause `replayed`, evaluated
+and appended once under §12.1 rule 1 — and, **only** while a throttle already holds for that
+caller, rule 3's exception applies instead and it is counted, not appended, same as any other row
+(d) attempt refused at that moment. "Subject to the throttle" is not a synonym for "never appends";
+outside a held throttle this is an ordinary append like the first re-submission's, on a different
+row.
 
 **A re-submission carrying no session at all is not one this section ever sees. a1p** — it is
 substep 3's redirect like any other session-less `/authorize` request, and nothing here applies to
@@ -1178,6 +1192,9 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
     (`/authorize` · `/device` · `/pending` · `/pending/<id>` · `/` · `/items/<id>`, `<id>` on D-C5's
     positive charset). The reference MUST have **no scheme and no authority**; it is never an
     absolute URL; the **fragment is always dropped**.
+  - **Step 3 — the query carry — stated below at the `continue`-survives-login bullet**, not here:
+    it depends on the login round-trip this list precedes, so restating it in numeric order would
+    separate it from the mechanism it belongs to. Genuinely covered, not skipped.
   - **Step 4 — a value failing any step is dropped silently for the container's root** — a 303 to
     `/`, never reported, never echoed back as a reason. `consent.md`'s **R2** login-state table
     fixes the same case the same way — `| invalid continue | ignored; 303 to / |` — no page and no
@@ -1463,8 +1480,10 @@ naming decision:
 5. **The release appends whenever an engage did, `refused: 0` included.** (e) is the only entry that
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
-   `authorize` · `tap` (the step-up tap is the fourth surface; if §10's `[LEAN]` is not taken, the
-   word is unused, not wrong) — and `refused`, an integer.
+   `authorize` · `tap` (the step-up tap is the fourth surface, throttled unconditionally by
+   `consent.md`'s D-C6; if §10's `[LEAN]` is not taken the tap rides a channel of its own rather
+   than these AS endpoints, but the word is still used there, by the tap spec's own release entry —
+   never unused, only ridden elsewhere) — and `refused`, an integer.
 6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
    interactive session that decided it, and *that* session's re-submission is the one this rule
    exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that
@@ -1473,8 +1492,10 @@ naming decision:
    has an interest in and the session it arrives on is one §10 has already authenticated. **The
    exemption reaches no further**: not to another session, and not to a second
    re-submission of the same request, substep 1 being once per decided request. Each of those is an
-   ordinary (d) under rules 2 and 3 — §5.3's page, cause `replayed`, counted and refused like
-   anything else. A re-submission carrying **no** session reaches neither the exemption nor the page:
+   ordinary (d) under rule 1 — §5.3's page, cause `replayed`, evaluated and appended once, exactly
+   like any other row (d) cause — and subject to rule 3's exception the same way every row (d)
+   cause is: only while a throttle already holds does it get counted instead of appended, not as a
+   rule of its own. A re-submission carrying **no** session reaches neither the exemption nor the page:
    substep 1 falls through, substep 3 redirects it to `/login` before either validation tier, and
    §11.4's decided-request record is not read for it at all — which is why rule 3 does not have to
    carry `replayed` among the causes an unauthenticated caller can reach.
@@ -1485,9 +1506,10 @@ naming decision:
    `stale` row, R12's `back after decision` row, and §20's fixture list all describe the deciding
    session's replay as unbounded — "whatever the throttle's state," with no limit on how many
    times. Rule 6 exempts only the first re-submission; a second on the same session is an ordinary
-   (d), counted and refused like any other. The contract's bound is the better of the two, for the
-   reason rule 3 exists, and wins under §11's own preamble — over every one of the five, not only
-   the one this section happened to quote.
+   (d), evaluated and appended once like any other row (d) cause unless a throttle already holds,
+   in which rule-3 case alone it is counted instead. The contract's bound is the better of the two,
+   for the reason rule 3 exists, and wins under §11's own preamble — over every one of the five, not
+   only the one this section happened to quote.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
    the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one

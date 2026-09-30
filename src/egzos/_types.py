@@ -389,8 +389,11 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 
 #: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
 #: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up
-#: tap's page; if §10's `[LEAN]` is not taken the word is unused, not wrong. The caller's network
-#: identifier is NEVER the actor: it would write surveillance into a chain the owner cannot prune.
+#: tap's page, throttled unconditionally by `consent.md`'s D-C6 rather than by this contract; if
+#: §10's `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints,
+#: but the word is still used there, by the tap spec's own release entry — never unused, only
+#: ridden elsewhere. The caller's network identifier is NEVER the actor: it would write
+#: surveillance into a chain the owner cannot prune.
 #: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
 #: is no constant for them here, deliberately.
 AS_THROTTLE_SURFACES: tuple[str, ...] = ("login", "device", "authorize", "tap")
