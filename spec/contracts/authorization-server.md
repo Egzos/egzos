@@ -22,7 +22,7 @@ Clauses carry one of four markings instead:
 - `[LEAN]` — **§K's own fourth marking**, carried with the same word §K uses. A direction the Chief
   leaned toward and did not decide. It is recorded so a reviewer can see it was considered and is
   **not a decision**: no clause marked `[LEAN]` fixes a shape, and **a builder may not implement
-  against one.** Part B carries exactly one (§10, the step-up tap riding these endpoints), and
+  against one.** Part B carries exactly one (§10.5, the step-up tap riding these endpoints), and
   hardening it would be the one thing this marking exists to prevent.
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
@@ -1062,7 +1062,7 @@ parameters the caller itself sent, and that is the whole of the difference. Noth
 enters the redirect — no registry fact, no validity verdict, not even whether the `client_id` is a
 string the container has ever seen — so a caller comparing two redirects is comparing its own two
 requests. **The invariant this ordering needs is that nothing the AS knows varies, not that the bytes
-do not**, and §5.3 and §10 now state it in those terms.
+do not**, and §5.3 and §10.2 now state it in those terms.
 
 **The redirect of substep 3 appends nothing, and stores nothing**, and both are deliberate rather
 than an omission from §12's table: it performs no read — not §11.1's keyed entry, not §11.3's —
@@ -1439,13 +1439,14 @@ which §12.1 rule 5's four-word `surface` vocabulary names but this section does
 endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10.5's `[LEAN]`
 paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
 carries); its own audit entries are a different pointer, §10.5's `[LEAN]` closing line's, which
-keeps them with #68's batch and `events.md` rather than here — and the effects those three pages
-produce **before any token exists** —
-(a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
-any session exists either, (e) on no request at all (§12.2), the rest inside a session §11.0's
-substep 3 has already required — and the drafted taxonomy has no name for one of them.
-`events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
-non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
+keeps them with #68's batch and `events.md` rather than here.
+
+**The effects those three pages produce before any token exists** — (a), (b), (e) and (d)'s
+`throttled` and `token_presented` causes before any session exists either, (e) on no request at all
+(§12.2), the rest inside a session §11.0's substep 3 has already required — **and the drafted
+taxonomy has no name for any of them.** `events.md` §4 invariant 2: *"A surface that produces an
+effect without a corresponding event is non-conforming."* `events.md` §1 closes the vocabulary by
+construction. Both cannot hold here today.
 
 **Raised, not invented.** The five below are `spec/design/consent.md` §14.8's (a), (b), (d), (e) and
 (f). That spec routes (a), (b), (d) and (e) to this document and explicitly **not** to #68; (f) is
@@ -1623,7 +1624,9 @@ naming decision:
    than these AS endpoints, but the word is still used there — D-C6's release entry is
    `consent.md` §14.8 (e), the same event this rule pins, and the tap spec §14.5 binds to it **by
    citing the decision, not by restating it in an entry of its own** — never unused, only ridden
-   elsewhere) — and `refused`, an integer.
+   elsewhere) — and `refused`, an integer. **These two are closed; §12.2 is the one place this
+   rule's entry may still grow a third `details` key** — the opaque throttle key pairing (e) with
+   the engage entries it summarises — and that key is `[OPEN→0.3]` there, not decided by this rule.
 6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
    interactive session that decided it, and *that* session's re-submission is the one this rule
    exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that

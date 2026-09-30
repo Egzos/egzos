@@ -397,7 +397,7 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
 #: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up
 #: tap's page, throttled unconditionally by `consent.md`'s D-C6 rather than by this contract; if
-#: §10's `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints,
+#: §10.5's `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints,
 #: but the word is still used there — D-C6's release entry is `consent.md` §14.8 (e), the same
 #: event this vocabulary pins, and the tap spec §14.5 binds to it by citing the decision rather
 #: than restating it in an entry of its own — never unused, only ridden elsewhere. The caller's
