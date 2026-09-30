@@ -59,10 +59,14 @@ the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in 
 parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` row, and §20's
 fixture list — none of which invites the narrowing, so this document names all five rather than
 one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
-silence bullet, §14 item 8 and R2/R3's refused rows all state for a throttle-refused attempt,
-named there for the same reason; and §12's row (f) below narrows R12's `rejected (post-trust)` row
-and its own §10 post-trust clause, both of which name an over-long expiry as a rejection cause —
-§11.5's clamp rule decides the opposite, named at row (f) itself.
+silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a throttle-refused
+attempt — **five** places, R12 being the `/authorize` row the clause itself governs — named there
+for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **five**
+places — §14 item 8's cause list itself (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust
+tier ("expiry within config → else redirect"), §20's fixture requiring an over-long expiry to
+append under (f), R12's `rejected (post-trust)` row, and §10's post-trust clause (stated only
+conditionally there, and so the weakest of the five, not the strongest) — §11.5's clamp rule decides
+the opposite for all five, named at row (f) itself.
 
 ## 1 · One AS, three client types
 
@@ -352,11 +356,13 @@ under any cause.** Testable as written:
    an implementer who pads the registry read alone has met this clause's rationale and missed its
    rule. (§11.0's substep-1 replay is the same family seen from the other side: it appends where a
    throttled attempt does not.) **This is a named spec revision, not a rule this document merely
-   restates.** `consent.md` states the opposite in four places, deliberately and with a reason —
+   restates.** `consent.md` states the opposite in five places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), §10's pre-trust silence
    bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
-   and R2/R3's refused rows ("the timing class is the throttle's own"). This clause is the stricter
+   and R2, R3 **and R12's** refused rows ("the timing class is the throttle's own") — R12 being the
+   `/authorize` row, the surface this clause itself governs, and so the most on-point of the five,
+   not an afterthought to the other four. This clause is the stricter
    of the two on purpose — padding the refusal closes a real, if narrow, timing channel the spec
    accepted rather than closed — and the stricter reading stands, but it is a cost `consent.md`
    argued against by name and no source asks a builder to bear, so it is marked **a1p** rather than
@@ -988,9 +994,10 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    throttle which holds does not evaluate. Every attempt refused while the throttle holds is
    **counted, not appended**, whatever its cause would otherwise have been — the engaging attempt
    above appended once under `throttled`, cause and all; every attempt after it, at every surface,
-   is discarded and reaches **neither** the page nor the ledger, adding only to the causeless count
-   that rides on the throttle's eventual release entry (§12.1 rule 5, `surface` and `refused`, no
-   cause) and appending nothing of its own. §5.3's page is `/authorize`'s
+   still receives the page the bullets above name, and **its cause** is what is discarded, reaching
+   **neither** the page nor the ledger, adding only to the causeless count that rides on the
+   throttle's eventual release entry (§12.1 rule 5, `surface` and `refused`, no cause) and appending
+   nothing of its own. §5.3's page is `/authorize`'s
    answer and is not the other two surfaces' answer to anything.
 3. **At `/authorize` only: is there an interactive session?** If there is none and the request
    presents no bearer credential, the response is a **303 to §11.7's `/login`** carrying a `continue`
@@ -1408,10 +1415,13 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 | **(e)** | a throttle releasing | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` |
 
-**Row (f) has two closed causes, not three — a narrowing of `consent.md`'s own list, named as the
-spec revision it is.** `consent.md` R12's `rejected (post-trust)` row and its §10 post-trust
-validation clause both name three post-trust rejection causes, the third being an expiry request
-beyond the container's maximum. §11.5, answering `consent.md` §14.6's own `[OPEN→a1p]`, decides the
+**Row (f) has two closed causes, not three — a narrowing of a decision `consent.md` states in
+**five** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
+(`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust tier ("expiry within config → else
+redirect"), §20's fixture requiring an over-long expiry to append under (f), R12's
+`rejected (post-trust)` row, and §10's post-trust clause (stated only conditionally there, the
+weakest of the five) all name a third post-trust rejection cause: an expiry request beyond the
+container's maximum. §11.5, answering `consent.md` §14.6's own `[OPEN→a1p]`, decides the
 opposite for that one cause: an over-long expiry is **clamped to the maximum, never refused for that
 reason alone** — the same probe-oracle reasoning §7 closes for `scope`, and §11.2 consequence 2
 already names the clamp as its one exception to the refuse-don't-narrow rule. Row (f)'s cause list
@@ -1431,7 +1441,14 @@ existing-tokens read and produces no entry, which sits oddly beside `events.md` 
 container's state, inside an interactive session §10 has already authenticated, to decide an act they
 are performing.** Not a caller's reads, and not taxonomy reads — the entry recording the moment is
 the decision's own, §9's and #68's. Both are bounded (§11.1 one keyed entry, §11.3 a count and a
-timestamp), so neither carries anything out that an unrecorded read would hide. `[OPEN→0.3]` **#86's
+timestamp), so neither carries anything out that an unrecorded read would hide. **A third read of
+container state carries the same argument, and this paragraph names it rather than leaving it to be
+found elsewhere**: §11.0 substep 1's match against §11.4's decided-request record, taken ahead of the
+counter to recognise the deciding session's own re-submission. It is bounded the same way (one
+record, keyed on the interactive session) and read for the same reason — the owner's own session,
+deciding whether the act in front of it was already decided — so where it matches, `replayed`'s
+append is the entry that records the read; where it falls through, substep 2 governs and the read
+leaves no trace of its own, the same shape as the two reads above. `[OPEN→0.3]` **#86's
 sitting should confirm this**: it is the one place here where invariant 2 is satisfied by an argument
 rather than an append, and if the sitting disagrees the answer is a sixth row, not a changed read.
 
