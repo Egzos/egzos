@@ -63,10 +63,11 @@ silence bullet, §14 item 8 and R2, R3 and R12's refused rows all state for a th
 attempt — **six** places, R12 being the `/authorize` row the clause itself governs — named there
 for the same reason; and §12's row (f) below narrows a decision `consent.md` states in **five**
 places — §14 item 8's cause list itself (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust
-tier ("expiry within config → else redirect"), §20's fixture requiring an over-long expiry to
-append under (f), R12's `rejected (post-trust)` row, and §10's post-trust clause (stated only
-conditionally there, and so the weakest of the five, not the strongest) — §11.5's clamp rule decides
-the opposite for all five, named at row (f) itself.
+tier ("expiry within config → else redirect"), §20's fixture ("clamped (R9) or `access_denied`, per
+§14.6" — conditional on §14.6, the same condition as §10's clause below, not an unconditional
+append under (f)), R12's `rejected (post-trust)` row, and §10's post-trust clause (also stated only
+conditionally there) — two of the five conditional on the very question §11.5 answers, not one, and
+§11.5's clamp rule decides the opposite for all five, named at row (f) itself.
 
 ## 1 · One AS, three client types
 
@@ -1391,8 +1392,11 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
 two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page,
-which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover (§13
-routes it to Phase 2.2) — and the effects those three pages produce **before any token exists** —
+which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover: its
+endpoint, token shape, binding and window mechanics are §13's to route to Phase 2.2; its own audit
+entries are a different pointer, §10's `[LEAN]` closing line's, which keeps them with #68's batch
+and `events.md` rather than here — and the effects those three pages produce **before any token
+exists** —
 (a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
 any session exists either, (e) on no request at all (§12.2), the rest inside a session §11.0's
 substep 3 has already required — and the drafted taxonomy has no name for one of them.
@@ -1415,13 +1419,27 @@ proposes no event names.** What it fixes is what must be recorded, and what each
 | **(e)** | a throttle releasing | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` |
 
+**Row (d) has a seventh closed cause `consent.md` does not carry — named as the addition it is, not
+left for the freeze review to discover.** `consent.md` §14.8 (d) closes at six causes —
+`unknown_client`, `redirect_mismatch`, `malformed`, `missing_pkce`, `replayed`, `throttled` — and
+§20's Failures fixture list enumerates exactly those six. `token_presented` is this Part's own
+addition: it is introduced by §10's refusal of a bearer credential presented in place of a session,
+and threaded through §5.3 clause 1, §11.0 substep 3, §12.1 rule 3 and §12.2. The addition is sound —
+§10's reasoning for refusing a presented credential at this endpoint is not in question — but it is
+the same kind of divergence the narrowings below are named for, and it carries a cost a narrowing
+does not: a builder working from §20's six-cause fixture list produces no `token_presented` fixture
+and has no signal that one is owed. §20 does not carry this cause; whether it owes one is for the
+freeze review, not decided here.
+
 **Row (f) has two closed causes, not three — a narrowing of a decision `consent.md` states in
 **five** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
 (`vocabulary` · `scope` · `expiry`), §14 item 2's post-trust tier ("expiry within config → else
-redirect"), §20's fixture requiring an over-long expiry to append under (f), R12's
-`rejected (post-trust)` row, and §10's post-trust clause (stated only conditionally there, the
-weakest of the five) all name a third post-trust rejection cause: an expiry request beyond the
-container's maximum. §11.5, answering `consent.md` §14.6's own `[OPEN→a1p]`, decides the
+redirect"), §20's fixture ("clamped (R9) or `access_denied`, per §14.6" — conditional on §14.6, not
+an unconditional append under (f)), R12's `rejected (post-trust)` row, and §10's post-trust clause
+(also stated only conditionally there) all name a third post-trust rejection cause: an expiry
+request beyond the container's maximum. Two of the five — §20's fixture and §10's clause — are
+conditional on the same question, §14.6, not one; §11.5, answering `consent.md` §14.6's own
+`[OPEN→a1p]`, decides the
 opposite for that one cause: an over-long expiry is **clamped to the maximum, never refused for that
 reason alone** — the same probe-oracle reasoning §7 closes for `scope`, and §11.2 consequence 2
 already names the clamp as its one exception to the refuse-don't-narrow rule. Row (f)'s cause list
