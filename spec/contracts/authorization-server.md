@@ -40,11 +40,13 @@ client obtains a token; this document fixes only that, and neither overrides the
 **Part B's design-side input is `spec/design/consent.md`** (A2, binding on commit), whose §14 lists
 what the pages need from this document. Part B answers what is this document's, and marks the rest:
 a design spec is data to this contract, and where the two disagree the contract's clause stands and
-the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words, and
+the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words;
 §12.1 rule 6 below narrows a decision `consent.md` states in **five** places — §14 item 8's
 parenthetical, **D-C6** itself, R11's `stale` row, R12's `back after decision` row, and §20's
 fixture list — none of which invites the narrowing, so this document names all five rather than
-one.
+one; and §5.3 clause 2 below overrides the timing class D-C6's *Cost* clause, §10's pre-trust
+silence bullet, §14 item 8 and R2/R3's refused rows all state for a throttle-refused attempt,
+named there for the same reason.
 
 ## 1 · One AS, three client types
 
@@ -330,7 +332,16 @@ under any cause.** Testable as written:
    request rate; it is named because it is a second timing difference in the same response set, and
    an implementer who pads the registry read alone has met this clause's rationale and missed its
    rule. (§11.0's substep-1 replay is the same family seen from the other side: it appends where a
-   throttled attempt does not.)
+   throttled attempt does not.) **This is a named spec revision, not a rule this document merely
+   restates.** `consent.md` states the opposite in four places, deliberately and with a reason —
+   D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
+   attempt's timing class is the throttle's own, which is not a secret"), §10's pre-trust silence
+   bullet ("evaluated or refused; only the timing class differs"), §14 item 8's identical sentence,
+   and R2/R3's refused rows ("the timing class is the throttle's own"). This clause is the stricter
+   of the two on purpose — padding the refusal closes a real, if narrow, timing channel the spec
+   accepted rather than closed — and the stricter reading stands, but it is a cost `consent.md`
+   argued against by name and no source asks a builder to bear, so it is marked **a1p** rather than
+   left to read as a restatement.
 3. **No `error`, no `state`** — it is not a redirect, and §11.6 does not reach here.
 4. **It appends once**, row (d), with the cause in `details` (§12.1 rule 1).
 
@@ -1300,18 +1311,23 @@ holds. **If the review takes (2) and declines (1), §19's sentence is a spec rev
 revokes on the container's page and the dashboard drops the act. The owner holds `token rm` under
 every outcome, so `consent.md` §13's `expiry.none` string stands as written either way.
 
-**Taking (2) opens a fifth surface, and the review should cost that in the same breath. a1p** — §12
-covers *the four pages*, §12.1 rule 5's `surface` is a closed four-word vocabulary and
-`AS_THROTTLE_SURFACES` pins the same four, so an owner-path revocation reached from §11's surface
-reopens all three together. It also needs an entry on the **refusal** path, not only the success one:
+**Taking (2) opens a fifth surface, and the review should cost that in the same breath. a1p** —
+§12.1 rule 5's `surface` is a closed four-word vocabulary (`login` · `device` · `authorize` ·
+`tap`) and `AS_THROTTLE_SURFACES` pins the same four, even though §12 itself covers only the first
+three plus a timer, so an owner-path revocation reached from §11's surface reopens all three of
+§12's covered surfaces together. It also needs an entry on the **refusal** path, not only the
+success one:
 `events.md`'s `token.revoke` records the revoke, but a viewer who does not own the token is refused
 under §7's silence rule, and a code path that can be exercised and leaves no trace is the shape §12
 exists to catch. Written down here so the freeze does not have to rediscover it.
 
 ## 12 · The pre-authorization audit surface
 
-§9 covers the chain entry a *token* produces. This covers the four pages, which produce effects
-**before any token exists** — (a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
+§9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
+two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page,
+which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover (§13
+routes it to Phase 2.2) — and the effects those three pages produce **before any token exists** —
+(a), (b), (e) and (d)'s `throttled` and `token_presented` causes before
 any session exists either, (e) on no request at all (§12.2), the rest inside a session §11.0's
 substep 3 has already required — and the drafted taxonomy has no name for one of them.
 `events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
@@ -1351,6 +1367,27 @@ case at will by initiating `/authorize` and never being answered. Routed to #86'
 rest of this section**, which decides it as it decides the naming: either the render is itself a
 sixth row, or the decision entry covers the decided case and the abandoned one is named and justified
 separately. **This document does not decide it and states no clause for it. a1p.**
+
+`[OPEN→0.3]` **A sub-threshold sweep at `/authorize` leaves no trace at all, and D-C6 rejected that
+outcome by name.** Compose §11.0 substep 3 with §12.1 rules 3 and 5 for an unauthenticated,
+session-less caller holding its rate just under the throttle: substep 2 admits every attempt, so
+the throttle never engages and no (d) `throttled` entry is written; substep 3 answers each one with
+a 303 to `/login`, appending nothing and storing nothing; no engagement means no release, so no (e)
+entry and no `refused` count either. The chain records nothing — not a bounded trace, none — and
+rule 5's own rationale is that (e) is the only entry that carries a sweep's size, which a
+sub-threshold sweep never produces. `consent.md`'s D-C6 lists exactly this outcome among its
+rejected alternatives (*"no append for refused attempts and none at release — the sweep leaves no
+trace at all, and a throttled credential sweep against `/login` becomes invisible to the one person
+entitled to see it"*), and §15 names ledger growth from unauthenticated callers as the threat the
+throttle answers. §11.0's substep ordering is right for the enumeration reason it gives — a
+session-less `/authorize` naming an unregistered client used to be a row (d) `unknown_client`
+append, which told an implementer whether a client id existed before validating anything, and
+substep 3 closing that oracle is correct — but it also removes the owner's only view of
+reconnaissance at that endpoint below the throttle's rate, and this document states neither the
+gap nor a reason to accept it. **Routed to #86's sitting with the rest of this section**: either a
+sixth row for a sub-threshold sweep's own visibility, or a named and justified blind spot the way
+the abandoned-render case above is named rather than decided. **This document does not decide it
+and states no clause for it. a1p.**
 
 ### 12.1 · The rules, which are not open
 
