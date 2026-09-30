@@ -1464,9 +1464,11 @@ naming decision:
    §7, §11.7 and §11.8 — four sections making **three** surfaces uniform to the *caller*, §5.3 and §7
    being `/authorize`'s two tiers and not two surfaces of their own, matching §12's own "three pages
    and a timer" — **each in its own response, not in one shared one** (§11.0 substep 2) — and that
-   uniformity is owed to the caller, never to the owner's own ledger. Not `surface`: rule 5's closed
-   four-word vocabulary below, which the tap belongs to and this rule's three do not, since this rule
-   covers only the pages that render a uniform *failure*.
+   uniformity is owed to the caller, never to the owner's own ledger. This rule's three are three of
+   rule 5's four closed `surface` words below, but this rule is not using them as that vocabulary —
+   the tap is the fourth, the one rule 5's vocabulary "names but this section does not cover" (§12's
+   own framing sentence, above), and this rule does not reach it, because this rule covers only the
+   pages that render a uniform *failure*.
 2. **One append per** ***evaluated*** **path, however the path is reached.** (d)'s page is one page;
    a request the throttle *evaluates* — every cause but the ones rule 3 excepts — writes once each
    time, so among evaluated attempts no cause is distinguishable by the *number* of writes it makes.
