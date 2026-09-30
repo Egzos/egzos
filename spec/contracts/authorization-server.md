@@ -794,12 +794,26 @@ So the gate has two parts, and `capabilities.md` §4 is the **floor**, not the w
 - **principal** — a `client` principal is refused outright. Unchanged, **running**.
 - **presence** — an `interactive` principal is *necessary and not sufficient*. From **Phase 2.2**,
   every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`) additionally requires a
-  **live presence window** — `container.md`'s `step_up_window_seconds`, the step-up tap's window.
+  **live presence window** — `container.md`'s `step_up.window_seconds`, the step-up tap's window.
   An expired or absent window refuses the act, and the refusal is a human-only violation like any
   other.
 
 Stated so it can be tested when 2.2 lands: an interactive-principal token, presented with no live
 window, MUST be refused a human-only act. A container that admits one is non-conforming.
+
+Two clauses of this backstop are **not** settled by the text above, and each is marked rather than
+written, because this document is at its narrowing round:
+
+`[OPEN→0.3]` **Which ring pair's or manifest shape's window gates which act.** `container.md` scopes
+`step_up.window_seconds` per source→destination ring pair and manifest shape (R11) — a window opened
+for one shape of act does not cover another. `gate.confirm` is plausibly ring-pair shaped;
+whether `approve.pending` and `yes.consume` are ring-pair-scoped, manifest-shape-bounded, or bound
+some other way is undecided here.
+
+`[OPEN→0.3]` **What `container.md`'s `0` value means for this backstop.** `container.md` allows
+`step_up.window_seconds` to be `0` ("zero is supported"). Whether `0` means every human-only act is
+refused, or the backstop is off and a deployment may disable the promise this section makes to the
+human, is undecided here.
 
 **Until Phase 2.2 the interactive owner token is the proof** (`capabilities.md` §3, **running**), and
 this document does not pretend otherwise: that is a **stated, dated gap**, not the posture. The
@@ -1122,7 +1136,9 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
     positive charset). The reference MUST have **no scheme and no authority**; it is never an
     absolute URL; the **fragment is always dropped**.
   - **Step 4 — a value failing any step is dropped silently for the container's root** — a 303 to
-    `/`, never reported, never echoed back as a reason.
+    `/`, never reported, never echoed back as a reason. `consent.md`'s **R2** login-state table
+    fixes the same case the same way — `| invalid continue | ignored; 303 to / |` — no page and no
+    form rendered for it; this clause restates R2 rather than deciding it fresh.
 
   **a1p**: this is the open-redirect hole in the one place a human has just typed a credential, and
   the allowlist is an allowlist rather than a validator because every "validate a redirect" bug in
@@ -1135,12 +1151,13 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
   without one. The **one permitted position** is the login form's own `action` query or a single
   hidden input the form posts, and there the value is carried **still percent-encoded and
   contextually escaped for the position it occupies**, then read back only as a parameter of the
-  POST. Two bounds on that carrier: a value that failed step 1 or step 2 **never reaches it** — it
-  was dropped at the GET and the form carries nothing — and the value is re-matched against steps 1
-  and 2 on the POST before the 303 is issued, because a form field is caller-controlled input
-  whatever put it there. A form that round-trips an unvalidated value is the same hole one hop later.
+  POST. Two bounds on that carrier: a value that failed step 1 or step 2 **never reaches it** —
+  Step 4's 303 fires at the GET and no login page, and so no form, is ever rendered for it — and
+  the value is re-matched against steps 1 and 2 on the POST before the 303 is issued, because a
+  form field is caller-controlled input whatever put it there. A form that round-trips an
+  unvalidated value is the same hole one hop later.
 
-  Three clauses of that carrier are **not** settled by the text above, and each is marked rather than
+  Two clauses of that carrier are **not** settled by the text above, and each is marked rather than
   written, because every available answer is a new requirement and this document is at its narrowing
   round:
 
@@ -1153,10 +1170,6 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
   failing the POST-hop re-match takes that same 303 with the login otherwise completed, or fails the
   POST itself.
 
-  `[OPEN→0.3]` **Two response shapes are named for the same failure at the GET.** Step 4 requires a
-  value failing any step to be dropped silently for a 303 to `/`, while this bullet's first bound
-  describes a login page that renders with its form carrying nothing — both cannot be what
-  `/login?continue=<a failing value>` returns, and which one it returns is undecided here.
 - **`continue` is also how the pending authorization request survives the login, and it is the only
   thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
   before anything about it has been validated, so the request has to reach the login *and come back*,
@@ -1289,9 +1302,10 @@ substep 3 has already required — and the drafted taxonomy has no name for one 
 `events.md` §4 invariant 2: *"A surface that produces an effect without a corresponding event is
 non-conforming."* `events.md` §1 closes the vocabulary by construction. Both cannot hold here today.
 
-**Raised, not invented.** The five below are `spec/design/consent.md` §14.8 (a), (b), (d), (e) and
-(f), which that spec routes to this document and explicitly **not** to #68. Its (c), a consent
-denial, is #68's with the other four AS effects §9 names. **The naming and the `events.md` amendment
+**Raised, not invented.** The five below are `spec/design/consent.md` §14.8's (a), (b), (d), (e) and
+(f). That spec routes (a), (b), (d) and (e) to this document and explicitly **not** to #68; (f) is
+raised to #68 as well, with its own distinct outcome `rejected`, and stays asked of #61 until #68
+says which. Its (c), a consent denial, is #68's with the other four AS effects §9 names. **The naming and the `events.md` amendment
 are `[OPEN→0.3]`, batched as #86, to be decided in the same sitting as #68** — #68's option (b)
 `authz.grant` *is* (c), so splitting the two sittings leaves the denial in neither. **This section
 proposes no event names.** What it fixes is what must be recorded, and what each entry carries.
