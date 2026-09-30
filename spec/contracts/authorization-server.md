@@ -33,7 +33,10 @@ pre-authorization audit surface, and what this document does not fix (§13). §5
 uniform failure — is Part B's, written back in §5 because that is where §5.1's "reject" needed an
 answer; §11.0, §11.1, §11.4, §7's closing line and the whole of §12's row (d) route to it, and a
 reader mapping the document from this paragraph would otherwise place it in Part A. §5's subsection
-numbering (§5.1, §5.2) is Part B's too, headings only. **Three more of Part B's additions land in
+numbering (§5.1, §5.2), and likewise §1's and §7's (§1.1, §7.1), are Part B's too, headings only —
+each groups a single pre-existing Part A subsection so it can be cited by number rather than by
+quoted title; §10's own numbering (§10.1–§10.5) needs no such note, since §10 is Part B's section in
+full. **Three more of Part B's additions land in
 §§1–9 and are named here for the same reason**, so the freeze review does not read any of them as
 already-ratified Part A text: §5's `registered_at` key on the registration entry (§11.1's addition,
 carried back because §5 is where a registration's shape lives); §7's closing paragraph, which
@@ -110,7 +113,7 @@ leaves the other two implicit; stating it for all three closes the gap deliberat
 omission. `[OPEN→0.3]` if the review wants a confidential type reserved for a future server-side
 integration, it must say so now: adding one after the freeze widens the trust model.
 
-### Device-code in a browser is retired
+### 1.1 · Device-code in a browser is retired
 
 **§K, and the reason is carried because a rejected alternative a reader can see is worth more than a
 clean surface they have to re-litigate.** v0.5 §C had browsers log in by device-code against the
@@ -319,8 +322,8 @@ AS has nowhere to send an error and does not invent one.
 **Neither tier is reached at `/authorize` without an interactive session. a1p.** §11.0's substep 3
 sends a session-less request to §11.7's `/login` **before** the pre-trust checks below and before
 §7's post-trust ones, so this section's responses — the `throttled` cause (substep 2 running ahead of
-substep 3) and the `token_presented` cause (decided inside substep 3, §10) excepted — are answers to
-a caller §10 has already authenticated. The redirect is not a member of the response set clause 1
+substep 3) and the `token_presented` cause (decided inside substep 3, §10.2) excepted — are answers to
+a caller §10.1 has already authenticated. The redirect is not a member of the response set clause 1
 converges, because it is decided before any of these causes has been evaluated.
 
 **What is invariant about that redirect, stated as it is actually true. a1p.** The AS reads nothing,
@@ -348,7 +351,7 @@ under any cause.** Testable as written:
    same closed cause, `missing_pkce`, never `malformed`), a decided request
    re-submitted (§11.4), a throttled attempt (§11.0, checked before either tier, so the AS has
    not yet determined which tier the request would have reached), and a caller presenting a bearer
-   credential where §11 accepts none (§10, refused inside §11.0's substep 3 and likewise before
+   credential where §11 accepts none (§10.2, refused inside §11.0's substep 3 and likewise before
    either tier). Those seven are exactly row (d). The
    page names no client, echoes no request parameter, and **reveals nothing about which occurred**.
    Five of the seven are answers to an authenticated session by the paragraph above; `throttled` and
@@ -514,7 +517,7 @@ Three consequences that are contract, not style:
    `["*"]` on the token, and a token that stored the prefixed form would not match
    `capabilities.md` §5 or the coverage check that reads it.
 
-### The AS is not an enumeration oracle
+### 7.1 · The AS is not an enumeration oracle
 
 **A `node:<id>` the requester may not reach and a `node:<id>` that does not exist MUST produce the
 same result. a1p** — this is `capabilities.md` §6 and `container.md` §4 invariant 3 applied at the
@@ -632,7 +635,7 @@ three client types have. The review must pick one, and a1p does not pick for it:
    document's rather than the RFC's:
    - **The silence rule.** The endpoint returns **200 for an unknown, malformed or already-revoked
      token** — the same status, shape and time budget as for a token it really did revoke. RFC 7009
-     asks for 200 on an invalid token; §7's "the AS is not an enumeration oracle" is why it is a
+     asks for 200 on an invalid token; §7.1's "the AS is not an enumeration oracle" is why it is a
      MUST here, because an endpoint that answered differently would let any caller test whether a
      token value exists without holding one.
    - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
@@ -992,7 +995,7 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
 **§11.0 is three substeps, in this order**:
 
 1. **Is this the deciding session's first re-submission of this request?** Two halves, and the
-   document means them separately. The read is **keyed on the interactive session of §10 — never on
+   document means them separately. The read is **keyed on the interactive session of §10.1 — never on
    anything the request carries**, because a key the caller can vary at no cost is no bound, which is
    this section's own `[OPEN→0.3]` floor below. The **match** is then against the decided request
    *that session's record names*: one interactive session can decide more than one authorization
@@ -1027,10 +1030,11 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    answer and is not the other two surfaces' answer to anything.
 3. **At `/authorize` only: is there an interactive session?** If there is none and the request
    presents no bearer credential, the response is a **303 to §11.7's `/login`** carrying a `continue`
-   under that section's allowlist — §10's *"a caller with no session is sent to §11's login first"*,
-   stated here as its place in the order. **This substep runs before either validation tier**: before
+   under that section's allowlist — §10.2's *"a caller presenting no credential and holding no
+   session is sent to §11's login first,"* stated here as its place in the order. **This substep runs
+   before either validation tier**: before
    §5.3's pre-trust checks and before §7's post-trust ones. A caller presenting a `Token` instead of
-   a session is **not** sent to `/login`: §10 refuses it with §5.3's page, cause `token_presented`,
+   a session is **not** sent to `/login`: §10.2 refuses it with §5.3's page, cause `token_presented`,
    on the presence of the credential and never on its validity. **A request holding both** — an
    interactive session *and* a bearer credential in the same `Authorization` header or position —
    is decided on the session alone; substep 3 branches on session presence first, so the credential
@@ -1069,7 +1073,7 @@ request in container state would hand an unauthenticated sweep something to *gro
 thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. What the sweep does produce is
 the counter's increment, and the attempt that
 engages the throttle appends once under §12.1 rule 3 as row (d) cause `throttled`. That entry, and
-one row (d) `token_presented` entry per evaluated attempt that presents a bearer credential (§10,
+one row (d) `token_presented` entry per evaluated attempt that presents a bearer credential (§10.2,
 bounded by the same counter), are the whole of an unauthenticated *caller's* reach into the chain at
 `/authorize`, which is what rule 3 is now written on — rule 5's release entry is not a third addition
 to this reach: the throttle's own timer writes it once per engagement, on no request at all (§12.2),
@@ -1186,7 +1190,7 @@ a different object and the one the back button re-submits. A re-submission rende
 failure and appends once, §12's cause `replayed`.
 
 **A re-submission is recognised as one only on the deciding session. a1p** — a decided request is
-bound to the interactive session (§10) that decided it, and only that session's **first**
+bound to the interactive session (§10.1) that decided it, and only that session's **first**
 re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside §11.0's substep 1,
 which is where the ordering that exempts it is fixed. The same request arriving on **another**
 session, or a second time on the deciding session, is an **ordinary pre-trust failure**, subject to
@@ -1403,7 +1407,7 @@ The two questions are separate, and the review should take them separately:
 
 1. **§9's question** — does a *client* get a value-keyed endpoint to revoke its own token.
 2. **This one** — does the *owner* get an id-keyed revocation on the container's own pages (§11's
-   surface), authenticated by the interactive session of §10, refusing a token the viewer does not
+   surface), authenticated by the interactive session of §10.1, refusing a token the viewer does not
    own with §7's silence rule and `events.md`'s `token.revoke` on success.
 
 **a1p's reading, for the review to take or reject: yes to (2), independently of (1).** It needs no
@@ -1504,7 +1508,7 @@ own row (d) addition sat in until this review caught it by hand.
 four failures and a release; a screen that renders performs §11.1's registry read and §11.3's
 existing-tokens read and produces no entry, which sits oddly beside `events.md` §4 invariant 2
 (*"Every read … is an event"*) until the reason is said: **both are the owner reading their own
-container's state, inside an interactive session §10 has already authenticated, to decide an act they
+container's state, inside an interactive session §10.1 has already authenticated, to decide an act they
 are performing.** Not a caller's reads, and not taxonomy reads — the entry recording the moment is
 the decision's own, §9's and #68's. Both are bounded (§11.1 one keyed entry, §11.3 a count and a
 timestamp), so neither carries anything out that an unrecorded read would hide. **A third read of
@@ -1585,7 +1589,7 @@ naming decision:
    must be reachable unauthenticated because they are the surfaces at which authentication is
    *attempted*; and (d) with two of its seven causes — `throttled`, which §11.0's substep 2 produces
    ahead of its substep 3, and `token_presented`, which substep 3 produces for a caller presenting a
-   bearer credential (§10). Both are bounded by the same counter, because both are decided after it:
+   bearer credential (§10.2). Both are bounded by the same counter, because both are decided after it:
    a sweep presenting credentials is throttled exactly as a sweep presenting none is, and neither
    reaches a response that depends on the registry. **(d)'s other five causes and the whole of (f)
    are not reachable unauthenticated** — a
@@ -1625,7 +1629,7 @@ naming decision:
    exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that
    ordering is carved and the only place the read is reachable** — and appends once, cause
    `replayed`, whatever the throttle's state, because a replay after a decision is a fact the owner
-   has an interest in and the session it arrives on is one §10 has already authenticated. **The
+   has an interest in and the session it arrives on is one §10.1 has already authenticated. **The
    exemption reaches no further**: not to another session, and not to a second
    re-submission of the same request, substep 1 being once per decided request. Each of those is an
    ordinary (d) under rule 1 — §5.3's page, cause `replayed`, evaluated and appended once, exactly
@@ -1667,7 +1671,7 @@ truthful there; the entries with no principal to carry are (a), (b), (d) with ca
 `token_presented`, and
 (e) — and the two (d) causes reach "no principal to carry" for different reasons, not one. A
 `token_presented` entry is the sharpest case of the second reading's point: the caller held a
-credential, the AS deliberately did not look at it (§10), and a principal derived from it would be
+credential, the AS deliberately did not look at it (§10.2), and a principal derived from it would be
 asserting exactly what that clause refuses to determine — its reason is **availability**, and there
 genuinely is none. `throttled` is not the same: §11.0 substep 2 gives that response "for a caller
 with a session and a caller without one alike," so an `interactive` principal is sometimes available
@@ -1729,7 +1733,7 @@ are taken `consent.md` §19's revoke sentence has no transport under it.
 
 TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
 authorization codes, pending device authorizations, refresh-token chains, §11.4's decided-request
-records, §12's throttle counters and §10's interactive sessions are all durable state this document
+records, §12's throttle counters and §10.1's interactive sessions are all durable state this document
 requires and `storage.md` §3 does not name a method group for — the same shape as `container.md`
 §8's open question about the config object, and the same reason it matters: state that Trust does
 not own is state that can be edited around Trust. The last three are Part B's additions to the list
