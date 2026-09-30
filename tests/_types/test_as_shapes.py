@@ -120,12 +120,14 @@ def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
     """§11.1: a keyed read of one entry, never a listing — §7's enumeration rule at the registry.
 
     The five names are written out on BOTH sides of the first assertion's intent: the constant is a
-    literal in `_types`, and this test compares it to a literal here. The second assertion then
-    holds the constant against `ClientRegistration` with `<=`, not `==`: the read-set must never
-    reach beyond what the registration carries (a field added to the registration alone, and not to
-    this literal, still fails here rather than silently reaching the consent screen by inheritance),
-    but the registration is free to carry a field the consent screen does not read — `client_secret`
-    is refused entry today by the assertion below, and a future reserved confidential-client type
+    literal in `_types`, and this test compares it to a literal here — that literal pin, plus
+    `test_the_registration_and_device_shapes`'s own `==` on `ClientRegistration`, is what catches a
+    field silently added to the registration: either test's literal goes stale and fails, so the
+    field cannot reach the consent screen by inheritance without one of them noticing. The second
+    assertion here holds the constant against `ClientRegistration` with `<=`, not `==`, for a
+    narrower purpose: the read-set must never reach beyond what the registration carries, but the
+    registration is free to carry a field the consent screen does not read — `client_secret` is
+    refused entry today by the assertion below, and a future reserved confidential-client type
     (§1's own `[OPEN->0.3]`) could add one without this pin demanding it be rendered. `==` would
     demand exactly that the day such a field landed. Deriving either side would make the pin a
     tautology that holds for every possible content of the registration.

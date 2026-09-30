@@ -40,7 +40,9 @@ client obtains a token; this document fixes only that, and neither overrides the
 **Part B's design-side input is `spec/design/consent.md`** (A2, binding on commit), whose §14 lists
 what the pages need from this document. Part B answers what is this document's, and marks the rest:
 a design spec is data to this contract, and where the two disagree the contract's clause stands and
-the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words.
+the spec's string is a spec revision — its §14 items 10, 12 and 13 say so in their own words, and
+item 8's unbounded-replay parenthetical is narrowed by §12.1 rule 6 below without its own invitation
+to differ, so this document says so instead.
 
 ## 1 · One AS, three client types
 
@@ -301,7 +303,9 @@ under any cause.** Testable as written:
 1. **One response.** The same status and a byte-identical body across every cause — an unregistered
    `client_id` (§11.1), a registered client with a mismatched `redirect_uri` (§5.1), a malformed
    request, a missing or `plain` `code_challenge` (§2 admits no downgrade, so a request without PKCE
-   is not one this AS recognises and never reaches the redirectable tier), a decided request
+   is not one this AS recognises and never reaches the redirectable tier — a `plain` value is not a
+   malformed one; it is a rejected downgrade, and both it and an absent challenge append under the
+   same closed cause, `missing_pkce`, never `malformed`), a decided request
    re-submitted (§11.4), a throttled attempt (§11.0, checked before either tier, so the AS has
    not yet determined which tier the request would have reached), and a caller presenting a bearer
    credential where §11 accepts none (§10, refused inside §11.0's substep 3 and likewise before
@@ -1409,7 +1413,13 @@ naming decision:
    §11.4's decided-request record is not read for it at all — which is why rule 3 does not have to
    carry `replayed` among the causes an unauthenticated caller can reach.
    Read without §11.4's binding and §11.0's substep this rule would be an unthrottled
-   append reachable by any caller, which is exactly what rule 3 exists to prevent.
+   append reachable by any caller, which is exactly what rule 3 exists to prevent. **This narrows
+   `consent.md` §14.8's parenthetical, and is named as the spec revision it is** (this document's
+   opening provenance rule): that parenthetical describes the deciding session's replay as unbounded — "the
+   throttle neither counts nor refuses it" — with no limit on how many times. Rule 6 exempts only
+   the first re-submission; a second on the same session is an ordinary (d), counted and refused
+   like any other. The contract's bound is the better of the two, for the reason rule 3 exists, and
+   wins under §11's own preamble.
 7. **`details` never carry the credential, the `user_code`, a token value or a `code_verifier`** —
    `events.md` invariant 4, restated because these are the five entries closest to a credential in
    the whole taxonomy. The cause is a closed word, not a message, and a closed word cannot carry one
