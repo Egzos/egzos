@@ -363,9 +363,15 @@ class ClientRegistration(TypedDict):
     ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
 
     `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
-    timestamp. `client_name` is owner-supplied DATA — the AS never verifies it and nothing in the AS
-    may branch on it; a name that imitates the product is a registration the owner made, and the
-    page's defence is showing the origin and the kind beside it.
+    timestamp. It is the fifth `*_at: str` timestamp in this module and the first not spelled
+    `created_at` — deliberately: `created_at` is generic across every other TypedDict here, but
+    `Token.created_at` (a mint) and this registration's timestamp (an owner act at `/5`, not a
+    mint) are two different events that can appear on the same consent screen at once (§11.1's
+    client entry beside §11.3's existing-tokens read), and one screen showing two `created_at`
+    values for two different things would be the confusion the domain word avoids. `client_name`
+    is owner-supplied DATA — the AS never verifies it and nothing in the AS may branch on it; a
+    name that imitates the product is a registration the owner made, and the page's defence is
+    showing the origin and the kind beside it.
     """
 
     client_id: str
@@ -391,8 +397,10 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: a1p's reading of what `actor` carries on every pre-authorization append. `tap` is the step-up
 #: tap's page, throttled unconditionally by `consent.md`'s D-C6 rather than by this contract; if
 #: §10's `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints,
-#: but the word is still used there, by the tap spec's own release entry — never unused, only
-#: ridden elsewhere. The caller's network identifier is NEVER the actor: it would write
+#: but the word is still used there — D-C6's release entry is `consent.md` §14.8 (e), the same
+#: event this vocabulary pins, and the tap spec §14.5 binds to it by citing the decision rather
+#: than restating it in an entry of its own — never unused, only ridden elsewhere. The caller's
+#: network identifier is NEVER the actor: it would write
 #: surveillance into a chain the owner cannot prune.
 #: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
 #: is no constant for them here, deliberately.

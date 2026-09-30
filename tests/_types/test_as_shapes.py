@@ -152,7 +152,9 @@ def test_the_throttle_surfaces_are_four_closed_words():
 
     Written out rather than derived, because the point of the vocabulary is that it is closed: a
     fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
-    §10's `[LEAN]` may be taken; an unused word is not a wrong one. Rule 5's use of the tuple is
+    `consent.md`'s D-C6 throttles the tap page unconditionally, as the fourth surface, independent
+    of whether §10's `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not whether the
+    word is used. Rule 5's use of the tuple is
     settled; §12.2's use of the same four words for `actor` is not — it is `[OPEN->0.3]`, a1p's
     reading offered for #86 to take or reject, not a decision this test's green result should be
     read as making. If #86 rejects it, this test still passes: it only pins the tuple itself.

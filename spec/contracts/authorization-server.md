@@ -39,7 +39,15 @@ already-ratified Part A text: §5's `registered_at` key on the registration entr
 carried back because §5 is where a registration's shape lives); §7's closing paragraph, which
 states what routes to §5.3 but is itself new prose, not a description of existing text; and §9's
 *"Every value this AS issues is unguessable — unconditionally"* subsection, a fresh normative
-requirement this PR adds, not a restatement of anything #67, #73 or #78 reviewed.
+requirement this PR adds, not a restatement of anything #67, #73 or #78 reviewed. **This Part also
+*modifies* ratified §9 text, which is a stronger reason to name it than an addition, not a weaker
+one:** §9 option 1's blast-radius argument is rewritten — RFC 7009 §2.1 is demoted from a premise
+to a corroborating, conditional SHOULD; rotation clause 2 is named as carrying the chain-reach
+argument on its own; and the `[OPEN→0.3]` on entropy that #67/#73/#78 left in option 1's own prose
+is removed from there and relocated into the new unguessable-values subsection as the broader
+marker it became. The relocation is not asked back — it is a defensible edit — but a freeze reader
+of §9 option 1 at this head is reading Part B's reasoning, not #67/#73/#78's, and nothing in this
+paragraph said so until now.
 `container.md` fixes everything about the container *except* how a
 client obtains a token; this document fixes only that, and neither overrides the other.
 
@@ -1090,7 +1098,8 @@ Two consequences:
 
 1. **The AS MUST NOT mint anything the screen did not render.** No scope, capability or lifetime is
    added between the decision and the mint.
-2. **A `scope` value the AS would narrow is refused, not narrowed** — §7 (line 448) refuses an
+2. **A `scope` value the AS would narrow is refused, not narrowed** — §7's scope-expansion
+   paragraph (just above its "Pinned" note and three consequences) refuses an
    **unparseable** `scope` rather than silently minting the part that parsed, and it is restated
    here because a screen that rendered a narrowed `scope` would be honest about a request the owner
    never made. **The clamped expiry above is this clause's one named exception, not an
@@ -1482,8 +1491,10 @@ naming decision:
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
    `authorize` · `tap` (the step-up tap is the fourth surface, throttled unconditionally by
    `consent.md`'s D-C6; if §10's `[LEAN]` is not taken the tap rides a channel of its own rather
-   than these AS endpoints, but the word is still used there, by the tap spec's own release entry —
-   never unused, only ridden elsewhere) — and `refused`, an integer.
+   than these AS endpoints, but the word is still used there — D-C6's release entry is
+   `consent.md` §14.8 (e), the same event this rule pins, and the tap spec §14.5 binds to it **by
+   citing the decision, not by restating it in an entry of its own** — never unused, only ridden
+   elsewhere) — and `refused`, an integer.
 6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
    interactive session that decided it, and *that* session's re-submission is the one this rule
    exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that
