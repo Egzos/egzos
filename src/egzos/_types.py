@@ -11,9 +11,9 @@ Phase 1 builds against the frozen surface rather than the skeleton's.
 **Drafted, awaiting the Phase 0.3 freeze review** — A6 and the Chief declare the freeze, not a1p.
 
 Covered so far: ``context-item.md``, ``capabilities.md``, ``events.md`` (issue #26),
-``storage.md`` (issue #27), ``container.md`` (issue #28) and the authorization server's core
-mechanics (``authorization-server.md``, issue #29; its consent half is #61). The consolidation pass
-is #30.
+``storage.md`` (issue #27), ``container.md`` (issue #28) and the authorization server, both its
+core mechanics (``authorization-server.md`` Part A, issue #67, with #73 and #78) and its consent,
+login and device-code half (Part B, issue #61). The consolidation pass is #30.
 """
 
 from __future__ import annotations
@@ -347,7 +347,9 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
 # --- the authorization server (spec/contracts/authorization-server.md) ----------------------
 #
 # The one contract with NO running shape: the skeleton mints the owner token at `init` and has no
-# login, device-code or consent screen. Prose-derived (#29, part A); the consent half is #61.
+# login, device-code or consent screen. Prose-derived — core mechanics from #67 (Part A, with #73
+# and #78), the consent, login and device-code half from #61 (Part B), both covered as of this
+# module.
 
 ASClientType = Literal["browser", "cli", "mcp"]
 #: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
@@ -361,12 +363,102 @@ class ClientRegistration(TypedDict):
     `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
     with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
     ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
+
+    `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
+    timestamp. It is the seventh `*_at: str` timestamp in this module, and the first naming a
+    *registration* rather than a mint, an update, or an expiry — deliberately not spelled
+    `created_at`: `created_at` is generic across every other TypedDict here, but
+    `Token.created_at` (a mint) and this registration's timestamp (an owner act at §5, not a
+    mint) are two different events that can appear on the same consent screen at once (§11.1's
+    client entry beside §11.3's existing-tokens read), and one screen showing two `created_at`
+    values for two different things would be the confusion the domain word avoids. `client_name`
+    is owner-supplied DATA — the AS never verifies it and nothing in the AS may branch on it; a
+    name that imitates the product is a registration the owner made, and the page's defence is
+    showing the origin and the kind beside it.
     """
 
     client_id: str
     client_name: str
     client_type: ASClientType
     redirect_uris: list[str]
+    registered_at: str
+
+
+#: §11.1 — what the consent screen may read about a client: ONE entry, keyed by the request's
+#: `client_id`. There is no listing endpoint, page or parameter, and an unregistered `client_id`
+#: produces §5.3's uniform failure and no read at all — §7's enumeration rule, at the registry.
+#:
+#: Written out rather than derived from `ClientRegistration`. Deriving it would make the pin a
+#: tautology: a field added to the registration would reach the consent screen the moment this
+#: module imported, with no test failing. Written, a new registration field has to be added HERE
+#: too — a deliberate act, against a §11.1 clause — before any page may read it.
+AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
+    {"client_id", "client_name", "client_type", "redirect_uris", "registered_at"}
+)
+
+#: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
+#: a1p's reading of what `actor` carries on every pre-authorization append, as a `Literal` alias
+#: read back with `get_args`, matching the pattern `Capability`/`CAPABILITIES`,
+#: `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES` already use above: a typo at a
+#: call site that writes `details.surface` is a type error, not a string `str` would accept
+#: silently. `tap` is the step-up tap's page, throttled unconditionally by `consent.md`'s D-C6
+#: rather than by this contract; if §10.5's `[LEAN]` is not taken the tap rides a channel of its
+#: own instead of these AS endpoints, but the word is still used there — D-C6's release entry is
+#: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
+#: by citing the decision rather than restating it in an entry of its own — never unused, only
+#: ridden elsewhere. The caller's network identifier is NEVER the actor: it would write
+#: surveillance into a chain the owner cannot prune.
+#: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
+#: is no constant for the event name itself, deliberately.
+ThrottleSurface = Literal["login", "device", "authorize", "tap"]
+AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
+
+#: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
+#: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
+#: `Capability`/`CAPABILITIES`, `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES`
+#: already use above: a typo at a call site that writes `details.cause` is a type error, not a
+#: string `str` would accept silently. Row (d)'s `token_presented` is this Part's own addition over
+#: `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not silently
+#: absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because §11.5
+#: clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s own
+#: paragraph). These four are never open — unlike the event *names* these causes travel under,
+#: which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
+LoginCause = Literal["wrong", "unknown", "throttled"]
+AS_LOGIN_CAUSES: tuple[LoginCause, ...] = get_args(LoginCause)
+
+DeviceRedemptionCause = Literal["invalid", "expired", "used", "malformed", "throttled"]
+AS_DEVICE_REDEMPTION_CAUSES: tuple[DeviceRedemptionCause, ...] = get_args(DeviceRedemptionCause)
+
+AuthorizePretrustCause = Literal[
+    "unknown_client",
+    "redirect_mismatch",
+    "malformed",
+    "missing_pkce",
+    "throttled",
+    "replayed",
+    "token_presented",
+]
+AS_AUTHORIZE_PRETRUST_CAUSES: tuple[AuthorizePretrustCause, ...] = get_args(AuthorizePretrustCause)
+
+AuthorizePosttrustCause = Literal["vocabulary", "scope"]
+AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[AuthorizePosttrustCause, ...] = get_args(
+    AuthorizePosttrustCause
+)
+
+#: §11.6 — a standard error redirect from `/authorize` carries exactly these two keys and nothing
+#: else. `error_description` and `error_uri` are MUST NOT, with any value, under any cause — removed
+#: rather than constrained, because a uniform constant description would satisfy §7's convergence
+#: while leaving a field every implementation eventually fills with the cause it already computed.
+#: Written out, not derived, the same reason `AS_CLIENT_REGISTRY_READ_FIELDS` is: a field added here
+#: reaches the redirect the moment this module imports, with no test failing, unless a new member is
+#: a deliberate act against this set.
+AS_AUTHORIZE_ERROR_REDIRECT_FIELDS: frozenset[str] = frozenset({"error", "state"})
+
+#: The two names §11.6 forbids outright — never emitted, not even empty or constant — so a test can
+#: assert their absence as directly as it asserts the two permitted keys' presence.
+AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS: frozenset[str] = frozenset(
+    {"error_description", "error_uri"}
+)
 
 
 class DeviceAuthorization(TypedDict):
@@ -542,17 +634,27 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
+    "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
+    "AS_AUTHORIZE_POSTTRUST_CAUSES",
+    "AS_AUTHORIZE_PRETRUST_CAUSES",
+    "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
+    "AS_DEVICE_REDEMPTION_CAUSES",
+    "AS_LOGIN_CAUSES",
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
+    "AS_THROTTLE_SURFACES",
     "ASClientType",
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
+    "AuthorizePosttrustCause",
+    "AuthorizePretrustCause",
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
@@ -566,6 +668,7 @@ __all__ = [
     "ContainerType",
     "ContextItem",
     "DeviceAuthorization",
+    "DeviceRedemptionCause",
     "EVENTS",
     "Event",
     "GENESIS_HASH",
@@ -574,6 +677,7 @@ __all__ = [
     "KINDS",
     "Kind",
     "Lifecycle",
+    "LoginCause",
     "Node",
     "PRINCIPALS",
     "PROPOSAL_STATUSES",
@@ -595,6 +699,7 @@ __all__ = [
     "StructureFloor",
     "TRUST_STATUSES",
     "TextContent",
+    "ThrottleSurface",
     "Token",
     "Trust",
     "TrustStatus",
