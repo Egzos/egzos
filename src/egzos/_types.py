@@ -364,8 +364,9 @@ class ClientRegistration(TypedDict):
     ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
 
     `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
-    timestamp. It is the fifth `*_at: str` timestamp in this module and the first not spelled
-    `created_at` — deliberately: `created_at` is generic across every other TypedDict here, but
+    timestamp. It is the seventh `*_at: str` timestamp in this module, and the first naming a
+    *registration* rather than a mint, an update, or an expiry — deliberately not spelled
+    `created_at`: `created_at` is generic across every other TypedDict here, but
     `Token.created_at` (a mint) and this registration's timestamp (an owner act at §5, not a
     mint) are two different events that can appear on the same consent screen at once (§11.1's
     client entry beside §11.3's existing-tokens read), and one screen showing two `created_at`
@@ -441,6 +442,21 @@ AS_AUTHORIZE_PRETRUST_CAUSES: tuple[AuthorizePretrustCause, ...] = get_args(Auth
 AuthorizePosttrustCause = Literal["vocabulary", "scope"]
 AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[AuthorizePosttrustCause, ...] = get_args(
     AuthorizePosttrustCause
+)
+
+#: §11.6 — a standard error redirect from `/authorize` carries exactly these two keys and nothing
+#: else. `error_description` and `error_uri` are MUST NOT, with any value, under any cause — removed
+#: rather than constrained, because a uniform constant description would satisfy §7's convergence
+#: while leaving a field every implementation eventually fills with the cause it already computed.
+#: Written out, not derived, the same reason `AS_CLIENT_REGISTRY_READ_FIELDS` is: a field added here
+#: reaches the redirect the moment this module imports, with no test failing, unless a new member is
+#: a deliberate act against this set.
+AS_AUTHORIZE_ERROR_REDIRECT_FIELDS: frozenset[str] = frozenset({"error", "state"})
+
+#: The two names §11.6 forbids outright — never emitted, not even empty or constant — so a test can
+#: assert their absence as directly as it asserts the two permitted keys' presence.
+AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS: frozenset[str] = frozenset(
+    {"error_description", "error_uri"}
 )
 
 
@@ -617,6 +633,8 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
+    "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
     "AS_CLIENT_REGISTRY_READ_FIELDS",

@@ -147,6 +147,22 @@ def test_the_consent_screen_reads_one_client_entry_and_nothing_more():
     # entry to the registration itself, above, rather than admitted and then withheld.
 
 
+def test_the_error_redirect_carries_exactly_two_fields_and_never_a_description():
+    """§11.6: `{error, state}` and nothing else — `error_description`/`error_uri` are MUST NOT.
+
+    Written out rather than derived, the same reason `AS_CLIENT_REGISTRY_READ_FIELDS` is: this is
+    Part B's one closed vocabulary that shipped with no constant behind it until this round, even
+    though the surfaces, the registry read and all four cause tuples got one. The permitted and
+    forbidden sets are asserted disjoint so a future edit cannot satisfy one by breaking the other.
+    """
+    assert t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS == {"error", "state"}
+    assert t.AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS == {"error_description", "error_uri"}
+    assert not t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS & t.AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS
+    # §7's convergence: the field removed rather than constrained is a description, never a code.
+    assert "error" in t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS
+    assert "error_description" not in t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS
+
+
 def test_the_throttle_surfaces_are_four_closed_words():
     """§12.1 rule 5 and §12.2: the release entry's `surface`, and what `actor` carries.
 

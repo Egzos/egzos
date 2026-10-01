@@ -1,4 +1,4 @@
-# Contract · the container's authorization server (core mechanics)
+# Contract · the container's authorization server
 
 **Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
 A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
@@ -86,6 +86,14 @@ direct negation of D-C6's premise that *the post-trust tier is as reachable as t
 Named at §11.0's own "Consequence recorded, not acted on here" clause; named here for the same
 reason as the other five. This document does not revise the premise — the revision is filed as
 **#98** (`design-gap`), which names the affected regions and states the options for the Chief's pick.
+A seventh, a **reopening** rather than a narrowing, an addition or a mapping: §11.8's `user_code`
+length and alphabet are not a rendering choice this Part merely restates — `consent.md`'s own
+**D-C4** already committed to a number, *"Device codes are 8 characters, shown `XXXX-XXXX`,"*
+rejecting shorter codes by name for the brute-force surface they would open. Taking ownership of the
+length and alphabet as this contract's to pin, rather than citing D-C4's eight directly, reopens a
+committed Decision. Named at §11.8 itself, and here for the same reason as the other six: this
+paragraph's standard reaches every divergence this Part states, reopenings included, not
+narrowings, the addition and the mapping alone.
 
 ## 1 · One AS, three client types
 
@@ -1393,12 +1401,17 @@ above holds whichever is picked.
 
 §3 fixes the flow, the endpoints and the three mitigations. This fixes what the entry page needs:
 
-- **The `user_code`'s length and alphabet are the contract's, not the page's** — they set the
+- **The `user_code`'s length and alphabet are the contract's, not the page's — a seventh divergence,
+  named in the opening register: `consent.md`'s own D-C4 already committed to a number, this
+  reopens it rather than restating a rendering.** D-C4 is *"Device codes are 8 characters, shown
+  `XXXX-XXXX`,"* rejecting shorter codes by name for the brute-force surface they would open — the
+  same reason this clause gives for taking ownership of the length and alphabet here. They set the
   brute-force floor §3 mitigation 1 bounds from the other side, and a page that chose them could
-  weaken the flow by rendering it. `consent.md` renders eight characters in two groups of four.
-  `[OPEN→0.3]`: the review should pin the length and the alphabet (a1p's reading: eight characters
-  from an alphabet with no visually ambiguous pairs, which is what makes a short code typable and is
-  the reason it is short). §9.1's entropy clause covers the *source*; this covers the *size*.
+  weaken the flow by rendering it. `[OPEN→0.3]`: the review should pin the length and the alphabet
+  (a1p's reading: eight characters — D-C4's own number — from an alphabet with no visually ambiguous
+  pairs, which is what makes a short code typable and is the reason it is short; D-C4 fixes the
+  length and leaves the alphabet open). §9.1's entropy clause covers the *source*; this covers the
+  *size*.
 - **Redemption is single-use and throttled**, per §3 mitigation 1 and §12: a code that has been
   redeemed is spent whether or not the authorization it belongs to was approved. **Its failures are
   uniform**, on §11.7's terms and for §11.7's reason: §12 row (b)'s five causes — `invalid`,
