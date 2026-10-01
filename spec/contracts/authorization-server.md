@@ -401,9 +401,10 @@ under any cause.** Testable as written:
    left to read as a restatement.
 3. **No `error`, no `state`** — it is not a redirect, and §11.6 does not reach here.
 4. **It appends once per evaluated attempt**, row (d), with the cause in `details` (§12.1 rule 1) —
-   **except** the one cause this page can carry that clause 2 and §12.1 rule 3 already except:
-   an attempt refused by a throttle that *already holds* is **counted, not appended**, whatever it
-   would otherwise have been. Stated here too, rather than left for clause 2 alone to carry,
+   **except** the one **state**, not cause, this page's responses can fall into, which clause 2 and
+   §12.1 rule 3 already except:
+   an attempt refused by a throttle that *already holds* is **counted, not appended**, whatever its
+   cause would otherwise have been. Stated here too, rather than left for clause 2 alone to carry,
    because this clause sits under "Testable as written" and an implementer who turns it into an
    assertion without the exception has built exactly the unbounded append D-C6 rejected by name.
 
@@ -1018,7 +1019,10 @@ redirect has the same property from the other side** — it is an ordering, so i
 ordering is fixed, and it is the step that decides whether §5.3's tier is reachable at all. So
 **§11.0 is three substeps, in this order**:
 
-1. **Is this the deciding session's first re-submission of this request?** Two halves, and the
+1. **At `/authorize` only: is this the deciding session's first re-submission of this request?**
+   `/login` and `/device` have no substep 1 — §11.4's decided-request record exists only for an
+   authorization request, so there is nothing for either surface to match against, the same way
+   §3's device redemption has no substep 3 below. Two halves, and the
    document means them separately. The read is **keyed on the interactive session of §10.1 — never on
    anything the request carries**, because a key the caller can vary at no cost is no bound, which is
    this section's own `[OPEN→0.3]` floor below. The **match** is then against the decided request
@@ -1322,7 +1326,11 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
   `[OPEN→0.3]` **Step 4's disposition on a POST-hop failure.** Step 4 fixes what a value failing *at
   the GET* gets — dropped for the container's root — and this document does not say whether a value
   failing the POST-hop re-match takes that same 303 with the login otherwise completed, or fails the
-  POST itself.
+  POST itself. The two options cost differently at §12, and the sitting should carry the cost along
+  with the pick: the first leaves the login's own entry `established`, with the carrier's failure
+  recorded nowhere of its own; the second has no cause to append under — row (a) closes at `wrong` ·
+  `unknown` · `throttled` (`AS_LOGIN_CAUSES`), and a POST-hop carrier failure is none of the three, so
+  taking it reopens that closed vocabulary rather than fitting inside it.
 
 - **`continue` is also how the pending authorization request survives the login, and it is the only
   thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
