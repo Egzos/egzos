@@ -1225,17 +1225,23 @@ MUST NOT mint. a1p.** §2 makes the *code* single-use; this makes the *request* 
 a different object and the one the back button re-submits. A re-submission renders §5.3's uniform
 failure and appends once, §12's cause `replayed`.
 
-**A re-submission is recognised as one only on the deciding session. a1p** — a decided request is
-bound to the interactive session (§10.1) that decided it, and only that session's **first**
-re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside §11.0's substep 1,
-which is where the ordering that exempts it is fixed. The same request arriving on **another**
-session, or a second time on the deciding session, is an **ordinary pre-trust failure**, subject to
-§11.0's throttle exactly like every other row (d) cause: §5.3's page, cause `replayed`, evaluated
-and appended once under §12.1 rule 1 — and, **only** while a throttle already holds for that
-caller, rule 3's exception applies instead and it is counted, not appended, same as any other row
-(d) attempt refused at that moment. "Subject to the throttle" is not a synonym for "never appends";
-outside a held throttle this is an ordinary append like the first re-submission's, on a different
-row.
+**A re-submission is recognised as one only on the deciding session — and that is the whole of the
+stated mechanism, which does not reach every case this section's MUST NOT covers. a1p / `[OPEN→0.3]`**
+— a decided request is bound to the interactive session (§10.1) that decided it, and only that
+session's **first** re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside
+§11.0's substep 1, which is where the ordering that exempts it is fixed and the only place this
+document states a read of the decided-request record. Substep 1's key is the session, never anything
+the request carries, so the same request arriving on **another** session, or a second time on the
+deciding session, matches nothing in substep 1 and falls through to the ordinary pre-trust tier —
+and no clause here states a second, request-keyed read that would recognise either case as the
+decided request once it gets there. As written, neither case is mechanised: this document asserts
+the requirement (the opening paragraph's MUST NOT reach a second decision, MUST NOT mint) without
+stating what makes it true outside the one session substep 1 reads. `[OPEN→0.3]` **the freeze
+review settles the mechanism**: a request-keyed read at the pre-trust tier — which carries none of
+substep 1's "a key the caller can vary at no cost is no bound" objection, since it would run *after*
+the counter — is one answer, and would be §12's fourth read of container state, extending the
+paragraph that today states three; a different mechanism is the freeze sitting's to propose instead.
+This document does not decide it and states no clause for it beyond this marker.
 
 **A re-submission carrying no session at all is not one this section ever sees. a1p** — it is
 substep 3's redirect like any other session-less `/authorize` request, and nothing here applies to
