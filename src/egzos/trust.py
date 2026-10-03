@@ -257,17 +257,10 @@ class TrustEngine:
             raise TrustError("target scope no longer exists")
         if any((i := self.backend.get(x)) and i.status == "quarantined" for x in p["items"]):
             # Quarantined after it was parked: the manifest still matches, but a manifest holding a
-            # quarantined item cannot be approved (step-up spec §11, R5). The refusal is on the
-            # chain like every other refusal here — the engine records it, not its callers — and
-            # the proposal stays open, because Deny still is (R5).
-            self.ledger.append(
-                "approval.stale",
-                actor=actor,
-                principal=token.principal,
-                subject=p["id"],
-                reason="an item was quarantined since the proposal",
-                status="open",
-            )
+            # quarantined item cannot be approved (step-up spec §11, R5). The proposal stays open,
+            # because Deny still is. Which event the ENGINE writes for this refusal is #125
+            # (approval.stale means drift and a stale proposal); until then the presence layer
+            # records it (step_up `closed`, reason `refused`).
             raise TrustError("Contains a quarantined item. It cannot move.")
         # Manifest binding: execute only if items + target + audience still match what was approved.
         current = self.manifest_hash(p["items"], p["to"], self.audience(to))

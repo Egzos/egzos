@@ -17,6 +17,7 @@ import pytest
 from egzos.auth import AuthError
 from egzos.container import OWNER, Container
 from egzos.mcp.server import build_server
+from egzos.trust import TrustError
 
 pytestmark = pytest.mark.adversarial
 
@@ -188,6 +189,23 @@ def test_an_agent_write_reaches_the_owner_terminal_as_text_never_as_commands(tmp
     json.loads(_egzos(tmp_path, "--json", "ls", "--inbox").stdout)  # still valid JSON
     bodies = [i.content.get("body") for _, i in c.store.inbox_items()]
     assert planted in bodies  # the store keeps the data as written; only the terminal is guarded
+
+
+@pytest.mark.xfail(strict=True, reason="#125: which event the engine writes for this refusal")
+def test_the_engine_records_a_quarantine_refusal(box):
+    owner = box.auth.interactive_token()
+    root = box.nodes.user_root()
+    org = box.nodes.create("org", "o", root, token=owner, actor=OWNER, principal="interactive")
+    src = box.nodes.create("project", "a", org, token=owner, actor=OWNER, principal="interactive")
+    dst = box.nodes.create("project", "b", org, token=owner, actor=OWNER, principal="interactive")
+    _client(box, scopes=[dst.id])
+    item = box.store.add(body="n", scope=src, token=owner, actor=OWNER, principal="interactive")
+    pid = box.trust.move(item, dst, token=owner, actor=OWNER)["proposal"]["id"]
+    box.trust.quarantine(box.backend.get(item.id), token=owner, actor=OWNER, reason="x")
+    before = len(box.ledger.tail(1000))
+    with pytest.raises(TrustError):
+        box.trust.execute(pid, token=owner, actor=OWNER)
+    assert len(box.ledger.tail(1000)) == before + 1  # the refusal itself is on the chain
 
 
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
