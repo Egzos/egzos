@@ -300,19 +300,19 @@ def fetch(
 def find(
     description: str = typer.Argument(...), kind: list[str] = typer.Option([], "--kind", "-k")
 ):
-    """Numbered results across every kind/scope the token sees, recency-ranked; act with %n."""
+    """Numbered results across every kind/scope the token sees, recency-ranked; act with %n.
+    The grammar is the lifeboat's search (`egzos.store.find`): free text plus `kind:` `scope:`
+    `trust:` `tag:` `key:` `ring:`."""
+    from egzos.store.find import QueryError
+    from egzos.store.find import find as run_find
+
     c = _container()
     token = c.require_token()
-    covered = [n for n in c.backend.list_nodes() if c.trust.covers(token, n)]
-    hits = []
-    for n in covered:
-        for item in c.backend.query([n.id], kinds=kind or None, text=description):
-            # fetch serves under policy; find is the curation view — the interactive curator sees
-            # every covered item with its trust label (labels + promotion queue are the control).
-            curator = token.principal == "interactive" and token.has("curate")
-            if item.status != "quarantined" and (curator or c.resolver.serve(item, n)):
-                hits.append((n, item))
-    hits.sort(key=lambda t: t[1].lifecycle.get("updated_at", ""), reverse=True)
+    query = " ".join([description, *(f"kind:{k}" for k in kind)])
+    try:
+        hits = run_find(c, token, query)
+    except QueryError:
+        _fail("That query isn't valid. Check the prefixes: kind: scope: trust: tag: key: ring:")
     mapping = {str(i + 1): item.id for i, (_, item) in enumerate(hits)}
     _find_map(c, token).write_text(json.dumps(mapping))
     c.ledger.append(
@@ -731,6 +731,19 @@ def serve(
     from egzos.mcp.server import serve_stdio
 
     serve_stdio(c, t)
+
+
+@app.command()
+def web(
+    port: int = typer.Option(7425, "--port", help="Loopback port."),
+    no_open: bool = typer.Option(False, "--no-open", help="Don't open a browser."),
+):
+    """The lifeboat: search, items and the pending queue in your browser, on loopback only."""
+    c = _container()
+    _owner(c, "the lifeboat")
+    from egzos.web import serve_web
+
+    serve_web(c, port=port, open_browser=not no_open)
 
 
 @app.command()

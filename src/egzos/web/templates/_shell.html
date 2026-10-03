@@ -1,0 +1,27 @@
+{#- The shell PARTIAL (lifeboat.md §18): three parameters — viewer line, nav, scheme switch — each
+    may be absent, and an absent one renders nothing. -#}
+<header>
+  <p class="shell">{{ shell.container_line }}</p>
+  {%- if shell.viewer_line %}
+  <p class="viewer">{{ shell.viewer_line }}</p>
+  {%- endif %}
+  {%- if shell.window %}
+  <p class="window{% if shell.window.state == 'lapsed' %} alarm-text{% endif %}" role="status">{{ shell.window.text }}</p>
+  {%- endif %}
+  {%- if shell.nav %}
+  <nav aria-label="egzos">
+    {%- for n in shell.nav %}
+    <a href="{{ n.href }}"{% if n.current %} aria-current="page"{% endif %}>{{ n.label }}</a>
+    {%- endfor %}
+  </nav>
+  {%- endif %}
+  {%- if shell.scheme %}
+  <form class="scheme" method="post" action="/prefs">
+    <input type="hidden" name="csrf" value="{{ shell.scheme.csrf }}">
+    <input type="hidden" name="return" value="{{ shell.scheme.return }}">
+    {%- for value, key in [("light", "scheme.light"), ("dark-neutral", "scheme.darkNeutral"), ("dark-violet", "scheme.darkViolet")] %}
+    <button name="scheme" value="{{ value }}" aria-pressed="{{ 'true' if shell.scheme.current == value else 'false' }}">{{ S[key] }}</button>
+    {%- endfor %}
+  </form>
+  {%- endif %}
+</header>

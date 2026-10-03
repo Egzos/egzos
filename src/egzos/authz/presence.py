@@ -255,6 +255,24 @@ class Presence:
                 return True
         return False
 
+    def window_status(self) -> dict[str, Any] | None:
+        """For the lifeboat shell (R1): the newest signed window, open or lapsed. A lapsed window
+        shows until the next act or tap, i.e. until a newer presence check is on the chain."""
+        seconds = window_seconds()
+        if seconds == 0:
+            return None
+        now = _iso(_now())
+        for e in self._recent_step_ups(max(seconds, 3600)):
+            d = e.get("details") or {}
+            if d.get("outcome") == "window":
+                continue  # a pass inside the window; the window itself is further back
+            if d.get("outcome") != "approved" or not d.get("window_closes"):
+                return None  # the newest act opened no window, or closed them
+            if d["window_closes"] > now:
+                return {"state": "open", "pair": d.get("pair"), "closes": d["window_closes"]}
+            return {"state": "lapsed", "at": d["window_closes"]}
+        return None
+
     def covers(self, act: dict[str, Any]) -> bool:
         # A manifest holding a quarantined item cannot be approved (R5): no window stands in for it.
         if act.get("blocked"):

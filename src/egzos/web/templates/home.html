@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block body %}
+<main>
+  <form role="search" method="get" action="/">
+    <h1><label for="q">{{ S["search.label"] }}</label></h1>
+    <div class="searchrow">
+      <input id="q" name="q" value="{{ q }}" placeholder="{{ S['search.placeholder'] }}"{% if invalid %} aria-describedby="q-invalid"{% endif %}>
+      <button>{{ S["search.button"] }}</button>
+    </div>
+    {%- if q %}
+    <p><a class="clear" href="/">{{ S["search.clear"] }}</a></p>
+    {%- endif %}
+    {%- if invalid %}
+    <p id="q-invalid" class="ink-2" role="status">{{ S["search.invalid"] }}</p>
+    {%- endif %}
+    <p class="hints">{{ S["search.hints"] }}</p>
+  </form>
+  {%- if not invalid %}
+  <h2>{{ header }}</h2>
+  {%- if empty %}
+  <p role="status">{{ S["results.none"] if q else S["results.empty"] }}</p>
+  {%- else %}
+  <ul class="rows">
+    {%- for r in rows %}
+    <li>
+      <a href="/items/{{ r.id }}"><span class="kind">{{ r.kind }}</span><span class="title{% if r.untitled %} ink-3{% endif %}" title="{{ r.title }}">{{ r.title }}</span><code class="scope">{{ r.scope }}</code><span class="stamp stamp--{{ r.status }}">{{ r.status }}</span><time datetime="{{ r.updated }}">{{ r.age }}</time></a>
+      <p class="meta">{{ r.who }} · v{{ r.version }}{% for tag in r.tags %} · <code>#{{ tag }}</code>{% endfor %}</p>
+    </li>
+    {%- endfor %}
+  </ul>
+  {%- if next %}
+  <nav aria-label="More results"><a class="next" href="{{ next }}">{{ S["results.next"] }}</a></nav>
+  {%- endif %}
+  {%- endif %}
+  {%- endif %}
+</main>
+{% endblock %}
