@@ -16,8 +16,8 @@ Every presence check is one `step_up` entry, whatever its outcome (`approved`, `
 `unavailable`, or `window` when an open window covered it), with the source → destination ring
 pair. With `step_up.window_seconds` set, a signature opens a window for that ring pair BOUNDED TO
 THE MANIFEST'S SHAPE (up to K items of the signed kinds), read back from the chain; `egzos trust
-close-window` appends the entry that ends every window. This build defaults the policy to `0` (every
-act taps); `EGZOS_STEP_UP_WINDOW_SECONDS` opts in.
+close-window` appends the entry that ends every window. The policy defaults to the contract's 300 s
+(container.md §8); `EGZOS_STEP_UP_WINDOW_SECONDS=0` makes every act tap, and #117 holds the default.
 
 The CLI's page opens in the browser; its URL is printed only when no browser could be opened AND
 stdout is a terminal: an agent's shell tool is not a terminal, so it never receives a URL to press.
@@ -53,9 +53,8 @@ from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_DEFAULTS
 from egzos.container import OWNER, Container
 
-# container.md §8's default is 300 s for a window bounded to the manifest's shape. Until the build
-# has run with shape-bound windows, the default is 0 (every act taps); the env var opts in.
-# The one default, from the typed contract (container.md §8): no second constant beside it.
+# The one default, from the typed contract (container.md §8, 300 s for a window bounded to the
+# manifest's shape): no second constant beside it. `EGZOS_STEP_UP_WINDOW_SECONDS=0` opts out.
 DEFAULT_WINDOW_SECONDS = CONTAINER_CONFIG_DEFAULTS["step_up_window_seconds"]
 ARM_SECONDS = 10
 CHIPS = 6
