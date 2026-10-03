@@ -7,7 +7,9 @@ remembered it. Parsing the workflow files moves them into the required `tests` c
 """
 
 import json
+import os
 import re
+import subprocess
 import textwrap
 from pathlib import Path
 
@@ -104,9 +106,39 @@ def test_control_inputs_cover_everything_claude_code_loads():
         run = step["run"]
         # At any depth, not only the root (#40 review): Claude Code loads nested ones too.
         for needle in ("-name CLAUDE.md", "CLAUDE.local.md", "-name .mcp.json",
-                       "-name .claude -type d -prune", r"(^|/)\.claude/",
+                       "-name .claude -prune", r"(^|/)\.claude/",
                        "REVIEW-DECISIONS.md"):
             assert needle in run, (wf, job_id, needle)
+
+
+@pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
+def test_control_inputs_cleanup_removes_every_kind_of_entry(job_id, tmp_path):
+    # Runs the step's own find|xargs against a tree holding each shape a PR could plant: a nested
+    # .claude directory, a .claude symlink to a PR-chosen directory, a .claude regular file, and
+    # nested CLAUDE.md / CLAUDE.local.md / .mcp.json, one of them a symlink (platform#46).
+    (step,) = [s for _, j, _, s in _steps()
+               if j == job_id and s.get("name") == "control-inputs-from-base"]
+    pattern = r"(find \. -path \./\.git -prune.*?xargs -0 -r rm -rf --)"
+    cmd = re.search(pattern, step["run"], re.DOTALL)
+    assert cmd, job_id
+    root = tmp_path / "tree"
+    (root / "payload" / "agents").mkdir(parents=True)
+    (root / "payload" / "settings.json").write_text("{}")
+    (root / "a" / "b").mkdir(parents=True)
+    (root / "a" / "b" / ".claude").symlink_to(root / "payload")
+    (root / "c" / ".claude" / "agents").mkdir(parents=True)
+    (root / "d").mkdir()
+    (root / "d" / ".claude").write_text("x")
+    (root / "e").mkdir()
+    (root / "e" / "CLAUDE.md").symlink_to(root / "payload" / "settings.json")
+    (root / "e" / "CLAUDE.local.md").write_text("x")
+    (root / "e" / ".mcp.json").write_text("{}")
+    (root / "keep.txt").write_text("x")
+    subprocess.run(["bash", "-c", cmd.group(1)], cwd=root, check=True)
+    for gone in ("a/b/.claude", "c/.claude", "d/.claude", "e/CLAUDE.md", "e/CLAUDE.local.md",
+                 "e/.mcp.json"):
+        assert not os.path.lexists(root / gone), (job_id, gone)
+    assert (root / "keep.txt").exists()
 
 
 INTERPRETERS = (

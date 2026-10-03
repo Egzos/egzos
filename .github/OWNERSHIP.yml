@@ -36,6 +36,14 @@ agent_identities:
 chief_only:
   - "docs/build/REVIEW-DECISIONS.md"
   - ".github/OWNERSHIP.yml"
+  # Claude Code loads these at any depth, so a nested one is a control input too, whatever the
+  # entry's type (Egzos/egzos-platform#46). `*/**/` needs at least one directory above, so the
+  # root CLAUDE.md and .claude/ stay a1p-planner's.
+  - "*/**/.claude"
+  - "*/**/.claude/**"
+  - "*/**/CLAUDE.md"
+  - "*/**/CLAUDE.local.md"
+  - "**/.mcp.json"
 
 # Paths that trigger a ::notice:: annotation when touched (not a failure for a1p-planner).
 governance_paths:

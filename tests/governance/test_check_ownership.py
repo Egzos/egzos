@@ -417,3 +417,16 @@ def test_main_fails_closed_on_unparseable_numstat_file(repo, tmp_path):
     )
     assert res.returncode == 1
     assert "unparseable" in res.stdout
+
+
+def test_nested_claude_control_inputs_are_chief_only():
+    # A builder must not be able to plant a .claude (symlink or not), CLAUDE.md or .mcp.json under
+    # its own paths: reviewers' sessions would load it (Egzos/egzos-platform#46).
+    import yaml
+
+    chief_only = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["chief_only"]
+    for path in ("apps/ui-flagship/src/.claude", "adversarial/x/.claude/settings.json",
+                 "src/egzos/web/CLAUDE.md", "tests/a/CLAUDE.local.md", "server/.mcp.json",
+                 ".mcp.json"):
+        assert co.matches_any(chief_only, path), path
+

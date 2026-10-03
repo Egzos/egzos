@@ -97,10 +97,12 @@ jobs:
           set -euo pipefail
           B="origin/${BASE_REF}"
           # At any depth: Claude Code discovers nested CLAUDE.md files and .claude directories too.
+          # Any entry named .claude goes, whatever its type: a symlink is type l, never d, and one
+          # left in place resolves to a PR-chosen directory (Egzos/egzos-platform#46).
           # The restore stages base's copies, so `git status` / `git diff HEAD` show them as local
           # changes; the PR's own versions are read with `gh pr diff`.
           find . -path ./.git -prune \
-            -o -name .claude -type d -prune -print0 \
+            -o -name .claude -prune -print0 \
             -o \( -name CLAUDE.md -o -name CLAUDE.local.md -o -name .mcp.json \) ! -type d -print0 \
             | xargs -0 -r rm -rf --
           { git ls-tree -r -z --name-only "$B" \
