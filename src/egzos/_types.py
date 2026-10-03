@@ -539,7 +539,9 @@ AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS: frozenset[str] = frozenset(
 class DeviceAuthorization(TypedDict):
     """RFC 8628's device-authorization response (§3) — CLI and headless only; browsers are retired.
 
-    `verification_uri_complete` is `[OPEN->0.3]`, so it is optional here, not absent or mandatory.
+    `verification_uri_complete` is NOT issued ([0.3 · 21]) — the key is absent from the response
+    entirely, not optional and not null, and `/device` ignores a `user_code` query parameter. The
+    typing step IS the mitigation: a code in a URL is a code a user can be asked to forward.
     """
 
     device_code: str
@@ -547,7 +549,6 @@ class DeviceAuthorization(TypedDict):
     verification_uri: str
     expires_in: int
     interval: int
-    verification_uri_complete: NotRequired[str]
 
 
 #: RFC 8414's location, at the container's own origin, unauthenticated (§6).
@@ -555,14 +556,18 @@ AS_METADATA_ENDPOINT: str = "/.well-known/oauth-authorization-server"
 
 #: The metadata document IS the interoperability surface: a container MUST NOT advertise what it
 #: does not implement, or implement what it does not advertise. This is the whole field vocabulary
-#: of eleven; two of them are CONDITIONAL, see `AS_METADATA_CONDITIONAL_FIELDS` below.
+#: of TEN, and every row is unconditional: omitting one is non-conforming, and advertising a field
+#: that is not here is too. `registration_endpoint` is ABSENT, not present-and-null — [0.3 · 10]
+#: decided there is no open dynamic client registration, and RFC 8414 omits an unsupported optional
+#: field rather than nulling it. `revocation_endpoint` is here unconditionally — [0.3 · 11] decided
+#: the RFC 7009 endpoint exists. The predecessor `AS_METADATA_CONDITIONAL_FIELDS` is gone with them:
+#: an empty constant is a place for a later field to be quietly added.
 AS_METADATA_FIELDS: tuple[str, ...] = (
     "issuer",
     "authorization_endpoint",
     "token_endpoint",
     "device_authorization_endpoint",
     "revocation_endpoint",
-    "registration_endpoint",
     "response_types_supported",
     "grant_types_supported",
     "code_challenge_methods_supported",
@@ -570,16 +575,15 @@ AS_METADATA_FIELDS: tuple[str, ...] = (
     "scopes_supported",
 )
 
-#: The two rows whose endpoint's very existence is `[OPEN->0.3]`, so §6's "MUST NOT advertise what
-#: it does not implement" forbids advertising either until the freeze says yes:
-#:   - `revocation_endpoint` — §9. §K answers revocation with `token rm`, an OWNER path; whether an
-#:     RFC 7009 endpoint exists (and its silence rule, and whether a client may revoke another
-#:     client's token) is the §9 `[OPEN->0.3]`. A browser or MCP client cannot run `token rm`.
-#:   - `registration_endpoint` — §5. Advertised only if dynamic registration (RFC 7591) is enabled.
-#: The other nine are unconditional: omitting one of those is non-conforming.
-AS_METADATA_CONDITIONAL_FIELDS: frozenset[str] = frozenset(
-    {"revocation_endpoint", "registration_endpoint"}
-)
+#: §2 — an authorization code expires 60 seconds after issuance ([0.3 · 16]). A contract value, not
+#: a default: there is no config key that raises it and a deployment may not add one.
+AS_CODE_LIFETIME_SECONDS: int = 60
+
+#: §9.3 — an AS-issued access token ALWAYS carries a non-null `expires_at`, 1 hour by default
+#: ([0.3 · 17]). `capabilities.md` §5's `expires_at: null` stays reachable through `token mint`
+#: ONLY, where the owner chooses it deliberately; no AS path, parameter or config key yields a
+#: non-expiring token.
+AS_ACCESS_TOKEN_LIFETIME_SECONDS: int = 3600
 
 #: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
 #: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
@@ -597,7 +601,8 @@ AS_SCOPE_ALL_NODES: str = "node:*"
 
 #: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
 #: MUST be rejected; every client is public, so `none` is the only auth method. `scopes_supported`
-#: is absent: it is the six capability names, and whether `node:` joins them is `[OPEN->0.3]`.
+#: is absent from this map because its value is container-independent but not literal: it is the six
+#: capability names, i.e. `CAPABILITIES`, and the `node:` form is NOT advertised ([0.3 · 28]).
 AS_METADATA_CLOSED_VALUES: dict[str, tuple[str, ...]] = {
     "response_types_supported": ("code",),
     "grant_types_supported": (
@@ -709,16 +714,17 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_ACCESS_TOKEN_LIFETIME_SECONDS",
     "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
     "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
     "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
+    "AS_CODE_LIFETIME_SECONDS",
     "AS_DEVICE_REDEMPTION_CAUSES",
     "AS_LOGIN_CAUSES",
     "AS_METADATA_CLOSED_VALUES",
-    "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
     "AS_SCOPE_ALL_NODES",
