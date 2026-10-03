@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import is_typeddict
 
+import pytest
+
 import egzos._types as t
 
 # `model.CONTAINER_TYPES`, verbatim — declaration order IS ring rank.
@@ -41,6 +43,18 @@ SERVING_POLICY = {
     "global": "verified-only",
     "user": "verified-only",
 }
+
+# container.md §8's table, one row per entry: the canonical dotted wire key, and the
+# `ContainerConfig` field that must hold its value. Transcribed from the contract, not read back
+# from the module — a mapping asked what it maps cannot notice itself changing.
+CONFIG_WIRE_ROWS = [
+    ("chain.personal_root", "chain_personal_root"),
+    ("org.policy.sovereign_chain", "org_policy_sovereign_chain"),
+    ("node.policy.structure_floor", "node_policy_structure_floor"),
+    ("blobs.inline_max_bytes", "blobs_inline_max_bytes"),
+    ("blobs.staging_retention_days", "blobs_staging_retention_days"),
+    ("step_up.window_seconds", "step_up_window_seconds"),
+]
 
 # `model.BASELINE_CREATE` — what the default floor must reproduce (v0.3 §2).
 BASELINE_CREATE = {"thread", "project"}
@@ -140,3 +154,54 @@ def test_proposal_spells_the_wire_key_from_exactly_once():
 def test_stale_is_a_proposal_status():
     """The TOCTOU close needs somewhere to record a refused approval (container.md §6)."""
     assert t.PROPOSAL_STATUSES == ("open", "executed", "denied", "stale")
+
+
+@pytest.mark.parametrize(("wire_key", "field"), CONFIG_WIRE_ROWS)
+def test_each_config_row_maps_its_wire_key_to_its_field(wire_key, field):
+    """Forward, one row at a time: §8's dotted name reaches the field that holds its value."""
+    assert t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY[wire_key] == field
+
+
+@pytest.mark.parametrize(("wire_key", "field"), CONFIG_WIRE_ROWS)
+def test_each_config_field_is_reached_by_exactly_one_wire_key(wire_key, field):
+    """Reverse, one row at a time: no field is unreachable, none has two spellings."""
+    assert [k for k, v in t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY.items() if v == field] == [
+        wire_key
+    ]
+
+
+def test_the_wire_mapping_covers_the_config_object_and_nothing_else():
+    """A row the mapping omits is a key §8 promises a deployment may set and a loader drops."""
+    assert set(t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY) == {k for k, _ in CONFIG_WIRE_ROWS}
+    assert set(t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY.values()) == set(
+        t.ContainerConfig.__annotations__
+    )
+
+
+def test_no_config_wire_key_is_spelled_the_same_as_its_field():
+    """Every row differs, so a loader that skips the mapping fails on all six, never on some.
+
+    Unlike `CONSENT_KIND_FROM_CLIENT_TYPE`, where two of three rows are identities and the bug can
+    hide, this mapping has no row that works by accident.
+    """
+    for wire_key, field in t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY.items():
+        assert "." in wire_key, wire_key
+        assert "." not in field, field
+        assert wire_key != field
+
+
+def test_a_zero_step_up_window_survives_a_load_that_uses_the_mapping():
+    """Decision 2 (#102): `0` is a value. Absence is tested by absence, never by truthiness.
+
+    The second assertion is the bug this constant exists to prevent, written out: the deployment
+    that asked for the strictest setting in the table gets served the default it refused.
+    """
+    wire = {"step_up.window_seconds": 0}
+    loaded = dict(t.CONTAINER_CONFIG_DEFAULTS)
+    for wire_key, field in t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY.items():
+        if wire_key in wire:  # `in`, not `or` — the whole of the clause
+            loaded[field] = wire[wire_key]
+    assert loaded["step_up_window_seconds"] == 0
+
+    truthy = wire["step_up.window_seconds"] or t.CONTAINER_CONFIG_DEFAULTS["step_up_window_seconds"]
+    assert truthy == 300

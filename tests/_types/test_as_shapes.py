@@ -13,7 +13,18 @@ from __future__ import annotations
 
 from typing import NotRequired, get_type_hints, is_typeddict
 
+import pytest
+
 import egzos._types as t
+
+# authorization-server.md §11.1's table: the AS-internal `client_type` literal, and the kind word
+# `consent.md` renders beside the client name (its `kind.*` copy keys). Transcribed from the two
+# documents, never read back from the module under test.
+CONSENT_KIND_ROWS = [
+    ("browser", "browser"),
+    ("cli", "device"),
+    ("mcp", "mcp"),
+]
 
 # authorization-server.md §6's table, in order.
 AS_METADATA_FIELDS = (
@@ -60,6 +71,41 @@ def test_plain_is_never_advertised_and_code_is_the_only_response_type():
     assert v["token_endpoint_auth_methods_supported"] == ("none",)
     assert t.AS_CLIENT_TYPES == ("browser", "cli", "mcp")
     assert "client_secret" not in t.ClientRegistration.__annotations__
+
+
+@pytest.mark.parametrize(("client_type", "kind"), CONSENT_KIND_ROWS)
+def test_each_client_type_renders_its_contracted_kind_word(client_type, kind):
+    """Forward, one row at a time: §11.1's table, with `cli` rendering as `device`."""
+    assert t.CONSENT_KIND_FROM_CLIENT_TYPE[client_type] == kind
+
+
+@pytest.mark.parametrize(("client_type", "kind"), CONSENT_KIND_ROWS)
+def test_each_kind_word_is_rendered_by_exactly_one_client_type(client_type, kind):
+    """Reverse, one row at a time: no kind word is unreachable, none has two sources."""
+    assert [c for c, k in t.CONSENT_KIND_FROM_CLIENT_TYPE.items() if k == kind] == [client_type]
+
+
+def test_the_kind_mapping_spans_both_vocabularies_exactly():
+    """§11.1 binds `AS_CLIENT_TYPES` to `consent.md`'s rendered kinds; neither side may grow alone.
+
+    A fourth client type with no kind word is a client the consent page cannot render, and a kind
+    word no client type produces is a copy key nothing emits.
+    """
+    assert set(t.CONSENT_KIND_FROM_CLIENT_TYPE) == set(t.AS_CLIENT_TYPES)
+    assert set(t.CONSENT_KIND_FROM_CLIENT_TYPE.values()) == set(t.CONSENT_KINDS)
+    assert t.CONSENT_KINDS == ("browser", "device", "mcp")
+
+
+def test_cli_is_the_one_row_where_the_two_vocabularies_differ():
+    """The reason the mapping is named rather than left to prose (#10 F25).
+
+    Two rows are identities, so a surface that re-derives the kind from the literal agrees on
+    `browser` and `mcp` and emits `kind.cli` — a copy key that does not exist — on the third.
+    """
+    differing = {c for c, k in t.CONSENT_KIND_FROM_CLIENT_TYPE.items() if c != k}
+    assert differing == {"cli"}
+    assert "cli" not in t.CONSENT_KINDS
+    assert "device" not in t.AS_CLIENT_TYPES
 
 
 def test_the_scope_vocabulary_is_the_six_names_plus_the_node_form():
