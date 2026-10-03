@@ -580,8 +580,11 @@ class Tap:
                if self.gate else "")
             # §2.2 item 8: initial focus on the page heading, never on an act.
             + f"<h1 tabindex=-1 autofocus>{e(a['title'])}</h1>"
-            f"<p><span class=attr>{e(a.get('requester', 'you'))} states:</span> {said}</p>"
-            f"<h2>what moves</h2>{rows}"
+            # §2.2 item 4 is the requester's stated reason: a proposal has one; approve.pending is
+            # the owner's own act and has none to state (design-gap #122).
+            + (f"<p><span class=attr>{e(a.get('requester', 'you'))} states:</span> {said}</p>"
+               if self.gate else "")
+            + f"<h2>what moves</h2>{rows}"
             f"<h2>who will see it at {e(a.get('dest', a['to']))}</h2>"
             f"<p>{people} people · {agents} agents · resolved from token grants and scope "
             f"membership</p>{chips}{consequence}"

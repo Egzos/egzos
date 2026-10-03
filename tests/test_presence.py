@@ -308,8 +308,9 @@ def test_an_item_promotion_tap_renders_only_what_the_spec_defines():
     item = {**ACT, "kind": "item", "title": "Mark verified: x at user:self"}
     tap = Tap(item)
     page = tap.page(armed=False)
-    # approve.pending has no deny act (capabilities.md §4); its reference line is #122.
-    assert "value=deny" not in page and "class=ref" not in page
+    # approve.pending has no deny act (capabilities.md §4) and no requester to state a reason;
+    # its reference line and the rest are #122.
+    assert "value=deny" not in page and "class=ref" not in page and " states:" not in page
     assert "Sign and approve" in page
     status, again = tap.post("deny")
     assert tap.outcome is None and "Sign and approve" in again  # a forged deny decides nothing
