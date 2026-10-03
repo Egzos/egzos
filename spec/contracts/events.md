@@ -9,8 +9,12 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. Seventeen events run; one is
-decided and not yet running.
+An appended event whose name is not in this list MUST be rejected. **Eighteen names are listed
+below**: sixteen **run**, one (`step_up`) is **reserved** for Phase 2.2, and one (`blob.grant`) is
+**decided, not running** (F5). The skeleton's `EVENTS` tuple holds seventeen of them — the sixteen
+running plus the reserved `step_up` — so `blob.grant` is the single name this list adds to the
+running code, and an append of it is rejected until F5 lands. Counted here because a count that
+disagrees with its own table is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|
@@ -53,14 +57,18 @@ unaudited move; it is an audited move that does not interrupt anyone.
 ## 3 · The chain
 
 ```
-hash = sha256( prev_hash || canonical(entry minus hash) )
+hash = sha256( prev_hash || canonical(entry minus `hash` and minus `seq`) )
 ```
 
 - The genesis `prev_hash` is **64 ASCII zeros**.
 - `||` is string concatenation of the previous hash's hex digest with the canonical body, encoded
   UTF-8.
 - The body hashed is the entry **without** `hash` and **without** `seq` — `seq` is the store's, not
-  the chain's.
+  the chain's. The formula above says so in the formula; it previously read *entry minus hash*,
+  which against §2's entry shape reads as *seq included*, and disagreed with this bullet.
+
+`storage.md` §3 and `_types.py`'s `BackendProtocol` say the same thing from the store's side:
+`audit_append` receives an entry carrying no `seq`, and the store assigns one. **running.**
 
 **`canonical` is part of the contract, not an implementation detail.** Two implementations that
 serialise differently produce different hashes and the chain stops verifying across them. It is
@@ -71,6 +79,32 @@ JSON with:
 - **non-ASCII preserved**, not `\u`-escaped.
 
 **running.**
+
+### Why `seq` stays out of the hashed body
+
+Stated as a decision rather than left as the absence of one, because the drift report found the
+formula and the prose disagreeing, and *including* `seq` was the first reading offered (#10 F7,
+#102). **Order is already bound** — every entry commits to `prev_hash`, so the entries form a linked
+list, and a reordering, an insertion or a deletion in the middle breaks verification at the first
+entry whose `prev_hash` no longer matches the one before it. `seq` adds no ordering fact the chain
+does not already carry. What it would add is a dependency on the store's numbering.
+
+That dependency has a cost this product cannot pay. `storage.md` plans three backends
+(sqlite → postgres → mem0/zep) and the container is meant to move between them. With `seq` hashed, a
+container exported from sqlite — where `seq` is `INTEGER PRIMARY KEY AUTOINCREMENT` and the first
+entry is `1` — and imported into a store that numbers from `0`, or that renumbers after a
+compaction, has an audit chain that can never verify again, for a change that altered no fact about
+what happened. With `seq` out, **an exported container verifies unchanged wherever it lands, and its
+entries may be renumbered.** That is the rest of the contract's promise applied to the ledger: the
+container is the user's, and it travels.
+
+*Rejected:* hashing `seq`, to bind the displayed order to the chained order. The mutations it would
+newly catch are exactly the ones that preserve relative order — a uniform offset, or a gap — and
+those state nothing false about what happened in which order. A *shuffle* is already caught:
+verification walks in `seq` order, and the linkage check fails at the first entry out of place.
+*Cost of this choice:* `seq` is a field `audit verify` reports (§4.1) and the hash does not cover, so
+a store may renumber its own ledger without the chain objecting. Accepted — the audience is the
+owner inspecting their own container, and the order they are shown is the order the chain enforces.
 
 ## 4 · Invariants
 
