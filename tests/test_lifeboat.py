@@ -55,7 +55,7 @@ def test_session_guard_and_headers(lb, tmp_path):
     assert fresh.get("/?k=wrong", follow_redirects=False).status_code == 403
     r = client.get("/")
     assert r.status_code == 200
-    for header, value in (("referrer-policy", "no-referrer"), ("cache-control", "no-store"),
+    for header, value in (("referrer-policy", "same-origin"), ("cache-control", "no-store"),
                           ("x-content-type-options", "nosniff")):
         assert r.headers[header] == value
     assert "script-src 'self'" in r.headers["content-security-policy"]

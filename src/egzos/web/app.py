@@ -799,8 +799,12 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
 
 def _harden(resp: Response, path: str) -> Response:
-    """lifeboat.md §18: every response is no-referrer, no-store, nosniff, framed by no one."""
-    resp.headers["Referrer-Policy"] = "no-referrer"
+    """lifeboat.md §18: no referrer leaves this origin; no-store, nosniff, framed by no one.
+
+    `same-origin`, not `no-referrer`: under `no-referrer` a browser serialises a form POST's
+    Origin as `null` (Fetch, "serializing a request origin"), and the guard refuses any POST
+    whose Origin is not this one, so every act would fail in Chromium and Firefox."""
+    resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"

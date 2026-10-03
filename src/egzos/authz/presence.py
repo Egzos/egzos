@@ -4,7 +4,7 @@
 The step-up tap, MVP cut (spec/design/step-up-tap-and-pending-approval.md §2, lifeboat baseline).
 
 A human-only act does not happen on a terminal's or a form's say-so. The container serves a
-one-shot page at `/tap/<token>` (an opaque single-use token, no parameters, no-referrer, no-store)
+one-shot page at `/tap/<token>` (an opaque single-use token, no parameters, no referrer off-origin, no-store)
 with §2.2's content — the container and viewer lines, what moves, who will see it and the
 consequence, the presence block — and waits for a decision: *Sign and approve* then *Confirm
 signature* within 10 s, *Approve without a window* then the same confirm, or *Deny* (one press).
@@ -740,7 +740,9 @@ def send_page(request: BaseHTTPRequestHandler, status: int, body: str) -> None:
     request.send_header("Content-Type", "text/html; charset=utf-8")
     request.send_header("Content-Length", str(len(data)))
     request.send_header("Cache-Control", "no-store")
-    request.send_header("Referrer-Policy", "no-referrer")
+    # same-origin, not no-referrer: under no-referrer a browser sends a form POST's Origin as
+    # `null`, and same_origin() refuses it, so the tap's own buttons would never land.
+    request.send_header("Referrer-Policy", "same-origin")
     request.send_header("X-Frame-Options", "DENY")
     request.send_header(
         "Content-Security-Policy",
