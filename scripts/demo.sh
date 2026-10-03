@@ -11,6 +11,9 @@ set -euo pipefail
 PY="${PY:-$( [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3 )}"
 export PYTHONPATH="${PYTHONPATH:-src}"
 export EGZOS_HOME="$(mktemp -d)"
+# Human-only acts open a presence check in a browser. The demo plays the person at the browser with
+# scripts/human_tap.py (two deliberate presses over the same HTTP a browser uses).
+export BROWSER="$PY scripts/human_tap.py %s"
 E="$PY -m egzos.cli"
 say() { printf '\n\033[1m▶ %s\033[0m\n' "$*"; }
 run() { printf '\033[2m$ egzos %s\033[0m\n' "$*"; $E "$@"; }

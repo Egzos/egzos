@@ -400,8 +400,48 @@ def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal 
     """Human-only: promote an item to verified, or execute a parked proposal (manifest-bound)."""
     c = _container()
     token = c.require_token()
+    if token.principal != "interactive":
+        _fail("approve is a human-only act; a client principal can only propose")
+    prop = c.backend.get_proposal(ref)
+    if prop and prop.get("status") == "open":
+        act = {
+            "ref": f"PROPOSAL {prop['id'][:10]}…",
+            "filed": prop.get("created_at", ""),
+            "title": f"Move {len(prop['items'])} item(s) outward: "
+            f"{prop['from_path']} → {prop['to_path']}",
+            "requester": f"{prop.get('proposed_by', {}).get('client', 'cli')}",
+            "reason": prop.get("reason"),
+            "items": [
+                {"kind": i.kind, "title": i.content.get("auto_title", i.id), "trust": i.status}
+                for i in (c.backend.get(x) for x in prop["items"])
+                if i
+            ],
+            "audience": [f"{a['client']} · {a['role']}" for a in prop["audience_delta"]],
+            "from": prop["from_path"],
+            "to": prop["to_path"],
+            "subject": prop["id"],
+        }
+    else:
+        it = _item_ref(c, ref)
+        act = {
+            "ref": f"ITEM {it.id[:10]}…",
+            "title": f"Mark verified: “{it.content.get('auto_title', it.id)}”",
+            "requester": it.provenance.get("client") or "cli",
+            "reason": "promote to verified, so it is served where unverified items are withheld",
+            "items": [{"kind": it.kind, "title": it.content.get("auto_title", it.id),
+                       "trust": f"{it.status} → verified"}],
+            "audience": [],
+            "from": _p(c, it.scope),
+            "to": _p(c, it.scope),
+            "subject": it.id,
+        }
+    from egzos.presence import Presence
+
+    outcome = Presence(c).require(act)
+    if outcome not in ("approved", "window"):
+        _fail(f"not approved: {outcome} in the presence check")
     try:
-        if c.backend.get_proposal(ref):
+        if prop:
             p = c.trust.execute(ref, token=token, actor=OWNER)
             _out(
                 p,

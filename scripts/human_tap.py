@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+# Copyright 2026 Ali Sasanian
+# SPDX-License-Identifier: Apache-2.0
+"""Stands in for a person at a browser, for the demo and tests only: given a /tap/<token> URL it
+opens the page, presses *Sign and approve*, then *Confirm signature* — the same two deliberate
+presses the page asks of a human, over the same HTTP.
+Usage: BROWSER="python scripts/human_tap.py %s" (or `python scripts/human_tap.py --deny URL`).
+It is not a bypass: it holds no credential and does nothing a person's browser could not."""
+
+from __future__ import annotations
+
+import sys
+import urllib.request
+from urllib.parse import urlparse
+
+
+def press(url: str, step: str) -> str:
+    origin = "{0.scheme}://{0.netloc}".format(urlparse(url))
+    req = urllib.request.Request(url, data=f"step={step}".encode(), headers={"Origin": origin})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return r.read().decode()
+
+
+def main(argv: list[str]) -> int:
+    deny = "--deny" in argv
+    url = [a for a in argv if not a.startswith("--")][0]
+    urllib.request.urlopen(url, timeout=10).read()
+    if deny:
+        press(url, "deny")
+        return 0
+    press(url, "arm")
+    press(url, "confirm")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
