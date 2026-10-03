@@ -11,10 +11,15 @@ and `::test_reads_are_audited`.
 
 An appended event whose name is not in this list MUST be rejected. **Eighteen names are listed
 below**: sixteen **run**, one (`step_up`) is **reserved** for Phase 2.2, and one (`blob.grant`) is
-**decided, not running** (F5). The skeleton's `EVENTS` tuple holds seventeen of them — the sixteen
-running plus the reserved `step_up` — so `blob.grant` is the single name this list adds to the
-running code, and an append of it is rejected until F5 lands. Counted here because a count that
-disagrees with its own table is the kind of drift a reader resolves by guessing.
+**decided, not running** (F5). The typed vocabulary in this repository — `_types.py`'s `Event`, and
+the `EVENTS` tuple derived from it — carries **all eighteen**, `blob.grant` included:
+`AuditEntry.event` is typed `Event`, and F5's mint needs the member on the day it lands. So a
+validator written against `EVENTS` accepts a `blob.grant` append today, and **nothing in this tree
+rejects one** — what is not running is the *emitter*: no code path mints a `BlobGrant`, so no such
+entry is ever produced. The walking skeleton's own `ledger.py` tuple held seventeen — the sixteen
+running plus the reserved `step_up` — but that file is on `chief/walking-skeleton`, not on `main`,
+and its count is the skeleton's, not this tree's. Counted here because a count that disagrees with
+its own table, or with the constant beside it, is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|

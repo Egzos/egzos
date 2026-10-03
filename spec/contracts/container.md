@@ -138,12 +138,22 @@ returned**, each carrying `shadowed_by` set to the id of the item that beat it; 
 
 **`shadowed_by` is not a field of the item.** It is a property of *this resolution* — the same item
 is shadowed in one chain and the winner in another — so it rides on the envelope the resolver wraps
-each item in, never on the stored `ContextItem`. The envelope is `{item, layer, layer_type, trust,
+each item in, never on the stored `ContextItem`. The envelope is `{item, layer, layer_type,
 shadowed_by}`, typed as `ResolvedItem` in `_types.py`, and `layer`/`layer_type` are there for the
 same reason: they say where this copy was found, which is also not the item's own business. An
 implementation that persisted `shadowed_by` onto the item would have to rewrite stored items on
 every resolution, and would serve one chain's answer to another chain. **running** (F10 — the
 clause ran in the skeleton with no typed home; it has one now).
+
+**The item's trust status is not restated on the envelope.** It is the item's own fact and has one
+home, `item.trust.status`; a surface that branches on invariant 2 above or on the serving policy
+reads it there and nowhere else. A second spelling of the same status, nested one level outside the
+first, is the one a resolver could snapshot before serialisation and serve stale — an envelope
+saying `verified` around an item quarantined in between is exactly the read invariant 2 forbids,
+and the contract removes the field rather than naming which copy wins. **decided, not running** —
+the typed envelope this PR first drafted carried a `trust: TrustStatus` key and this clause removes
+it before anything reads it; whether the skeleton's resolver emits such a key is not re-checked
+here, and if it does, Phase 1 drops it. Nothing in this tree reads it today.
 
 **Clients may see the full chain, overridden values included** (v0.4 §7) — `shadowed_by` is the
 mechanism, and it is deliberate: a client that sees only the winner cannot explain *why* a preference

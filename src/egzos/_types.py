@@ -162,6 +162,11 @@ class ResolvedItem(TypedDict):
     `layer_type` are here for the same reason — where this copy was found is not the item's own
     business. Nothing here is ever persisted onto the `ContextItem`.
 
+    The item's trust status is deliberately NOT a key here. It has one home,
+    `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
+    in two places with no rule for which wins when they differ — the copy a resolver snapshots
+    before serialisation, and serves a quarantined item under. Read it from the item.
+
     The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
     here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is
     `[OPEN->0.3]`, and typing the response would answer it by accident.
@@ -170,7 +175,6 @@ class ResolvedItem(TypedDict):
     item: ContextItem
     layer: str
     layer_type: str
-    trust: TrustStatus
     shadowed_by: str | None
 
 
@@ -211,7 +215,9 @@ Event = Literal[
     "blob.grant",
 ]
 #: An append whose event name is not here MUST be rejected. `step_up` is reserved (Phase 2.2);
-#: `blob.grant` is decided, not running (F5).
+#: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
+#: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
+#: code that emits it. events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
@@ -722,11 +728,15 @@ __all__ = [
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
+    "CONSENT_KINDS",
+    "CONSENT_KIND_FROM_CLIENT_TYPE",
     "CONTAINER_CONFIG_DEFAULTS",
+    "CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY",
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
     "ClientRegistration",
+    "ConsentKind",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
@@ -754,6 +764,7 @@ __all__ = [
     "RING_RANK",
     "ROLE_BUNDLES",
     "ROOT_TYPES",
+    "ResolvedItem",
     "Role",
     "RootType",
     "SERVING_POLICY",

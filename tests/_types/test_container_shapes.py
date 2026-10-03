@@ -144,6 +144,22 @@ def test_node_and_proposal_are_real_shapes_not_the_provisional_aliases():
     assert is_typeddict(t.Proposal)
 
 
+def test_resolved_item_is_the_envelope_and_shadowed_by_never_touches_the_item():
+    """F10 (container.md §4): `shadowed_by` is a property of the resolution, never of the item.
+
+    The envelope is exactly `{item, layer, layer_type, shadowed_by}`. The item's trust status is
+    deliberately NOT restated on it — it has one home, `item["trust"]["status"]`, and a second
+    spelling nested outside the first is the copy a resolver could snapshot stale and serve a
+    quarantined item under. The last two assertions are what the contract paragraph was written to
+    earn: the next hand to add `shadowed_by` to `ContextItem` breaks a running clause here, loudly.
+    """
+    assert is_typeddict(t.ResolvedItem)
+    assert set(t.ResolvedItem.__annotations__) == {"item", "layer", "layer_type", "shadowed_by"}
+    assert "trust" not in t.ResolvedItem.__annotations__
+    assert "shadowed_by" not in t.ContextItem.__annotations__
+    assert "shadowed_by" not in t.CONTEXT_ITEM_FIELDS
+
+
 def test_proposal_spells_the_wire_key_from_exactly_once():
     """`from` is a Python keyword; the contract names the mapping so nobody invents a third."""
     assert t.PROPOSAL_WIRE_KEY_FROM == "from"
