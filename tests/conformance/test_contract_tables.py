@@ -43,15 +43,15 @@ NUMBER_WORDS = {word: value for value, word in enumerate(_WORDS)}
 
 _CODE = re.compile(r"`([^`\n]+)`")
 _BRACE = re.compile(r"\{([^{}]*)\}")
-_FENCE = re.compile(r"^```[^\n]*\n(.*?)^```", re.M | re.S)
+_FENCE = re.compile(r"^```[^\n]*\n(.*?)^```", re.MULTILINE | re.DOTALL)
 _SEP = re.compile(r"\s*[,·]\s*")
 # A signature line in one of storage.md's fenced blocks. Anchored at column 0, so `query`'s wrapped
 # continuation line is not mistaken for a second method.
-_SIGNATURE = re.compile(r"^(\w+)\(", re.M)
+_SIGNATURE = re.compile(r"^(\w+)\(", re.MULTILINE)
 # `## 8 · …`, `### 11.1 · …`. The number is what the rest of the tree cites; the title is not.
 # The trailing `[^\n]*` swallows the title, so a section's body starts below its heading and a
 # heading such as ``## 2 · `kind` `` does not donate a code span to the first vocabulary parsed.
-_HEADING = re.compile(r"^(#{2,6})[ \t]+(?:([\d.]+)[ \t]*·)?[^\n]*", re.M)
+_HEADING = re.compile(r"^(#{2,6})[ \t]+(?:([\d.]+)[ \t]*·)?[^\n]*", re.MULTILINE)
 
 
 # --- reading the documents ------------------------------------------------------------------
@@ -212,7 +212,7 @@ def assert_counted(md: str, pattern: str, expected: int, *, where: str) -> None:
     stops being checked, which is the same silence. Patterns spell gaps `\\s+`, never a literal
     space — *"six keys"* is split across two lines in `container.md` §8 today.
     """
-    words = [m.group(1).lower() for m in re.finditer(pattern, plain(md), re.I)]
+    words = [m.group(1).lower() for m in re.finditer(pattern, plain(md), re.IGNORECASE)]
     numbers = [NUMBER_WORDS[w] for w in words if w in NUMBER_WORDS]
     if not numbers:
         pytest.fail(f"{where}: no spelled-out count matching {pattern!r} — the sentence is gone")
