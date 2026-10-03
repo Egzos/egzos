@@ -317,10 +317,10 @@ registration endpoint on a personal container lets any caller create a client en
 2. **`registration_endpoint` is not advertised** in the AS metadata (§6): the row is absent from the document, not present-and-empty.
 3. No unauthenticated path creates, amends or removes a client entry, and a deployment may not add one.
 
-What this costs is named rather than hidden, and clause 1 makes it larger rather than smaller: an MCP client that
-expects to self-register against an unknown AS does not work until the owner registers its `client_id` at the CLI — a
-config-file-class act, the owner at a terminal rather than at the browser the client just opened. Whether v1.1 adds an owner-gated RFC 7591 endpoint — the standard's shape, behind the consent
-screen — is a **`[v1.1]`** question at the Phase 5 contract boundary, not reopened here.
+What this costs is named rather than hidden, and clause 1 makes it larger rather than smaller: an MCP client that expects to
+self-register against an unknown AS does not work until the owner registers its `client_id` at the CLI — a config-file-class
+act, the owner at a terminal rather than at the browser the client just opened. Whether v1.1 adds an owner-gated RFC 7591
+endpoint — the standard's shape, behind the consent screen — is a **`[v1.1]`** question at the Phase 5 contract boundary.
 
 ### 5.1 · The matching rule is exact string comparison
 
@@ -734,10 +734,9 @@ A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and re
 second revocation semantics, which is the point.
 
 **The AS exposes an RFC 7009 revocation endpoint, and the owner additionally revokes by `Token.id`. [0.3 · 11]** The
-review took **both** halves: clause 1 below as written, **plus** an owner path on the container's own pages. **A browser
-or an MCP client cannot run `token rm`**, so an HTTP endpoint is the only revocation path two of §1's three client types
-have; and an endpoint bounded by a token's value alone is no path on which an owner should have to revoke *someone else's*
-live token. Each half covers what the other cannot:
+review took **both** halves: clause 1 below as written, **plus** an owner path on the container's own pages. **A browser or
+an MCP client cannot run `token rm`**, so an HTTP endpoint is the only revocation path two of §1's three client types have, and
+an endpoint bounded by a token's value alone is no path on which an owner should revoke *someone else's* live token:
 
 - **The client path** (clause 1) lets a holder revoke the token it holds, with the silence rule and the `client_id` comparison
   as clause 1 states them, bounded by §9.1's entropy and nothing else.
@@ -746,11 +745,11 @@ live token. Each half covers what the other cannot:
   for §9.1's closing reason: it is the identifier, not the value, so a page listing it hands a reader no credential.
 
 **The owner path adds `revoke` to the closed `surface` vocabulary** — **decided-pending**: §12.1 rule 5 and
-`AS_THROTTLE_SURFACES` in `_types.py` still pin four words (`login` · `device` · `authorize` · `tap`), both land in
-**#113**, and so the fifth word is decided but written nowhere a test can read. It also adds **an entry on its refusal
-path**: an attempt naming a `Token.id` that does not exist, or one the session may not reach, is refused uniformly — §7.1
-applied to an identifier rather than a scope, since a page answering "no such token" differently from "not yours" would
-enumerate tokens. The throttle keyed on `revoke` bounds a walk of the id space.
+`AS_THROTTLE_SURFACES` in `_types.py` still pin four words (`login` · `device` · `authorize` · `tap`) and both land in **#113**,
+so the fifth word is decided but written nowhere a test can read. It also adds **an entry on its refusal path**: an attempt
+naming a `Token.id` that does not exist, or one the session may not reach, is refused uniformly — §7.1 applied to an identifier
+rather than a scope, since a page answering "no such token" differently from "not yours" would enumerate tokens. The throttle
+keyed on `revoke` bounds a walk of the id space.
 
 Where the two paths meet: a token revoked by either is `capabilities.md` §5's revoked token, holds no capabilities, and writes
 one `token.revoke` (**[0.3 · 30]**, carrying the refresh-family id) — the transport does not change the semantics, which is the
@@ -888,14 +887,14 @@ event rather than a member of the `authz.*` family: a registration produces no t
 writes is the state §5.1's exact-match rule compares against.
 
 **A device authorization request gets no separate event. [0.3 · 32]** Effect 7 is covered wherever it goes anywhere: §12's
-device-redemption row appends when a `user_code` is redeemed, rows 3/4 when the owner decides. The
-**initiated-then-abandoned** request — a `device_code` and `user_code` minted and never redeemed, by a caller holding no token
-— is **not** covered, is accepted knowingly, and is why row 7 reads *partly*. **The reason is what that state is, not what the
-throttle does. a1p**: the pending record is bounded (§3 mitigation 1 expires it), reaches nothing, and becomes visible the
-moment it is used, at §12's redemption row — so there is no effect to miss until a redemption, and a redemption appends. **An earlier draft argued from §12.1's throttle and had the mechanism backwards:** rule 3 and §11.0
-substep 2 bound the *append* more tightly than the request, since attempts refused while a throttle holds are counted and not
-appended — which is how §12 keeps rows (a), (b), (d) and (e) for unauthenticated callers at all. The throttle is an argument
-*for* appending, so this silence rests on the bounded, unreaching state alone.
+device-redemption row appends when a `user_code` is redeemed, rows 3/4 when the owner decides. The **initiated-then-abandoned**
+request — a `device_code` and `user_code` minted and never redeemed, by a caller holding no token — is **not** covered, is accepted
+knowingly, and is why row 7 reads *partly*. **The reason is what that state is, not what the throttle does. a1p**: the pending record
+is bounded (§3 mitigation 1 expires it), reaches nothing, and becomes visible the moment it is used, at §12's redemption row — so
+there is no effect to miss until a redemption, and a redemption appends. **An earlier draft argued from §12.1's throttle and had the
+mechanism backwards:** rule 3 and §11.0 substep 2 bound the *append* more tightly than the request, since attempts refused while a
+throttle holds are counted and not appended — which is how §12 keeps rows (a), (b), (d) and (e) for unauthenticated callers at all.
+The throttle is an argument *for* appending, so this silence rests on the bounded, unreaching state alone.
 
 **Default access-token lifetime: 1 hour, and never null. [0.3 · 17]** An AS-issued access token **always** carries a non-null
 `expires_at`, defaulting to **1 hour** from issuance. `capabilities.md` §5 permits `expires_at: null`, which is right for a
