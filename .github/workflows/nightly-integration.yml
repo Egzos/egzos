@@ -47,10 +47,12 @@ jobs:
           {
             echo "== pip install -e .[dev]"
             pip install -q -e ".[dev]"; echo "exit status (install): $?"
-            echo "== pytest -q -rfExX (testpaths from pyproject)"
-            pytest -q -rfExX; echo "exit status (pytest): $?"
-            echo "== pytest --collect-only -q (per-file counts)"
-            pytest --collect-only -q | sed -n 's/::.*//p' | sort | uniq -c
+            # tests/ only: adversarial/ is a6's, swept by its own token-free job, and its failure text
+            # does not belong in a public artifact or the public drift issue.
+            echo "== pytest -q -rfExX tests"
+            pytest -q -rfExX tests; echo "exit status (pytest): $?"
+            echo "== pytest --collect-only -q tests (per-file counts)"
+            pytest --collect-only -q tests | sed -n 's/::.*//p' | sort | uniq -c
             echo "== ruff check ."
             ruff check .; echo "exit status (ruff): $?"
           } > "$OUT" 2>&1 || true
@@ -136,7 +138,7 @@ jobs:
 
             You are a1r-reviewer running the nightly integration check on main.
 
-            1. The suites already ran, in a job of their own that held no token. Their full output is `/tmp/suite/suite.txt`: install, `pytest -q -rfExX` over the configured testpaths, per-file collection counts, and `ruff check .`, each with its exit status. Read it; execute nothing — this session holds no interpreter, by design (drift F22). If the file says the suite job produced no result, report that as the night's first finding.
+            1. The suites already ran, in a job of their own that held no token. Their full output is `/tmp/suite/suite.txt`: install, `pytest -q -rfExX tests` (the integration, conformance and governance suites; `adversarial/` is a6's sweep and not in this run), per-file collection counts, and `ruff check .`, each with its exit status. Read it; execute nothing — this session holds no interpreter, by design (drift F22). If the file says the suite job produced no result, report that as the night's first finding.
             2. Check for drift: compare the code on main against spec/contracts/** (if it exists) and CLAUDE.md invariants, by reading.
             3. Write or update ONE GitHub issue titled "drift report $(date +%F)" labelled `drift`:
                - First search: `gh issue list --label drift --search "drift report" --state open --json number,title`

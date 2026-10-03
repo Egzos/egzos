@@ -530,3 +530,56 @@ def test_main_backstop_reads_a_renamed_test_at_its_new_path(repo):
     res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
     assert res.returncode == 1
     assert "adversarial/test_new.py" in res.stdout
+
+
+_PY = "import pytest\n"
+
+
+@pytest.mark.parametrize(
+    ("source", "live"),
+    [
+        # A later binding overrides an earlier xfail; one under an `if` may never run.
+        (_PY + "pytestmark = pytest.mark.xfail(reason='r')\npytestmark = []\n"
+               "def test_a():\n    pass\n", ["test_a"]),
+        (_PY + "if True:\n    pytestmark = pytest.mark.xfail\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        (_PY + "pytestmark = [pytest.mark.xfail]\npytestmark += []\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        (_PY + "pytestmark = pytest.mark.xfail\nfrom os import sep as pytestmark\n"
+               "def test_a():\n    pass\n", ["test_a"]),
+        # pytest collects tests at any statement depth, bound by assignment, and in any
+        # unittest.TestCase subclass whatever its name.
+        (_PY + "try:\n    def test_a():\n        pass\nexcept ImportError:\n    pass\n",
+         ["test_a"]),
+        (_PY + "def _mk():\n    return lambda: None\ntest_a = _mk()\n", ["test_a"]),
+        ("import unittest\nclass Foo(unittest.TestCase):\n    def test_a(self):\n        pass\n",
+         ["Foo.test_a"]),
+        # A function nested in a function is not collected.
+        (_PY + "@pytest.mark.xfail\ndef test_a():\n    def test_inner():\n        pass\n", []),
+        # raises= turns any other exception into a hard failure; run=False is the safest mark.
+        (_PY + "@pytest.mark.xfail(raises=KeyError)\ndef test_a():\n    pass\n", ["test_a"]),
+        (_PY + "@pytest.mark.xfail(run=False, reason='r')\ndef test_a():\n    pass\n", []),
+    ],
+)
+def test_non_xfail_tests_is_conservative(source, live):
+    assert co.non_xfail_tests(source) == live
+
+
+def test_security_backstop_refuses_symlinks():
+    out = co.security_backstop_failures(
+        ["adversarial/test_x.py", "adversarial/data"], lambda p: co.SYMLINK)
+    assert [p for p, _ in out] == ["adversarial/test_x.py", "adversarial/data"]
+
+
+def test_main_backstop_refuses_a_symlink(repo):
+    _write(repo, "adversarial/__init__.py", "")
+    _commit(repo, "base")
+
+    def mutate(r):
+        _write(r, "adversarial/payload.txt", "def test_x():\n    pass\n")
+        (r / "adversarial" / "test_x.py").symlink_to("payload.txt")
+
+    _branch_diff(repo, mutate)
+    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    assert res.returncode == 1
+    assert "adversarial/test_x.py" in res.stdout and "symlink" in res.stdout

@@ -43,7 +43,9 @@ RD-005's named backstop (Egzos/egzos-platform#45): while the `security` issue an
 works on is in force ($A6_SECURITY_IN_FORCE=true, resolved by the workflow), every test that
 branch adds or changes under `adversarial/**` must carry an unconditional xfail mark, and it may
 not touch a conftest.py. `security-fix-landed`, last applied by an approver, lifts it once the fix
-has merged.
+has merged. Both repositories carry this checker line-identical but for the docstring's first
+line; the backstop is wired only where a workflow sets $A6_SECURITY_IN_FORCE (egzos-platform), and
+is inert elsewhere rather than dead code.
 """
 
 import argparse
@@ -233,7 +235,7 @@ def fix_landed_waives(labels_set, applier, approvers):
 
 
 def _is_unconditional_xfail(node):
-    """`pytest.mark.xfail`, or the same called with only reason/strict/raises: never conditional."""
+    """`pytest.mark.xfail`, or the same called with only reason/strict/run: never conditional."""
     call = node if isinstance(node, ast.Call) else None
     target = call.func if call else node
     if not (isinstance(target, ast.Attribute) and target.attr == "xfail"
@@ -241,9 +243,10 @@ def _is_unconditional_xfail(node):
         return False
     if call is None:
         return True
-    # A positional argument or `condition=` makes the mark conditional, and `run=` is irrelevant
-    # to whether the test is live: only reason and strict are accepted.
-    return not call.args and all(k.arg in ("reason", "strict", "raises") for k in call.keywords)
+    # A positional argument or `condition=` makes the mark conditional, and `raises=` turns any
+    # other exception into a hard failure: only reason, strict and run (False stops the body
+    # executing at all) leave every outcome an xfail.
+    return not call.args and all(k.arg in ("reason", "strict", "run") for k in call.keywords)
 
 
 def _marks(value):
@@ -251,18 +254,49 @@ def _marks(value):
     return value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
 
 
-def _pytestmark_xfail(body):
-    for n in body:
-        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "pytestmark"
-                                              for t in n.targets)):
-            if any(_is_unconditional_xfail(m) for m in _marks(n.value)):
-                return True
+def _assigned_names(node):
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    return [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+
+
+def _binds_pytestmark(node):
+    """True when `node` binds or deletes the name `pytestmark` in any form."""
+    if isinstance(node, ast.Name):
+        return node.id == "pytestmark" and not isinstance(node.ctx, ast.Load)
+    if isinstance(node, ast.alias):
+        return (node.asname or node.name.split(".")[0]) == "pytestmark"
+    if isinstance(node, (ast.Global, ast.Nonlocal)):
+        return "pytestmark" in node.names
     return False
 
 
-def non_xfail_tests(source):
-    """Names of the tests in `source` that would run without an unconditional xfail mark.
+def _pytestmark_xfail(body):
+    """True when every binding of `pytestmark` in this scope is a top-level statement assigning
+    it an unconditional xfail. One under an `if` may never run and a later one overrides an
+    earlier one, so any other binding of the name, anywhere in the scope, clears nothing."""
+    top = [n for n in body if isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None
+           and "pytestmark" in _assigned_names(n)]
+    if not top or not all(any(_is_unconditional_xfail(m) for m in _marks(n.value)) for n in top):
+        return False
+    stack = list(body)
+    bindings = 0
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        bindings += _binds_pytestmark(node)
+        stack.extend(ast.iter_child_nodes(node))
+    # Each top-level assignment binds exactly one Name; anything beyond them is another binding.
+    return bindings == sum(_assigned_names(n).count("pytestmark") for n in top)
 
+
+def non_xfail_tests(source):
+    """Names of the tests in `source` that could run without an unconditional xfail mark.
+
+    Conservative by design, since it guards a disclosure: a `test*` function at any statement
+    depth (inside if/try/with/for, in any class, since pytest also collects unittest.TestCase
+    subclasses whatever their name) counts, and so does a `test*` name bound by assignment, which
+    no static reading can clear. Functions nested in functions are not collected and do not count.
     Source that does not parse is reported as one entry: a gate does not pass what it cannot read.
     """
     try:
@@ -273,25 +307,39 @@ def non_xfail_tests(source):
         return []
     live = []
 
-    def visit(body, prefix, inherited):
-        for n in body:
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test"):
-                if not (inherited or any(_is_unconditional_xfail(d) for d in n.decorator_list)):
-                    live.append(prefix + n.name)
-            elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
-                marked = inherited or _pytestmark_xfail(n.body) or any(
-                    _is_unconditional_xfail(d) for d in n.decorator_list)
-                visit(n.body, f"{prefix}{n.name}.", marked)
+    def visit(node, prefix, inherited):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if child.name.startswith("test") and not (
+                        inherited or any(_is_unconditional_xfail(d) for d in child.decorator_list)):
+                    live.append(prefix + child.name)
+            elif isinstance(child, ast.ClassDef):
+                marked = inherited or _pytestmark_xfail(child.body) or any(
+                    _is_unconditional_xfail(d) for d in child.decorator_list)
+                visit(child, f"{prefix}{child.name}.", marked)
+            elif isinstance(child, (ast.Assign, ast.AnnAssign)):
+                if not inherited:
+                    live.extend(prefix + n for n in _assigned_names(child) if n.startswith("test"))
+            elif isinstance(child, ast.Lambda):
+                continue
+            else:
+                visit(child, prefix, inherited)
 
-    visit(tree.body, "", False)
+    visit(tree, "", False)
     return live
 
 
+SYMLINK = object()
+
+
 def _source_at(head, path):
-    """The file at `head`, or None when the change deleted it."""
-    if subprocess.run(["git", "cat-file", "-e", f"{head}:{path}"],
-                      capture_output=True, check=False).returncode != 0:
+    """The file at `head`, SYMLINK for a link, or None when the change deleted it."""
+    entry = subprocess.run(["git", "ls-tree", "-z", head, "--", path],
+                           capture_output=True, check=True).stdout
+    if not entry:
         return None
+    if entry.split(b" ", 1)[0] == b"120000":
+        return SYMLINK
     return subprocess.run(["git", "show", f"{head}:{path}"],
                           capture_output=True, check=True, text=True).stdout
 
@@ -302,16 +350,16 @@ def security_backstop_failures(changed, read_source):
     for path in changed:
         if not path_matches_glob("adversarial/**", path):
             continue
-        if path.rsplit("/", 1)[-1] == "conftest.py":
-            out.append((path, "conftest.py can re-mark tests; refused while the issue is open"))
-            continue
-        if not path.endswith(".py"):
-            continue
         source = read_source(path)
         if source is None:
             continue
-        for name in non_xfail_tests(source):
-            out.append((path, f"{name} is not xfail while the branch's security issue is open"))
+        if source is SYMLINK:
+            out.append((path, "a symlink is not read here and pytest follows it; refused"))
+        elif path.rsplit("/", 1)[-1] == "conftest.py":
+            out.append((path, "conftest.py can re-mark tests; refused while the issue is open"))
+        elif path.endswith(".py"):
+            for name in non_xfail_tests(source):
+                out.append((path, f"{name} is not xfail while the branch's security issue is open"))
     return out
 
 # ---------------------------------------------------------------------------

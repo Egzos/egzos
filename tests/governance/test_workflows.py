@@ -380,6 +380,41 @@ def test_a2_scope_fails_closed_when_git_fails():
     assert "2>/dev/null" not in run
 
 
+def _fake_gh(tmp_path, routes):
+    """A `gh` that serves `routes` (endpoint substring -> JSON value) and applies the caller's own
+    --jq filter with jq, so a test exercises the workflow's real filter, not a pre-shaped answer."""
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    cases = []
+    for i, (needle, value) in enumerate(routes):
+        data = tmp_path / f"route{i}.json"
+        data.write_text(json.dumps(value))
+        cases.append(f'  *"{needle}"*) data="{data}" ;;\n')
+    (fake / "gh").write_text(
+        "#!/bin/bash\n"
+        'expr=""; ep=""\n'
+        'while [[ $# -gt 0 ]]; do case "$1" in\n'
+        '  --jq) expr="$2"; shift 2 ;;\n'
+        '  api|--paginate) shift ;;\n'
+        '  *) ep="$1"; shift ;;\n'
+        "esac; done\n"
+        'case "$ep" in\n' + "".join(cases) + "  *) exit 1 ;;\nesac\n"
+        'jq -r "$expr" "$data"\n'
+    )
+    (fake / "gh").chmod(0o755)
+    return fake
+
+
+def _label_events(pairs, label="security"):
+    out = [{"event": "referenced", "actor": {"login": "x"}},
+           {"event": "labeled", "actor": {"login": "egzos-forge[bot]"}, "label": {"name": "other"}}]
+    for pair in pairs:
+        event, login = pair.split(" ", 1)
+        out.append({"event": event, "actor": {"login": login}, "label": {"name": label}})
+    out.append({"event": "unlabeled", "actor": {"login": "Gond-ul"}, "label": {"name": "other"}})
+    return out
+
+
 def _a6_scope_run():
     (run,) = [s["run"] for _, j, _, s in _steps() if j == "a6-adversary" and s.get("id") == "scope"]
     (env,) = [s["env"] for _, j, _, s in _steps() if j == "a6-adversary" and s.get("id") == "scope"]
@@ -413,11 +448,7 @@ def test_security_label_removers_equal_the_size_exception_approvers():
 def test_a6_security_label_is_sticky(tmp_path, has_label, events, applicable):
     # Drift F23 / Egzos/egzos-platform#48: builders hold `gh pr edit --remove-label`.
     run, env = _a6_scope_run()
-    fake = tmp_path / "bin"
-    fake.mkdir()
-    (tmp_path / "events").write_text("".join(e + "\n" for e in events))
-    (fake / "gh").write_text(f'#!/bin/bash\ncat "{tmp_path / "events"}"\n')
-    (fake / "gh").chmod(0o755)
+    fake = _fake_gh(tmp_path, [("issues/1/events", _label_events(events))])
     out = tmp_path / "out"
     proc_env = {
         "PATH": f"{fake}:/usr/bin:/bin",

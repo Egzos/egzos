@@ -202,10 +202,13 @@ producing a second result in a job that holds the review token and the comment s
 sweep, which holds the forge token and so runs no interpreter either, a separate job holding no
 token runs the adversarial suite against `main`. Step order inside one job would not separate it,
 for the reason above. The sweep cites `/tmp/adversarial-suite.txt`, which reaches it as a one-day
-artifact rather than a job output or step env, so the detail stays out of the run log. The nightly
+artifact rather than a job output or step env, so the detail stays out of the run log.
+The artifact is as public as the log on this repository: the gain is retention and no plaintext
+in an indexed log, not confidentiality. What keeps the detail safe is unchanged: `main` holds no open
+reproduction, because a security regression test enters `adversarial/` only in its fix PR. The nightly
 integration check is the same shape (drift F22): `integration-suite` runs the suites holding
-`contents: read` only, and the session that holds the drift issue's write token reads
-`/tmp/suite/suite.txt` and runs no interpreter.
+`contents: read` only, over `tests/` and never `adversarial/` (a6's sweep owns that output), and the
+session that holds the drift issue's write token reads `/tmp/suite/suite.txt` and runs no interpreter.
 
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
