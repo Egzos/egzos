@@ -38,9 +38,20 @@ cap only when whoever last applied it is in OWNERSHIP.yml's `size_exception_appr
 label's presence proves only that someone with issues: write applied it, and egzos-forge holds
 issues: write (drift F18). Both values come from the environment the workflow sets, so a
 workflow that passes them runs against a checker that predates them without an argument error.
+
+RD-005's named backstop (Egzos/egzos-platform#45): on every a6 branch ($A6_BACKSTOP=true, set
+by the workflow from the branch prefix, never from anything the branch names), each test the branch
+adds or changes under `adversarial/**` must carry an unconditional xfail mark, and the branch may
+not touch a conftest.py or commit a symlink or submodule there. `fix-landed`, last applied by an
+approver, lifts it once the fix a live test exercises has merged. Residual, named: a non-Python
+file under `adversarial/**` is not read here; a6's charter and the Chief's approval cover it. Both
+repositories carry this checker line-identical but for the docstring's first line; the backstop is
+wired only where a workflow sets $A6_BACKSTOP (egzos-platform), and is inert elsewhere rather than
+dead code.
 """
 
 import argparse
+import ast
 import fnmatch
 import json
 import os
@@ -219,6 +230,151 @@ def size_exception_waives(labels_set, applier, approvers):
     """True only when `size-exception` is present AND its last applier is an approver."""
     return "size-exception" in labels_set and bool(applier) and applier in set(approvers)
 
+
+def fix_landed_waives(labels_set, applier, approvers):
+    """True only when `fix-landed` is present AND its last applier is an approver."""
+    return "fix-landed" in labels_set and bool(applier) and applier in set(approvers)
+
+
+def _is_unconditional_xfail(node):
+    """`pytest.mark.xfail`, or the same called with only reason/strict/run: never conditional."""
+    call = node if isinstance(node, ast.Call) else None
+    target = call.func if call else node
+    if not (isinstance(target, ast.Attribute) and target.attr == "xfail"
+            and isinstance(target.value, ast.Attribute) and target.value.attr == "mark"):
+        return False
+    if call is None:
+        return True
+    # A positional argument or `condition=` makes the mark conditional, and `raises=` turns any
+    # other exception into a hard failure: only reason, strict and run (False stops the body
+    # executing at all) leave every outcome an xfail.
+    return not call.args and all(k.arg in ("reason", "strict", "run") for k in call.keywords)
+
+
+def _marks(value):
+    """The mark expressions in a `pytestmark = ...` value: one mark or a list/tuple of them."""
+    return value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
+
+
+def _assigned_names(node):
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    return [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+
+
+def _binds_pytestmark(node):
+    """True when `node` binds or deletes the name `pytestmark` in any form."""
+    if isinstance(node, ast.Name):
+        return node.id == "pytestmark" and not isinstance(node.ctx, ast.Load)
+    if isinstance(node, ast.alias):
+        return (node.asname or node.name.split(".")[0]) == "pytestmark"
+    if isinstance(node, (ast.Global, ast.Nonlocal)):
+        return "pytestmark" in node.names
+    return False
+
+
+def _pytestmark_xfail(body):
+    """True when every binding of `pytestmark` in this scope is a top-level statement assigning
+    it an unconditional xfail. One under an `if` may never run and a later one overrides an
+    earlier one, so any other binding of the name, anywhere in the scope, clears nothing."""
+    top = [n for n in body if isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None
+           and "pytestmark" in _assigned_names(n)]
+    if not top or not all(any(_is_unconditional_xfail(m) for m in _marks(n.value)) for n in top):
+        return False
+    stack = list(body)
+    bindings = 0
+    while stack:
+        node = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            continue
+        bindings += _binds_pytestmark(node)
+        stack.extend(ast.iter_child_nodes(node))
+    # Each top-level assignment binds exactly one Name; anything beyond them is another binding.
+    return bindings == sum(_assigned_names(n).count("pytestmark") for n in top)
+
+
+def non_xfail_tests(source):
+    """Names of the tests in `source` that could run without an unconditional xfail mark.
+
+    Conservative by design, since it guards a disclosure: a `test*` function at any statement
+    depth (inside if/try/with/for, in any class, since pytest also collects unittest.TestCase
+    subclasses whatever their name) counts, and so does a `test*` name bound by assignment, which
+    no static reading can clear. Functions nested in functions are not collected and do not count.
+    Source that does not parse is reported as one entry: a gate does not pass what it cannot read.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ["<unparseable>"]
+    if _pytestmark_xfail(tree.body):
+        return []
+    live = []
+
+    def visit(node, prefix, inherited):
+        for child in ast.iter_child_nodes(node):
+            if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if child.name.startswith("test") and not (
+                        inherited or any(_is_unconditional_xfail(d) for d in child.decorator_list)):
+                    live.append(prefix + child.name)
+            elif isinstance(child, ast.ClassDef):
+                marked = inherited or _pytestmark_xfail(child.body) or any(
+                    _is_unconditional_xfail(d) for d in child.decorator_list)
+                visit(child, f"{prefix}{child.name}.", marked)
+            elif isinstance(child, (ast.Assign, ast.AnnAssign)):
+                if not inherited:
+                    live.extend(prefix + n for n in _assigned_names(child) if n.startswith("test"))
+            elif isinstance(child, ast.Lambda):
+                continue
+            else:
+                visit(child, prefix, inherited)
+
+    visit(tree, "", False)
+    return live
+
+
+def _mode_at(head, path):
+    """The tree mode of `path` at `head` (b"100644", b"120000", ...), or None when deleted."""
+    entry = subprocess.run(["git", "ls-tree", "-z", head, "--", path],
+                           capture_output=True, check=True).stdout
+    return entry.split(b" ", 1)[0] if entry else None
+
+
+def _text_at(head, path):
+    """The file at `head` as UTF-8 text, or None when it is not UTF-8."""
+    raw = subprocess.run(["git", "show", f"{head}:{path}"], capture_output=True, check=True).stdout
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def security_backstop_failures(changed, mode_of, text_of):
+    """(path, reason) for each change an a6 branch may not make while the backstop applies.
+
+    The mode is read for every path, so a link is refused whatever its name; content is read only
+    for Python, so a binary fixture is neither decoded nor refused.
+    """
+    out = []
+    for path in changed:
+        if not path_matches_glob("adversarial/**", path):
+            continue
+        mode = mode_of(path)
+        if mode is None:
+            continue
+        if mode == b"120000":
+            out.append((path, "a symlink is not read here and pytest follows it; refused"))
+        elif mode == b"160000":
+            out.append((path, "a submodule is not read here; refused"))
+        elif path.rsplit("/", 1)[-1] == "conftest.py":
+            out.append((path, "conftest.py can re-mark tests; refused"))
+        elif path.endswith(".py"):
+            source = text_of(path)
+            if source is None:
+                out.append((path, "not UTF-8, so not read; refused"))
+                continue
+            for name in non_xfail_tests(source):
+                out.append((path, f"{name} is not unconditionally xfail; refused until fix-landed"))
+    return out
+
 # ---------------------------------------------------------------------------
 # Size cap
 # ---------------------------------------------------------------------------
@@ -259,6 +415,18 @@ def main():
         dest="size_exception_applier",
         default=os.environ.get("SIZE_EXCEPTION_APPLIER", ""),
         help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
+    )
+    parser.add_argument(
+        "--a6-backstop",
+        dest="a6_backstop",
+        default=os.environ.get("A6_BACKSTOP", ""),
+        help="'true' when the RD-005 backstop applies to this branch (default: $A6_BACKSTOP)",
+    )
+    parser.add_argument(
+        "--fix-landed-applier",
+        dest="fix_landed_applier",
+        default=os.environ.get("FIX_LANDED_APPLIER", ""),
+        help="Login that last applied fix-landed (default: $FIX_LANDED_APPLIER)",
     )
     parser.add_argument(
         "--pr-author",
@@ -442,6 +610,16 @@ def main():
     # ---- Emit governance ::notice:: annotations ------------------------------
     for gpath in notices:
         print(f"::notice::governance path touched: {gpath}")
+
+    # ---- RD-005 backstop on a6 branches (Egzos/egzos-platform#45) -------------
+    if agent_name == "a6-adversary" and args.a6_backstop == "true":
+        if fix_landed_waives(labels_set, args.fix_landed_applier, approvers):
+            print(f"fix-landed applied by {args.fix_landed_applier} — backstop lifted.")
+        else:
+            post_image = [p for p in changed if p not in new_path_of]
+            failures.extend(security_backstop_failures(
+                post_image, lambda path: _mode_at(args.head, path),
+                lambda path: _text_at(args.head, path)))
 
     # ---- Size cap -----------------------------------------------------------
     total_lines, file_count = compute_size(numstat_entries, cap_exclude)
