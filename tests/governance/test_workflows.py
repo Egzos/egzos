@@ -139,6 +139,8 @@ def test_control_inputs_cleanup_removes_every_kind_of_entry(job_id, tmp_path):
                  "e/.mcp.json"):
         assert not os.path.lexists(root / gone), (job_id, gone)
     assert (root / "keep.txt").exists()
+    # rm removes a symlink, never its target: a `.claude -> /tmp` must not take the charter with it.
+    assert (root / "payload" / "settings.json").exists()
 
 
 INTERPRETERS = (
@@ -280,6 +282,11 @@ def test_builders_can_keep_their_pr_body_current():
         args = step["with"].get("claude_args", "")
         if "Bash(gh pr create:*)" in args:
             assert "Bash(gh pr edit:*)" in args, (wf.name, job_id)
+            # The grant is used: the body is revised before the PR is marked ready (#99), and
+            # `gh pr edit` never retargets the base or touches labels.
+            prompt = " ".join(step["with"]["prompt"].split())
+            assert "rewrite the PR body with `gh pr edit --body-file`" in prompt, (wf.name, job_id)
+            assert "never `--base`, `--add-label` or `--remove-label`" in prompt, (wf.name, job_id)
             seen += 1
         else:
             assert "gh pr edit" not in args, (wf.name, job_id)
@@ -303,8 +310,11 @@ def test_a6_suite_runs_in_a_job_holding_no_token():
     assert "secrets." not in blob and "create-github-app-token" not in blob
     assert "GH_TOKEN" not in blob
     (run,) = [s["run"] for s in suite["steps"] if s.get("id") == "suite"]
-    # The output delimiter is not guessable from the suite's own text.
-    assert "openssl rand" in run
+    # The detail leaves the job as an artifact, never as a job output or a step env, which the
+    # run log prints.
+    assert "outputs" not in suite and "GITHUB_OUTPUT" not in run
+    (up,) = [s for s in suite["steps"] if s.get("uses", "").startswith("actions/upload-artifact@")]
+    assert up["with"]["retention-days"] == 1
     # The log line is pytest's own last line, not the first match anywhere in captured output.
     assert 'tail -n 2 "$OUT" | head -n 1' in run
     assert "::warning::" in run and "::error::" in run
@@ -314,9 +324,30 @@ def test_a6_suite_runs_in_a_job_holding_no_token():
     names = [s.get("name") or s.get("id") for s in nightly["steps"]]
     assert "adversarial-suite" not in names
     assert names.index("suite-result") < names.index("forge")
+    assert "needs." not in str(nightly["steps"])
+    (down,) = [s for s in nightly["steps"]
+               if s.get("uses", "").startswith("actions/download-artifact@")]
+    assert down["with"] == {"name": up["with"]["name"], "path": "/tmp"}
     (model,) = [s for s in nightly["steps"] if s.get("uses", "").startswith(ACTION)]
     assert "/tmp/adversarial-suite.txt" in model["with"]["prompt"]
 
+
+def test_nightly_integration_session_executes_nothing():
+    # Drift F22: the suites run in a job holding no token; the session that holds the issue-write
+    # token reads their result and runs no interpreter. F21: it carries the reviewers' diagnosis.
+    suite = _job("integration-suite")
+    assert suite["permissions"] == {"contents": "read"}
+    blob = str(suite)
+    assert "secrets." not in blob and "GH_TOKEN" not in blob and "outputs" not in suite
+    nightly = _job("nightly-integration")
+    assert nightly["needs"] == "integration-suite"
+    assert "!cancelled()" in nightly["if"]
+    (step,) = [s for _, j, _, s in _model_steps() if j == "nightly-integration"]
+    assert not any(i in step["with"]["claude_args"] for i in INTERPRETERS)
+    assert "/tmp/suite/suite.txt" in step["with"]["prompt"]
+    names = [s.get("name") or s.get("uses", "") for s in nightly["steps"]]
+    assert "diagnose-failure" in names and "diagnose-timeout" in names
+    assert "pip install" not in str(nightly["steps"])
 
 @pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
 def test_review_sessions_never_execute_the_tree(job_id):
@@ -347,6 +378,108 @@ def test_a2_scope_fails_closed_when_git_fails():
     assert 'if ! CHANGED=$(git diff --name-only "origin/${BASE_REF}...HEAD"' in run
     assert "|| true" not in run
     assert "2>/dev/null" not in run
+
+
+def _a6_scope_run():
+    (run,) = [s["run"] for _, j, _, s in _steps() if j == "a6-adversary" and s.get("id") == "scope"]
+    (env,) = [s["env"] for _, j, _, s in _steps() if j == "a6-adversary" and s.get("id") == "scope"]
+    return run, env
+
+
+def test_security_label_removers_equal_the_size_exception_approvers():
+    _, env = _a6_scope_run()
+    ownership = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())
+    assert json.loads(env["SECURITY_LABEL_REMOVERS"]) == ownership["size_exception_approvers"]
+
+
+@pytest.mark.parametrize(
+    ("has_label", "events", "applicable"),
+    [
+        ("true", [], "true"),
+        ("false", [], "false"),
+        # A builder's `gh pr edit --remove-label security` does not take the PR out of scope.
+        ("false", ["labeled Gond-ul", "unlabeled egzos-forge[bot]"], "true"),
+        ("false", ["labeled egzos-forge[bot]", "unlabeled github-actions[bot]"], "true"),
+        # Only an approver's removal does, and only while it is the latest label event.
+        ("false", ["labeled egzos-forge[bot]", "unlabeled Gond-ul"], "false"),
+        ("false", ["labeled Gond-ul", "unlabeled chief-proxy[bot]"], "false"),
+        ("false", ["unlabeled Gond-ul", "labeled x", "unlabeled egzos-forge[bot]"], "true"),
+        # A latest event that is a labeling, even by an approver, is never an exemption.
+        ("false", ["labeled Gond-ul"], "true"),
+        # A login that merely contains an approver's name is not that approver.
+        ("false", ["labeled Gond-ul", "unlabeled Gond-ul-bot"], "true"),
+    ],
+)
+def test_a6_security_label_is_sticky(tmp_path, has_label, events, applicable):
+    # Drift F23 / Egzos/egzos-platform#48: builders hold `gh pr edit --remove-label`.
+    run, env = _a6_scope_run()
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (tmp_path / "events").write_text("".join(e + "\n" for e in events))
+    (fake / "gh").write_text(f'#!/bin/bash\ncat "{tmp_path / "events"}"\n')
+    (fake / "gh").chmod(0o755)
+    out = tmp_path / "out"
+    proc_env = {
+        "PATH": f"{fake}:/usr/bin:/bin",
+        "HAS_SECURITY": has_label,
+        "ACTOR": "egzos-forge[bot]",
+        "REPO": "o/r",
+        "PR": "1",
+        "SECURITY_LABEL_REMOVERS": env["SECURITY_LABEL_REMOVERS"],
+        "GITHUB_OUTPUT": str(out),
+    }
+    subprocess.run(["bash", "-c", run], env=proc_env, check=True, capture_output=True)
+    assert out.read_text().strip() == f"applicable={applicable}"
+
+
+def test_a6_scope_fails_closed_when_the_event_lookup_fails(tmp_path):
+    run, env = _a6_scope_run()
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "gh").write_text("#!/bin/bash\nexit 1\n")
+    (fake / "gh").chmod(0o755)
+    out = tmp_path / "out"
+    proc = subprocess.run(
+        ["bash", "-c", run],
+        env={"PATH": f"{fake}:/usr/bin:/bin", "HAS_SECURITY": "false", "ACTOR": "x",
+             "REPO": "o/r", "PR": "1", "GITHUB_OUTPUT": str(out),
+             "SECURITY_LABEL_REMOVERS": env["SECURITY_LABEL_REMOVERS"]},
+        capture_output=True,
+    )
+    assert proc.returncode != 0
+    assert not out.exists() or "applicable=false" not in out.read_text()
+
+
+REQUIRED_CHECKS = ("ownership", "tests", "a1r-review", "a2-conformance", "a6-adversary")
+
+
+@pytest.mark.parametrize("job_id", REQUIRED_CHECKS)
+def test_required_checks_fail_off_the_default_branch(job_id, tmp_path):
+    # A run against another base says nothing about a merge into the default branch, and a
+    # retarget with `gh pr edit --base` re-runs nothing (#99).
+    first = _job(job_id)["steps"][0]
+    assert first["name"] == "base-is-default-branch"
+    assert first["if"] == "github.event_name == 'pull_request'"
+    for base, code in (("main", 0), ("agent/x/y", 1), ("", 1)):
+        proc = subprocess.run(
+            ["bash", "-c", first["run"]],
+            env={"PATH": "/usr/bin:/bin", "BASE_REF": base, "DEFAULT_BRANCH": "main"},
+            capture_output=True,
+        )
+        assert proc.returncode == code, base
+
+
+def test_pr_template_marks_author_claims_apart_from_ci():
+    # Herald distils these fields to the Chief's phone, where a ticked box and a green check look
+    # alike: author-supplied fields say so, and no box restates what a required check decides (#21).
+    text = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text()
+    headings = re.findall(r"^## (.+)$", text, re.MULTILINE)
+    assert "Checks (author's claims)" in headings
+    assert "Risk (author's rating)" in headings
+    assert "Checks" not in headings and "Risk" not in headings
+    assert "not a CI result" in text
+    boxes = re.findall(r"^- \[ \] (.+)$", text, re.MULTILINE)
+    assert not any(("owned paths" in b) or ("size cap" in b) for b in boxes)
 
 
 REVIEW_TOOLS = {

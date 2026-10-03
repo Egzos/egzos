@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "check_ownership.py"
@@ -295,7 +296,9 @@ def _run_main(repo, branch, env_extra=None):
     own = repo.parent / "OWNERSHIP.yml"
     own.write_text(json.dumps(OWNERSHIP))  # JSON is YAML
     env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON", "PR_AUTHOR",
-                                                            "SIZE_EXCEPTION_APPLIER")}
+                                                            "SIZE_EXCEPTION_APPLIER",
+                                                            "A6_SECURITY_IN_FORCE",
+                                                            "FIX_LANDED_APPLIER")}
     env.update(env_extra or {})
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--base", "main", "--head", "HEAD",
@@ -422,11 +425,108 @@ def test_main_fails_closed_on_unparseable_numstat_file(repo, tmp_path):
 def test_nested_claude_control_inputs_are_chief_only():
     # A builder must not be able to plant a .claude (symlink or not), CLAUDE.md or .mcp.json under
     # its own paths: reviewers' sessions would load it (Egzos/egzos-platform#46).
-    import yaml
-
     chief_only = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["chief_only"]
     for path in ("apps/ui-flagship/src/.claude", "adversarial/x/.claude/settings.json",
                  "src/egzos/web/CLAUDE.md", "tests/a/CLAUDE.local.md", "server/.mcp.json",
                  ".mcp.json"):
         assert co.matches_any(chief_only, path), path
+    # The root CLAUDE.md and .claude/ stay a1p-planner's: a widening to `**/` would break its PRs.
+    for path in ("CLAUDE.md", ".claude/agents/x.md", ".claude"):
+        assert not co.matches_any(chief_only, path), path
 
+
+# ---------------------------------------------------------------------------
+# RD-005 backstop: an a6 branch while its security issue is open (Egzos/egzos-platform#45)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("source", "live"),
+    [
+        ("def test_a():\n    assert 1\n", ["test_a"]),
+        ("import pytest\n@pytest.mark.xfail(reason='r', strict=True)\ndef test_a():\n    pass\n",
+         []),
+        ("import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n", []),
+        # Conditional marks leave the test live whenever the condition is false.
+        ("import pytest\n@pytest.mark.xfail(False, reason='r')\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        ("import pytest\n@pytest.mark.xfail(condition=False)\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        ("import pytest\n@pytest.mark.skipif(False, reason='xfail')\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        ("import pytest\npytestmark = pytest.mark.xfail(reason='r')\ndef test_a():\n    pass\n",
+         []),
+        ("import pytest\npytestmark = [pytest.mark.xfail(strict=True)]\ndef test_a():\n    pass\n",
+         []),
+        ("import pytest\n@pytest.mark.xfail\nclass TestA:\n    def test_b(self):\n        pass\n",
+         []),
+        ("class TestA:\n    def test_b(self):\n        pass\n    def helper(self):\n        pass\n",
+         ["TestA.test_b"]),
+        ("def helper():\n    pass\n", []),
+        ("def test_a(:\n", ["<unparseable>"]),
+    ],
+)
+def test_non_xfail_tests(source, live):
+    assert co.non_xfail_tests(source) == live
+
+
+def test_security_backstop_failures_scope():
+    files = {
+        "adversarial/test_live.py": "def test_a():\n    pass\n",
+        "adversarial/test_ok.py": "import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n",
+        "adversarial/conftest.py": "",
+        "adversarial/data.json": "{}",
+        "docs/test_elsewhere.py": "def test_a():\n    pass\n",
+    }
+    out = co.security_backstop_failures([*files, "adversarial/test_deleted.py"], files.get)
+    assert [p for p, _ in out] == ["adversarial/test_live.py", "adversarial/conftest.py"]
+
+
+def _a6_live_test(repo):
+    _write(repo, "adversarial/__init__.py", "")
+    _commit(repo, "base")
+    _branch_diff(repo, lambda r: _write(r, "adversarial/test_x.py", "def test_x():\n    pass\n"))
+
+
+def test_main_backstop_refuses_a_live_test_while_the_issue_is_in_force(repo):
+    _a6_live_test(repo)
+    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    assert res.returncode == 1
+    assert "test_x is not xfail" in res.stdout
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"A6_SECURITY_IN_FORCE": "false"},
+        {},
+        {"A6_SECURITY_IN_FORCE": "true", "PR_LABELS_JSON": '["security-fix-landed"]',
+         "FIX_LANDED_APPLIER": "Gond-ul"},
+    ],
+)
+def test_main_backstop_passes_out_of_force_or_after_the_fix(repo, env):
+    _a6_live_test(repo)
+    res = _run_main(repo, "agent/a6-adversary/issue-7", env)
+    assert res.returncode == 0, res.stdout
+
+
+def test_main_backstop_waiver_needs_an_approver(repo):
+    _a6_live_test(repo)
+    res = _run_main(repo, "agent/a6-adversary/issue-7", {
+        "A6_SECURITY_IN_FORCE": "true", "PR_LABELS_JSON": '["security-fix-landed"]',
+        "FIX_LANDED_APPLIER": "egzos-forge[bot]"})
+    assert res.returncode == 1
+
+
+def test_main_backstop_reads_a_renamed_test_at_its_new_path(repo):
+    xfail = "import pytest\n@pytest.mark.xfail\ndef test_x():\n    pass\n"
+    _write(repo, "adversarial/test_old.py", xfail)
+    _commit(repo, "base")
+
+    def mutate(r):
+        _git(r, "mv", "adversarial/test_old.py", "adversarial/test_new.py")
+        _write(r, "adversarial/test_new.py", "def test_x():\n    pass\n")
+
+    _branch_diff(repo, mutate)
+    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    assert res.returncode == 1
+    assert "adversarial/test_new.py" in res.stdout

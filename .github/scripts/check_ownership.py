@@ -38,9 +38,16 @@ cap only when whoever last applied it is in OWNERSHIP.yml's `size_exception_appr
 label's presence proves only that someone with issues: write applied it, and egzos-forge holds
 issues: write (drift F18). Both values come from the environment the workflow sets, so a
 workflow that passes them runs against a checker that predates them without an argument error.
+
+RD-005's named backstop (Egzos/egzos-platform#45): while the `security` issue an a6 build branch
+works on is in force ($A6_SECURITY_IN_FORCE=true, resolved by the workflow), every test that
+branch adds or changes under `adversarial/**` must carry an unconditional xfail mark, and it may
+not touch a conftest.py. `security-fix-landed`, last applied by an approver, lifts it once the fix
+has merged.
 """
 
 import argparse
+import ast
 import fnmatch
 import json
 import os
@@ -219,6 +226,94 @@ def size_exception_waives(labels_set, applier, approvers):
     """True only when `size-exception` is present AND its last applier is an approver."""
     return "size-exception" in labels_set and bool(applier) and applier in set(approvers)
 
+
+def fix_landed_waives(labels_set, applier, approvers):
+    """True only when `security-fix-landed` is present AND its last applier is an approver."""
+    return "security-fix-landed" in labels_set and bool(applier) and applier in set(approvers)
+
+
+def _is_unconditional_xfail(node):
+    """`pytest.mark.xfail`, or the same called with only reason/strict/raises: never conditional."""
+    call = node if isinstance(node, ast.Call) else None
+    target = call.func if call else node
+    if not (isinstance(target, ast.Attribute) and target.attr == "xfail"
+            and isinstance(target.value, ast.Attribute) and target.value.attr == "mark"):
+        return False
+    if call is None:
+        return True
+    # A positional argument or `condition=` makes the mark conditional, and `run=` is irrelevant
+    # to whether the test is live: only reason and strict are accepted.
+    return not call.args and all(k.arg in ("reason", "strict", "raises") for k in call.keywords)
+
+
+def _marks(value):
+    """The mark expressions in a `pytestmark = ...` value: one mark or a list/tuple of them."""
+    return value.elts if isinstance(value, (ast.List, ast.Tuple)) else [value]
+
+
+def _pytestmark_xfail(body):
+    for n in body:
+        if (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "pytestmark"
+                                              for t in n.targets)):
+            if any(_is_unconditional_xfail(m) for m in _marks(n.value)):
+                return True
+    return False
+
+
+def non_xfail_tests(source):
+    """Names of the tests in `source` that would run without an unconditional xfail mark.
+
+    Source that does not parse is reported as one entry: a gate does not pass what it cannot read.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return ["<unparseable>"]
+    if _pytestmark_xfail(tree.body):
+        return []
+    live = []
+
+    def visit(body, prefix, inherited):
+        for n in body:
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test"):
+                if not (inherited or any(_is_unconditional_xfail(d) for d in n.decorator_list)):
+                    live.append(prefix + n.name)
+            elif isinstance(n, ast.ClassDef) and n.name.startswith("Test"):
+                marked = inherited or _pytestmark_xfail(n.body) or any(
+                    _is_unconditional_xfail(d) for d in n.decorator_list)
+                visit(n.body, f"{prefix}{n.name}.", marked)
+
+    visit(tree.body, "", False)
+    return live
+
+
+def _source_at(head, path):
+    """The file at `head`, or None when the change deleted it."""
+    if subprocess.run(["git", "cat-file", "-e", f"{head}:{path}"],
+                      capture_output=True, check=False).returncode != 0:
+        return None
+    return subprocess.run(["git", "show", f"{head}:{path}"],
+                          capture_output=True, check=True, text=True).stdout
+
+
+def security_backstop_failures(changed, read_source):
+    """(path, reason) for each change an a6 branch may not make while its security issue is open."""
+    out = []
+    for path in changed:
+        if not path_matches_glob("adversarial/**", path):
+            continue
+        if path.rsplit("/", 1)[-1] == "conftest.py":
+            out.append((path, "conftest.py can re-mark tests; refused while the issue is open"))
+            continue
+        if not path.endswith(".py"):
+            continue
+        source = read_source(path)
+        if source is None:
+            continue
+        for name in non_xfail_tests(source):
+            out.append((path, f"{name} is not xfail while the branch's security issue is open"))
+    return out
+
 # ---------------------------------------------------------------------------
 # Size cap
 # ---------------------------------------------------------------------------
@@ -259,6 +354,18 @@ def main():
         dest="size_exception_applier",
         default=os.environ.get("SIZE_EXCEPTION_APPLIER", ""),
         help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
+    )
+    parser.add_argument(
+        "--a6-security-in-force",
+        dest="a6_security_in_force",
+        default=os.environ.get("A6_SECURITY_IN_FORCE", ""),
+        help="'true' while an a6 branch's security issue is in force ($A6_SECURITY_IN_FORCE)",
+    )
+    parser.add_argument(
+        "--fix-landed-applier",
+        dest="fix_landed_applier",
+        default=os.environ.get("FIX_LANDED_APPLIER", ""),
+        help="Login that last applied security-fix-landed (default: $FIX_LANDED_APPLIER)",
     )
     parser.add_argument(
         "--pr-author",
@@ -442,6 +549,15 @@ def main():
     # ---- Emit governance ::notice:: annotations ------------------------------
     for gpath in notices:
         print(f"::notice::governance path touched: {gpath}")
+
+    # ---- RD-005 backstop: a6 and an open security issue (Egzos/egzos-platform#45) --
+    if agent_name == "a6-adversary" and args.a6_security_in_force == "true":
+        if fix_landed_waives(labels_set, args.fix_landed_applier, approvers):
+            print(f"security-fix-landed applied by {args.fix_landed_applier} — backstop lifted.")
+        else:
+            post_image = [p for p in changed if p not in new_path_of]
+            failures.extend(security_backstop_failures(
+                post_image, lambda path: _source_at(args.head, path)))
 
     # ---- Size cap -----------------------------------------------------------
     total_lines, file_count = compute_size(numstat_entries, cap_exclude)

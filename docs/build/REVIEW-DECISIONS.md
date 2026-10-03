@@ -201,7 +201,11 @@ reads its result (`gh pr checks`, with `checks`, `statuses` and `actions: read`)
 producing a second result in a job that holds the review token and the comment script. For the a6
 sweep, which holds the forge token and so runs no interpreter either, a separate job holding no
 token runs the adversarial suite against `main`. Step order inside one job would not separate it,
-for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
+for the reason above. The sweep cites `/tmp/adversarial-suite.txt`, which reaches it as a one-day
+artifact rather than a job output or step env, so the detail stays out of the run log. The nightly
+integration check is the same shape (drift F22): `integration-suite` runs the suites holding
+`contents: read` only, and the session that holds the drift issue's write token reads
+`/tmp/suite/suite.txt` and runs no interpreter.
 
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
@@ -235,7 +239,8 @@ required. If it ever stops doing either, the reviewer is left with no executed r
 half 2 has to be reopened.
 
 **Paths in scope.** `.github/workflows/a1r-review.yml`, `.github/workflows/a2-conformance.yml`,
-`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`, `.claude/agents/a1r-reviewer.md`,
+`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`,
+`.github/workflows/nightly-integration.yml`, `.claude/agents/a1r-reviewer.md`,
 `.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
 `.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.
 
