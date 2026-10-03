@@ -141,8 +141,8 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "items": [
                 {"kind": i.kind, "title": i.content.get("auto_title", i.id),
                  "trust": (
-                     f"{i.status} → unverified · agent-run move resets"
-                     if by.get("principal") == "client"
+                     "verified → unverified · agent-run move resets"
+                     if by.get("principal") != "interactive" and i.status == "verified"
                      else f"{i.status} → {i.status}"
                  )}
                 for i in items

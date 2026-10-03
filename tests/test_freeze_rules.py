@@ -171,3 +171,45 @@ def test_role_names_are_read_from_the_bundles():
 
     for role, bundle in ROLE_BUNDLES.items():
         assert _role_name(sorted(bundle)) == role
+
+
+# --- an agent-run landing is a write: it lands unverified, on every path, on the record ----------
+def test_an_agent_run_silent_move_resets_and_says_so_on_the_chain(box: Container):
+    t, org, proj, other = _tree(box)
+    op = _client(box, "op", "operator", [org.id])
+    item = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    box.trust.promote(item, token=t, actor=OWNER)
+    box.trust.move(box.backend.get(item.id), other, token=op, actor="op")
+    moved = box.backend.get(item.id)
+    assert moved.status == "unverified" and moved.trust == {"status": "unverified"}
+    silent = [e for e in box.ledger.tail(10) if e["event"] == "gate.pass.silent"][-1]
+    assert silent["details"]["reset"] == [item.id]
+
+
+def test_a_human_run_move_keeps_its_status_until_the_freeze_says_otherwise(box: Container):
+    t, org, proj, other = _tree(box)
+    item = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    box.trust.promote(item, token=t, actor=OWNER)
+    box.trust.move(box.backend.get(item.id), other, token=t, actor=OWNER)
+    assert box.backend.get(item.id).status == "verified"
+
+
+def test_an_approved_agent_move_records_the_reset_on_approval_execute(box: Container):
+    t, org, proj, other = _tree(box)
+    _client(box, "watcher", "reader", [other.id])
+    op = _client(box, "op", "operator", [org.id])
+    item = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    box.trust.promote(item, token=t, actor=OWNER)
+    pid = box.trust.move(box.backend.get(item.id), other, token=op, actor="op")["proposal"]["id"]
+    box.trust.execute(pid, token=t, actor=OWNER)
+    done = [e for e in box.ledger.tail(10) if e["event"] == "approval.execute"][-1]
+    assert done["details"]["reset"] == [item.id]
+    assert box.backend.get(item.id).trust == {"status": "unverified"}
+
+
+def test_a_quarantined_item_does_not_move(box: Container):
+    t, org, proj, other = _tree(box)
+    item = box.store.add(body="bad", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    box.trust.quarantine(item, token=t, actor=OWNER, reason="x")
+    with pytest.raises(TrustError, match="quarantined items do not move"):
+        box.trust.move(box.backend.get(item.id), other, token=t, actor=OWNER)

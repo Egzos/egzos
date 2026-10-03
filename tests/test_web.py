@@ -293,3 +293,18 @@ def test_an_agent_run_move_lands_unverified_and_the_outcome_says_so(boat, monkey
     outcome = b.tap_post(token, "confirm")[1]
     assert f"items at {c.nodes.path(org)}, unverified." in outcome
     assert c.backend.get(item.id).status == "unverified"
+
+
+def test_the_tap_promises_a_reset_only_where_one_happens(boat):
+    b, item = boat
+    c = b.c
+    owner = c.require_token()
+    org = c.nodes.create("org", "acme2", c.nodes.user_root(), token=owner, actor=OWNER,
+                         principal="interactive")
+    c.auth.mint(principal="client", owner=OWNER, client="watcher", role="reader",
+                scopes=[org.id], actor=OWNER, by_principal="interactive")
+    agent = c.auth.mint(principal="client", owner=OWNER, client="bot", role="operator",
+                        scopes=["*"], actor=OWNER, by_principal="interactive")
+    pid = c.trust.move(item, org, token=agent, actor="bot")["proposal"]["id"]  # unverified item
+    page = b.tap_get(_to_tap(b, pid))[1]
+    assert "unverified → unverified" in page and "agent-run move resets" not in page

@@ -160,6 +160,9 @@ class TrustEngine:
             # Coverage lives here, not per surface: an item or target the token cannot see answers
             # exactly like one that does not exist (silence-not-errors).
             raise TrustError("not found")
+        if item.status == "quarantined":
+            # A quarantined item does not move, silently or by proposal (step-up spec R5).
+            raise TrustError("quarantined items do not move; lift the quarantine deliberately")
         before = self.audience(frm)
         after = self.audience(to)
         delta = [a for a in after if a["token"] not in {b["token"] for b in before}]
@@ -171,6 +174,7 @@ class TrustEngine:
             # token fill the owner's pending queue (#94; freeze item 3).
             if not token.has("organize"):
                 raise TrustError("moving items needs `organize`")
+            reset = self._reset_if_agent_run(item, token.principal)
             self._do_move(item, to, actor, token.principal)
             self.ledger.append(
                 "gate.pass.silent",
@@ -181,6 +185,7 @@ class TrustEngine:
                 audience_delta="none",
                 from_=frm.id,
                 outward=outward,
+                reset=[item.id] if reset else [],
             )
             return {"moved": True, "gate": "silent", "audience_delta": []}
 
@@ -259,15 +264,13 @@ class TrustEngine:
                 else "manifest changed since proposal (TOCTOU)",
             )
             raise TrustError("manifest changed since the proposal was made — re-propose")
-        agent_run = (p.get("proposed_by") or {}).get("principal") != "interactive"
+        proposer = (p.get("proposed_by") or {}).get("principal", "client")
+        reset = []
         for item_id in p["items"]:
             item = self.backend.get(item_id)
             if item:
-                if agent_run and item.status == "verified":
-                    # An agent-run move resets: the landing is a write, and writes land unverified
-                    # (step-up spec §11; the freeze's open trust-on-copy question, until it says
-                    # otherwise). Verifying it at the destination is approve.pending, separately.
-                    item.trust = {"status": "unverified", "reset_by": "agent-run move"}
+                if self._reset_if_agent_run(item, proposer):
+                    reset.append(item.id)
                 self._do_move(item, to, actor, token.principal)
         p["status"] = "executed"
         p["executed_at"] = now_iso()
@@ -281,6 +284,7 @@ class TrustEngine:
             scope=to.id,
             items=p["items"],
             manifest=p["manifest"],
+            reset=reset,
         )
         return p
 
@@ -295,6 +299,17 @@ class TrustEngine:
         return p
 
     # -- internals -------------------------------------------------------------------------------
+    @staticmethod
+    def _reset_if_agent_run(item: ContextItem, principal: str) -> bool:
+        """An agent-run move lands its item unverified, on every path (silent or approved): the
+        landing is a write, and writes land unverified (step-up spec §11). Whether a human-run
+        move keeps a verified status is the freeze's open trust-on-copy question (#121); until it
+        is settled, human-run moves keep it. The reset is recorded on the chain by the caller."""
+        if principal == "interactive" or item.status != "verified":
+            return False
+        item.trust = {"status": "unverified"}
+        return True
+
     def _do_move(self, item: ContextItem, to: Node, actor: str, principal: str) -> None:
         frm = item.scope
         item.scope = to.id
