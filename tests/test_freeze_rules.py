@@ -237,3 +237,21 @@ def test_a_quarantine_after_parking_blocks_the_approval_but_not_the_deny(box: Co
     assert box.backend.get(item.id).scope == proj.id
     box.trust.deny(pid, token=t, actor=OWNER)
     assert box.backend.get_proposal(pid)["status"] == "denied"
+
+
+def test_a_proposal_into_an_exo_room_names_its_external_audience(box: Container):
+    from egzos.authz.presence import build_act
+
+    t, org, proj, other = _tree(box)
+    exo = box.nodes.create("exo", "partners", org, token=t, actor=OWNER, principal=t.principal)
+    _client(box, "vendor", "reader", [exo.id])
+    item = box.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    to_exo = box.trust.move(item, exo, token=t, actor=OWNER)["proposal"]["id"]
+    # §4 R6 / §13 `consequence.exo`: the room's named external parties, not a subtree.
+    assert build_act(box, to_exo)["consequence"] == (
+        "Consequence. Everything in the exo room partners sees this — every named external "
+        "party, now and in future.")
+    _client(box, "watcher", "reader", [other.id])
+    second = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    to_project = box.trust.move(second, other, token=t, actor=OWNER)["proposal"]["id"]
+    assert build_act(box, to_project)["consequence"].startswith("Consequence. Everything under ")

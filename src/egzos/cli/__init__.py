@@ -483,7 +483,9 @@ def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
             return outcome_text(act, "approved", closes=closes)
         except TrustError as e:
             result["error"] = str(e)
-            return TAP_COPY["outcome.invalid"] if prop else TAP_COPY["tap.invalid"]
+            # R11 (the standalone /tap/<token> page): a proposal invalidated under it reads
+            # `tap.invalid`, as an item that is no longer pending does.
+            return TAP_COPY["tap.invalid"]
 
     outcome = Presence(c).require(act, decide=perform)
     if outcome == "window":

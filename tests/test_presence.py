@@ -330,3 +330,21 @@ def test_radius_zero_is_asserted_not_left_to_the_browser():
     assert "button,summary,.box,.note,.alarm,.chip,.stamp,table{border-radius:var(--egz-radius)}" \
         in TAP_STYLE  # §7: radius 0, from the token
     assert "button{-webkit-appearance:none;appearance:none}" in TAP_STYLE  # no native chrome
+
+
+def test_a_failed_act_reverts_to_ready_with_the_error_line_and_a_lapse_says_nothing():
+    from egzos.authz.presence import Tap
+
+    def broken(outcome, windowed):
+        raise RuntimeError("the container did not answer")
+
+    tap = Tap(ACT, decide=broken)
+    tap.post("arm")
+    status, page = tap.post("confirm")
+    # R9 error: back to ready, §13 `act.error`, the page still live for another try.
+    assert tap.outcome is None and "Sign and approve" in page
+    error = "That didn&#x27;t go through. Nothing changed. Try again."
+    assert f"<p class=alarm role=status>{error}</p>" in page
+    assert tap.live(f"/tap/{tap.token}")
+    status, page = tap.post("confirm")  # never armed: reverts, with no invented line
+    assert "Sign and approve" in page and "class=note" not in page and "class=alarm" not in page

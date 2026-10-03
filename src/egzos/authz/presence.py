@@ -171,9 +171,12 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             ],
             "audience": prop.get("audience", []),
             "dest": prop["to_path"],
+            # §4 R6: the sentence follows the destination's ring — an exo room's audience is
+            # its named external parties, not a subtree.
             "consequence": (
-                f"Consequence. Everything under {prop['to_path']} inherits this — every team, "
-                "project and thread, now and in future."
+                TAP_COPY["consequence.exo"].format(name=to.name)
+                if to and to.type == "exo"
+                else TAP_COPY["consequence"].format(destination=prop["to_path"])
             ),
             "from": prop["from_path"],
             "to": prop["to_path"],
@@ -421,6 +424,12 @@ TAP_COPY = {
     "act.promoted": "Promoted at {at} by {user}. Served as verified from now on.",
     "tap.invalid": "This request is no longer valid.",
     "tap.empty": "Nothing is waiting for you.",
+    "act.confirm.sr": "Press again to confirm.",
+    "act.error": "That didn't go through. Nothing changed. Try again.",
+    "consequence": "Consequence. Everything under {destination} inherits this — every team, "
+    "project and thread, now and in future.",
+    "consequence.exo": "Consequence. Everything in the exo room {name} sees this — every named "
+    "external party, now and in future.",
 }
 
 
@@ -471,7 +480,7 @@ class Tap:
         """A parked proposal (gate.confirm: approve or deny), not an item promotion."""
         return self.act.get("kind") == "proposal"
 
-    def page(self, armed: bool, note: str = "") -> str:
+    def page(self, armed: bool, note: str = "", error: str = "") -> str:
         a = self.act
         e = _e
         seconds = window_seconds()
@@ -563,6 +572,7 @@ class Tap:
             "<section role=region aria-labelledby=presence-h class=box>"
             f"<h2 id=presence-h>presence</h2><p>{e(presence_text(a, seconds))}</p>{terms}"
             + (f"<p class=note aria-live=polite>{e(note)}</p>" if note else "")
+            + (f"<p class=alarm role=status>{e(error)}</p>" if error else "")
             + f"<form method=post>{acts}</form></section></main></body></html>"
         )
 
@@ -591,19 +601,30 @@ class Tap:
         container's answer in §13's canonical copy."""
         if step == "deny" and self.gate:
             self.outcome = "denied"
-            return 200, self.outcome_page(self._decided())
+            return self._answer()
         if self.act.get("blocked") and step in ("arm", "arm_once", "confirm"):
             return 200, self.page(armed=False)
         if step in ("arm", "arm_once"):
             self.armed_until = _now() + ARM_SECONDS
             self.armed_mode = "once" if step == "arm_once" else "window"
-            return 200, self.page(armed=True, note="Press again to confirm.")
+            return 200, self.page(armed=True, note=TAP_COPY["act.confirm.sr"])
         if step == "confirm" and self.armed_until > _now():
             self.windowed = self.armed_mode == "window"
             self.outcome = "approved"
-            return 200, self.outcome_page(self._decided())
+            return self._answer()
+        # R9: a confirm after the 10 s, or any other press, reverts to Sign and approve, un-armed.
         self.armed_until = 0.0
-        return 200, self.page(armed=False, note="Not signed. Press Sign and approve, then Confirm.")
+        return 200, self.page(armed=False)
+
+    def _answer(self) -> tuple[int, str]:
+        """The container's answer; or, if the act failed, R9's error row: back to ready, nothing
+        changed, the page still live so the person can try again."""
+        try:
+            return 200, self.outcome_page(self._decided())
+        except Exception:
+            self.outcome = None
+            self.armed_until = 0.0
+            return 200, self.page(armed=False, error=TAP_COPY["act.error"])
 
     def _decided(self) -> str:
         if self.decide is not None:
