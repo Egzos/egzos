@@ -208,6 +208,54 @@ def test_the_engine_records_a_quarantine_refusal(box):
     assert len(box.ledger.tail(1000)) == before + 1  # the refusal itself is on the chain
 
 
+def test_the_lifeboat_tells_an_unproven_caller_nothing_and_records_nothing(box):
+    from fastapi.testclient import TestClient
+
+    from egzos.web.app import Lifeboat, create_app
+
+    boat = Lifeboat(box, key="k" * 32, host="127.0.0.1:8765")
+    app = create_app(boat, "http://127.0.0.1:8765")
+    before = len(box.ledger.tail(1000))
+    bound = TestClient(app, base_url="http://127.0.0.1:8765")
+    locked = bound.get("/").text
+    rebound = TestClient(app, base_url="http://rebound.example:8765")  # a name aimed at loopback
+    for client, url in ((bound, "/?k=wrong"), (bound, "/items/x?k=wrong"), (bound, "/pending"),
+                        (rebound, "/?k=" + "k" * 32)):
+        r = client.get(url, follow_redirects=False)
+        assert r.status_code == 403 and r.text == locked, url  # one static page, every cause
+    assert box.home.name not in locked and "pending" not in locked.lower()
+    assert len(box.ledger.tail(1000)) == before  # an unproven caller writes nothing to the chain
+
+
+def test_the_lifeboat_launch_key_works_once_and_the_session_never_reaches_a_page(box):
+    from fastapi.testclient import TestClient
+
+    from egzos.web.app import Lifeboat, create_app
+
+    boat = Lifeboat(box, host="127.0.0.1:8765")
+    app = create_app(boat, "http://127.0.0.1:8765")
+    owner = TestClient(app, base_url="http://127.0.0.1:8765")
+    assert owner.get(f"/?k={boat.key}", follow_redirects=False).status_code == 303
+    page = owner.get("/").text
+    assert boat.session not in page and boat.key not in page  # the cookie is never in a page
+    late = TestClient(app, base_url="http://127.0.0.1:8765")  # a copy read later from argv
+    assert late.get(f"/?k={boat.key}", follow_redirects=False).status_code == 403
+    # The form key is in every page and is never a credential on its own.
+    forged = late.post("/prefs", data={"csrf": boat.form_key, "scheme": "light", "return": "/"},
+                       headers={"Origin": "http://127.0.0.1:8765"}, follow_redirects=False)
+    assert forged.status_code == 403
+
+
+def test_a_lifeboat_arm_nonce_decides_once(box):
+    from egzos.web.app import Lifeboat
+
+    boat = Lifeboat(box, host="127.0.0.1:8765")
+    nonce = boat.arm("window", "P1", 0)
+    assert not boat.armed("window", "P2", 0, nonce)  # bound to its act: spent on a mismatch
+    nonce = boat.arm("window", "P1", 0)
+    assert boat.armed("window", "P1", 0, nonce) and not boat.armed("window", "P1", 0, nonce)
+
+
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
     owner = box.auth.interactive_token()
     f = tmp_path / "secret.txt"

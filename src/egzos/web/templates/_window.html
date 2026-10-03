@@ -1,0 +1,5 @@
+{%- if window_text %}
+<section id="window" role="status" hx-get="/pending/{{ pid }}/window" hx-trigger="every 15s" hx-swap="outerHTML"><p class="mono">{{ window_text }}</p></section>
+{%- else %}
+<section id="window"></section>
+{%- endif %}
