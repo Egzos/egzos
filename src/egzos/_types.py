@@ -160,12 +160,15 @@ class ResolvedItem(TypedDict):
     one chain and the winner in another. It is the id of the item that beat this one on its
     `(kind, key)` pair, or `None` for the winner and for every item without a `key`. `layer` and
     `layer_type` are here for the same reason — where this copy was found is not the item's own
-    business. Nothing here is ever persisted onto the `ContextItem`.
+    business. `layer_type` is a `ContainerType` or a `RootType`, as `Node.type` is, and is the key
+    `SERVING_POLICY` is read by. Nothing here is ever persisted onto the `ContextItem`.
 
     The item's trust status is deliberately NOT a key here. It has one home,
     `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
     in two places with no rule for which wins when they differ — the copy a resolver snapshots
-    before serialisation, and serves a quarantined item under. Read it from the item.
+    before serialisation, and serves a quarantined item under. Read it from the item. The walking
+    skeleton's resolver does emit a `trust` key here; container.md §4 states the removal as a1p's
+    reading, pending the freeze, with the Chief's confirmation as its TODO.
 
     The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
     here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is

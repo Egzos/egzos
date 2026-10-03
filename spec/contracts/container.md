@@ -142,18 +142,23 @@ each item in, never on the stored `ContextItem`. The envelope is `{item, layer, 
 shadowed_by}`, typed as `ResolvedItem` in `_types.py`, and `layer`/`layer_type` are there for the
 same reason: they say where this copy was found, which is also not the item's own business. An
 implementation that persisted `shadowed_by` onto the item would have to rewrite stored items on
-every resolution, and would serve one chain's answer to another chain. **running** (F10 — the
-clause ran in the skeleton with no typed home; it has one now).
+every resolution, and would serve one chain's answer to another chain. **running** for
+`shadowed_by`, `layer` and `layer_type` (F10 — the clause ran in the skeleton with no typed home; it
+has one now); the envelope's fourth key, `trust`, is addressed in the next paragraph.
 
-**The item's trust status is not restated on the envelope.** It is the item's own fact and has one
-home, `item.trust.status`; a surface that branches on invariant 2 above or on the serving policy
-reads it there and nowhere else. A second spelling of the same status, nested one level outside the
-first, is the one a resolver could snapshot before serialisation and serve stale — an envelope
-saying `verified` around an item quarantined in between is exactly the read invariant 2 forbids,
-and the contract removes the field rather than naming which copy wins. **decided, not running** —
-the typed envelope this PR first drafted carried a `trust: TrustStatus` key and this clause removes
-it before anything reads it; whether the skeleton's resolver emits such a key is not re-checked
-here, and if it does, Phase 1 drops it. Nothing in this tree reads it today.
+**The item's trust status is not restated on the envelope — a1p's reading, pending the freeze.** It
+is the item's own fact and has one home, `item.trust.status`; a surface that branches on invariant 2
+above or on the serving policy reads it there and nowhere else. A second spelling of the same
+status, nested one level outside the first, is the one a resolver could snapshot before
+serialisation and serve stale — an envelope saying `verified` around an item quarantined in between
+is exactly the read invariant 2 forbids, and the contract removes the field rather than naming which
+copy wins. **decided, not running.** The walking skeleton's `Resolver.resolve` (`resolver.py`)
+**does** emit a `trust` key beside `item` on every envelope, so this clause removes a running key,
+not an unbuilt one. The skeleton shows no bug — `trust` and `item` are copied from the same
+`item.status` in one pass, so they cannot differ there — and the removal is for the resolver Phase 1
+builds, where the two reads need not be one. Phase 1 drops the key; a consumer of the envelope's
+`trust` moves to `item.trust.status`. TODO(chief): confirm the removal, or keep the key and say which
+copy wins on divergence — one field and this paragraph.
 
 **Clients may see the full chain, overridden values included** (v0.4 §7) — `shadowed_by` is the
 mechanism, and it is deliberate: a client that sees only the winner cannot explain *why* a preference

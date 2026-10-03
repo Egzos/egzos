@@ -86,6 +86,13 @@ JSON with:
 
 ### Why `seq` stays out of the hashed body
 
+**a1p's reading, pending the freeze — `[OPEN→0.3]`.** The Chief's note on #102 recorded the opposite
+recommendation (hash `seq`); this section goes the other way, and the freeze should read it as an
+agenda item, not as settled text. Four places already agree on excluding it — §3's bullet, §3's
+formula as amended here, `storage.md` §3 and `_types.py`'s `AuditEntry` — so **if the freeze takes
+the other reading, those four move together, and `a3-ledger` implements against a skeleton that
+does it the other way.** The reasoning below is why a1p chose as it did.
+
 Stated as a decision rather than left as the absence of one, because the drift report found the
 formula and the prose disagreeing, and *including* `seq` was the first reading offered (#10 F7,
 #102). **Order is already bound** — every entry commits to `prev_hash`, so the entries form a linked
