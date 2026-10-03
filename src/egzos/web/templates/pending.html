@@ -3,13 +3,18 @@
 <div class="pending">
   <nav aria-label="Pending" class="queue">
     <h2>{{ S["queue.title"] }}{% if rows %} <span>{{ t("queue.count", n=rows | length) }}</span>{% endif %}</h2>
-    {%- if rows %}
+    {%- if rows or notices %}
     <ul>
       {%- for r in rows %}
       <li><a href="/pending/{{ r.id }}"{% if r.id == open_id %} aria-current="true" class="open"{% endif %}><span class="kind">{{ r.label }}</span><span class="title">{{ r.title }}</span><span class="meta">{{ r.meta }}</span></a></li>
       {%- endfor %}
+      {#- Quarantine notices, pinned at the end (the tap spec §3.1, R3): the only red in the queue. #}
+      {%- for n in notices %}
+      <li class="notice"><span class="kind alarm">{{ S["kind.quarantine"] }}</span><span class="title">{{ n.title }}</span><span class="meta">{{ n.meta }}</span></li>
+      {%- endfor %}
     </ul>
-    {%- else %}
+    {%- endif %}
+    {%- if not rows %}
     <p>{{ S["queue.empty"] }}</p>
     {%- endif %}
   </nav>
@@ -19,7 +24,7 @@
     {%- endif %}
     {%- if detail %}
     <p class="ref">{{ detail.ref }}</p>
-    <h1>{{ detail.title }}</h1>
+    <h1 tabindex="-1" autofocus>{{ detail.title }}</h1>
     <blockquote class="reason"><cite>{{ t("reason.attr", who=detail.who) }}</cite>
       {%- if detail.reason_cut %} “{{ detail.reason_cut }}…”<details><summary>{{ S["reason.more"] }}</summary><p>“{{ detail.reason }}”</p></details>
       {%- elif detail.reason %} “{{ detail.reason }}”
