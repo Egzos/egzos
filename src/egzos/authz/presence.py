@@ -50,11 +50,13 @@ from typing import Any
 from urllib.parse import parse_qs
 
 from egzos._term import safe
+from egzos._types import CONTAINER_CONFIG_DEFAULTS
 from egzos.container import OWNER, Container
 
 # container.md §8's default is 300 s for a window bounded to the manifest's shape. Until the build
 # has run with shape-bound windows, the default is 0 (every act taps); the env var opts in.
-DEFAULT_WINDOW_SECONDS = 0
+# The one default, from the typed contract (container.md §8): no second constant beside it.
+DEFAULT_WINDOW_SECONDS = CONTAINER_CONFIG_DEFAULTS["step_up_window_seconds"]
 ARM_SECONDS = 10
 CHIPS = 6
 ROWS = 12  # §2.2 item 5: 12 rows, then `+ N more`
@@ -704,7 +706,8 @@ def same_origin(headers) -> bool:
 
 
 def read_step(request: BaseHTTPRequestHandler) -> str:
-    length = min(int(request.headers.get("Content-Length") or 0), 4096)
+    # Bounded both ways: a negative length would read until the sender closed the connection.
+    length = max(0, min(int(request.headers.get("Content-Length") or 0), 4096))
     return parse_qs(request.rfile.read(length).decode()).get("step", [""])[0]
 
 

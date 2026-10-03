@@ -21,15 +21,15 @@ display and reasoning; a token carries an explicit set, not a level. **running**
 | `fetch` | reading context; **artifact download IS fetch** | yes — resolver, blob pull |
 | `remember` | writing, **same-scope only**: the token must cover where the write lands | yes — `Store.add` |
 | `organize` | moving items between containers | yes — the gate |
-| `publish` | proposing a widening of audience | `[OPEN→0.3]` |
+| `publish` | proposing a widening of audience | yes — the gate, on a widening move (freeze item 3) |
 | `curate` | quarantine, and lifting it | yes — `TrustEngine.quarantine` |
 | `admin` | creating a container above a node's `structure_floor` (**F2**) | yes — `NodeService.create` |
 
-`[OPEN→0.3]` **`publish` has no distinct enforcement point in the skeleton.** A move whose audience
-widens is parked as a proposal regardless of the mover's capabilities, and the confirm is human-only
-— so `publish` currently gates nothing that `organize` does not already reach. The freeze review
-must either give `publish` a checkable meaning or record why it is carried unenforced. It is **not**
-dropped here: the six-capability sentence is DECIDED and a1p does not edit a DECIDED sentence.
+**`publish` gates proposing a widening** (freeze item 3, the Chief on #31). `organize` is the floor
+on both branches of the gate and is checked before the audience delta (`container.md` §6); a move
+whose audience widens is then parked only for a token that also holds `publish`. Both refusals carry
+one text, so a refusal never says whether the destination's audience is wider. **running.** The
+six-capability sentence is DECIDED and unchanged.
 
 ### `structure` is not a capability
 

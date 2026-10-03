@@ -45,13 +45,19 @@ def _tree(box: Container):
 
 
 # --- item 3: publish gates widening, organize gates the silent move ------------------------------
-def test_widening_without_publish_is_refused_and_parks_nothing(box: Container):
+def test_a_token_below_the_floor_gets_one_refusal_whichever_branch(box: Container):
     t, org, proj, other = _tree(box)
+    quiet = box.nodes.create("project", "quiet", org, token=t, actor=OWNER, principal=t.principal)
     _client(box, "watcher", "reader", [other.id])  # `other` has an audience `proj` lacks
     writer = _client(box, "writer", "contributor", [org.id])
     item = box.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
-    with pytest.raises(TrustError, match="needs `publish`"):
-        box.trust.move(item, other, token=writer, actor="writer")
+    refusals = []
+    for to in (other, quiet):  # a widening move, then a zero-delta one
+        with pytest.raises(TrustError) as e:
+            box.trust.move(item, to, token=writer, actor="writer")
+        refusals.append(str(e.value))
+    # container.md §6: checked before the delta, so the refusal says nothing about the audience
+    assert refusals[0] == refusals[1] and "organize" in refusals[0]
     assert box.backend.list_proposals(status="open") == []
     assert box.backend.get(item.id).scope == proj.id
 

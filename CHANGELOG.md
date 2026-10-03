@@ -16,14 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The container home is owner-only (0700): it holds the chain, every item and the token hashes.
 - The presence tap (`egzos.authz.presence`): `egzos trust approve` / `trust deny` open a one-shot
   loopback decision page — *Sign and approve* → *Confirm signature* within 10 s, *Approve without a
-  window*, or *Deny*. Every check appends `step_up` with its outcome. With
-  `EGZOS_STEP_UP_WINDOW_SECONDS` set (default `0`: every act taps), a signature opens a window for
-  that ring pair bounded to the signed shape, read back from the chain; `egzos trust close-window`.
+  window*, or *Deny*. Every check appends `step_up` with its outcome. A signature opens a window
+  for that ring pair bounded to the signed shape, read back from the chain, for
+  `step_up.window_seconds` (the contract's default 300; `EGZOS_STEP_UP_WINDOW_SECONDS=0` makes
+  every act tap); `egzos trust close-window` ends it. An act lands whole or not at all.
 - Token values are 256 random bits, stored only as a hash; the id is public (freeze item 19).
   `egzos token revoke <id>` takes a client token back, in a running `serve --mcp` too: the door
   re-reads its token on every call. A token past its `expires_at` is not live.
 - The gate: `organize` for a silent move, `publish` to propose a widening one; a manifest drift is
-  `approval.stale` (freeze items 3, 39); an ambiguous path resolves by latest activity (item 1).
+  `approval.stale` (freeze items 3, 39); an ambiguous path is refused with its matches named, never picked (item 1, as revised).
 
 ### Security
 

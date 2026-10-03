@@ -32,6 +32,10 @@ class HumanOnly(TrustError):
     """Raised when a client principal attempts a human-only act."""
 
 
+# One refusal for both branches of the gate (container.md §6, capabilities.md §1).
+_MOVE_REFUSED = "moving items needs `organize` (and `publish` where the audience widens)"
+
+
 class TrustEngine:
     def __init__(self, backend: Backend, ledger: Ledger, nodes: NodeService):
         self.backend = backend
@@ -167,6 +171,10 @@ class TrustEngine:
         if item.status == "quarantined":
             # A quarantined item does not move, silently or by proposal (step-up spec R5).
             raise TrustError("quarantined items do not move; lift the quarantine deliberately")
+        # The floor is checked BEFORE the delta (container.md §6): a token that may not move the
+        # item never learns from the refusal whether the destination's audience is wider.
+        if not token.has("organize"):
+            raise TrustError(_MOVE_REFUSED)
         before = self.audience(frm)
         after = self.audience(to)
         delta = [a for a in after if a["token"] not in {b["token"] for b in before}]
@@ -174,10 +182,6 @@ class TrustEngine:
 
         if not delta:
             # Zero audience delta (true solo — counting agents) → instant, silently logged.
-            # Without `organize` the move is refused, never parked: parking let a fetch-only
-            # token fill the owner's pending queue (#94; freeze item 3).
-            if not token.has("organize"):
-                raise TrustError("moving items needs `organize`")
             reset = self._reset_if_agent_run(item, token.principal)
             with self.backend.atomic():  # the move and its gate entry, together
                 self._do_move(item, to, actor, token.principal)
@@ -198,7 +202,7 @@ class TrustEngine:
         # even for the interactive owner the gate shows the RESOLVED audience; the confirm is a
         # separate human act (`trust approve`, behind the presence tap).
         if not token.has("publish"):
-            raise TrustError("proposing a wider audience needs `publish`")
+            raise TrustError(_MOVE_REFUSED)  # the floor's text: the branch is not disclosed
         return self._park(item, frm, to, token, actor, delta, reason="audience widens")
 
     def _park(

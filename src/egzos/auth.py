@@ -3,7 +3,8 @@
 """
 Principals and tokens, skeleton edition (v0.4 §5, v0.3 §5). Bearer tokens cannot prove a human;
 tokens carry `principal: interactive | client`. Human-only acts demand the interactive principal
-(the step-up tap arrives in Phase 2.2 — here the interactive owner token IS the proof).
+AND the step-up tap (`egzos.authz.presence`): the token says who may act, the tap that a person
+is present and decided.
 
 The OS keychain is stood in for by a mode-0600 file under the container home. Machine clients
 never touch it; they receive their own client tokens.

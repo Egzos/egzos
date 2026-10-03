@@ -234,6 +234,7 @@ def ls(
         rows = [(node, i) for i in c.backend.query([node.id])]
     else:
         rows = [(n, i) for n, i in c.store.inbox_items() if c.trust.covers(token, n)]
+    held = len(rows)
     if token.principal != "interactive":
         # A client is SERVED, never shown the store: the same policy as fetch — rules
         # verified-only everywhere, quarantined never, each layer's serving policy.
@@ -248,7 +249,7 @@ def ls(
         view="ls" if node and not inbox else "ls --inbox",
         items=[i.id for _, i in rows],
         layers=[],
-        withheld=0,
+        withheld=held - len(rows),  # what the serving policy kept back, as the door records it
     )
     _out(
         [{"scope": c.nodes.path(n), **i.to_dict()} for n, i in rows],
@@ -640,8 +641,11 @@ def token_revoke(
 @token_app.command("ls")
 def token_ls():
     c = _container()
-    _owner(c, "the token list")
+    owner = _owner(c, "the token list")
     ts = c.backend.list_tokens()
+    # An owner view like the others: every principal, its scopes and last use — a read on the chain.
+    c.ledger.append("context.fetch", actor=OWNER, principal=owner.principal, client=owner.client,
+                    view="token ls", items=[], tokens=[t.id for t in ts], layers=[], withheld=0)
     _out(
         [t.to_dict() for t in ts],
         "\n".join(

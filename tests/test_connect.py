@@ -98,3 +98,33 @@ def test_an_expired_token_is_not_live(tmp_path):
         assert (c.auth.use(secret) is not None) is live, when
         assert c.backend.get_token(t.id).live is live
         assert c.trust.covers(c.backend.get_token(t.id), c.nodes.user_root()) is live
+
+
+def test_token_ls_is_a_read_on_the_chain(tmp_path, monkeypatch):
+    from egzos.container import Container
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    assert main(["token", "ls"]) == 0
+    last = Container(tmp_path).ledger.tail(1)[0]
+    assert last["event"] == "context.fetch" and last["details"]["view"] == "token ls"
+
+
+def test_a_client_ls_records_what_the_policy_withheld(tmp_path, monkeypatch):
+    from egzos.container import OWNER, Container
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    c = Container(tmp_path)
+    owner = c.auth.interactive_token()
+    bad = c.store.add(body="b", token=owner, actor=OWNER, principal="interactive")
+    c.store.add(body="o", token=owner, actor=OWNER, principal="interactive")
+    c.trust.quarantine(bad, token=owner, actor=OWNER, reason="x")
+    bot = c.auth.mint(principal="client", owner=OWNER, client="bot", role="reader",
+                      scopes=[c.nodes.inbox().id], actor=OWNER, by_principal="interactive")
+    monkeypatch.setenv("EGZOS_TOKEN", bot.secret)
+    assert main(["ls", "--inbox"]) == 0
+    last = Container(tmp_path).ledger.tail(1)[0]["details"]
+    assert last["view"] == "ls --inbox" and last["withheld"] == 1

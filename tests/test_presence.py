@@ -144,14 +144,16 @@ def test_page_consumes_the_design_tokens_not_literal_colours():
     assert not re.search(r"#[0-9A-Fa-f]{3,8}\b", TAP_STYLE)
 
 
-def test_the_default_is_no_window_until_windows_bind_to_the_manifest(box, monkeypatch):
+def test_the_default_window_is_the_contracts(box, monkeypatch):
+    from egzos._types import CONTAINER_CONFIG_DEFAULTS
     from egzos.authz.presence import window_seconds
 
     monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
-    assert window_seconds() == 0
+    # container.md §8 / _types: one default, read from the typed contract (300 s), never a copy
+    assert window_seconds() == CONTAINER_CONFIG_DEFAULTS["step_up_window_seconds"] == 300
     p = Presence(box)
     assert p.require(ACT, timeout=10, opener=_person()) == "approved"
-    assert _step_ups(box)[-1]["window_closes"] is None and not p.window_open(("user", "user"))
+    assert _step_ups(box)[-1]["window_closes"] and p.window_open(("user", "user"))
 
 
 def test_the_standalone_tap_refuses_a_post_without_origin(box):
