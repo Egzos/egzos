@@ -24,6 +24,13 @@ that touches the same paths. Chief-only (`chief_only` in `.github/OWNERSHIP.yml`
 settle a `blocker` or a security-class finding. `Egzos/egzos-platform` keeps its own register at
 the same path; entry ids are repo-local and are never cited across repositories.
 
+**`instruments/`**
+A2's verification instruments for `spec/design/**`: the pre-push text audit, the copy-key and
+sync checks, and the selftest that makes every check fail on purpose. Tooling that reads the
+specs, not a source-of-record text. Landed 2026-10-02 (decision (a)); changes arrive as Chief
+commits on `chief/` branches, since A2 is not a CI identity. See `instruments/README.md` for
+what each check sees and what it cannot.
+
 ## Earlier logs (not published)
 
 The earlier decisions logs — v0.3, v0.4, v0.5 and the v0.5 amendment set — are internal working
