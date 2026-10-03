@@ -370,14 +370,13 @@ Testably:
    unregistered URI — clause (1) made sure no such entry exists — and takes §5.3's pre-trust uniform
    failure like any other unregistered one. It gets no special error: a distinct "localhost is
    refused" response at `/authorize` would be a registry oracle of exactly the kind §5.3 closes.
-3. **§K's "localhost dev origins"** are accommodated, which is what §K asked for. A dev client binds
-   to loopback and registers `http://127.0.0.1/…` or `http://[::1]/…`; the port exception above
-   means the ephemeral port it actually binds needs no second registration. Nothing a developer does
-   requires the name form — a browser follows `http://127.0.0.1:8731/cb` exactly as it follows the
-   name — so this costs a string and buys a resolver out of the trust path.
+3. **§K's "localhost dev origins"** are still accommodated, which is what §K asked for: a dev client
+   registers `http://127.0.0.1/…` or `http://[::1]/…`, and the port exception above means the
+   ephemeral port it binds needs no second registration. A browser follows `http://127.0.0.1:8731/cb`
+   exactly as it follows the name, so this costs a string and buys a resolver out of the trust path.
 
-This is also the one clause in §5 where **a1p's binding was overruled** rather than confirmed, and
-it is marked so a reader of the freeze record and a reader of this section see the same thing.
+This is the one clause in §5 where **a1p's binding was overruled** rather than confirmed, marked so
+that a reader of the freeze record and a reader of this section see the same thing.
 
 ### 5.3 · The pre-trust uniform failure
 
@@ -562,14 +561,12 @@ whole vocabulary of ten, and `AS_METADATA_CONDITIONAL_FIELDS`, which named the t
 removed: an empty constant would be a place for a later field to be quietly added.
 
 **`scopes_supported` does not advertise the `node:` form. [0.3 · 28]** It carries the six capability
-names from §7 and nothing else. Clients learn the node-scope form from this contract, which is where
-an interoperability surface's *vocabulary* belongs; the metadata announces what a container
-implements, and every container implements the same six. Advertising the bare `node:` prefix would
-reveal nothing on its own — the argument for it — but it would put a container-specific *form* in
-the one document whose rule is that nothing container-specific appears in it, and the next step from
-"the prefix is advertised" to "an example is advertised" is a short one. Listing an actual node id
-would break that rule outright, and this clause removes the position from which a reader could argue
-for it.
+names from §7 and nothing else; clients learn the node-scope form from this contract, which is where
+an interoperability surface's *vocabulary* belongs. Advertising the bare prefix would reveal nothing
+on its own — the argument for it — but it would put a container-specific *form* in the one document
+whose rule is that nothing container-specific appears there, and the step from "the prefix is
+advertised" to "an example is advertised" is short. This clause removes the position from which a
+reader could argue for it.
 
 ## 7 · The grant is six capabilities and node ids — nothing else
 
@@ -737,19 +734,16 @@ AS's instance of it and defers the normative clause; `capabilities.md` §5 is th
 
 Two readings the number does not have:
 
-1. **It is a floor, not a size.** A value may be longer, and a format that carries structure around
-   a random core (a prefix, a checksum) conforms as long as the random core meets the floor. The
-   entropy is what an attacker must search, never what the string's length suggests.
-2. **`user_code` is the one exception, and it is bounded differently.** [0.3 · 20] fixes it at eight
-   characters from a 20-consonant alphabet — roughly 34 bits, far under this floor, and deliberately
-   so, because a human types it. Its security comes from §3 mitigation 1's attempt bound and
-   expiry, not from entropy, and that substitution is stated at §11.8 where the code is specified.
-   No other value may use that argument: `user_code` is short because a human reads it aloud, and
-   nothing else this AS issues is.
+1. **It is a floor, not a size.** A format carrying structure around a random core (a prefix, a
+   checksum) conforms as long as that core meets the floor: the entropy is what an attacker must
+   search, never what the string's length suggests.
+2. **`user_code` is the one exception, bounded differently.** [0.3 · 20] fixes it at eight
+   characters from a 20-consonant alphabet — far under this floor, deliberately, because a human
+   types it. Its security comes from §3 mitigation 1's attempt bound and expiry instead, as §11.8
+   states. No other value may borrow that argument.
 
-`Token.id` is a token's *identifier* and not its value; this clause governs values. **[0.3 · 11]**'s
-owner-path revocation keys on the identifier precisely because that is the half safe to render on a
-page the owner is reading.
+`Token.id` is a token's *identifier*, not its value, and this clause governs values. **[0.3 · 11]**'s
+owner path keys on the identifier precisely because that is the half safe to render on a page.
 
 ### 9.2 · Revocation, rotation and expiry
 
@@ -852,10 +846,9 @@ contract specifies, which is what §6's conformance rule requires and what the c
 not deliver. `token rm` remains the revocation *semantics* under both transports: a revoked token is
 `capabilities.md` §5's, and `token.revoke` is written once, whichever path reached it.
 
-**What was given up, named rather than left for a reader to find:** a client holding only a token's
-value can revoke that token and nothing else, and the `client_id` it sends is not what stops it
-reaching further — §9.1's entropy is. That was the cost of having any client-reachable revocation at
-all, and the alternative on the table was leaving browsers and MCP clients with no revocation path.
+**What was given up:** a client holding only a token's value can revoke that token, and the
+`client_id` it sends is not what stops it reaching further — §9.1's entropy is. The alternative was
+leaving browsers and MCP clients with no revocation path at all.
 
 **Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
 
