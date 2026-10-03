@@ -313,3 +313,12 @@ def test_an_item_promotion_tap_renders_only_what_the_spec_defines():
     assert "Sign and approve" in page
     status, again = tap.post("deny")
     assert tap.outcome is None and "Sign and approve" in again  # a forged deny decides nothing
+
+
+def test_a_dead_tap_token_gets_the_one_empty_page_and_reveals_have_44px_targets():
+    from egzos.authz.presence import TAP_STYLE, empty_page
+
+    page = empty_page()
+    assert "<h1 tabindex=-1 autofocus>Nothing is waiting for you.</h1></main>" in page  # R11
+    summary = next(r for r in TAP_STYLE.split("}") if r.lstrip().startswith("summary{"))
+    assert "min-height:44px" in summary  # §12.1: pad the target, never the type

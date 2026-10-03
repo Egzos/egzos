@@ -190,6 +190,8 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "subject": item.id,
             "ref": "ITEM",
             "filed": None,
+            # Interim, named on design-gap #122: the tap spec's §2.2 item 3 titles a proposal
+            # (a ring pair) and has no title for approve.pending.
             "title": f"Mark verified: “{item.content.get('auto_title', item.id)}” at {path}",
             "requester": f"agent:{client}" if client and client != "cli" else "you",
             "reason": None,
@@ -351,7 +353,8 @@ h2{font-size:var(--egz-fs-4);font-weight:var(--egz-w-semibold)}
 .ink3{color:var(--egz-ink-3)}
 .chips{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .attr{font-family:var(--egz-font-mono);font-size:.8rem}
-summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem}
+summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem;min-height:44px;
+ padding:var(--egz-sp-3) 0;box-sizing:border-box}
 .ref,.shell{font-family:var(--egz-font-mono);text-transform:uppercase;
  letter-spacing:var(--egz-tracking-caps);font-size:.8rem;font-feature-settings:var(--egz-tabular)}
 .ref code{font:inherit}
@@ -413,6 +416,7 @@ TAP_COPY = {
     "outcome.invalid": "This proposal is no longer valid.",
     "act.promoted": "Promoted at {at} by {user}. Served as verified from now on.",
     "tap.invalid": "This request is no longer valid.",
+    "tap.empty": "Nothing is waiting for you.",
 }
 
 
@@ -425,6 +429,7 @@ def outcome_text(act: dict[str, Any], outcome: str, *, closes: str | None,
             return TAP_COPY["outcome.denied"].format(at=at, user=OWNER, destination=act["dest"])
         return TAP_COPY["tap.invalid"]
     if act.get("kind") != "proposal":
+        # lifeboat.md §13's string for this act; the tap spec's §13 has none (#122).
         return TAP_COPY["act.promoted"].format(at=at, user=OWNER)
     trust = ", ".join(sorted(set(landed or [r.get("after", "unverified")
                                                for r in act.get("items", [])])))
@@ -618,17 +623,29 @@ class Tap:
 
             def do_GET(self):  # noqa: N802
                 if not tap.live(self.path):
-                    return self._send(404, "<p>Nothing here.</p>")
+                    return self._send(404, empty_page())
                 self._send(*tap.get())
 
             def do_POST(self):  # noqa: N802
                 if not tap.live(self.path):
-                    return self._send(404, "<p>Nothing here.</p>")
+                    return self._send(404, empty_page())
                 if not same_origin(self.headers):
                     return self._send(403, "<p>Refused.</p>")
                 self._send(*tap.post(read_step(self)))
 
         return Handler
+
+
+def empty_page() -> str:
+    """R11: one page for an unknown, foreign, expired or used token — §13 `tap.empty` as the
+    heading, the body empty, nothing on it depending on which cause it was."""
+    return (
+        "<!doctype html><html lang=en><head><meta charset=utf-8>"
+        '<meta name=viewport content="width=device-width,initial-scale=1">'
+        f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+        f"<body><main><h1 tabindex=-1 autofocus>{_e(TAP_COPY['tap.empty'])}</h1></main>"
+        "</body></html>"
+    )
 
 
 def same_origin(headers) -> bool:
