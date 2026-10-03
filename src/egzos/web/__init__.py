@@ -212,10 +212,17 @@ class Lifeboat:
             if act["kind"] == "proposal":
                 p = self.c.trust.execute(act["subject"], token=token, actor=OWNER)
                 return f"Signed at {at} by {OWNER}. {len(p['items'])} items at {act['dest']}. {window}"
-            item = self.c.trust.promote(self.c.backend.get(act["subject"]), token=token, actor=OWNER)
+            item = self.c.backend.get(act["subject"])
+            if item is None or item.status != "unverified":
+                return "This request is no longer valid."
+            item = self.c.trust.promote(item, token=token, actor=OWNER)
             return f"Signed at {at} by {OWNER}. {_title(item)} is verified. {window}"
         except TrustError:
-            return "This proposal is no longer valid."
+            return (
+                "This proposal is no longer valid."
+                if act["kind"] == "proposal"
+                else "This request is no longer valid."
+            )
 
     def _path(self, node_id: str) -> str:
         node = self.c.backend.get_node(node_id)

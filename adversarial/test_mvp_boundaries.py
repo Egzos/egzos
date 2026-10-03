@@ -235,3 +235,67 @@ def test_the_mcp_inbox_serves_no_quarantined_item_and_no_unverified_rule(box):
     box.trust.quarantine(bad, token=owner, actor=OWNER, reason="x")
     ids = {i["id"] for i in _call(build_server(box, _client(box)), "egzos_inbox", {})["items"]}
     assert ok.id in ids and rule.id not in ids and bad.id not in ids
+
+
+# --- round 3: approve what you saw; report only what the caller may see ---
+def test_cli_promotes_the_item_the_page_showed_even_if_percent_n_moves(tmp_path, monkeypatch):
+    from egzos.authz import presence
+    from egzos.cli import main
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    c = Container(tmp_path)
+    owner = c.auth.interactive_token()
+    seen = c.store.add(body="the one I saw", token=owner, actor=OWNER, principal="interactive")
+    other = c.store.add(body="swapped in", token=owner, actor=OWNER, principal="interactive")
+    (tmp_path / f"last-find-{owner.id}.json").write_text(json.dumps({"1": seen.id}))
+
+    def swap_then_approve(self, act, **kw):
+        assert act["subject"] == seen.id
+        (tmp_path / f"last-find-{owner.id}.json").write_text(json.dumps({"1": other.id}))
+        return "approved"
+
+    monkeypatch.setattr(presence.Presence, "require", swap_then_approve)
+    assert main(["trust", "approve", "%1"]) == 0
+    assert c.backend.get(seen.id).status == "verified"
+    assert c.backend.get(other.id).status == "unverified"
+
+
+def test_quarantine_reports_only_ids_the_caller_covers(box):
+    owner = box.auth.interactive_token()
+    hidden = box.nodes.create("project", "hidden", box.nodes.user_root(), token=owner,
+                              actor=OWNER, principal="interactive")
+    src = box.store.add(body="src", token=owner, actor=OWNER, principal="interactive")
+    copy = box.store.add(body="copy", scope=hidden, token=owner, actor=OWNER,
+                         principal="interactive")
+    copy.provenance["derived_from"] = src.id
+    box.backend.put(copy)
+    bot = _client(box, role="curator")
+    assert box.trust.quarantine(src, token=bot, actor="bot", reason="x") == [src.id]
+    assert box.backend.get(copy.id).status == "quarantined"  # propagation is not narrowed
+    assert box.ledger.tail(1)[0]["details"]["affected"] == [src.id, copy.id]
+
+
+def test_connect_apply_json_never_echoes_the_secret(tmp_path, monkeypatch, capsys):
+    from egzos.cli import main
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    monkeypatch.setattr("egzos.cli.shutil.which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr("egzos.cli.subprocess.run", lambda *a, **k: None)
+    assert main(["init"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "connect", "--apply"]) == 0
+    assert "egz_" not in capsys.readouterr().out
+
+
+def test_init_never_mints_a_second_owner(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    keychain = (tmp_path / "keychain.json").read_text()
+    r = _egzos(tmp_path, "init", token="egz_01HZZZZZZZZZZZZZZZZZZZZZZZ_forged")
+    assert r.returncode != 0
+    assert (tmp_path / "keychain.json").read_text() == keychain
+    owners = [t for t in json.loads(_egzos(tmp_path, "--json", "token", "ls").stdout)
+              if t["principal"] == "interactive"]
+    assert len(owners) == 1

@@ -55,6 +55,12 @@ class Container:
             token = self.auth.interactive_token()
             if token:
                 return token
+            # Never mint a second owner, and never overwrite the keychain, because a token did
+            # not resolve: that is exactly what a wrong or revoked EGZOS_TOKEN looks like.
+            raise PermissionError(
+                "this container is already initialized and the token presented does not resolve; "
+                "unset EGZOS_TOKEN or restore the keychain — init will not mint a new owner"
+            )
         self.ledger.append(
             "container.init", actor=OWNER, principal="interactive", home=str(self.home)
         )

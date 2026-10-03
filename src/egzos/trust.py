@@ -143,7 +143,14 @@ class TrustEngine:
             reason=reason,
             affected=affected,
         )
-        return affected
+        # The caller learns only what it may see; the chain keeps the whole propagation.
+        return [
+            i
+            for i in affected
+            if (it := self.backend.get(i))
+            and (n := self.backend.get_node(it.scope))
+            and self.covers(token, n)
+        ]
 
     # -- the gate ------------------------------------------------------------------------------
     def move(self, item: ContextItem, to: Node, *, token: Token, actor: str) -> dict[str, Any]:

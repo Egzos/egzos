@@ -232,3 +232,12 @@ def test_item_page_puts_the_acts_last_and_quarantine_is_an_outline(boat):
     body = b.item(item.id)[1]
     assert body.index("lifecycle") < body.index("Approve — mark verified")
     assert ".badge.quarantined{color:var(--egz-alarm);border-color:var(--egz-alarm)}" in body
+
+
+def test_a_tap_for_an_item_gone_meanwhile_answers_uniformly(boat):
+    b, item = boat
+    token = _to_tap(b, item.id)
+    b.c.backend.tombstone(item.id)
+    b.tap_post(token, "arm")
+    status, page = b.tap_post(token, "confirm")
+    assert status == 200 and "This request is no longer valid." in page

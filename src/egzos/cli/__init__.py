@@ -465,7 +465,12 @@ def _decide(c: Container, token, ref: str) -> None:
                 f"(manifest {p['manifest'][:12]}… matched)",
             )
             return
-        item = c.trust.promote(_item_ref(c, ref), token=token, actor=OWNER)
+        # Approve what you saw: the item the page showed, never `ref` resolved a second time
+        # (a `%n` map can be rewritten while the page waits).
+        item = c.store.get(act["subject"])
+        if not item or item.status != "unverified":
+            _fail("nothing to decide: it is no longer pending")
+        item = c.trust.promote(item, token=token, actor=OWNER)
         _out(
             item.to_dict(),
             f"{item.id} → verified  (approved_by {item.provenance['approved_by']}, "
@@ -722,7 +727,17 @@ def connect(
             _fail("`claude` is not on PATH; run the printed command once Claude Code is installed")
         subprocess.run(cmd, check=True)
     _out(
-        {"token": t.id, "client": client, "role": role, "command": cmd, "applied": apply},
+        {
+            "token": t.id,
+            "client": client,
+            "role": role,
+            # Once `claude mcp add` holds the secret, no output repeats it.
+            "command": [
+                "EGZOS_TOKEN=<registered>" if apply and a.startswith("EGZOS_TOKEN=") else a
+                for a in cmd
+            ],
+            "applied": apply,
+        },
         f"client token minted for {client} (role {role}, principal client)\n"
         + ("registered with Claude Code." if apply else
            "register it with Claude Code:\n  " + " ".join(shlex.quote(x) for x in cmd)),
