@@ -50,6 +50,8 @@ from egzos.container import OWNER, Container
 DEFAULT_WINDOW_SECONDS = 0
 ARM_SECONDS = 10
 CHIPS = 6
+ROWS = 12  # §2.2 item 5: 12 rows, then `+ N more`
+REASON_MAX = 480  # §2.2 item 4: then `…` and *Show full reason*
 
 
 def window_seconds() -> int:
@@ -124,7 +126,7 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         return {
             "kind": "proposal",
             "subject": prop["id"],
-            "ref": f"PROPOSAL {prop['id']} · filed {prop.get('created_at', '')[11:19]}",
+            "ref": f"PROPOSAL {prop['id'][:10]}… · filed {prop.get('created_at', '')[11:19]}",
             "title": f"Move {len(items)} items outward: {prop['from_path']} → {prop['to_path']}",
             "requester": f"agent:{by['client']}" if by.get("principal") == "client" else "you",
             "reason": prop.get("reason"),
@@ -151,7 +153,7 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         return {
             "kind": "item",
             "subject": item.id,
-            "ref": f"ITEM {item.id}",
+            "ref": f"ITEM {item.id[:10]}…",
             "title": f"Mark verified: “{item.content.get('auto_title', item.id)}” at {path}",
             "requester": f"agent:{client}" if client and client != "cli" else "you",
             "reason": None,
@@ -292,6 +294,8 @@ TAP_STYLE = """
 body{margin:0;background:var(--egz-canvas);color:var(--egz-ink);font-family:var(--egz-font-ui);
  line-height:var(--egz-lh)}
 main{max-width:720px;margin:32px auto;padding:0 16px}
+.attr{font-family:var(--egz-font-mono);font-size:.8rem}
+summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem}
 .ref,.shell,h2{font-family:var(--egz-font-mono);text-transform:uppercase;
  letter-spacing:var(--egz-tracking-caps);font-size:.8rem}
 .shell{text-transform:none;letter-spacing:0;border-bottom:var(--egz-hair) solid var(--egz-rule-soft);
@@ -358,11 +362,24 @@ class Tap:
         a = self.act
         e = _e
         seconds = window_seconds()
-        rows = "".join(
+        manifest = [
             f"<tr><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
             f"<td>{e(r.get('trust'))}</td></tr>"
             for r in a.get("items", [])
-        )
+        ]
+        rows = f"<table>{''.join(manifest[:ROWS])}</table>"
+        if len(manifest) > ROWS:  # expands in place, no script: a disclosure element
+            rows += (
+                f"<details><summary>+ {len(manifest) - ROWS} more</summary>"
+                f"<table>{''.join(manifest[ROWS:])}</table></details>"
+            )
+        reason = a.get("reason") or "(no reason given)"
+        said = f"“{e(reason)}”"
+        if len(reason) > REASON_MAX:
+            said = (
+                f"“{e(reason[:REASON_MAX])}…”<details><summary>Show full reason</summary>"
+                f"<p>“{e(reason)}”</p></details>"
+            )
         audience = a.get("audience", [])
         people = sum(1 for x in audience if x.get("principal") == "interactive")
         agents = len(audience) - people
@@ -388,16 +405,18 @@ class Tap:
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
             '<meta name=viewport content="width=device-width,initial-scale=1">'
-            f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+            # §2.3's 10 s revert, without script: the armed page reloads itself after the arm
+            # lapses, and the server (which enforces the 10 s regardless) answers un-armed.
+            + (f'<meta http-equiv=refresh content="{ARM_SECONDS}">' if armed else "")
+            + f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
             "<body><main>"
             f"<p class=shell>egzos · container {e(self.container)} · {e(self.host)}</p>"
             f"<p class=shell>you · {e(OWNER)} · principal: interactive · present since "
             f"{e(_since(self.opened))}</p>"
             f"<p class=ref>{e(a.get('ref', 'act'))}</p>"
             f"<h1>{e(a['title'])}</h1>"
-            f"<p><span class=ref>{e(a.get('requester', 'you'))} states:</span> "
-            f"“{e(a.get('reason') or '(no reason given)')}”</p>"
-            f"<h2>what moves</h2><table>{rows}</table>"
+            f"<p><span class=attr>{e(a.get('requester', 'you'))} states:</span> {said}</p>"
+            f"<h2>what moves</h2>{rows}"
             f"<h2>who will see it at {e(a.get('dest', a['to']))}</h2>"
             f"<p>{people} people · {agents} agents · resolved from token grants and scope "
             f"membership</p><p>{chips}</p>{consequence}"

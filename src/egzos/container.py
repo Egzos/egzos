@@ -53,8 +53,13 @@ class Container:
         `login` (device-code) replaces this step from Phase 2; the skeleton is single-user."""
         if self.initialized:
             token = self.auth.interactive_token()
-            if token:
+            if token and token.principal == "interactive":
                 return token
+            if token:
+                raise PermissionError(
+                    "this container is already initialized and the token presented is a client "
+                    "principal's; init answers only for the owner"
+                )
             # Never mint a second owner, and never overwrite the keychain, because a token did
             # not resolve: that is exactly what a wrong or revoked EGZOS_TOKEN looks like.
             raise PermissionError(

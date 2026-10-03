@@ -299,3 +299,11 @@ def test_init_never_mints_a_second_owner(tmp_path):
     owners = [t for t in json.loads(_egzos(tmp_path, "--json", "token", "ls").stdout)
               if t["principal"] == "interactive"]
     assert len(owners) == 1
+
+
+def test_init_never_calls_a_client_token_the_owners(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    secret = _json(_egzos(tmp_path, "--json", "token", "create", "--client", "bot",
+                          "--role", "reader"))["secret"]
+    r = _egzos(tmp_path, "init", token=secret)
+    assert r.returncode != 0 and "client principal" in (r.stdout + r.stderr)

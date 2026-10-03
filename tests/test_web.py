@@ -70,6 +70,7 @@ def test_approve_redirects_to_the_tap_which_needs_two_presses(boat, monkeypatch)
     token = _to_tap(b, item.id)
     assert b.c.backend.get(item.id).status == "unverified"
     status, page = b.tap_get(token)
+    assert f"ITEM {item.id[:10]}…" in page  # §2.2 item 2: an id prefix
     for required in ("egzos · container", "principal: interactive", "what moves",
                      "who will see it at", "presence", "Sign and approve", "window would close"):
         assert required in page, required

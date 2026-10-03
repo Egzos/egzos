@@ -172,3 +172,22 @@ def test_the_standalone_tap_refuses_a_post_without_origin(box):
         return True
 
     assert Presence(box).require(ACT, timeout=2, opener=no_origin) == "expired"
+
+
+def test_the_page_caps_long_reasons_and_long_manifests_with_reveals():
+    from egzos.authz.presence import Tap
+
+    act = {**ACT, "requester": "agent:claude-code", "reason": "r" * 600,
+           "items": [{"kind": "memory", "title": f"t{i}", "trust": "x"} for i in range(15)]}
+    page = Tap(act).page(armed=False)
+    assert "r" * 480 + "…" in page and "<summary>Show full reason</summary>" in page
+    assert page.count("<tr>") == 15 and "<summary>+ 3 more</summary>" in page
+    assert "<span class=attr>agent:claude-code states:</span>" in page  # verbatim, no caps class
+
+
+def test_an_armed_page_reverts_itself_after_ten_seconds():
+    from egzos.authz.presence import Tap
+
+    tap = Tap(ACT)
+    assert 'http-equiv=refresh content="10"' in tap.page(armed=True)
+    assert "http-equiv=refresh" not in tap.page(armed=False)
