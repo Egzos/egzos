@@ -603,3 +603,62 @@ def test_main_backstop_refuses_a_symlink(repo):
     res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
     assert res.returncode == 1
     assert "adversarial/test_x.py" in res.stdout and "symlink" in res.stdout
+
+
+_LIVE = "def test_a():\n    pass\n"
+
+
+@pytest.mark.parametrize(
+    ("source", "live"),
+    [
+        # The mark must be the real pytest's: bound by `import pytest` and nothing else.
+        ("class _M:\n    class mark:\n        xfail = staticmethod(lambda f: f)\npytest = _M\n"
+         "@pytest.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
+        ("import pytest\npytest = object()\n@pytest.mark.xfail\ndef test_a():\n    pass\n",
+         ["test_a"]),
+        ("import pytest as pt\n@pt.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
+        ("from pytest import mark\n@mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
+        ("import pytest\ntry:\n    pass\nexcept Exception as pytest:\n    pass\n"
+         "@pytest.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
+        ("import pytest\nx = object()\n@x.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
+        # Names pytest collects can arrive by import or by assignment, classes included.
+        ("from helpers import test_a\n", ["test_a"]),
+        ("import pytest\nTestA = type('TestA', (), {})\n", ["TestA"]),
+        # Run-time binding cannot be read statically, so the file is refused whole.
+        ("exec('def test_a(): pass')\n", ["<unreadable: exec>"]),
+        ("globals()['test_a'] = lambda: None\n", ["<unreadable: globals>"]),
+        ("import sys\nsetattr(sys.modules[__name__], 'test_a', print)\n",
+         ["<unreadable: modules>", "<unreadable: setattr>"]),
+        ("from helpers import *\n", ["<unreadable: import *>"]),
+        ("def __getattr__(name):\n    return None\n", ["<unreadable: __getattr__>"]),
+        ("class Meta(type):\n    pass\nclass TestA(metaclass=Meta):\n    pass\n",
+         ["<unreadable: metaclass>"]),
+        ("pytest_plugins = ['x']\n", ["<unreadable: pytest_plugins>"]),
+        ("import pytest\npytestmark = pytest.mark.xfail\nexec('')\n", ["<unreadable: exec>"]),
+    ],
+)
+def test_non_xfail_tests_reads_only_what_it_can_prove(source, live):
+    assert co.non_xfail_tests(source) == live
+
+
+def test_security_backstop_scope_and_pytest_shadowing():
+    ok = "import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n"
+    files = {"adversarial/pytest.py": "", "adversarial/_pytest/x.py": "", "other/test_a.py": _LIVE,
+             "adversarial/test_ok.py": ok}
+    out = co.security_backstop_failures(
+        list(files), lambda p: b"100644", files.get, ["adversarial/**"])
+    assert [p for p, _ in out] == ["adversarial/pytest.py", "adversarial/_pytest/x.py"]
+    out = co.security_backstop_failures(list(files), lambda p: b"100644", files.get, ["other/**"])
+    assert [p for p, _ in out] == ["other/test_a.py"]
+
+
+def test_main_backstop_matches_paths_exactly(repo):
+    # A filename holding glob characters is a name, never a pattern that could read another entry.
+    _write(repo, "adversarial/__init__.py", "")
+    _write(repo, "adversarial/test_ok.py", "import pytest\n@pytest.mark.xfail\ndef test_a():\n"
+                                           "    pass\n")
+    _commit(repo, "base")
+    _branch_diff(repo, lambda r: _write(r, "adversarial/test_[ok].py", _LIVE))
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
+    assert res.returncode == 1
+    assert "adversarial/test_[ok].py" in res.stdout and "test_a is not" in res.stdout

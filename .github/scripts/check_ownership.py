@@ -43,8 +43,9 @@ RD-005's named backstop (Egzos/egzos-platform#45): on every a6 branch ($A6_BACKS
 by the workflow from the branch prefix, never from anything the branch names), each test the branch
 adds or changes under `adversarial/**` must carry an unconditional xfail mark, and the branch may
 not touch a conftest.py or commit a symlink or submodule there. `fix-landed`, last applied by an
-approver, lifts it once the fix a live test exercises has merged. Residual, named: a non-Python
-file under `adversarial/**` is not read here; a6's charter and the Chief's approval cover it. Both
+approver, lifts it once the fix a live test exercises has merged. Residuals, named: a non-Python
+file under `adversarial/**` is not read here, and a Python module's body runs at collection even
+when every test in it is xfail; a6's charter and the Chief's approval cover both. Both
 repositories carry this checker line-identical but for the docstring's first line; the backstop is
 wired only where a workflow sets $A6_BACKSTOP (egzos-platform), and is inert elsewhere rather than
 dead code.
@@ -53,6 +54,7 @@ dead code.
 import argparse
 import ast
 import fnmatch
+import functools
 import json
 import os
 import subprocess
@@ -237,11 +239,16 @@ def fix_landed_waives(labels_set, applier, approvers):
 
 
 def _is_unconditional_xfail(node):
-    """`pytest.mark.xfail`, or the same called with only reason/strict/run: never conditional."""
+    """`pytest.mark.xfail`, or the same called with only reason/strict/run: never conditional.
+
+    The chain must start at the name `pytest`; non_xfail_tests separately requires that name to be
+    bound by `import pytest` and nothing else, so the mark is the real one.
+    """
     call = node if isinstance(node, ast.Call) else None
     target = call.func if call else node
     if not (isinstance(target, ast.Attribute) and target.attr == "xfail"
-            and isinstance(target.value, ast.Attribute) and target.value.attr == "mark"):
+            and isinstance(target.value, ast.Attribute) and target.value.attr == "mark"
+            and isinstance(target.value.value, ast.Name) and target.value.value.id == "pytest"):
         return False
     if call is None:
         return True
@@ -259,6 +266,63 @@ def _marks(value):
 def _assigned_names(node):
     targets = node.targets if isinstance(node, ast.Assign) else [node.target]
     return [n.id for t in targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+
+
+def _bound_names(node):
+    """Every name `node` binds or deletes, in any form, without descending into it."""
+    if isinstance(node, ast.Name) and not isinstance(node.ctx, ast.Load):
+        return [node.id]
+    if isinstance(node, ast.alias):
+        return [(node.asname or node.name).split(".")[0]]
+    if isinstance(node, (ast.Global, ast.Nonlocal)):
+        return list(node.names)
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return [node.name]
+    if isinstance(node, ast.ExceptHandler) and node.name:
+        return [node.name]
+    if isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+        return [node.name]
+    if isinstance(node, ast.MatchMapping) and node.rest:
+        return [node.rest]
+    return []
+
+
+def _pytest_bound_cleanly(tree):
+    """True when the only binding of the name `pytest` anywhere in the file is a top-level
+    `import pytest`, so `pytest.mark.xfail` in it is the real mark."""
+    imports = [n for n in tree.body if isinstance(n, ast.Import)
+               and any(a.name == "pytest" and a.asname is None for a in n.names)]
+    if not imports:
+        return False
+    allowed = {id(a) for n in imports for a in n.names if a.name == "pytest" and a.asname is None}
+    return all(id(n) in allowed for n in ast.walk(tree) if "pytest" in _bound_names(n))
+
+
+# Constructs that bind names at run time, or change what pytest collects, where no static reading
+# can follow them. A file holding one is refused while the backstop applies.
+_DYNAMIC_CALLS = {"exec", "eval", "compile", "__import__", "globals", "vars", "locals", "setattr",
+                  "delattr"}
+_DYNAMIC_ATTRS = {"__dict__", "modules", "__builtins__"}
+_DYNAMIC_DEFS = {"__getattr__", "__dir__", "__init_subclass__", "__class_getitem__"}
+
+
+def _unclearable(tree):
+    """Reasons the file cannot be read statically, one entry per construct kind."""
+    found = set()
+    for n in ast.walk(tree):
+        if isinstance(n, ast.Name) and n.id in _DYNAMIC_CALLS | {"__builtins__"}:
+            found.add(n.id)
+        elif isinstance(n, ast.Attribute) and n.attr in _DYNAMIC_ATTRS:
+            found.add(n.attr)
+        elif isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names):
+            found.add("import *")
+        elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name in _DYNAMIC_DEFS:
+            found.add(n.name)
+        elif isinstance(n, ast.ClassDef) and any(k.arg == "metaclass" for k in n.keywords):
+            found.add("metaclass")
+        elif "pytest_plugins" in _bound_names(n):
+            found.add("pytest_plugins")
+    return sorted(f"<unreadable: {k}>" for k in found)
 
 
 def _binds_pytestmark(node):
@@ -305,23 +369,37 @@ def non_xfail_tests(source):
         tree = ast.parse(source)
     except SyntaxError:
         return ["<unparseable>"]
-    if _pytestmark_xfail(tree.body):
+    unclearable = _unclearable(tree)
+    if unclearable:
+        return unclearable
+    marks_real = _pytest_bound_cleanly(tree)
+    if marks_real and _pytestmark_xfail(tree.body):
         return []
     live = []
+
+    def xfailed(decorators):
+        return marks_real and any(_is_unconditional_xfail(d) for d in decorators)
+
+    def collectable(name):
+        return name.startswith(("test", "Test"))
 
     def visit(node, prefix, inherited):
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if child.name.startswith("test") and not (
-                        inherited or any(_is_unconditional_xfail(d) for d in child.decorator_list)):
+                        inherited or xfailed(child.decorator_list)):
                     live.append(prefix + child.name)
             elif isinstance(child, ast.ClassDef):
-                marked = inherited or _pytestmark_xfail(child.body) or any(
-                    _is_unconditional_xfail(d) for d in child.decorator_list)
+                marked = inherited or (marks_real and _pytestmark_xfail(child.body)) or xfailed(
+                    child.decorator_list)
                 visit(child, f"{prefix}{child.name}.", marked)
-            elif isinstance(child, (ast.Assign, ast.AnnAssign)):
+            elif isinstance(child, (ast.Assign, ast.AnnAssign, ast.Import, ast.ImportFrom)):
                 if not inherited:
-                    live.extend(prefix + n for n in _assigned_names(child) if n.startswith("test"))
+                    if isinstance(child, (ast.Assign, ast.AnnAssign)):
+                        names = _assigned_names(child)
+                    else:
+                        names = [b for a in child.names for b in _bound_names(a)]
+                    live.extend(prefix + n for n in names if collectable(n))
             elif isinstance(child, ast.Lambda):
                 continue
             else:
@@ -331,11 +409,23 @@ def non_xfail_tests(source):
     return live
 
 
+@functools.cache
+def _tree_modes(head):
+    """Every path at `head` mapped to its tree mode, from one listing. Paths are matched exactly,
+    never as pathspecs, since every path here is a name the branch chose."""
+    raw = subprocess.run(["git", "ls-tree", "-r", "-z", "--full-tree", head],
+                         capture_output=True, check=True).stdout
+    modes = {}
+    for record in raw.split(b"\0"):
+        if record:
+            meta, path = record.split(b"\t", 1)
+            modes[path.decode("utf-8", "surrogateescape")] = meta.split(b" ", 1)[0]
+    return modes
+
+
 def _mode_at(head, path):
     """The tree mode of `path` at `head` (b"100644", b"120000", ...), or None when deleted."""
-    entry = subprocess.run(["git", "ls-tree", "-z", head, "--", path],
-                           capture_output=True, check=True).stdout
-    return entry.split(b" ", 1)[0] if entry else None
+    return _tree_modes(head).get(path)
 
 
 def _text_at(head, path):
@@ -347,7 +437,7 @@ def _text_at(head, path):
         return None
 
 
-def security_backstop_failures(changed, mode_of, text_of):
+def security_backstop_failures(changed, mode_of, text_of, scope=("adversarial/**",)):
     """(path, reason) for each change an a6 branch may not make while the backstop applies.
 
     The mode is read for every path, so a link is refused whatever its name; content is read only
@@ -355,7 +445,7 @@ def security_backstop_failures(changed, mode_of, text_of):
     """
     out = []
     for path in changed:
-        if not path_matches_glob("adversarial/**", path):
+        if not matches_any(scope, path):
             continue
         mode = mode_of(path)
         if mode is None:
@@ -366,6 +456,8 @@ def security_backstop_failures(changed, mode_of, text_of):
             out.append((path, "a submodule is not read here; refused"))
         elif path.rsplit("/", 1)[-1] == "conftest.py":
             out.append((path, "conftest.py can re-mark tests; refused"))
+        elif {"pytest", "_pytest", "pytest.py"} & set(path.split("/")):
+            out.append((path, "a module named like pytest could shadow it; refused"))
         elif path.endswith(".py"):
             source = text_of(path)
             if source is None:
@@ -619,7 +711,8 @@ def main():
             post_image = [p for p in changed if p not in new_path_of]
             failures.extend(security_backstop_failures(
                 post_image, lambda path: _mode_at(args.head, path),
-                lambda path: _text_at(args.head, path)))
+                lambda path: _text_at(args.head, path),
+                agents_cfg[agent_name].get("exclusive") or ["adversarial/**"]))
 
     # ---- Size cap -----------------------------------------------------------
     total_lines, file_count = compute_size(numstat_entries, cap_exclude)

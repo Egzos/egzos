@@ -105,7 +105,7 @@ jobs:
                 echo "security was removed by approver ${WHO} — out of scope."
               else
                 APPLICABLE=true
-                echo "::warning::security was removed by ${WHO}, who is not an approver — a6 still reviews this PR."
+                echo "::warning::the latest security label event is a ${EVENT} by ${WHO}, not an approver's removal — a6 still reviews this PR."
               fi
             fi
           fi
