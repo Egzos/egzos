@@ -52,6 +52,7 @@ from egzos.authz.presence import (
     Tap,
     build_act,
     presence_text,
+    tap_css,
     tap_timeout,
     window_seconds,
 )
@@ -474,6 +475,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             "htmx.min.js": ("static/htmx.min.js", "text/javascript; charset=utf-8"),
             "lifeboat.js": ("static/lifeboat.js", "text/javascript; charset=utf-8"),
         }
+        if name == "tap.css":  # the hosted tap's styles, linked so no page needs inline style
+            return Response(tap_css(), media_type="text/css; charset=utf-8")
         if name not in files:
             return boat.not_found(request)
         rel, ctype = files[name]
@@ -667,7 +670,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             boat.outcomes[act["subject"]] = (state, text)
             return text
 
-        tap = Tap(act, container=boat.c.home.name, host=boat.host, decide=perform)
+        tap = Tap(act, container=boat.c.home.name, host=boat.host, decide=perform,
+                  stylesheet="/static/tap.css")
         boat.taps[tap.token] = {"tap": tap, "return": return_target(f"/items/{item.id}")}
         return RedirectResponse(f"/tap/{tap.token}", status_code=303)
 
@@ -922,13 +926,11 @@ def _harden(resp: Response, path: str) -> Response:
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
-    # The tap page carries its own inline style (it is the same page the CLI serves); every other
-    # page loads one stylesheet and one script, both from here.
-    style = "'self' 'unsafe-inline'" if path.startswith("/tap/") else "'self'"
+    # One CSP for every response (§18): styles and scripts from this origin only. The hosted
+    # tap links /static/tap.css rather than carrying the CLI tap page's inline style.
     resp.headers["Content-Security-Policy"] = (
-        f"default-src 'none'; script-src 'self'; connect-src 'self'; style-src {style}; "
-        "img-src 'self'; "
-        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
+        "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; "
+        "img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
     return resp
 

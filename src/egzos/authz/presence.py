@@ -437,6 +437,19 @@ button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px
 """
 
 
+def tap_css() -> str:
+    """The tap page's whole stylesheet: the tokens and TAP_STYLE, for a host that serves it."""
+    return _tokens_css() + TAP_STYLE
+
+
+def _style(stylesheet: str | None) -> str:
+    """Inline for the CLI's own one-page server; a link to the host's copy of `tap_css()` when the
+    lifeboat hosts the page, so the lifeboat's CSP stays `style-src 'self'` (lifeboat.md §18)."""
+    if stylesheet:
+        return f'<link rel=stylesheet href="{_e(stylesheet)}">'
+    return f"<style>{_tokens_css()}{TAP_STYLE}</style>"
+
+
 def _tokens_css() -> str:
     from importlib import resources
 
@@ -509,8 +522,9 @@ class Tap:
     """One page, one decision. The token is single-use: after a decision every request is refused."""
 
     def __init__(self, act: dict[str, Any], *, container: str = "egzos", host: str = "",
-                 decide=None):
+                 decide=None, stylesheet: str | None = None):
         self.act = act
+        self.stylesheet = stylesheet
         # The host's callback: performs the decision and returns the container's outcome line, so
         # the page never shows an outcome before the container has answered (lifeboat.md §15).
         self.decide = decide
@@ -600,7 +614,7 @@ class Tap:
             # lapses, and the server (which enforces the 10 s regardless) answers un-armed.
             # Escape and focus-loss need script; the baseline has none (design-gap #119).
             + (f'<meta http-equiv=refresh content="{ARM_SECONDS}">' if armed else "")
-            + f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+            + f"<title>egzos · presence</title>{_style(self.stylesheet)}</head>"
             "<body><main>"
             f"<p class=shell>egzos · container {e(self.container)} · {e(self.host)}</p>"
             f"<p class=shell>you · {e(OWNER)} · principal: interactive · present since "
@@ -631,7 +645,7 @@ class Tap:
         link = f'<p><a href="{_e(back)}">Return to pending</a></p>' if back else ""
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
-            f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+            f"<title>egzos · presence</title>{_style(self.stylesheet)}</head>"
             f"<body><main><div class=box><p role=status>{_e(text)}</p></div>{link}</main>"
             "</body></html>"
         )

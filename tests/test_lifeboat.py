@@ -559,6 +559,19 @@ def test_every_view_is_an_audited_read(lb):
         assert len(after) == before + 1 and "pending_count" in after[-1]["details"]
 
 
+def test_the_hosted_tap_links_its_styles_and_no_page_allows_inline_style(lb):
+    boat, client, item = lb
+    url = f"/items/{item.id}/promote"
+    tap_url = post(client, boat, url, {"version": 1, "arm": _arm(client, boat, url)}).headers[
+        "location"]
+    r = client.get(tap_url)
+    assert '<link rel=stylesheet href="/static/tap.css">' in r.text and "<style>" not in r.text
+    assert "unsafe-inline" not in r.headers["content-security-policy"]
+    assert "style-src 'self'" in r.headers["content-security-policy"]
+    css = client.get("/static/tap.css")
+    assert css.status_code == 200 and css.headers["content-type"].startswith("text/css")
+
+
 def test_a_failed_promote_through_the_tap_changes_nothing_and_says_so(lb, monkeypatch):
     boat, client, item = lb
     url = f"/items/{item.id}/promote"
