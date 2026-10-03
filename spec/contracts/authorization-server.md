@@ -19,12 +19,10 @@ Clauses carry one of six markings instead:
 - **a1p** — a1p's binding of a §K decision onto the already-drafted contracts, or onto OAuth 2.1
   where §K names a standard and stops. Reviewable, and the review should read it as a proposal.
 - **[0.3 · N]** — **decided by the Chief at the Phase 0.3 freeze review**, recorded on #31 (the
-  freeze record, 2026-10-03). `N` is that record's item number, so every clause carrying this
-  marking is traceable to the line that decided it. A `[0.3]` decision is law on the same terms as a
-  §K one: the wording may be improved, the decision may not be changed here. Where the record
-  settled a question but left a detail unnamed — a config key's spelling, a constant's name, a
-  section's number — a1p chose it and the choice is named in the PR that wrote it; such a detail is
-  an **a1p** binding of a `[0.3]` decision and is marked as both.
+  freeze record, 2026-10-03). `N` is that record's item number, so the clause is traceable to the
+  line that decided it. Law on the same terms as a §K one: the wording may be improved, the decision
+  may not be changed here. Where the record settled a question but left a detail unnamed — a config
+  key's spelling, a constant's name, a section's number — a1p chose it, and marked it **a1p** too.
 - `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately. The 0.3 record
   answered every one, but **this PR rewrote §§1–9 only**: **27 of these markers are still live
   across §§10–13** and are to be read as genuinely open text until the Part B PR replaces each with
@@ -188,10 +186,10 @@ enforced does not hold.
 **Code lifetime: 60 seconds. [0.3 · 16]** An authorization code MUST expire 60 seconds after it is
 issued, and the token endpoint MUST refuse an expired one by the same path as an unknown one (§5.3).
 The number is a contract value, not a default: there is no config key that raises it, and a
-deployment may not add one. OAuth 2.1's guidance is a maximum of ten minutes; a redirect that is
-already in flight does not need them, and an hour-long code would be a different security posture
-from a one-minute code while satisfying every clause above. `AS_CODE_LIFETIME_SECONDS = 60` in
-`_types.py` carries it — **a1p**'s naming of a `[0.3]` number.
+deployment may not add one. OAuth 2.1's guidance is a maximum of ten minutes; a redirect already in
+flight does not need them, and an hour-long code is a different security posture from a one-minute
+one while satisfying every clause above. `AS_CODE_LIFETIME_SECONDS = 60` in `_types.py` carries it —
+**a1p**'s naming of a `[0.3]` number.
 
 **Response type.** `code` only. The implicit grant and the resource-owner-password grant do not
 exist in this AS, are not advertised, and MUST be rejected. **a1p** — OAuth 2.1 removes both; said
@@ -254,11 +252,10 @@ Because the flow's weakness is a human typing a code, three mitigations are cont
 
 **`verification_uri_complete` is not issued. [0.3 · 21]** The device authorization response MUST NOT
 carry the key at all — not empty, not null, absent — and `/device` MUST ignore a `user_code` query
-parameter, rendering the empty entry form as if none had been supplied (§11.8). Including the
-`user_code` in a URL removes the typing step and with it some of the phishing surface the browser
-retirement was about, but it makes the code pasteable into a chat window, which is the same mistake
-with fewer steps: a code a user can forward is a code a user can be asked to forward. The typing
-step is the mitigation, so the flow keeps it.
+parameter, rendering the empty entry form as if none had been supplied (§11.8, still stale on this
+point). Including the `user_code` in a URL removes the typing step and with it some of the phishing
+surface the browser retirement was about, but it makes the code pasteable into a chat window: a code
+a user can forward is a code a user can be asked to forward. The typing step is the mitigation.
 
 The response's key set is therefore `{device_code, user_code, verification_uri, expires_in,
 interval}`, narrowing §3's RFC 8628 list above by one. Ignoring the query parameter rather than
@@ -465,12 +462,11 @@ under any cause.** Testable as written:
    **a1p**, on this clause's own reasoning and on no quotation: the first two differences leak a
    fact about the **registry** — what is registered, which is the owner's — while this one leaks
    only a fact about the **caller's own request**, that it was throttled or that it carried a
-   credential, which the caller already knows. An implementation that pads it fully is conforming;
-   one that does not is conforming too, and neither may use the exception to widen the first two,
-   which stay MUSTs. **Decided-pending: [0.3 · 42]'s rewrite of `capabilities.md` §6 into numbered
-   binding clauses — where a container-wide timing posture is to be stated — lands in #109 PR 2 and
-   is not in this tree**, so nothing outside this clause carries the SHOULD today and the freeze
-   reading must re-read it against §6 there. **The first two differences' padding is a named
+   credential, which it already knows. An implementation that pads it fully is conforming, one that
+   does not is conforming too, and neither may widen the first two, which stay MUSTs.
+   **Decided-pending: [0.3 · 42]'s rewrite of `capabilities.md` §6 into numbered binding clauses —
+   where a container-wide timing posture is to be stated — lands in #109 PR 2 and is not in this
+   tree**, so nothing outside this clause carries the SHOULD. **The first two differences' padding is a named
    spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
@@ -498,15 +494,13 @@ exactly the distinctions §12 records and this page hides.
 clause 1's set answers `400` with the same single line of copy, and a status that differed by cause
 breaks clause 1 whatever the page says. `400` rather than `401` or `403`: those two are claims about
 the caller's *credential*, and this page is reached by causes that have nothing to do with one — a
-malformed request and a mismatched `redirect_uri` among them — so a status naming authentication
-would itself be a weak distinguisher and would invite a client to retry with a credential §11
-accepts none of. `404` is wrong for the opposite reason: the endpoint exists and is advertised
-(§6).
+malformed request, a mismatched `redirect_uri` — so a status naming authentication would itself be a
+weak distinguisher and would invite a retry with a credential §11 accepts none of. `404` is wrong
+for the opposite reason: the endpoint exists and is advertised (§6).
 
-**One copy line** means the body carries a single sentence, identical across causes, naming neither
-the client, nor the request, nor which check failed. `consent.md` renders the words, and the words
-are a spec revision there, not a clause here; the convergence — one status, one body, byte-identical
-— is this document's and is what clause 1 tests.
+**One copy line** means a single sentence, identical across causes, naming neither the client, nor
+the request, nor which check failed. `consent.md` renders the words and the words are a spec
+revision there; the convergence — one status, one body, byte-identical — is this document's.
 
 ## 6 · AS metadata discovery
 
@@ -723,11 +717,10 @@ endpoint, and §2's code binding, §3's device codes and every access token alre
 normative: 128 bits of a weak generator is not 128 bits of entropy, which is why §9.1's opening
 clause names the source and this one names the amount. **This is the citable clause, here, today.**
 
-It is **not** the whole requirement, and the rest is **decided-pending**: the container mints tokens
-by paths that are not the AS's — `token mint` is the owner's own — so a floor binding only the AS
-leaves the same forgeable value reachable through a different verb, and `capabilities.md` §5 must
-carry the container-wide one. **That text lands in #109 PR 2 and is not in this tree**; nothing
-below defers to it in the meantime.
+It is **not** the whole requirement, and the rest is **decided-pending**: `token mint` is the
+owner's own path, so a floor binding only the AS leaves the same forgeable value reachable through
+another verb, and `capabilities.md` §5 must carry the container-wide clause. **That text lands in
+#109 PR 2 and is not in this tree**; nothing below defers to it in the meantime.
 
 Two readings the number does not have:
 
@@ -836,14 +829,12 @@ the first place.
    is the same act on the CLI.
 
 **Both paths are in force, and `revocation_endpoint` is an unconditional row in §6** (**[0.3 · 11]**,
-with §6's own clause). A container that advertises the endpoint is advertising something this
-contract specifies, which is what §6's conformance rule requires and what the conditional row could
-not deliver. `token rm` remains the revocation *semantics* under both transports: a revoked token is
-`capabilities.md` §5's, and `token.revoke` is written once, whichever path reached it.
-
-**What was given up:** a client holding only a token's value can revoke that token, and the
-`client_id` it sends is not what stops it reaching further — §9.1's entropy is. The alternative was
-leaving browsers and MCP clients with no revocation path at all.
+with §6's own clause): a container advertising the endpoint now advertises something this contract
+specifies, which is what §6's conformance rule requires. `token rm` remains the revocation
+*semantics* under both transports — a revoked token is `capabilities.md` §5's, and `token.revoke` is
+written once, whichever path reached it. **What was given up:** a client holding only a token's
+value can revoke that token, and the `client_id` it sends is not what stops it reaching further —
+§9.1's entropy is. The alternative was leaving browsers and MCP clients with no revocation path.
 
 **Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
 
