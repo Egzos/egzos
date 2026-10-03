@@ -348,6 +348,11 @@ def test_nightly_integration_session_executes_nothing():
     names = [s.get("name") or s.get("uses", "") for s in nightly["steps"]]
     assert "diagnose-failure" in names and "diagnose-timeout" in names
     assert "pip install" not in str(nightly["steps"])
+    # The charter is appended to that session's system prompt, so it must not claim the session
+    # runs the suites (#105 review): the wording and the tool list move together.
+    charter = " ".join((ROOT / ".claude" / "agents" / "a1r-reviewer.md").read_text().split())
+    assert "run the suites" not in charter and "runs the suites" not in charter
+    assert "execute nothing" in charter
 
 @pytest.mark.parametrize("job_id", sorted(REVIEW_JOBS))
 def test_review_sessions_never_execute_the_tree(job_id):

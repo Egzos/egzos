@@ -39,13 +39,15 @@ label's presence proves only that someone with issues: write applied it, and egz
 issues: write (drift F18). Both values come from the environment the workflow sets, so a
 workflow that passes them runs against a checker that predates them without an argument error.
 
-RD-005's named backstop (Egzos/egzos-platform#45): while the `security` issue an a6 build branch
-works on is in force ($A6_SECURITY_IN_FORCE=true, resolved by the workflow), every test that
-branch adds or changes under `adversarial/**` must carry an unconditional xfail mark, and it may
-not touch a conftest.py. `security-fix-landed`, last applied by an approver, lifts it once the fix
-has merged. Both repositories carry this checker line-identical but for the docstring's first
-line; the backstop is wired only where a workflow sets $A6_SECURITY_IN_FORCE (egzos-platform), and
-is inert elsewhere rather than dead code.
+RD-005's named backstop (Egzos/egzos-platform#45): on every a6 branch ($A6_BACKSTOP=true, set
+by the workflow from the branch prefix, never from anything the branch names), each test the branch
+adds or changes under `adversarial/**` must carry an unconditional xfail mark, and the branch may
+not touch a conftest.py or commit a symlink or submodule there. `fix-landed`, last applied by an
+approver, lifts it once the fix a live test exercises has merged. Residual, named: a non-Python
+file under `adversarial/**` is not read here; a6's charter and the Chief's approval cover it. Both
+repositories carry this checker line-identical but for the docstring's first line; the backstop is
+wired only where a workflow sets $A6_BACKSTOP (egzos-platform), and is inert elsewhere rather than
+dead code.
 """
 
 import argparse
@@ -230,8 +232,8 @@ def size_exception_waives(labels_set, applier, approvers):
 
 
 def fix_landed_waives(labels_set, applier, approvers):
-    """True only when `security-fix-landed` is present AND its last applier is an approver."""
-    return "security-fix-landed" in labels_set and bool(applier) and applier in set(approvers)
+    """True only when `fix-landed` is present AND its last applier is an approver."""
+    return "fix-landed" in labels_set and bool(applier) and applier in set(approvers)
 
 
 def _is_unconditional_xfail(node):
@@ -329,37 +331,48 @@ def non_xfail_tests(source):
     return live
 
 
-SYMLINK = object()
-
-
-def _source_at(head, path):
-    """The file at `head`, SYMLINK for a link, or None when the change deleted it."""
+def _mode_at(head, path):
+    """The tree mode of `path` at `head` (b"100644", b"120000", ...), or None when deleted."""
     entry = subprocess.run(["git", "ls-tree", "-z", head, "--", path],
                            capture_output=True, check=True).stdout
-    if not entry:
+    return entry.split(b" ", 1)[0] if entry else None
+
+
+def _text_at(head, path):
+    """The file at `head` as UTF-8 text, or None when it is not UTF-8."""
+    raw = subprocess.run(["git", "show", f"{head}:{path}"], capture_output=True, check=True).stdout
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
         return None
-    if entry.split(b" ", 1)[0] == b"120000":
-        return SYMLINK
-    return subprocess.run(["git", "show", f"{head}:{path}"],
-                          capture_output=True, check=True, text=True).stdout
 
 
-def security_backstop_failures(changed, read_source):
-    """(path, reason) for each change an a6 branch may not make while its security issue is open."""
+def security_backstop_failures(changed, mode_of, text_of):
+    """(path, reason) for each change an a6 branch may not make while the backstop applies.
+
+    The mode is read for every path, so a link is refused whatever its name; content is read only
+    for Python, so a binary fixture is neither decoded nor refused.
+    """
     out = []
     for path in changed:
         if not path_matches_glob("adversarial/**", path):
             continue
-        source = read_source(path)
-        if source is None:
+        mode = mode_of(path)
+        if mode is None:
             continue
-        if source is SYMLINK:
+        if mode == b"120000":
             out.append((path, "a symlink is not read here and pytest follows it; refused"))
+        elif mode == b"160000":
+            out.append((path, "a submodule is not read here; refused"))
         elif path.rsplit("/", 1)[-1] == "conftest.py":
-            out.append((path, "conftest.py can re-mark tests; refused while the issue is open"))
+            out.append((path, "conftest.py can re-mark tests; refused"))
         elif path.endswith(".py"):
+            source = text_of(path)
+            if source is None:
+                out.append((path, "not UTF-8, so not read; refused"))
+                continue
             for name in non_xfail_tests(source):
-                out.append((path, f"{name} is not xfail while the branch's security issue is open"))
+                out.append((path, f"{name} is not unconditionally xfail; refused until fix-landed"))
     return out
 
 # ---------------------------------------------------------------------------
@@ -404,16 +417,16 @@ def main():
         help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
     )
     parser.add_argument(
-        "--a6-security-in-force",
-        dest="a6_security_in_force",
-        default=os.environ.get("A6_SECURITY_IN_FORCE", ""),
-        help="'true' while an a6 branch's security issue is in force ($A6_SECURITY_IN_FORCE)",
+        "--a6-backstop",
+        dest="a6_backstop",
+        default=os.environ.get("A6_BACKSTOP", ""),
+        help="'true' when the RD-005 backstop applies to this branch (default: $A6_BACKSTOP)",
     )
     parser.add_argument(
         "--fix-landed-applier",
         dest="fix_landed_applier",
         default=os.environ.get("FIX_LANDED_APPLIER", ""),
-        help="Login that last applied security-fix-landed (default: $FIX_LANDED_APPLIER)",
+        help="Login that last applied fix-landed (default: $FIX_LANDED_APPLIER)",
     )
     parser.add_argument(
         "--pr-author",
@@ -598,14 +611,15 @@ def main():
     for gpath in notices:
         print(f"::notice::governance path touched: {gpath}")
 
-    # ---- RD-005 backstop: a6 and an open security issue (Egzos/egzos-platform#45) --
-    if agent_name == "a6-adversary" and args.a6_security_in_force == "true":
+    # ---- RD-005 backstop on a6 branches (Egzos/egzos-platform#45) -------------
+    if agent_name == "a6-adversary" and args.a6_backstop == "true":
         if fix_landed_waives(labels_set, args.fix_landed_applier, approvers):
-            print(f"security-fix-landed applied by {args.fix_landed_applier} — backstop lifted.")
+            print(f"fix-landed applied by {args.fix_landed_applier} — backstop lifted.")
         else:
             post_image = [p for p in changed if p not in new_path_of]
             failures.extend(security_backstop_failures(
-                post_image, lambda path: _source_at(args.head, path)))
+                post_image, lambda path: _mode_at(args.head, path),
+                lambda path: _text_at(args.head, path)))
 
     # ---- Size cap -----------------------------------------------------------
     total_lines, file_count = compute_size(numstat_entries, cap_exclude)

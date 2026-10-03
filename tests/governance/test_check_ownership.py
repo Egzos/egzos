@@ -297,7 +297,7 @@ def _run_main(repo, branch, env_extra=None):
     own.write_text(json.dumps(OWNERSHIP))  # JSON is YAML
     env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON", "PR_AUTHOR",
                                                             "SIZE_EXCEPTION_APPLIER",
-                                                            "A6_SECURITY_IN_FORCE",
+                                                            "A6_BACKSTOP",
                                                             "FIX_LANDED_APPLIER")}
     env.update(env_extra or {})
     return subprocess.run(
@@ -436,7 +436,7 @@ def test_nested_claude_control_inputs_are_chief_only():
 
 
 # ---------------------------------------------------------------------------
-# RD-005 backstop: an a6 branch while its security issue is open (Egzos/egzos-platform#45)
+# RD-005 backstop on every a6 branch (Egzos/egzos-platform#45)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize(
@@ -475,10 +475,21 @@ def test_security_backstop_failures_scope():
         "adversarial/test_ok.py": "import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n",
         "adversarial/conftest.py": "",
         "adversarial/data.json": "{}",
+        "adversarial/blob.bin": None,
+        "adversarial/test_latin1.py": None,
         "docs/test_elsewhere.py": "def test_a():\n    pass\n",
     }
-    out = co.security_backstop_failures([*files, "adversarial/test_deleted.py"], files.get)
-    assert [p for p, _ in out] == ["adversarial/test_live.py", "adversarial/conftest.py"]
+
+    def mode_of(path):
+        return b"100644" if path in files else None
+
+    def text_of(path):
+        assert path.endswith(".py"), path  # a binary fixture is never decoded
+        return files[path]
+
+    out = co.security_backstop_failures([*files, "adversarial/test_deleted.py"], mode_of, text_of)
+    assert [p for p, _ in out] == [
+        "adversarial/test_live.py", "adversarial/conftest.py", "adversarial/test_latin1.py"]
 
 
 def _a6_live_test(repo):
@@ -487,32 +498,32 @@ def _a6_live_test(repo):
     _branch_diff(repo, lambda r: _write(r, "adversarial/test_x.py", "def test_x():\n    pass\n"))
 
 
-def test_main_backstop_refuses_a_live_test_while_the_issue_is_in_force(repo):
+def test_main_backstop_refuses_a_live_test_on_an_a6_branch(repo):
     _a6_live_test(repo)
-    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
     assert res.returncode == 1
-    assert "test_x is not xfail" in res.stdout
+    assert "test_x is not unconditionally xfail" in res.stdout
 
 
 @pytest.mark.parametrize(
     "env",
     [
-        {"A6_SECURITY_IN_FORCE": "false"},
+        {"A6_BACKSTOP": "false"},
         {},
-        {"A6_SECURITY_IN_FORCE": "true", "PR_LABELS_JSON": '["security-fix-landed"]',
+        {"A6_BACKSTOP": "true", "PR_LABELS_JSON": '["fix-landed"]',
          "FIX_LANDED_APPLIER": "Gond-ul"},
     ],
 )
-def test_main_backstop_passes_out_of_force_or_after_the_fix(repo, env):
+def test_main_backstop_passes_when_unset_or_after_the_fix(repo, env):
     _a6_live_test(repo)
-    res = _run_main(repo, "agent/a6-adversary/issue-7", env)
+    res = _run_main(repo, "agent/a6-adversary/x", env)
     assert res.returncode == 0, res.stdout
 
 
 def test_main_backstop_waiver_needs_an_approver(repo):
     _a6_live_test(repo)
-    res = _run_main(repo, "agent/a6-adversary/issue-7", {
-        "A6_SECURITY_IN_FORCE": "true", "PR_LABELS_JSON": '["security-fix-landed"]',
+    res = _run_main(repo, "agent/a6-adversary/x", {
+        "A6_BACKSTOP": "true", "PR_LABELS_JSON": '["fix-landed"]',
         "FIX_LANDED_APPLIER": "egzos-forge[bot]"})
     assert res.returncode == 1
 
@@ -527,7 +538,7 @@ def test_main_backstop_reads_a_renamed_test_at_its_new_path(repo):
         _write(r, "adversarial/test_new.py", "def test_x():\n    pass\n")
 
     _branch_diff(repo, mutate)
-    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
     assert res.returncode == 1
     assert "adversarial/test_new.py" in res.stdout
 
@@ -565,10 +576,19 @@ def test_non_xfail_tests_is_conservative(source, live):
     assert co.non_xfail_tests(source) == live
 
 
-def test_security_backstop_refuses_symlinks():
+@pytest.mark.parametrize("mode", [b"120000", b"160000"])
+def test_security_backstop_refuses_links_and_submodules(mode):
     out = co.security_backstop_failures(
-        ["adversarial/test_x.py", "adversarial/data"], lambda p: co.SYMLINK)
+        ["adversarial/test_x.py", "adversarial/data"], lambda p: mode, lambda p: "")
     assert [p for p, _ in out] == ["adversarial/test_x.py", "adversarial/data"]
+
+
+def test_main_backstop_passes_a_binary_fixture(repo):
+    _write(repo, "adversarial/__init__.py", "")
+    _commit(repo, "base")
+    _branch_diff(repo, lambda r: (r / "adversarial" / "fixture.bin").write_bytes(b"\xff\xfe\x00"))
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
+    assert res.returncode == 0, res.stdout + res.stderr
 
 
 def test_main_backstop_refuses_a_symlink(repo):
@@ -580,6 +600,6 @@ def test_main_backstop_refuses_a_symlink(repo):
         (r / "adversarial" / "test_x.py").symlink_to("payload.txt")
 
     _branch_diff(repo, mutate)
-    res = _run_main(repo, "agent/a6-adversary/issue-7", {"A6_SECURITY_IN_FORCE": "true"})
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
     assert res.returncode == 1
     assert "adversarial/test_x.py" in res.stdout and "symlink" in res.stdout
