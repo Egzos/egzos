@@ -246,6 +246,10 @@ class TrustEngine:
         to = self.backend.get_node(p["to"])
         if not to:
             raise TrustError("target scope no longer exists")
+        if any((i := self.backend.get(x)) and i.status == "quarantined" for x in p["items"]):
+            # Quarantined after it was parked: the manifest still matches, but a manifest holding a
+            # quarantined item cannot be approved (step-up spec §11, R5). Deny stays open.
+            raise TrustError("Contains a quarantined item. It cannot move.")
         # Manifest binding: execute only if items + target + audience still match what was approved.
         current = self.manifest_hash(p["items"], p["to"], self.audience(to))
         items = [self.backend.get(x) for x in p["items"]]

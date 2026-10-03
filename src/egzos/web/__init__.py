@@ -357,7 +357,13 @@ class Lifeboat:
             )
             + f"</p><p class=muted>{_e(p['blast_radius'])} container(s) under the target inherit it."
             f" Reason: {_e(p['reason'])}</p><div class=row>"
-            + self.approve_button(p["id"], "/pending", "Approve this move")
+            + (
+                "<p class='flash err'>Contains a quarantined item. It cannot move.</p>"
+                if any(
+                    (i := self.c.backend.get(x)) and i.status == "quarantined" for x in p["items"]
+                )
+                else self.approve_button(p["id"], "/pending", "Approve this move")
+            )
             + self.form("/deny", {"proposal": p["id"], "back": "/pending"}, "Deny")
             + "</div></div>"
             for p in pend["proposals"]
@@ -414,6 +420,8 @@ class Lifeboat:
                 act = build_act(self.c, ref)
                 if not act:
                     return (*self.not_found(), "")
+                if act.get("blocked"):
+                    return 200, "", f"{back}?{urlencode({'err': act['blocked']})}"
                 if self.presence.covers(act):
                     msg = self._decide(act, "window", False, via="window")
                     return 200, "", f"{back}?{urlencode({'ok': msg})}"

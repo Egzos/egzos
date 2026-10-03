@@ -213,3 +213,27 @@ def test_a_quarantined_item_does_not_move(box: Container):
     box.trust.quarantine(item, token=t, actor=OWNER, reason="x")
     with pytest.raises(TrustError, match="quarantined items do not move"):
         box.trust.move(box.backend.get(item.id), other, token=t, actor=OWNER)
+
+
+def test_a_quarantine_after_parking_blocks_the_approval_but_not_the_deny(box: Container):
+    from egzos.authz.presence import Tap, build_act
+
+    t, org, proj, other = _tree(box)
+    _client(box, "watcher", "reader", [other.id])
+    item = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    pid = box.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
+    box.trust.quarantine(box.backend.get(item.id), token=t, actor=OWNER, reason="poisoned")
+    act = build_act(box, pid)
+    assert act["blocked"] == "Contains a quarantined item. It cannot move."
+    page = Tap(act).page(armed=False)
+    assert "Sign and approve" not in page and "Approve without a window" not in page
+    assert "It cannot move." in page and "value=deny" in page
+    tap = Tap(act)
+    tap.post("arm")
+    tap.post("confirm")
+    assert tap.outcome is None  # no press reaches approve
+    with pytest.raises(TrustError, match="cannot move"):
+        box.trust.execute(pid, token=t, actor=OWNER)
+    assert box.backend.get(item.id).scope == proj.id
+    box.trust.deny(pid, token=t, actor=OWNER)
+    assert box.backend.get_proposal(pid)["status"] == "denied"

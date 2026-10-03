@@ -156,6 +156,9 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "from": prop["from_path"],
             "to": prop["to_path"],
             "pair": (frm.type if frm else "?", to.type if to else "?"),
+            "blocked": (
+                "Contains a quarantined item. It cannot move." if any(i.status == "quarantined" for i in items) else None
+            ),
         }
     item = c.backend.get(ref)
     node = c.backend.get_node(item.scope) if item else None
@@ -323,6 +326,7 @@ button.act{background:var(--egz-act);color:var(--egz-act-on);border-color:var(--
 button.ghost{border-color:transparent;text-decoration:underline}
 button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px}
 .note{border:var(--egz-bw) solid var(--egz-act);padding:12px}
+.alarm{border:var(--egz-bw) solid var(--egz-alarm);color:var(--egz-alarm);padding:12px}
 .terms{font-family:var(--egz-font-mono);font-feature-settings:var(--egz-tabular);font-size:.85rem}
 """
 
@@ -407,12 +411,15 @@ class Tap:
                 f"<p class=terms>window would close {_clock(_now() + seconds)} · org policy "
                 f"{seconds // 60}:{seconds % 60:02d} · close early at any time</p>"
             )
-        if armed:
+        blocked = a.get("blocked")
+        if blocked:  # R5: the approve acts are absent, replaced by the red line
+            acts = f"<p class=alarm>{e(blocked)}</p>"
+        elif armed:
             acts = "<button name=step value=confirm class=act>Confirm signature</button>"
         else:
             acts = "<button name=step value=arm class=act>Sign and approve</button>"
         acts += "<button name=step value=deny>Deny</button>"
-        if seconds and not armed:
+        if seconds and not armed and not blocked:
             acts += "<button name=step value=arm_once class=ghost>Approve without a window</button>"
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
@@ -461,6 +468,8 @@ class Tap:
         if step == "deny":
             self.outcome = "denied"
             return 200, self.outcome_page(f"Denied at {_clock(_now())} by {OWNER}. Logged.")
+        if self.act.get("blocked") and step in ("arm", "arm_once", "confirm"):
+            return 200, self.page(armed=False)
         if step in ("arm", "arm_once"):
             self.armed_until = _now() + ARM_SECONDS
             self.armed_mode = "once" if step == "arm_once" else "window"
