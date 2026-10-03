@@ -564,7 +564,8 @@ def token_create(
         _fail("token create needs `admin`")
     if role == "admin":
         typer.echo(
-            "warning: admin for an agent — it can mint itself anything (--i-understand in v0.1)",
+            "warning: admin for an agent — it may create any node type in its scopes; it still "
+            "cannot mint, approve or read the owner's views",
             err=True,
         )
     scopes = []

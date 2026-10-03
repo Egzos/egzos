@@ -28,7 +28,9 @@ baseline, which "works without htmx" (§18); the htmx enhancement is optional th
 Residuals, named: a process running as the user that drives a browser, fakes a terminal, or appends
 to the chain directly can do what the user can — a shell running as the user is the user. The URL
 travels in the browser launcher's argv, readable by other local users on a shared host, as the
-client secret does in `claude mcp add`'s argv under `connect --apply`. Audience
+client secret does in `claude mcp add`'s argv under `connect --apply`. The armed confirm reverts
+on 10 s only: §2.3 also names Escape and focus leaving the control, which a page with no script
+cannot observe — design-gap #119 holds the choice. Audience
 chips carry no contractor / external flag: tokens record no principal class yet. OS-backed
 presence (WebAuthn / platform authenticator) is the stronger tier the spec names for later.
 """
@@ -361,6 +363,8 @@ summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem;min-hei
 .shell{text-transform:none;letter-spacing:0;border-bottom:var(--egz-hair) solid var(--egz-rule-soft);
  margin:0;padding:4px 0}
 .box,.note,.alarm,button{box-shadow:var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)}
+button,summary,.box,.note,.alarm,.chip,.stamp,table{border-radius:var(--egz-radius)}
+button{-webkit-appearance:none;appearance:none}
 .box{border:var(--egz-bw) solid var(--egz-rule);padding:16px;margin:16px var(--egz-off)
  calc(16px + var(--egz-off)) 0}
 .chip{display:inline-block;border:var(--egz-hair) solid var(--egz-rule);padding:2px 8px;
@@ -537,6 +541,7 @@ class Tap:
             '<meta name=viewport content="width=device-width,initial-scale=1">'
             # §2.3's 10 s revert, without script: the armed page reloads itself after the arm
             # lapses, and the server (which enforces the 10 s regardless) answers un-armed.
+            # Escape and focus-loss need script; the baseline has none (design-gap #119).
             + (f'<meta http-equiv=refresh content="{ARM_SECONDS}">' if armed else "")
             + f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
             "<body><main>"

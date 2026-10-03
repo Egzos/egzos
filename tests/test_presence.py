@@ -322,3 +322,11 @@ def test_a_dead_tap_token_gets_the_one_empty_page_and_reveals_have_44px_targets(
     assert "<h1 tabindex=-1 autofocus>Nothing is waiting for you.</h1></main>" in page  # R11
     summary = next(r for r in TAP_STYLE.split("}") if r.lstrip().startswith("summary{"))
     assert "min-height:44px" in summary  # §12.1: pad the target, never the type
+
+
+def test_radius_zero_is_asserted_not_left_to_the_browser():
+    from egzos.authz.presence import TAP_STYLE
+
+    assert "button,summary,.box,.note,.alarm,.chip,.stamp,table{border-radius:var(--egz-radius)}" \
+        in TAP_STYLE  # §7: radius 0, from the token
+    assert "button{-webkit-appearance:none;appearance:none}" in TAP_STYLE  # no native chrome
