@@ -909,6 +909,14 @@ So the gate has two parts, and `capabilities.md` §4 is the **floor**, not the w
   or an absent one where the configured window is nonzero, refuses the act, and the refusal is a
   human-only violation like any other.
 
+**`0` is a configured value, and a reader of the config must treat it as one** (`container.md` §8,
+Chief 2026-10-03). The clause above is a statement about *policy zero*, which a container only ever
+enters if the zero it was given survives being loaded. It does not survive `window or DEFAULT`:
+`0` is falsy in Python, so the deployment that asked for the strictest setting in the table is
+served the 300-second default it explicitly refused — the one coercion bug in this document whose
+failure mode is a silently *weaker* gate than the one configured. Absence is tested by absence.
+Stated here, at the clause that reads the window, as well as at the clause that defines it.
+
 Stated so it can be tested when 2.2 lands: an interactive-principal token, presented with no live
 window where the configured window is nonzero, and with no proof-at-the-act where it is zero, MUST
 be refused a human-only act. A container that admits one is non-conforming.
@@ -916,11 +924,20 @@ be refused a human-only act. A container that admits one is non-conforming.
 One clause of this backstop is **not** settled by the text above, and it is marked rather than
 written, because this document is at its narrowing round:
 
-`[OPEN→0.3]` **Which ring pair's or manifest shape's window gates which act.** `container.md` scopes
-`step_up.window_seconds` per source→destination ring pair and manifest shape (R11) — a window opened
-for one shape of act does not cover another. `gate.confirm` is plausibly ring-pair shaped;
-whether `approve.pending` and `yes.consume` are ring-pair-scoped, manifest-shape-bounded, or bound
-some other way is undecided here.
+**`yes.consume` is gated by the window of the ring pair the act crosses** — source → destination,
+the pair `container.md` §8's third column already scopes the key by. **There is no single global
+step-up window**, and a container that keeps one has collapsed R11's per-pair key into a setting
+that lets a tap taken for an inbox-to-thread act satisfy a project-to-org one. Decided by the Chief,
+2026-10-03; **decided, not running** (Phase 2.2). The consequence a builder needs: looking the
+window up takes the act's *source and destination*, so a call site that has only the destination
+cannot evaluate this gate and must not approximate it.
+
+`[OPEN→0.3]` **Which window gates the other two acts.** `container.md` scopes
+`step_up.window_seconds` per source→destination ring pair **and manifest shape** (R11) — a window
+opened for one shape of act does not cover another. `gate.confirm` is plausibly ring-pair shaped;
+whether `approve.pending` is ring-pair-scoped, manifest-shape-bounded, or bound some other way is
+undecided here. The manifest-shape half of the bound is undecided for `yes.consume` too: the
+paragraph above settles *which pair*, not whether a pair's window is further narrowed by shape.
 
 `[OPEN→0.3]` **This backstop adds a second, mandatory gate to `capabilities.md` §4's human-only-act
 rule, and `capabilities.md` §4 carries no pointer to it.** §4 is marked **running** and states only
@@ -1180,6 +1197,21 @@ document's own type predates Part B as `cli`, because the design names the clien
 rendering this entry's `client_type` renders `cli` as the copy key `kind.device`, never as
 `kind.cli`, which does not exist. The AS-internal literal does not change; only its display name
 does, at the one place a display name is rendered.
+
+**The mapping is named, not left to prose** (#10 F25): `_types.py` carries it as
+`CONSENT_KIND_FROM_CLIENT_TYPE`, from `ASClientType` to `ConsentKind`, pinned by a test against
+both `AS_CLIENT_TYPES` and `consent.md`'s rendered vocabulary.
+
+| `client_type` (§1) | rendered kind / copy key |
+|---|---|
+| `browser` | `browser` · `kind.browser` |
+| `cli` | **`device`** · `kind.device` |
+| `mcp` | `mcp` · `kind.mcp` |
+
+Two rows are identities and one is not, which is exactly why it needed a name: a reader who checks
+the easy rows concludes the two vocabularies are the same and renders `kind.cli` on the third. A
+surface that re-derives the mapping from the literal is non-conforming even where it happens to
+agree.
 
 ### 11.2 · The screen renders what will be minted, after any clamp (§14 item 3)
 

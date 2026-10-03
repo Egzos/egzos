@@ -136,6 +136,30 @@ For each `(kind, key)` pair the **innermost** item wins. Outer items with the sa
 returned**, each carrying `shadowed_by` set to the id of the item that beat it; the winner carries
 `shadowed_by: null`. Items without a `key` never shadow and are never shadowed. **running.**
 
+**`shadowed_by` is not a field of the item.** It is a property of *this resolution* — the same item
+is shadowed in one chain and the winner in another — so it rides on the envelope the resolver wraps
+each item in, never on the stored `ContextItem`. The envelope is `{item, layer, layer_type,
+shadowed_by}`, typed as `ResolvedItem` in `_types.py`, and `layer`/`layer_type` are there for the
+same reason: they say where this copy was found, which is also not the item's own business. An
+implementation that persisted `shadowed_by` onto the item would have to rewrite stored items on
+every resolution, and would serve one chain's answer to another chain. **running** for
+`shadowed_by`, `layer` and `layer_type` (F10 — the clause ran in the skeleton with no typed home; it
+has one now); the envelope's fourth key, `trust`, is addressed in the next paragraph.
+
+**The item's trust status is not restated on the envelope — a1p's reading, pending the freeze.** It
+is the item's own fact and has one home, `item.trust.status`; a surface that branches on invariant 2
+above or on the serving policy reads it there and nowhere else. A second spelling of the same
+status, nested one level outside the first, is the one a resolver could snapshot before
+serialisation and serve stale — an envelope saying `verified` around an item quarantined in between
+is exactly the read invariant 2 forbids, and the contract removes the field rather than naming which
+copy wins. **decided, not running.** The walking skeleton's `Resolver.resolve` (`resolver.py`)
+**does** emit a `trust` key beside `item` on every envelope, so this clause removes a running key,
+not an unbuilt one. The skeleton shows no bug — `trust` and `item` are copied from the same
+`item.status` in one pass, so they cannot differ there — and the removal is for the resolver Phase 1
+builds, where the two reads need not be one. Phase 1 drops the key; a consumer of the envelope's
+`trust` moves to `item.trust.status`. TODO(chief): confirm the removal, or keep the key and say which
+copy wins on divergence — one field and this paragraph.
+
 **Clients may see the full chain, overridden values included** (v0.4 §7) — `shadowed_by` is the
 mechanism, and it is deliberate: a client that sees only the winner cannot explain *why* a preference
 took the value it did. Not a leak — every returned layer already passed coverage and the policy.
@@ -217,11 +241,28 @@ audience; a token minted between proposal and approval makes the approval one fo
 than the one displayed. An implementation that executed against the *stored* manifest would pass
 every test that does not mint a token mid-flight — and would break the only thing the gate is for.
 
-TODO(a1p): the **nonzero-delta** path parks a proposal **without checking any capability**, while the
-*zero*-delta path requires `organize`. A `reader` token holding only `fetch` can therefore fill the
-owner's pending queue — the surface the Chief approves from. No source names a floor for proposing;
-the freeze should name one (`organize` at the source scope, matching the silent path, is the obvious
-candidate) or state that proposing is deliberately uncapped. a1p does not answer it in the spec.
+### Proposing carries the same floor as moving — `organize` (#94)
+
+**Both branches of the gate require `organize` at the source scope.** Parking a proposal is not a
+cheaper way to touch an item than moving it. **decided, not running** (Chief, 2026-10-03, resolving
+#94) — the skeleton checks `organize` on the zero-delta path and checks nothing on the nonzero one.
+
+**The capability is checked before the delta is computed**, and that order is part of the clause.
+A token without `organize` is refused identically whichever branch its move would have taken, so it
+never learns from the refusal whether the destination's audience is wider than the source's. Check
+the delta first and the gate answers a question about who can see what, to a caller that may not
+move the item at all — §4 invariant 3's rule arriving at the gate.
+
+The reason the floor is the *same* one rather than a lower one: a proposal **is** a move the mover
+is asking a human to confirm, so it cannot cost less than the move. Were the nonzero path uncapped,
+a `reader` token holding only `fetch` could fill the owner's pending queue — the one surface the
+owner approves from — and the cheapest token in the vocabulary would hold a write-shaped channel
+into the owner's attention. That is a denial-of-attention surface built out of the gate that exists
+to protect attention.
+
+The floor is not a second human-only rule and does not weaken the first: `organize` buys the right
+to **ask**, and `gate.confirm` stays human-only (§6 above, `capabilities.md` §4), so a token holding
+`organize` — `admin` included — still cannot execute what it parked.
 
 ## 7 · Structure creation — a floor, not a capability (F2)
 
@@ -249,8 +290,9 @@ must say so explicitly, because scope-free `admin` makes every floor in this sec
 ## 8 · The container-config object
 
 **decided, not running.** The skeleton has no config surface; every value below is a constant in
-`model.py`. F1, F2 and F5 each need a configurable value and R11 needs a fourth, so the freeze
-introduces **one object** rather than four ad-hoc settings — defined here.
+`model.py`. F1 needs **two** configurable values, F2 and F5 one each, and R11 **two** more — **six
+keys**, so the freeze introduces **one object** rather than six ad-hoc settings, defined here. (The
+count is spelled out because the table below has six rows and the sentence used to say four.)
 
 | key | default | applies at | may a deployment change it? |
 |---|---|---|---|
@@ -259,11 +301,35 @@ introduces **one object** rather than four ad-hoc settings — defined here.
 | `node.policy.structure_floor` | `project` | node | **yes** — set on an org, inherited by its subtree (§7) |
 | `blobs.inline_max_bytes` | `65536` (64 KiB) | container | **yes** — F5 (`storage.md` §4) |
 | `blobs.staging_retention_days` | `30` | container | **yes** — R11: 30 days cold, then purge |
-| `step_up.window_seconds` | `300` (≈5 min) | container, per source→destination **ring pair** | **yes, including `0`** — R11 |
+| `step_up.window_seconds` | `300` (≈5 min) | container, per source→destination **ring pair** | **yes, including `0`** — R11; `0` is *no grace period*, never *no check* |
 
 A deployment that omits the object gets the defaults, and the defaults are exactly what the skeleton
 runs as constants — so `between` + floor `project` + 64 KiB is both the shipped default and the
-observed behaviour. Four notes the table cannot carry:
+observed behaviour.
+
+### The dotted keys above are the names on the wire
+
+**The left column is canonical.** `chain.personal_root`, `org.policy.sovereign_chain`,
+`node.policy.structure_floor`, `blobs.inline_max_bytes`, `blobs.staging_retention_days` and
+`step_up.window_seconds` are what a config file carries and what the wire carries; no other spelling
+of them is a key. `_types.py`'s `ContainerConfig` spells each with underscores because a dotted name
+is not a Python identifier, and it carries **one named mapping**,
+`CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY`, from the key here to the field there — the same device as
+`PROPOSAL_WIRE_KEY_FROM` for the wire's `from` against `Proposal.from_`. A loader that does not
+consult the mapping does not read this table's keys at all; it silently ignores every one of them
+and serves the defaults. **decided, not running** (Chief, 2026-10-03).
+
+**A key that is present with the value `0` is a value.** Loaders coerce, and in Python `0` is falsy:
+`config.get(key) or DEFAULT` returns `300` for an org that set `step_up.window_seconds` to `0` —
+the strictest setting in the table silently replaced by the laxest one the deployment refused. The
+rule is therefore stated rather than assumed: **absence is tested by absence, never by
+truthiness**, for every key here, and `0` reaches the reader as `0`. For
+`step_up.window_seconds` specifically, **`0` means no grace period** — every human-only act then
+needs presence proven at the act itself, which is the *strictest* reading and the one
+`authorization-server.md` §10 enforces; it never means the check is off. It fails safe in the only
+direction that matters.
+
+Four notes the table cannot carry:
 
 - **`chain.personal_root`** is per-deployment by F1 and "invertible **per user**" by R11 — the same
   key in a single-owner container, which is all v0.1 has. Recorded so the freeze reads a known
@@ -273,8 +339,12 @@ observed behaviour. Four notes the table cannot carry:
   withheld is not a permission to withhold. TODO(chief): confirm `allow`, or say `deny` and make org
   branches sovereign-proof by default.
 - **`step_up.window_seconds`** is per source→destination ring pair and **manifest-shape bounded**
-  (R11) — a window opened for one shape of act does not cover another. **Zero is supported.** The
-  flow is Phase 2.2 and `step_up` is a reserved event (`events.md` §1); only the *key* is frozen.
+  (R11) — a window opened for one shape of act does not cover another. **Zero is supported, and
+  means no grace period** (above). Because the key is per pair, **the window that gates a human-only
+  act is the window of the ring pair that act crosses**, source → destination — never a single
+  global window; `authorization-server.md` §10 states this at `yes.consume`, where the window is
+  read. The flow is Phase 2.2 and `step_up` is a reserved event (`events.md` §1); only the *key* is
+  frozen.
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
   written before this key existed: R11 ratifies 30 days cold, then purge. TODO(a1p): #30 should
   strike that TODO's "no source names" clause and point it here. It covers **staged** bytes only —
