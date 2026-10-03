@@ -252,15 +252,19 @@ class Presence:
         return False
 
     def covers(self, act: dict[str, Any]) -> bool:
+        # A manifest holding a quarantined item cannot be approved (R5): no window stands in for it.
+        if act.get("blocked"):
+            return False
         return self.window_open(pair_of(act), shape_of(act))
 
     def act_failed(self, act: dict[str, Any], error: BaseException, *,
-                   actor: str = OWNER) -> None:
-        """The presence was proven and the act did not land (it rolled back whole). The chain says
-        so, and the window that signature opened closes with it: a failure never leaves one open."""
+                   reason: str = "act failed", actor: str = OWNER) -> None:
+        """The presence was proven and the act did not land: it failed and rolled back whole, or
+        the engine refused it. The chain says so, and the window that signature opened closes
+        with it, so neither a failure nor a refusal leaves one open."""
         self.c.ledger.append(
             "step_up", actor=actor, principal="interactive", subject=act.get("subject"),
-            via="tap", outcome="closed", reason="act failed", error=type(error).__name__,
+            via="tap", outcome="closed", reason=reason, error=type(error).__name__,
         )
 
     def close_windows(self, *, actor: str = OWNER) -> None:

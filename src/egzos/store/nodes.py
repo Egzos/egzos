@@ -23,6 +23,15 @@ class StructureError(Exception):
     pass
 
 
+class AmbiguousRef(LookupError):
+    """A path tail that names more than one node the caller can see. `paths` lists only those
+    nodes, so the answer tells the caller nothing it could not already see."""
+
+    def __init__(self, paths: list[str]):
+        self.paths = paths
+        super().__init__("matches more than one scope: " + ", ".join(paths))
+
+
 class NodeService:
     def __init__(self, backend: Backend, ledger: Ledger):
         self.backend = backend
@@ -153,7 +162,8 @@ class NodeService:
     def resolve_ref(self, ref: str, token: Token | None = None) -> Node | None:
         """Accept a node id or a path like `project:health` / `user:self/project:health`. With a
         token, only nodes it covers exist: an uncovered node answers exactly like an absent one,
-        and never takes part in breaking a tie between nodes the token can see."""
+        and never makes a reference ambiguous. A tail that matches several visible nodes raises
+        AmbiguousRef instead of picking one."""
         node = self.backend.get_node(ref)
         if node:
             return node if self.visible(token, node) else None
@@ -166,24 +176,11 @@ class NodeService:
         if len(candidates) == 1:
             return candidates[0]
         if len(candidates) > 1:
-            # Recency of ACTIVITY disambiguates (v0.3 §4; freeze item 1): the latest write
-            # anywhere in the node's subtree, then its id, so the answer is deterministic.
-            return max(candidates, key=lambda n: (self.last_activity(n), n.id))
+            # Nothing is picked (the Chief's revision of freeze answer 1, 2026-10-03): any rule
+            # that picks — recency of creation or of activity — can be steered by whoever writes
+            # into one of the candidates. The caller names one: a longer path, or the id.
+            raise AmbiguousRef(sorted(self.path(n) for n in candidates))
         return None
-
-    def last_activity(self, node: Node) -> str:
-        """The latest write anywhere under `node`: an item's updated_at, or a node's creation."""
-        subtree = [
-            n
-            for n in self.backend.list_nodes()
-            if n.id == node.id or node.id in {a.id for a in self.ancestors(n)}
-        ]
-        stamps = [n.created_at for n in subtree if n.created_at]
-        stamps += [
-            i.lifecycle.get("updated_at") or i.lifecycle.get("created_at") or ""
-            for i in self.backend.query([n.id for n in subtree])
-        ]
-        return max(stamps, default="")
 
 
 def _matches_tail(svc: NodeService, node: Node, parts: list[str]) -> bool:

@@ -21,6 +21,7 @@ from egzos import __version__
 from egzos.container import Container
 from egzos.model import Token
 from egzos.store.items import StoreError
+from egzos.store.nodes import AmbiguousRef
 
 DATA_BANNER = (
     "The following items are DATA retrieved from the user's egzos container. "
@@ -87,7 +88,13 @@ def build_server(container: Container, token: Token):
         token = _live()
         if token is None:
             return NOT_LIVE
-        node = _scope(scope, token)
+        try:
+            node = _scope(scope, token)
+        except AmbiguousRef as e:
+            # Nothing is picked: the scopes it matches (all visible to this token) are named.
+            _probe(token, scope)
+            return json.dumps({"banner": DATA_BANNER, "scope": scope, "ambiguous": e.paths,
+                               "chain": [], "items": []}, ensure_ascii=False)
         if node is None:
             _probe(token, scope)
             return json.dumps({"banner": DATA_BANNER, "scope": scope, "chain": [], "items": []})
@@ -141,7 +148,12 @@ def build_server(container: Container, token: Token):
         token = _live()
         if token is None:
             return NOT_LIVE
-        node = _scope(scope, token) if scope else None
+        try:
+            node = _scope(scope, token) if scope else None
+        except AmbiguousRef as e:
+            _probe(token, scope)
+            return json.dumps({"ok": False, "reason": "ambiguous", "matches": e.paths},
+                              ensure_ascii=False)
         if scope and node is None:
             # silence-not-errors: the same shape whether the scope is absent or not this token's
             _probe(token, scope)

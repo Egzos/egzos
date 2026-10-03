@@ -3,7 +3,7 @@
 """
 Freeze decisions read off the running code: `publish` gates widening and `organize` gates the
 silent move (item 3), a TOCTOU refusal is `approval.stale` not `approval.deny` (item 39), and an
-ambiguous path resolves to the most recently ACTIVE node (item 1).
+ambiguous path is refused with its matches named, never picked (item 1, as the Chief revised it).
 """
 
 from __future__ import annotations
@@ -112,30 +112,26 @@ def test_a_human_no_is_still_approval_deny(box: Container):
     assert box.ledger.tail(1)[0]["event"] == "approval.deny"
 
 
-# --- item 1: recency means last activity ---------------------------------------------------------
-def test_ambiguous_path_resolves_to_the_most_recently_active_node(box: Container):
+# --- item 1, as revised by the Chief (2026-10-03): an ambiguous tail is refused, never picked ----
+def test_an_ambiguous_path_names_its_matches_and_picks_none(box: Container):
+    from egzos.store.nodes import AmbiguousRef
+
     t = box.auth.interactive_token()
     root = box.nodes.user_root()
     a = box.nodes.create("org", "a", root, token=t, actor=OWNER, principal=t.principal)
     b = box.nodes.create("org", "b", root, token=t, actor=OWNER, principal=t.principal)
     older = box.nodes.create("project", "health", a, token=t, actor=OWNER, principal=t.principal)
     newer = box.nodes.create("project", "health", b, token=t, actor=OWNER, principal=t.principal)
-    older.created_at, newer.created_at = "2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"
-    box.backend.put_node(older)
-    box.backend.put_node(newer)
-    # created later wins while nothing has been written
-    assert box.nodes.resolve_ref("project:health").id == newer.id
-    # a write deep in the OLDER node's subtree makes it the active one
-    thread = box.nodes.create("thread", "t", older, token=t, actor=OWNER, principal=t.principal)
-    thread.created_at = "2026-01-02T00:00:00Z"
-    box.backend.put_node(thread)
-    item = box.store.add(body="x", scope=thread, token=t, actor=OWNER, principal=t.principal)
-    item.lifecycle["updated_at"] = "2026-03-01T00:00:00Z"
-    box.backend.put(item)
-    assert box.nodes.last_activity(older) == "2026-03-01T00:00:00Z"
-    assert box.nodes.resolve_ref("project:health").id == older.id
-    # a qualified path is never ambiguous
-    assert box.nodes.resolve_ref("org:b/project:health").id == newer.id
+    with pytest.raises(AmbiguousRef) as refused:
+        box.nodes.resolve_ref("project:health", t)
+    assert refused.value.paths == [box.nodes.path(older), box.nodes.path(newer)]
+    # activity in one candidate changes nothing: no write can steer the answer
+    box.store.add(body="x", scope=newer, token=t, actor=OWNER, principal=t.principal)
+    with pytest.raises(AmbiguousRef):
+        box.nodes.resolve_ref("health", t)
+    # a qualified path, or the id, is never ambiguous
+    assert box.nodes.resolve_ref("org:b/project:health", t).id == newer.id
+    assert box.nodes.resolve_ref(older.id, t).id == older.id
 
 
 # --- the chain never forks; the manifest binds the source; roles come from ROLE_BUNDLES ---------
@@ -333,3 +329,27 @@ def test_a_failed_act_under_an_open_window_is_on_the_chain(tmp_path, monkeypatch
     steps = [e["details"] for e in c.ledger.tail(10) if e["event"] == "step_up"]
     assert [s["outcome"] for s in steps[-2:]] == ["window", "closed"]
     assert steps[-1]["reason"] == "act failed" and c.backend.get(item.id).status == "unverified"
+
+
+def test_a_quarantined_manifest_is_never_covered_and_a_refusal_is_on_the_chain(
+        box: Container, monkeypatch):
+    from egzos.authz.presence import Presence, build_act
+
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
+    t, org, proj, other = _tree(box)
+    _client(box, "watcher", "reader", [other.id])
+    item = box.store.add(body="n", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    pid = box.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
+    p = Presence(box)
+    p.record(build_act(box, pid), via="tap", outcome="approved", windowed=True)
+    assert p.covers(build_act(box, pid))
+    box.trust.quarantine(box.backend.get(item.id), token=t, actor=OWNER, reason="poisoned")
+    act = build_act(box, pid)
+    assert act["blocked"] and not p.covers(act)  # R5: no window stands in for a blocked manifest
+    try:
+        box.trust.execute(pid, token=t, actor=OWNER)
+    except TrustError as e:
+        p.act_failed(act, e, reason="refused")
+    last = box.ledger.tail(1)[0]["details"]
+    assert last["outcome"] == "closed" and last["reason"] == "refused"
+    assert last["error"] == "TrustError"

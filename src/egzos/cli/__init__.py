@@ -26,7 +26,7 @@ from egzos._term import safe
 from egzos.container import OWNER, Container
 from egzos.model import Node
 from egzos.store.items import StoreError
-from egzos.store.nodes import StructureError
+from egzos.store.nodes import AmbiguousRef, StructureError
 from egzos.trust import TrustError
 
 app = typer.Typer(
@@ -65,11 +65,20 @@ def _scope_file() -> Path:
     return Path.cwd() / ".egzos"
 
 
+def _resolve(c: Container, ref: str, token) -> Node | None:
+    """`resolve_ref`, with an ambiguous tail refused and the matching scopes named — all of them
+    ones this token can see — so the caller can give a longer path or the id."""
+    try:
+        return c.nodes.resolve_ref(ref, token)
+    except AmbiguousRef as e:
+        _fail(f"{ref} {e} — give more of the path, or the id")
+
+
 def _sticky_scope(c: Container) -> Node | None:
     """Sticky scope per shell/project: the `.egzos` file in the working directory (v0.3 §4)."""
     f = _scope_file()
     if f.exists():
-        return c.nodes.resolve_ref(f.read_text().strip(), c.require_token())
+        return _resolve(c, f.read_text().strip(), c.require_token())
     return None
 
 
@@ -77,7 +86,7 @@ def _scope_or(c: Container, ref: str | None, default: Node | None) -> Node | Non
     """Resolve a scope as the shell's token sees it: an uncovered scope is "scope not found",
     exactly like an absent one (silence-not-errors), on every verb that takes a scope."""
     if ref:
-        node = c.nodes.resolve_ref(ref, c.require_token())
+        node = _resolve(c, ref, c.require_token())
         if not node:
             _fail("scope not found")
         return node
@@ -454,6 +463,7 @@ def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
         _fail("nothing to decide: it is not pending")
     from egzos.authz.presence import TAP_COPY, outcome_text
 
+    presence = Presence(c)
     result: dict[str, Any] = {}
 
     def perform(outcome: str, windowed: bool, closes: str | None) -> str:
@@ -486,11 +496,12 @@ def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
             return outcome_text(act, "approved", closes=closes)
         except TrustError as e:
             result["error"] = str(e)
+            # Presence was proven and the engine refused the act: that is on the chain too.
+            presence.act_failed(act, e, reason="refused")
             # R11 (the standalone /tap/<token> page): a proposal invalidated under it reads
             # `tap.invalid`, as an item that is no longer pending does.
             return TAP_COPY["tap.invalid"]
 
-    presence = Presence(c)
     outcome = presence.require(act, decide=perform)
     if outcome == "window":
         try:
@@ -584,7 +595,7 @@ def token_create(
         if ref == "*":
             scopes.append("*")
             continue
-        n = c.nodes.resolve_ref(ref, token)
+        n = _resolve(c, ref, token)
         if not n:
             _fail(f"scope not found: {ref}")
         scopes.append(n.id)
@@ -740,7 +751,7 @@ def connect(
         _fail("connect prints a secret: run it from a terminal, or pass --apply")
     scopes = []
     for ref in scope or ["user:self"]:
-        n = c.nodes.resolve_ref(ref, token)
+        n = _resolve(c, ref, token)
         if not n:
             _fail(f"scope not found: {ref}")
         scopes.append(n.id)

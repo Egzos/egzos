@@ -285,6 +285,44 @@ def test_an_invisible_node_never_breaks_a_tie(box):
     assert box.nodes.resolve_ref("project:p", bot).id == mine.id
 
 
+def test_no_write_can_steer_where_an_ambiguous_reference_lands(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    c = Container(tmp_path)
+    owner = c.auth.interactive_token()
+    root = c.nodes.user_root()
+    a = c.nodes.create("org", "a", root, token=owner, actor=OWNER, principal="interactive")
+    b = c.nodes.create("org", "b", root, token=owner, actor=OWNER, principal="interactive")
+    mine = c.nodes.create("project", "x", a, token=owner, actor=OWNER, principal="interactive")
+    shared = c.nodes.create("project", "x", b, token=owner, actor=OWNER, principal="interactive")
+    bot = _client(c, scopes=[b.id])
+    _call(build_server(c, bot), "egzos_remember", {"text": "fresh", "scope": shared.id})
+    # The owner's short reference is refused with both matches named; nothing lands anywhere.
+    r = _egzos(tmp_path, "add", "--scope", "project:x", "private note")
+    assert r.returncode != 0 and "org:a/project:x" in r.stdout and "org:b/project:x" in r.stdout
+    assert all(i.content.get("body") != "private note" for i in c.backend.query([shared.id]))
+    assert _egzos(tmp_path, "add", "--scope", "org:a/project:x", "private note").returncode == 0
+    assert any(i.content.get("body") == "private note" for i in c.backend.query([mine.id]))
+    # The agent sees one match only, so for it the tail is not ambiguous at all.
+    assert c.nodes.resolve_ref("project:x", bot).id == shared.id
+
+
+def test_an_ambiguous_door_reference_names_only_what_the_token_sees(box):
+    owner = box.auth.interactive_token()
+    root = box.nodes.user_root()
+    a = box.nodes.create("org", "a", root, token=owner, actor=OWNER, principal="interactive")
+    b = box.nodes.create("org", "b", root, token=owner, actor=OWNER, principal="interactive")
+    box.nodes.create("project", "x", a, token=owner, actor=OWNER, principal="interactive")
+    box.nodes.create("project", "x", b, token=owner, actor=OWNER, principal="interactive")
+    box.nodes.create("project", "x", root, token=owner, actor=OWNER, principal="interactive")
+    server = build_server(box, _client(box, scopes=[a.id, b.id]))
+    out = _call(server, "egzos_fetch", {"scope": "project:x"})
+    assert out["ambiguous"] == ["user:self/org:a/project:x", "user:self/org:b/project:x"]
+    assert out["items"] == [] and box.ledger.tail(1)[0]["event"] == "context.fetch"
+    kept = _call(server, "egzos_remember", {"text": "t", "scope": "project:x"})
+    assert kept == {"ok": False, "reason": "ambiguous",
+                    "matches": ["user:self/org:a/project:x", "user:self/org:b/project:x"]}
+
+
 def test_percent_n_belongs_to_the_principal_that_found_it(tmp_path):
     assert _egzos(tmp_path, "init").returncode == 0
     mine = _json(_egzos(tmp_path, "--json", "add", "owner picks this"))
