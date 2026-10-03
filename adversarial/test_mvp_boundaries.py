@@ -208,6 +208,25 @@ def test_the_engine_records_a_quarantine_refusal(box):
     assert len(box.ledger.tail(1000)) == before + 1  # the refusal itself is on the chain
 
 
+def test_the_lifeboat_tells_an_unproven_caller_nothing_and_records_nothing(box):
+    from fastapi.testclient import TestClient
+
+    from egzos.web.app import Lifeboat, create_app
+
+    boat = Lifeboat(box, key="k" * 32, host="127.0.0.1:8765")
+    app = create_app(boat, "http://127.0.0.1:8765")
+    before = len(box.ledger.tail(1000))
+    bound = TestClient(app, base_url="http://127.0.0.1:8765")
+    locked = bound.get("/").text
+    rebound = TestClient(app, base_url="http://rebound.example:8765")  # a name aimed at loopback
+    for client, url in ((bound, "/?k=wrong"), (bound, "/items/x?k=wrong"), (bound, "/pending"),
+                        (rebound, "/?k=" + "k" * 32)):
+        r = client.get(url, follow_redirects=False)
+        assert r.status_code == 403 and r.text == locked, url  # one static page, every cause
+    assert box.home.name not in locked and "pending" not in locked.lower()
+    assert len(box.ledger.tail(1000)) == before  # an unproven caller writes nothing to the chain
+
+
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
     owner = box.auth.interactive_token()
     f = tmp_path / "secret.txt"

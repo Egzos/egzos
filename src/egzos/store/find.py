@@ -97,7 +97,9 @@ def find(container, token: Token, q: str | Query) -> list[tuple[Node, ContextIte
     if query.ring is not None:
         nodes = [n for n in nodes if n.type == query.ring]
     text = " ".join(query.text) or None
-    curator = token.principal == "interactive"
+    # The trust labels are the curator's view: the interactive principal holding `curate`. Any
+    # other token — a browser UI's interactive grant without it included — is served by policy.
+    curator = token.principal == "interactive" and token.has("curate")
     hits: list[tuple[Node, ContextItem]] = []
     for n in nodes:
         for item in c.backend.query([n.id], kinds=query.kinds or None, key=query.key, text=text):

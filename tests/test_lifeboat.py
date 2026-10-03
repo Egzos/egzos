@@ -52,7 +52,7 @@ def test_session_guard_and_headers(lb, tmp_path):
     boat, client, _ = lb
     fresh = TestClient(create_app(boat, ORIGIN), base_url=ORIGIN)
     assert fresh.get("/").status_code == 403
-    assert fresh.get("/?k=wrong", follow_redirects=False).status_code == 404
+    assert fresh.get("/?k=wrong", follow_redirects=False).status_code == 403
     r = client.get("/")
     assert r.status_code == 200
     for header, value in (("referrer-policy", "no-referrer"), ("cache-control", "no-store"),
@@ -420,3 +420,46 @@ def test_the_lifeboat_refuses_a_client_principal_before_it_binds(tmp_path, monke
     monkeypatch.setattr("uvicorn.run", never_runs)
     with pytest.raises(PermissionError, match="owner's"):
         serve_web(Container(tmp_path / "home"), port=0, open_browser=False)
+
+
+def test_a_refused_pending_approval_is_on_the_chain_and_closes_the_window(lb, monkeypatch):
+    from egzos.trust import TrustError
+
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
+    boat, client, _ = lb
+    t = boat.c.require_token()
+    root = boat.c.nodes.user_root()
+    org = boat.c.nodes.create("org", "o", root, token=t, actor=OWNER, principal="interactive")
+    a = boat.c.nodes.create("project", "a", org, token=t, actor=OWNER, principal="interactive")
+    b = boat.c.nodes.create("project", "b", org, token=t, actor=OWNER, principal="interactive")
+    boat.c.auth.mint(principal="client", owner=OWNER, client="w", role="reader", scopes=[b.id],
+                     actor=OWNER, by_principal="interactive")
+    item = boat.c.store.add(body="n", scope=a, token=t, actor=OWNER, principal="interactive")
+    pid = boat.c.trust.move(item, b, token=t, actor=OWNER)["proposal"]["id"]
+
+    def refuse(*args, **kw):
+        raise TrustError("manifest changed since the proposal was made — re-propose")
+
+    monkeypatch.setattr(boat.c.trust, "execute", refuse)
+    armed = post(client, boat, f"/pending/{pid}", {"step": "arm"})
+    tok = re.search(r'name="arm" value="([^"]+)"', armed.text).group(1)
+    post(client, boat, f"/pending/{pid}", {"step": "confirm", "arm": tok, "mode": "window"})
+    steps = [e["details"] for e in boat.c.ledger.tail(20) if e["event"] == "step_up"]
+    assert [s["outcome"] for s in steps[-2:]] == ["approved", "closed"]
+    assert steps[-1]["reason"] == "refused"
+    assert boat.presence.window_status() is None  # the signature's window closed with the refusal
+
+
+def test_a_promote_of_an_item_no_longer_pending_is_refused_on_the_chain(lb):
+    boat, client, item = lb
+    url = f"/items/{item.id}/promote"
+    arm = re.search(r'name="arm" value="([^"]+)"',
+                    post(client, boat, url, {"version": 1}).text).group(1)
+    tap_url = post(client, boat, url, {"version": 1, "arm": arm}).headers["location"]
+    t = boat.c.require_token()
+    boat.c.trust.quarantine(boat.c.backend.get(item.id), token=t, actor=OWNER, reason="x")
+    post(client, boat, tap_url, {"step": "arm"}, csrf=False)
+    post(client, boat, tap_url, {"step": "confirm"}, csrf=False)
+    last = [e for e in boat.c.ledger.tail(10) if e["event"] == "step_up"][-1]["details"]
+    assert last["outcome"] == "closed" and last["reason"] == "refused"
+    assert boat.c.backend.get(item.id).status == "quarantined"

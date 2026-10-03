@@ -315,10 +315,13 @@ class Lifeboat:
                          destination=act["dest"], trust=trust)
             item = self.c.backend.get(act["subject"])
             if item is None or item.status != "unverified":
-                return t("tap.invalid")
+                raise TrustError("no longer pending")
             self.c.trust.promote(item, token=token, actor=OWNER)
             return t("act.promoted", at=at, user=OWNER)
-        except TrustError:
+        except TrustError as e:
+            # Presence was proven and the act was refused: on the chain, and the window that
+            # signature opened closes with it — as the CLI does (presence.act_failed).
+            self.presence.act_failed(act, e, reason="refused")
             return t("outcome.invalid") if act["kind"] == "proposal" else t("tap.invalid")
         except Exception as e:
             # The act rolled back whole; the chain says so and the signature's window closes.
@@ -347,13 +350,18 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     @app.middleware("http")
     async def guard(request: Request, call_next):
         path = request.url.path
+        # Every refusal before the session is proven is the same static page: no shell, no
+        # container state, nothing written to the chain. Only the bound host is served, so a
+        # page elsewhere that rebinds a name to 127.0.0.1 reaches nothing.
+        if request.headers.get("host") != boat.host:
+            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         key = request.query_params.get("k")
         if request.method == "GET" and key is not None:
             if secrets.compare_digest(key, boat.key):
                 resp: Response = RedirectResponse(path or "/", status_code=303)
                 resp.set_cookie(COOKIE, boat.key, httponly=True, samesite="strict", path="/")
                 return _harden(resp, path)
-            return _harden(boat.not_found(request), path)
+            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         if not secrets.compare_digest(request.cookies.get(COOKIE, ""), boat.key):
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         if request.method == "POST":
@@ -591,6 +599,9 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     @app.post("/tap/{token}", response_class=HTMLResponse)
     async def tap_post(request: Request, token: str):
+        # Guarded by the session cookie, this origin's Origin, and in place of the form key the
+        # tap's own path token: unguessable, single-use, bound at issue (the tap page is the
+        # shared presence.Tap, which carries no lifeboat form key).
         boat.sweep()
         entry = boat.taps.get(token)
         if not entry or not entry["tap"].live(f"/tap/{token}"):
@@ -694,6 +705,9 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     @app.get("/pending/{pid}/window", response_class=HTMLResponse)
     async def pending_window(request: Request, pid: str):
+        # Not an audited read, on purpose: the 15 s poll shows only the window line (open, and
+        # when it closes), which the chain already holds as the step_up that opened it, and no
+        # item. The page that embeds it is the audited read.
         status = boat.presence.window_status()
         text = (t("window.open", closes=clock(status["closes"]))
                 if status and status["state"] == "open" else None)
