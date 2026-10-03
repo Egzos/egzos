@@ -128,3 +128,15 @@ def test_a_client_ls_records_what_the_policy_withheld(tmp_path, monkeypatch):
     assert main(["ls", "--inbox"]) == 0
     last = Container(tmp_path).ledger.tail(1)[0]["details"]
     assert last["view"] == "ls --inbox" and last["withheld"] == 1
+
+
+def test_find_refuses_an_unknown_prefix_and_names_nothing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    assert main(["add", "a note"]) == 0
+    capsys.readouterr()
+    assert main(["find", "colour:red"]) != 0  # an unknown prefix is refused (#128), not searched
+    out = capsys.readouterr().out
+    assert "a note" not in out
+    assert main(["find", "kind:memory"]) == 0

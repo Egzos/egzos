@@ -510,3 +510,15 @@ def test_the_armed_pending_page_is_a_read_and_a_refusal_is_styled_as_one(lb, mon
     assert boat.outcomes[pid][0] == "invalid"
     page = client.get(f"/pending/{pid}").text
     assert 'class="outcome alarm-text"' in page  # a refusal never reads as a success
+
+
+def test_every_lifeboat_route_runs_on_the_event_loop():
+    import inspect
+
+    from fastapi.routing import APIRoute
+
+    # The shared sqlite connection is safe only while no handler runs in the threadpool (a sync
+    # `def` would): backends/sqlite.py states it; this keeps it true.
+    app = create_app(Lifeboat(Container.__new__(Container), host="testserver"), ORIGIN)
+    routes = [r for r in app.routes if isinstance(r, APIRoute)]
+    assert routes and all(inspect.iscoroutinefunction(r.endpoint) for r in routes)
