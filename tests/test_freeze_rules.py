@@ -236,6 +236,9 @@ def test_a_quarantine_after_parking_blocks_the_approval_but_not_the_deny(box: Co
     assert tap.outcome is None  # no press reaches approve
     with pytest.raises(TrustError, match="cannot move"):
         box.trust.execute(pid, token=t, actor=OWNER)
+    refused = box.ledger.tail(1)[0]  # the engine records its own refusal
+    assert refused["event"] == "approval.stale" and refused["subject"] == pid
+    assert refused["details"]["status"] == "open"
     assert box.backend.get(item.id).scope == proj.id
     box.trust.deny(pid, token=t, actor=OWNER)
     assert box.backend.get_proposal(pid)["status"] == "denied"
