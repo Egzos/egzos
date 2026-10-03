@@ -20,7 +20,7 @@
   </nav>
   <main aria-label="Proposal">
     {%- if message and not detail %}
-    <p class="outcome{% if message[0] in ('invalid', 'error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
+    <p class="outcome{% if message[0] in ('error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
     {%- endif %}
     {%- if detail %}
     <p class="ref">{{ detail.ref }}</p>
@@ -73,7 +73,7 @@
     <section role="region" aria-labelledby="presence-h" class="box">
       <h2 id="presence-h">{{ S["section.presence"] }}</h2>
       {%- if message %}
-      <p class="outcome{% if message[0] in ('invalid', 'error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
+      <p class="outcome{% if message[0] in ('error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
       {%- else %}
       <p>{{ detail.presence }}</p>
       {%- if detail.terms %}<p class="mono">{{ detail.terms }}</p>{% endif %}

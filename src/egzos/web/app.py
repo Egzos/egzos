@@ -40,8 +40,10 @@ from typing import Any
 from urllib.parse import urlencode, urlsplit
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from egzos.authz.presence import (
     ARM_SECONDS,
@@ -53,7 +55,7 @@ from egzos.authz.presence import (
     window_seconds,
 )
 from egzos.container import OWNER, Container
-from egzos.store.find import QueryError, find
+from egzos.store.find import QueryError, find, shown
 from egzos.trust import TrustError
 from egzos.web.strings import S, around, number_free, t
 
@@ -290,9 +292,11 @@ class Lifeboat:
             status_code=status,
         )
 
-    def not_found(self, request: Request) -> HTMLResponse:
-        """R12: one page for not-found, not-yours, tombstoned, quarantined and malformed ids."""
-        self.read("not-found")
+    def not_found(self, request: Request, cause: str = "not-found") -> HTMLResponse:
+        """R12: one page for not-found, not-yours, tombstoned, quarantined and malformed ids. The
+        cause goes to the owner's ledger, never to the page (R6, the tap spec D-T8); the shape of
+        that field in `details` is lifeboat.md R6's [GAP→a1p]."""
+        self.read("not-found", cause=cause)
         return self.render(
             request,
             "notfound.html",
@@ -467,20 +471,22 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     # -- item detail (lifeboat.md §3, R6–R9) ------------------------------------------------------
     def item_or_none(item_id: str):
+        """(item, node, None) for an item this page may show, else (None, None, cause). Search's
+        predicate (`find.shown`), so the two views never disagree on one item."""
         token = boat.token()
         if not _UNRESERVED.fullmatch(item_id or ""):
-            return None, None
+            return None, None, "malformed"
         item = boat.c.backend.get(item_id)
         node = boat.c.backend.get_node(item.scope) if item else None
-        if (
-            not item
-            or not node
-            or item.status == "quarantined"
-            or item.lifecycle.get("tombstoned")
-            or not boat.c.trust.covers(token, node)
-        ):
-            return None, None
-        return item, node
+        if not item or not node:
+            return None, None, "not-found"
+        if item.lifecycle.get("tombstoned"):
+            return None, None, "tombstoned"
+        if item.status == "quarantined":
+            return None, None, "quarantined"
+        if not boat.c.trust.covers(token, node) or not shown(boat.c, token, item, node):
+            return None, None, "not-yours"
+        return item, node, None
 
     def item_context(request: Request, item, node, *, full: bool, arm: str | None,
                      message: tuple[str, str] | None) -> dict[str, Any]:
@@ -507,7 +513,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             "heading": item_title(item),
             "untitled": item_title(item) == S["row.untitled"],
             "scope": path,
-            "ring": None if node.type in ("user", "global") else node.type,
+            "ring": None if node.type == "user" else node.type,
             "engine": content.get("title_engine"),
             "text_kind": item.kind in TEXT_KINDS,
             "body": body[:BODY_CUT] if cut else body,
@@ -547,9 +553,9 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     @app.get("/items/{item_id}", response_class=HTMLResponse)
     async def item_page(request: Request, item_id: str, full: int = 0):
-        item, node = item_or_none(item_id)
+        item, node, cause = item_or_none(item_id)
         if item is None:
-            return boat.not_found(request)
+            return boat.not_found(request, cause)
         boat.read("item", subject=item.id, scope=item.scope, items=[item.id], layers=[node.id])
         message = boat.outcomes.pop(item.id, None)
         return boat.render(request, "item.html",
@@ -561,9 +567,9 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         form = await form_of(request)
         if form is None:
             return HTMLResponse(_REFUSED, status_code=403)
-        item, node = item_or_none(item_id)
+        item, node, cause = item_or_none(item_id)
         if item is None:
-            return boat.not_found(request)
+            return boat.not_found(request, cause)
         version = item.lifecycle.get("version", 1)
         if str(form.get("version")) != str(version):
             boat.read("item", subject=item.id, scope=item.scope, items=[item.id])
@@ -597,12 +603,12 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     @app.get("/items/{item_id}/download")
     async def download(request: Request, item_id: str):
-        item, node = item_or_none(item_id)
+        item, node, cause = item_or_none(item_id)
         token = boat.token()
         data = (boat.c.store.blob_pull(item, token=token, actor=OWNER, principal=token.principal)
                 if item is not None and item.kind == "artifact" else None)
         if data is None:
-            return boat.not_found(request)
+            return boat.not_found(request, cause or "not-found")
         name = re.sub(r"[^A-Za-z0-9._-]", "_", (item.content or {}).get("filename") or item.id)
         return Response(data, media_type="application/octet-stream",
                         headers={"Content-Disposition": f'attachment; filename="{name}"'})
@@ -801,6 +807,17 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     @app.api_route("/{rest:path}", methods=["GET", "POST"], include_in_schema=False)
     async def anything_else(request: Request, rest: str):
         return boat.not_found(request)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def no_other_shape(request: Request, exc: StarletteHTTPException):
+        # R12: a method no route declares (PUT, DELETE, ...) answers with the one not-found page,
+        # never the framework's own 405 body. Behind the guard, like every route.
+        return boat.not_found(request, "method")
+
+    @app.exception_handler(RequestValidationError)
+    async def no_validation_shape(request: Request, exc: RequestValidationError):
+        # And a parameter that does not parse (`?full=x`) gets that page too, not a 422 JSON body.
+        return boat.not_found(request, "malformed")
 
     return app
 

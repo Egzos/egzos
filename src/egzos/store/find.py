@@ -76,6 +76,14 @@ def parse(q: str) -> Query:
     return out
 
 
+def shown(container, token: Token, item: ContextItem, node: Node) -> bool:
+    """Whether a covered, live item is shown to `token`: search's predicate, and the lifeboat item
+    page's. The trust labels are the curator's view, the interactive principal holding `curate`;
+    any other token (a browser UI's interactive grant without it included) is served by policy."""
+    curator = token.principal == "interactive" and token.has("curate")
+    return curator or bool(container.resolver.serve(item, node))
+
+
 def find(container, token: Token, q: str | Query) -> list[tuple[Node, ContextItem]]:
     """Every item the token covers that matches, newest first. Quarantined items are never served
     in any query. A client principal is served under the serving policy; the interactive owner sees
@@ -97,9 +105,6 @@ def find(container, token: Token, q: str | Query) -> list[tuple[Node, ContextIte
     if query.ring is not None:
         nodes = [n for n in nodes if n.type == query.ring]
     text = " ".join(query.text) or None
-    # The trust labels are the curator's view: the interactive principal holding `curate`. Any
-    # other token — a browser UI's interactive grant without it included — is served by policy.
-    curator = token.principal == "interactive" and token.has("curate")
     hits: list[tuple[Node, ContextItem]] = []
     for n in nodes:
         for item in c.backend.query([n.id], kinds=query.kinds or None, key=query.key, text=text):
@@ -109,7 +114,7 @@ def find(container, token: Token, q: str | Query) -> list[tuple[Node, ContextIte
                 continue
             if query.tags and not set(query.tags) <= set(item.tags or []):
                 continue
-            if curator or c.resolver.serve(item, n):
+            if shown(c, token, item, n):
                 hits.append((n, item))
     hits.sort(key=lambda t: (t[1].lifecycle.get("updated_at", ""), t[1].id), reverse=True)
     return hits

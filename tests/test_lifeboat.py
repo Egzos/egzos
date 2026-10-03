@@ -107,7 +107,9 @@ def test_pagination_is_fifty_with_an_opaque_cursor(lb):
     first = client.get("/?q=note").text
     assert first.count("<li>") == 50 and "Next 50" in first
     nxt = re.search(r'href="(/\?q=note&amp;cursor=[^"]+)"', first).group(1).replace("&amp;", "&")
-    assert "50" not in nxt.split("cursor=")[1].split(".")[0] or True  # hex offset, signed
+    cursor = nxt.split("cursor=")[1]
+    forged = cursor[:-1] + ("A" if cursor[-1] != "A" else "B")
+    assert client.get(f"/?q=note&cursor={forged}").text.count("<li>") == 50  # a forged cursor
     second = client.get(nxt).text
     assert second.count("<li>") == 1 and "Next 50" not in second
     # an invalid cursor renders the first page, never an error
@@ -125,6 +127,16 @@ def test_a_root_item_shows_user_self_and_no_ring_word(lb):
     start = detail.index('class="where"')
     where = detail[start : detail.index("</p>", start)]
     assert "<code>user:self</code>" in where and "ring" not in where
+
+
+def test_an_item_at_the_global_root_keeps_its_ring(lb):
+    boat, client, _ = lb
+    t = boat.c.require_token()
+    g = boat.c.store.add(body="at global", scope=boat.c.nodes.global_root(), token=t, actor=OWNER,
+                         principal="interactive")
+    detail = client.get(f"/items/{g.id}").text
+    start = detail.index('class="where"')
+    assert "ring global" in detail[start : detail.index("</p>", start)]  # only user:self has none
 
 
 # --- item detail (R6–R9) ---
@@ -257,6 +269,39 @@ def test_the_uniform_not_found_page_for_every_cause(lb):
     bodies = {p.text for p in pages}
     assert len(bodies) == 1 and '<h1 tabindex="-1" autofocus>Nothing here.</h1>' in bodies.pop()
     assert all(e["details"].get("view") for e in fetches(boat)[-5:])  # every cause is a read
+    # The cause goes to the owner's ledger, never to the page (R6, D-T8).
+    # The store's `get` never returns a tombstone, so that id records `not-found`.
+    causes = [e["details"]["cause"] for e in fetches(boat)[-5:]]
+    assert causes[:3] == ["not-found", "not-found", "quarantined"], causes
+    assert client.get("/items/a b").status_code == 404
+    assert fetches(boat)[-1]["details"]["cause"] == "malformed"
+
+
+def test_a_method_no_route_declares_gets_the_uniform_page(lb):
+    boat, client, item = lb
+    page = client.get("/items/01HZZZZZZZZZZZZZZZZZZZZZZZ")
+    for method in ("PUT", "DELETE", "PATCH"):
+        r = client.request(method, f"/items/{item.id}")
+        assert r.status_code == 404 and r.text == page.text
+        assert fetches(boat)[-1]["details"]["cause"] == "method"
+    r = client.get(f"/items/{item.id}?full=x")  # a parameter that does not parse: no 422 JSON
+    assert r.status_code == 404 and r.text == page.text
+
+
+def test_the_item_page_and_search_share_one_predicate(lb, monkeypatch):
+    import dataclasses
+
+    boat, client, _ = lb
+    t = boat.c.require_token()
+    rule = boat.c.store.add(body="an unverified rule", kind="rule", token=t, actor=OWNER,
+                            principal="interactive")
+    assert rule.id in client.get("/?q=unverified").text  # the curator sees it
+    plain = dataclasses.replace(t, capabilities=[c for c in t.capabilities if c != "curate"])
+    monkeypatch.setattr(boat, "token", lambda: plain)
+    monkeypatch.setattr(boat.c, "require_token", lambda: plain)
+    assert rule.id not in client.get("/?q=unverified").text  # rules are served verified-only
+    assert client.get(f"/items/{rule.id}").status_code == 404  # and by id, the same answer
+    assert fetches(boat)[-1]["details"]["cause"] == "not-yours"
 
 
 def test_an_error_renders_the_card_and_no_detail(lb, monkeypatch):
@@ -511,7 +556,8 @@ def test_the_armed_pending_page_is_a_read_and_a_refusal_is_styled_as_one(lb, mon
     post(client, boat, f"/pending/{pid}", {"step": "confirm", "arm": tok, "mode": "window"})
     assert boat.outcomes[pid][0] == "invalid"
     page = client.get(f"/pending/{pid}").text
-    assert 'class="outcome alarm-text"' in page  # a refusal never reads as a success
+    # `invalid` is ink, not alarm (lifeboat.md §1.2's colour law; the tap spec R4).
+    assert 'class="outcome" role="status"' in page and "alarm-text" not in page
 
 
 def test_every_lifeboat_route_runs_on_the_event_loop():

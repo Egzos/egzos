@@ -65,7 +65,7 @@
 
   <section class="acts" id="acts">
     {%- if message %}
-    <p class="outcome{% if message[0] in ('invalid', 'error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
+    <p class="outcome{% if message[0] in ('error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
     {%- endif %}
     {%- if can_promote %}
     <form method="post" action="/items/{{ item.id }}/promote">
