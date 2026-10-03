@@ -12,13 +12,25 @@ no device-code, no consent screen and no REST surface. Every clause here is ther
 rules in `spec/contracts/README.md` — and the 0.3 review is reading translated prose, not observed
 behaviour. No clause in this document may be marked **running**, and none is.
 
-Clauses carry one of four markings instead:
+Clauses carry one of six markings instead:
 
 - **§K** — carried from a `[DECIDED]` paragraph of §K. The wording may be improved; the decision may
   not be changed here.
 - **a1p** — a1p's binding of a §K decision onto the already-drafted contracts, or onto OAuth 2.1
   where §K names a standard and stops. Reviewable, and the review should read it as a proposal.
-- `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately.
+- **[0.3 · N]** — **decided by the Chief at the Phase 0.3 freeze review**, recorded on #31 (the
+  freeze record, 2026-10-03). `N` is that record's item number, so every clause carrying this
+  marking is traceable to the line that decided it. A `[0.3]` decision is law on the same terms as a
+  §K one: the wording may be improved, the decision may not be changed here. Where the record
+  settled a question but left a detail unnamed — a config key's spelling, a constant's name, a
+  section's number — a1p chose it and the choice is named in the PR that wrote it; such a detail is
+  an **a1p** binding of a `[0.3]` decision and is marked as both.
+- `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately. **No marker of
+  this kind survives in this document**: the 0.3 record answered every one. Each was replaced by its
+  decision, or, where the record deferred it, by `[v1.1]` with the reason.
+- `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
+  Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
+  escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.
 - `[LEAN]` — **§K's own fourth marking**, carried with the same word §K uses. A direction the Chief
   leaned toward and did not decide. It is recorded so a reviewer can see it was considered and is
   **not a decision**: no clause marked `[LEAN]` fixes a shape, and **a builder may not implement
@@ -118,8 +130,10 @@ AS must not grow a `client_secret_post` path to accommodate a client that would 
 every client in the table is software the user can download and read, and a secret compiled into
 downloadable software is not a secret. **a1p** — §K says "public client, no secret" of browsers and
 leaves the other two implicit; stating it for all three closes the gap deliberately rather than by
-omission. `[OPEN→0.3]` if the review wants a confidential type reserved for a future server-side
-integration, it must say so now: adding one after the freeze widens the trust model.
+omission. **[0.3 · 15]** — the review confirmed it: **there is no confidential client type in v1.0**,
+and none is reserved. A server-side integration that would want one is a v1.1 question asked against
+a built AS, not a shape held open in a frozen contract; holding it open would have widened the trust
+model for a client that does not exist.
 
 ### 1.1 · Device-code in a browser is retired
 
@@ -163,10 +177,13 @@ the token endpoint; and short-lived. **a1p** — §K fixes the property ("an int
 useless"); the four checks are what make the property true, and a binding that is only partly
 enforced does not hold.
 
-`[OPEN→0.3]` **Code lifetime.** No source names one. OAuth 2.1's guidance is a maximum of ten
-minutes, and one minute is achievable for a redirect that is already in flight. The review should
-name a number rather than leave it to each implementation — an hour-long code is a different
-security posture from a one-minute code, and both would satisfy every clause above.
+**Code lifetime: 60 seconds. [0.3 · 16]** An authorization code MUST expire 60 seconds after it is
+issued, and the token endpoint MUST refuse an expired one by the same path as an unknown one (§5.3).
+The number is a contract value, not a default: there is no config key that raises it, and a
+deployment may not add one. OAuth 2.1's guidance is a maximum of ten minutes; a redirect that is
+already in flight does not need them, and an hour-long code would be a different security posture
+from a one-minute code while satisfying every clause above. `AS_CODE_LIFETIME_SECONDS = 60` in
+`_types.py` carries it — **a1p**'s naming of a `[0.3]` number.
 
 **Response type.** `code` only. The implicit grant and the resource-owner-password grant do not
 exist in this AS, are not advertised, and MUST be rejected. **a1p** — OAuth 2.1 removes both; said
@@ -178,16 +195,31 @@ allowance is **not** an exception to this clause: it governs a *client's* regist
 the client's own listener, on the same machine — and an AS endpoint is not a redirect URI. §5 says
 so in its own words, and the two sections are consistent only if read that way.
 
-`[OPEN→0.3]` **Whether a container on the user's own machine is exempt.** Read literally, the clause
-above requires a personal laptop container to serve its own AS over TLS: a certificate story for
-every local user, and a real requirement landing on `serve --tls`. TODO(a1p): **no source names
-it.** §K's Phase 0.2 freeze constraints cover metadata, registration, PKCE, device-code and
-revocation and say nothing about transport; build plan 5.3 gives Doorman `serve --tls` / ACME without
-saying when TLS is mandatory; 6.3 names "localhost + TLS" as a coverage matrix, not a rule. The
-review must pick one of three: TLS always; TLS except where the AS is bound to a loopback interface,
-for **any** user and not only a developer; or TLS except in an explicitly enabled developer mode.
-Until it does, this clause stands as written — failing closed, because a default that serves tokens
-in the clear is the wrong way to be wrong.
+**The loopback exemption. [0.3 · 9]** The clause above is narrowed in exactly one way: **no TLS is
+required where the AS is bound to a loopback interface** — and for **any** user, not only a
+developer, and not behind a developer-mode flag. **TLS is required everywhere else.** The three
+candidates the review weighed were TLS always, this exemption, and a developer-mode exemption; the
+middle one was taken because a certificate story for every laptop container is a requirement the
+product cannot meet, and a mode a user can enable is a mode an attacker can talk a user into
+enabling.
+
+The exemption is a property of the **bind address**, not of a request, a header or a hostname:
+
+1. The AS MAY be served over plain HTTP **only** when its listening socket is bound to `127.0.0.1`,
+   `::1`, or another address in `127.0.0.0/8`. Any other bind address — including `0.0.0.0`, `::`
+   and a LAN address — requires TLS, because a socket reachable from the network is reachable by
+   something other than the user.
+2. The decision is made from the socket the listener holds. A forwarded header (`X-Forwarded-For`,
+   `Forwarded`, `X-Forwarded-Proto`) MUST NOT be consulted for it: a proxy in front of a loopback
+   listener is exactly the case where a header would be attacker-supplied.
+3. A container reached through a tunnel or a reverse proxy is **not** exempt. The listener may be on
+   loopback, but the hop the user's bytes actually cross is not, and this clause is about that hop.
+4. This exemption governs AS endpoints only. §5's `http` allowance for a *client's* registered
+   loopback redirect URI is a separate clause with a separate reason, and neither widens the other.
+
+`serve --tls` (a3-doorman, build plan 5.3) therefore remains optional for a loopback bind and
+mandatory for every other one; enforcing that refusal is Doorman's, and requiring it is this
+document's.
 
 ## 3 · CLI and headless — device code
 
@@ -196,9 +228,10 @@ origin to bind to; the device flow's trade is exactly the right one there, and �
 about browsers only.
 
 The endpoints are RFC 8628's: a **device authorization endpoint** issuing
-`{device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval}`, and
+`{device_code, user_code, verification_uri, expires_in, interval}`, and
 the token endpoint redeeming `urn:ietf:params:oauth:grant-type:device_code`. **a1p** — §K names
-"device-code endpoints" as a freeze constraint and does not enumerate them; these are the standard's.
+"device-code endpoints" as a freeze constraint and does not enumerate them; these are the standard's,
+less `verification_uri_complete`, which **[0.3 · 21]** below removes from the set.
 
 Because the flow's weakness is a human typing a code, three mitigations are contract, not advice
 (**a1p**):
@@ -213,10 +246,18 @@ Because the flow's weakness is a human typing a code, three mitigations are cont
 3. **The pending authorization is bound to the `device_code`**, and approval at the verification
    screen grants *that* request only. A second concurrent request is a second approval.
 
-`[OPEN→0.3]` **`verification_uri_complete`.** Including the `user_code` in a URL removes the typing
-step and with it most of the phishing surface the browser retirement was about — but it also makes
-the code copy-pasteable into a chat window, which is the same mistake with fewer steps. No source
-names it. The review should decide whether the AS issues it.
+**`verification_uri_complete` is not issued. [0.3 · 21]** The device authorization response MUST NOT
+carry the key at all — not empty, not null, absent — and `/device` MUST ignore a `user_code` query
+parameter, rendering the empty entry form as if none had been supplied (§11.8). Including the
+`user_code` in a URL removes the typing step and with it some of the phishing surface the browser
+retirement was about, but it makes the code pasteable into a chat window, which is the same mistake
+with fewer steps: a code a user can forward is a code a user can be asked to forward. The typing
+step is the mitigation, so the flow keeps it.
+
+The response's key set is therefore `{device_code, user_code, verification_uri, expires_in,
+interval}`, narrowing §3's RFC 8628 list above by one. Ignoring the query parameter rather than
+refusing the request is deliberate: a refusal would tell a prober that the parameter was recognised,
+and the entry form is what a user arriving at `/device` expects either way.
 
 ## 4 · MCP clients — Phase 5, against this same AS
 
@@ -255,17 +296,32 @@ redirect_uris, registered_at}` enters container config through an owner-authenti
 reader looks for the entry's shape: the consent screen renders the timestamp, and a field the screen
 renders is a field the registry has to carry.
 
-**Whether registering, amending or removing a client writes an audit event is `[OPEN→0.3]`, in §9's
-marking and in #68.** It is named here because §5 is where a reader looks for it: this section's
-exact-match rule is only as strong as the allowlist it compares against, so a change to that
-allowlist is a change to the AS's security posture, and `events.md` §4 invariant 2 does not currently
-name an event for it.
+**Registering, amending or removing a client writes `client.register`. [0.3 · 31]** The event
+carries `{client_id, op, redirect_uris}`, where `op` is one of `add` · `amend` · `remove`, and it is
+its own event rather than a member of the `authz.*` family: the redirect allowlist is the classic AS
+hole, this section's exact-match rule is only as strong as the allowlist it compares against, and a
+change to that allowlist is a change to the AS's security posture whether or not any token is
+involved. `redirect_uris` carries the entry's URIs **after** the change (empty on `remove`), so the
+log states the allowlist as it then stood rather than the delta that produced it. `events.md` §1
+carries the row; this section is where a reader looks for why it exists.
 
-`[OPEN→0.3]` **Dynamic client registration** (RFC 7591) is what the MCP authorization spec expects
-(§4), and an **open** registration endpoint on a personal container lets any caller create a client
-entry. The two pull in opposite directions and the review must settle which wins before Phase 5
-builds against either. The AS metadata's `registration_endpoint` (§6) is advertised only if the
-answer is yes.
+**No open dynamic client registration. [0.3 · 10]** RFC 7591's endpoint is what the MCP
+authorization spec expects (§4), and an open registration endpoint on a personal container lets any
+caller create a client entry — which is the direction that loses. Concretely:
+
+1. **Only the owner registers a client**, through an owner-authenticated path: the CLI, or approving
+   the client on the consent screen (§11). Both are acts of the person who owns the container.
+2. **`registration_endpoint` is not advertised** in the AS metadata (§6). The row is absent from the
+   document, not present-and-empty — §6 states the same rule from the metadata side.
+3. There is no unauthenticated path by which a client entry is created, amended or removed, and a
+   deployment may not add one.
+
+What this costs is named rather than hidden: an MCP client that expects to self-register against an
+unknown AS does not work until its `client_id` is registered by the owner. Phase 5 builds against
+that, and the owner-approval path in (1) is what makes it a one-screen act rather than a config-file
+edit. Whether v1.1 adds an owner-gated RFC 7591 endpoint — registration that follows the standard's
+shape but behind the consent screen rather than open — is a **`[v1.1]`** question at the Phase 5
+contract boundary, not reopened here.
 
 ### 5.1 · The matching rule is exact string comparison
 
