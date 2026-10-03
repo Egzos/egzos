@@ -41,7 +41,7 @@ class TrustEngine:
     # -- coverage & audience -----------------------------------------------------------------
     def covers(self, token: Token, node: Node) -> bool:
         """Grants bind to container ids; coverage is computed at check time down the path."""
-        if token.revoked:
+        if not token.live:
             return False
         if "*" in token.scopes:
             return True

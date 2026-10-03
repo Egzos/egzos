@@ -51,3 +51,50 @@ def test_container_home_is_owner_only(tmp_path, monkeypatch):
     monkeypatch.setenv("EGZOS_HOME", str(home))
     assert main(["init"]) == 0
     assert stat.S_IMODE(home.stat().st_mode) == 0o700
+
+
+def test_ls_refuses_inbox_with_a_scope(tmp_path, monkeypatch):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    assert main(["ls", "--inbox", "--scope", "user:self"]) != 0
+    assert main(["ls", "--inbox"]) == 0
+
+
+def test_token_revoke_takes_a_client_token_back(tmp_path, monkeypatch, capsys):
+    import json
+
+    from egzos.container import Container
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "token", "create", "--client", "bot"]) == 0
+    minted = json.loads(capsys.readouterr().out)
+    c = Container(tmp_path)
+    assert c.auth.use(minted["secret"]) is not None
+    owner = c.auth.interactive_token()
+    assert main(["token", "revoke", owner.id]) != 0  # never the owner's own key
+    assert main(["token", "revoke", minted["id"]]) == 0
+    assert c.auth.use(minted["secret"]) is None
+    assert c.ledger.tail(1)[0]["event"] == "token.revoke"
+    assert main(["token", "revoke", minted["id"]]) != 0
+
+
+def test_an_expired_token_is_not_live(tmp_path):
+    from egzos.container import OWNER, Container
+
+    c = Container(tmp_path)
+    c.init()
+    t = c.auth.mint(principal="client", owner=OWNER, client="bot", role="reader",
+                    scopes=["*"], actor=OWNER, by_principal="interactive")
+    secret = t.secret
+    stored = c.backend.get_token(t.id)
+    for when, live in (("2000-01-01T00:00:00Z", False), ("2999-01-01T00:00:00Z", True),
+                       ("not a date", False), (None, True)):
+        stored.expires_at = when
+        c.backend.put_token(stored)
+        assert (c.auth.use(secret) is not None) is live, when
+        assert c.backend.get_token(t.id).live is live
+        assert c.trust.covers(c.backend.get_token(t.id), c.nodes.user_root()) is live

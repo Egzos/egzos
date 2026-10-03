@@ -27,7 +27,8 @@ baseline, which "works without htmx" (§18); the htmx enhancement is optional th
 
 Residuals, named: a process running as the user that drives a browser, fakes a terminal, or appends
 to the chain directly can do what the user can — a shell running as the user is the user. The URL
-travels in the browser launcher's argv, readable by other local users on a shared host. Audience
+travels in the browser launcher's argv, readable by other local users on a shared host, as the
+client secret does in `claude mcp add`'s argv under `connect --apply`. Audience
 chips carry no contractor / external flag: tokens record no principal class yet. OS-backed
 presence (WebAuthn / platform authenticator) is the stronger tier the spec names for later.
 """
@@ -128,6 +129,11 @@ def _fits(shape: dict[str, Any], bound: dict[str, Any] | None) -> bool:
 
 
 # --- what a decision is about ---------------------------------------------------------------------
+def short_id(value: str) -> str:
+    """The tap spec §5 id: first 8 characters, ` … `, last 4; the full id goes in `title`."""
+    return f"{value[:8]} … {value[-4:]}" if len(value) > 12 else value
+
+
 def build_act(c: Container, ref: str) -> dict[str, Any] | None:
     """The tap's content for an open proposal or an unverified item; None if there is nothing to
     decide. Everything the page shows comes from here, for the CLI and the lifeboat alike."""
@@ -139,7 +145,8 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         return {
             "kind": "proposal",
             "subject": prop["id"],
-            "ref": f"PROPOSAL {prop['id'][:10]}… · filed {_local(prop.get('created_at'))}",
+            "ref": "PROPOSAL",
+            "filed": _local(prop.get("created_at")),
             "title": f"Move {len(items)} items outward: {prop['from_path']} → {prop['to_path']}",
             "requester": f"agent:{by['client']}" if by.get("principal") == "client" else "you",
             "reason": prop.get("reason"),
@@ -181,7 +188,8 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         return {
             "kind": "item",
             "subject": item.id,
-            "ref": f"ITEM {item.id[:10]}…",
+            "ref": "ITEM",
+            "filed": None,
             "title": f"Mark verified: “{item.content.get('auto_title', item.id)}” at {path}",
             "requester": f"agent:{client}" if client and client != "cli" else "you",
             "reason": None,
@@ -344,24 +352,28 @@ h2{font-size:var(--egz-fs-4);font-weight:var(--egz-w-semibold)}
 .chips{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .attr{font-family:var(--egz-font-mono);font-size:.8rem}
 summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem}
-.ref,.shell,h2{font-family:var(--egz-font-mono);text-transform:uppercase;
- letter-spacing:var(--egz-tracking-caps);font-size:.8rem}
+.ref,.shell{font-family:var(--egz-font-mono);text-transform:uppercase;
+ letter-spacing:var(--egz-tracking-caps);font-size:.8rem;font-feature-settings:var(--egz-tabular)}
+.ref code{font:inherit}
 .shell{text-transform:none;letter-spacing:0;border-bottom:var(--egz-hair) solid var(--egz-rule-soft);
  margin:0;padding:4px 0}
-.box{border:var(--egz-bw) solid var(--egz-rule);padding:16px;margin:16px 0}
+.box,.note,.alarm,button{box-shadow:var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)}
+.box{border:var(--egz-bw) solid var(--egz-rule);padding:16px;margin:16px var(--egz-off)
+ calc(16px + var(--egz-off)) 0}
 .chip{display:inline-block;border:var(--egz-hair) solid var(--egz-rule);padding:2px 8px;
  margin:0 6px 6px 0;font-family:var(--egz-font-mono);font-size:.8rem}
 table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:6px 4px}
 td{padding:6px 4px;border-bottom:var(--egz-hair) solid var(--egz-rule-soft)}
 button{min-height:44px;padding:0 16px;border:var(--egz-bw) solid var(--egz-rule);
  background:var(--egz-canvas);color:var(--egz-ink);font:inherit;cursor:pointer;margin:0 8px 8px 0}
 button.act{background:var(--egz-act);color:var(--egz-act-on);border-color:var(--egz-act)}
-button.ghost{border-color:transparent;text-decoration:underline}
+button.ghost{border-color:transparent;text-decoration:underline;box-shadow:none}
 button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px}
-.note{border:var(--egz-bw) solid var(--egz-act);padding:12px}
-.alarm{border:var(--egz-bw) solid var(--egz-alarm);color:var(--egz-alarm);padding:12px}
+.note{border:var(--egz-bw) solid var(--egz-act);padding:12px;margin:0 var(--egz-off) 16px 0}
+.alarm{border:var(--egz-bw) solid var(--egz-alarm);color:var(--egz-alarm);padding:12px;
+ margin:0 var(--egz-off) 16px 0}
 .qrow td{color:var(--egz-alarm)}
-.qstamp{border:var(--egz-hair) solid var(--egz-alarm);padding:2px 6px;text-transform:uppercase}
 .terms{font-family:var(--egz-font-mono);font-feature-settings:var(--egz-tabular);font-size:.85rem}
 """
 
@@ -519,7 +531,10 @@ class Tap:
             f"<p class=shell>egzos · container {e(self.container)} · {e(self.host)}</p>"
             f"<p class=shell>you · {e(OWNER)} · principal: interactive · present since "
             f"{e(_since(self.opened))}</p>"
-            f"<p class=ref>{e(a.get('ref', 'act'))}</p>"
+            f"<p class=ref>{e(a.get('ref', 'ACT'))} <code title=\"{e(a['subject'])}\">"
+            f"{e(short_id(a['subject']))}</code>"
+            + (f" · filed {e(a['filed'])}" if a.get("filed") else "")
+            + "</p>"
             f"<h1>{e(a['title'])}</h1>"
             f"<p><span class=attr>{e(a.get('requester', 'you'))} states:</span> {said}</p>"
             f"<h2>what moves</h2>{rows}"

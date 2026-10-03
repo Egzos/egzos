@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EGZOS_STEP_UP_WINDOW_SECONDS` set (default `0`: every act taps), a signature opens a window for
   that ring pair bounded to the signed shape, read back from the chain; `egzos trust close-window`.
 - Token values are 256 random bits, stored only as a hash; the id is public (freeze item 19).
+  `egzos token revoke <id>` takes a client token back; a token past its `expires_at` is not live.
 - The gate: `organize` for a silent move, `publish` to propose a widening one; a manifest drift is
   `approval.stale` (freeze items 3, 39); an ambiguous path resolves by latest activity (item 1).
 
@@ -28,6 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minting is the owner's act (`connect`, `token create`, `Auth.mint`); the owner's views (`trust
   pending`, `token ls`, `audit`) refuse a client principal; `ls` checks coverage.
 - The MCP door answers identically for a scope that does not exist and one the token cannot see.
+- `egzos_fetch` fences each item with a fresh per-response nonce, so a body cannot forge the
+  delimiters that mark where its data ends.
+- An open presence window carries out what was asked: `trust deny` under a window denies.
 - `ls` and `trust pending` are audited reads; `blob_pull` checks coverage.
 - The tap's one-shot URL is printed only to a terminal, never to an agent's pipe.
 - Coverage is checked in the engine (`resolve_ref`, node creation, moves, quarantine, the resolver)

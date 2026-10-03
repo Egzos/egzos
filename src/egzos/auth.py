@@ -127,7 +127,7 @@ class Auth:
         """The token a bearer value proves, or None. Every failure looks the same to the caller."""
         tid = token_id_of(value or "")
         token = self.backend.get_token(tid) if tid else None
-        if not token or token.revoked or not token.secret_hash:
+        if not token or not token.live or not token.secret_hash:
             return None
         if not secrets.compare_digest(_hash(value), token.secret_hash):
             return None

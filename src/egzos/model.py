@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import time
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 # --- vocabularies -------------------------------------------------------------------------
@@ -177,8 +178,23 @@ class Token:
     # The bearer value, present only on the object `Auth.mint` returns. Never serialised.
     secret: str | None = field(default=None, repr=False, compare=False)
 
+    @property
+    def live(self) -> bool:
+        """Not revoked and not past `expires_at` (null means no expiry, capabilities.md §5)."""
+        if self.revoked:
+            return False
+        if self.expires_at is None:
+            return True
+        try:
+            until = datetime.fromisoformat(self.expires_at)
+        except ValueError:
+            return False  # an expiry nobody can read fails closed
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=UTC)
+        return datetime.now(UTC) < until
+
     def has(self, capability: str) -> bool:
-        return not self.revoked and capability in self.capabilities
+        return self.live and capability in self.capabilities
 
     def to_dict(self, *, with_secret_hash: bool = False) -> dict[str, Any]:
         """The token's public view. `secret_hash` is credential-derived: only the backend's own

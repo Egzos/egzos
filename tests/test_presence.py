@@ -248,3 +248,49 @@ def test_the_window_policy_is_whole_minutes(monkeypatch):
     monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "90")
     assert window_seconds() == 120
     assert "opens a 2-minute window" in presence_text({**ACT}, window_seconds())
+
+
+def test_an_open_window_never_turns_a_deny_into_an_approval(tmp_path, monkeypatch):
+    from egzos.authz.presence import build_act
+    from egzos.cli import main
+    from egzos.container import OWNER
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    c = Container(tmp_path)
+    t = c.auth.interactive_token()
+    root = c.nodes.user_root()
+    org = c.nodes.create("org", "acme", root, token=t, actor=OWNER, principal=t.principal)
+    proj = c.nodes.create("project", "p", org, token=t, actor=OWNER, principal=t.principal)
+    other = c.nodes.create("project", "q", org, token=t, actor=OWNER, principal=t.principal)
+    c.auth.mint(principal="client", owner=OWNER, client="watcher", role="reader",
+                scopes=[other.id], actor=OWNER, by_principal="interactive")
+    item = c.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    pid = c.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
+    act = build_act(c, pid)
+    p = Presence(c)
+    p.record(act, via="tap", outcome="approved", windowed=True)  # a window this proposal fits
+    assert p.covers(act)
+    assert main(["trust", "deny", pid]) == 0
+    assert c.backend.get_proposal(pid)["status"] == "denied"
+    assert c.backend.get(item.id).scope == proj.id
+    events = [e["event"] for e in c.ledger.tail(10)]
+    assert events[-1] == "approval.deny" and "approval.execute" not in events
+
+
+def test_the_tap_page_carries_the_structure_law_and_the_id_format():
+    from egzos.authz.presence import TAP_STYLE, Tap, short_id
+
+    sid = "01J7Q4N8ABCDEFGHJKMNPQM3KD"
+    act = {**ACT, "subject": sid, "ref": "ITEM", "filed": None}
+    page = Tap(act).page(armed=False)
+    assert short_id(sid) == "01J7Q4N8 … M3KD"
+    assert f'<code title="{sid}">01J7Q4N8 … M3KD</code>' in page  # §5: full id on hover
+    # §7: structural containers and acts carry the hard offset; §8: h2 keeps the heading token.
+    assert ".box,.note,.alarm,button{box-shadow:var(--egz-off) var(--egz-off) 0" in TAP_STYLE
+    rules = [r for r in TAP_STYLE.replace("\n", "").split("}") if "h2" in r.split("{")[0]]
+    assert rules == ["h2{font-size:var(--egz-fs-4);font-weight:var(--egz-w-semibold)"]
+    ref = next(r for r in TAP_STYLE.split("}") if r.lstrip().startswith(".ref,"))
+    assert "--egz-tabular" in ref

@@ -211,6 +211,8 @@ def ls(
     scope: str | None = typer.Option(None, "--scope", "-s"),
 ):
     """List items. `ls --inbox` is the capture queue."""
+    if inbox and scope:
+        _fail("--inbox lists the capture queue, which has no scope: pass one of --inbox, --scope")
     c = _container()
     token = c.require_token()
     node = _scope_or(c, scope, None)
@@ -436,9 +438,10 @@ def trust_pending():
     )
 
 
-def _decide(c: Container, token, ref: str) -> None:
+def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
     """Open the decision page for an item or a proposal. The terminal only ASKS; the page — two
-    deliberate presses, or Deny — is where the human decides (the step-up tap)."""
+    deliberate presses, or Deny — is where the human decides (the step-up tap). An open window
+    stands in for the presses, never for the answer: it carries out what was `asked`."""
     from egzos.authz.presence import Presence, build_act
 
     prop = c.backend.get_proposal(ref)
@@ -484,7 +487,7 @@ def _decide(c: Container, token, ref: str) -> None:
 
     outcome = Presence(c).require(act, decide=perform)
     if outcome == "window":
-        perform("approved", False, None)
+        perform("denied" if asked == "deny" else "approved", False, None)
     elif outcome not in ("approved", "denied"):
         _fail(f"not approved: {outcome} in the presence check")
     if "error" in result:
@@ -512,7 +515,7 @@ def trust_deny(proposal: str):
     p = c.backend.get_proposal(proposal)
     if not p or p.get("status") != "open":
         _fail("no open proposal with that id")
-    _decide(c, token, proposal)
+    _decide(c, token, proposal, asked="deny")
 
 
 @trust_app.command("close-window")
@@ -550,7 +553,11 @@ def token_create(
         [], "--scope", help="Node ids/paths covered; default: user:self"
     ),
 ):
-    """Mint a CLIENT principal for a machine client. Machine clients never touch web auth."""
+    """Mint a CLIENT principal for a machine client. Machine clients never touch web auth.
+
+    The secret IS this command's output, to any stdout, pipe included: it is the deliberate mint
+    for scripts and CI, where the caller captures the secret. `connect` is the person-facing
+    wrapper, so it prints a pasteable command only to a terminal."""
     c = _container()
     token = _owner(c, "minting a token")
     if not token.has("admin"):
@@ -587,6 +594,26 @@ def token_create(
     )
 
 
+@token_app.command("revoke")
+def token_revoke(
+    token_id: str = typer.Argument(..., help="A client token's id (`egzos token ls`)"),
+):
+    """Take a client token back: it stops working at once, and leaves every audience it was in."""
+    c = _container()
+    token = _owner(c, "revoking a token")
+    if not token.has("admin"):
+        _fail("token revoke needs `admin`")
+    target = c.backend.get_token(token_id)
+    if target is None or target.principal != "client":
+        # Never the owner's interactive token: it is the key to this container, and nothing
+        # re-mints it until `login` lands (Phase 2).
+        _fail("no client token with that id")
+    if target.revoked:
+        _fail(f"{target.id} is already revoked")
+    c.auth.revoke(target.id, actor=OWNER, principal=token.principal)
+    _out({"id": target.id, "revoked": True}, f"revoked {target.id} (client {target.client})")
+
+
 @token_app.command("ls")
 def token_ls():
     c = _container()
@@ -597,7 +624,7 @@ def token_ls():
         "\n".join(
             f"{t.id}  {t.principal:<11} {t.client:<14} {','.join(t.capabilities):<45} "
             f"last_used={t.last_used or '-'}"
-            f"{'  REVOKED' if t.revoked else ''}"
+            f"{'  REVOKED' if t.revoked else '  EXPIRED' if not t.live else ''}"
             for t in ts
         ),
     )
@@ -722,6 +749,9 @@ def connect(
         "--", egzos_bin, "serve", "--mcp",
     ]
     if apply:
+        # Residual, named: the secret rides `claude mcp add`'s argv while that process runs,
+        # readable by other local users on a shared host — the class of the tap URL in the
+        # launcher's argv (authz/presence.py). A shell running as the user is the user.
         if not shutil.which("claude"):
             _fail("`claude` is not on PATH; run the printed command once Claude Code is installed")
         subprocess.run(cmd, check=True)
