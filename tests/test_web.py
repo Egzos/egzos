@@ -39,7 +39,7 @@ def test_items_lists_and_searches(boat):
     status, body = b.items()
     assert status == 200 and "Prefer imperative commit messages" in body
     status, body = b.items("nothing-matches-this")
-    assert "No matches." in body
+    assert "No results." in body
     assert b.c.ledger.tail(1)[0]["event"] == "context.fetch"
 
 
@@ -241,3 +241,20 @@ def test_a_tap_for_an_item_gone_meanwhile_answers_uniformly(boat):
     b.tap_post(token, "arm")
     status, page = b.tap_post(token, "confirm")
     assert status == 200 and "This request is no longer valid." in page
+
+
+def test_the_lifeboat_stays_inside_its_spec(boat):
+    b, item = boat
+    assert b.get("/audit", {})[0] == 404  # lifeboat.md §0: the audit view is the CLI's
+    page = b.item(item.id)[1]
+    assert "Quarantine" not in page and f"<h1>{_title_of(item)}</h1>" in page  # §3.5 acts; §3.2
+    home = b.items()[1]
+    assert "<h1><label for=q>Search</label></h1>" in home
+    assert "Nothing here yet." not in home  # one item exists
+    assert "<h1>Pending</h1>" in b.pending()[1] and "1 waiting for you" in b.pending()[1]
+    assert b.get(f"/items/{item.id}", {})[0] == 200 and b.get(f"/item/{item.id}", {})[0] == 404
+    assert b.act("/quarantine", {"item": item.id})[0] == 404
+
+
+def _title_of(item):
+    return item.content.get("auto_title")

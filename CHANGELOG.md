@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The walking skeleton's modules land as the MVP's running core: nodes, items and blobs (store),
   trust engine and the gate, hash-chained ledger, resolver, tokens, the CLI and the MCP stdio door.
-- `egzos web`: the lifeboat, MVP cut — items, search, item detail, the pending queue with approve /
-  deny / quarantine, and the audit tail. Loopback only; a per-launch key becomes an HttpOnly,
+- `egzos web`: the lifeboat, MVP cut — items, search, item detail and the pending queue with approve /
+  deny (lifeboat.md §0's scope; audit and quarantine stay the CLI's). Loopback only; a per-launch key becomes an HttpOnly,
   SameSite=Strict cookie; every act is a same-origin POST carrying the key. Styled by `tokens.css`.
 - `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
   server with Claude Code at user scope.

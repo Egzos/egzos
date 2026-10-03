@@ -1,13 +1,14 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: Apache-2.0
 """
-The lifeboat, MVP cut: `egzos web` — list, search, item detail, the pending queue and the audit
-tail, served in-process on loopback only, as the owner's interactive principal.
+The lifeboat, MVP cut: `egzos web` — list, search, item detail and the pending queue
+(lifeboat.md §0's scope: no audit view, which stays the CLI's `egzos audit`), served in-process on
+loopback only, as the owner's interactive principal.
 
 Presence is the browser session: the URL opened at launch carries a per-launch key (printed only
 when no browser could be opened and stdout is a terminal — an agent's shell tool is not one); the
 first visit trades it for an HttpOnly, SameSite=Strict cookie, and every request needs that cookie. Every
-act (approve, deny, quarantine) is a POST that also carries the key in the form and must come from
+act (approve, deny) is a POST that also carries the key in the form and must come from
 this origin, so another page in the same browser cannot drive it. Unknown ids and missing pages
 answer one uniform 404 (silence-not-errors). Everything rendered is escaped: item text is data.
 
@@ -73,7 +74,6 @@ input[type=text]{flex:1;min-height:44px;padding:0 12px;border:var(--egz-bw) soli
 button{min-height:44px;padding:0 16px;border:var(--egz-bw) solid var(--egz-rule);
  background:var(--egz-canvas);color:var(--egz-ink);font:inherit;cursor:pointer}
 button.act{background:var(--egz-act);color:var(--egz-act-on);border-color:var(--egz-act)}
-button.alarm{background:var(--egz-alarm);color:var(--egz-alarm-on);border-color:var(--egz-alarm)}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:var(--egz-focus);outline-offset:3px}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:10px 8px;border-bottom:var(--egz-hair) solid var(--egz-rule-soft);
@@ -118,7 +118,7 @@ class Lifeboat:
     ) -> str:
         nav = "".join(
             f'<a href="{href}" class="{"on" if name == active else ""}">{name}</a>'
-            for name, href in (("items", "/"), ("pending", "/pending"), ("audit", "/audit"))
+            for name, href in (("items", "/"), ("pending", "/pending"))
         )
         counter = f'<span class="mono muted">{count} pending</span>' if count is not None else ""
         flash_html = f'<div class="flash{" err" if err else ""}">{_e(flash)}</div>' if flash else ""
@@ -255,7 +255,7 @@ class Lifeboat:
         body_rows = "".join(
             f"<tr><td><span class='badge {_e(i.status)}'>{_e(i.status)}</span></td>"
             f"<td class=mono>{_e(i.kind)}</td>"
-            f'<td><a href="/item/{_e(i.id)}">{_e(_title(i))}</a></td>'
+            f'<td><a href="/items/{_e(i.id)}">{_e(_title(i))}</a></td>'
             f"<td class=mono>{_e(self.c.nodes.path(n))}</td></tr>"
             for n, i in rows
         )
@@ -263,11 +263,13 @@ class Lifeboat:
             "<table><tr><th>trust</th><th>kind</th><th>item</th><th>scope</th></tr>"
             f"{body_rows}</table>"
             if rows
-            else f"<p class=muted>{'No matches.' if q else 'Nothing captured yet. Try: egzos add'}</p>"
+            else "<p class=muted>"
+            + ("No results." if q else "Nothing here yet. Items you can fetch will appear here.")
+            + "</p>"
         )
         search = (
-            '<form class=search method=get action="/">'
-            f'<input type=text name=q value="{_e(q)}" placeholder="Search everything you can see">'
+            '<h1><label for=q>Search</label></h1><form class=search method=get action="/">'
+            f'<input type=text id=q name=q value="{_e(q)}">'
             "<button>Search</button></form>"
         )
         return 200, self.page(
@@ -287,16 +289,12 @@ class Lifeboat:
         text = content.get("body") or content.get("inline") or ""
         acts = ""
         if item.status == "unverified":
-            acts += self.approve_button(item.id, f"/item/{item.id}", "Approve — mark verified")
-        if item.status != "quarantined":
-            acts += self.form(
-                "/quarantine", {"item": item.id, "back": f"/item/{item.id}"}, "Quarantine", "alarm"
-            )
+            acts += self.approve_button(item.id, f"/items/{item.id}", "Approve — mark verified")
         body = (
             f"<div class=card><div class=row><span class='badge {_e(item.status)}'>"
             f"{_e(item.status)}</span><span class=mono>{_e(item.kind)}</span>"
             f"<span class=mono>{_e(self.c.nodes.path(node))}</span></div>"
-            f"<h2>{_e(_title(item))}</h2>"
+            f"<h1>{_e(_title(item))}</h1>"
             + (f"<pre>{_e(text)}</pre>" if text else "")
             + "</div><table>"
             + "".join(
@@ -340,54 +338,39 @@ class Lifeboat:
             for p in pend["proposals"]
         )
         items = "".join(
-            f'<tr><td class=mono>{_e(i.kind)}</td><td><a href="/item/{_e(i.id)}">'
+            f'<tr><td class=mono>{_e(i.kind)}</td><td><a href="/items/{_e(i.id)}">'
             f"{_e(_title(i))}</a></td><td class=mono>{_e(self._path(i.scope))}</td>"
             f"<td class=mono>{_e((i.provenance or {}).get('client'))}</td><td>"
             + self.approve_button(i.id, "/pending", "Approve")
             + "</td></tr>"
             for i in pend["items"]
         )
+        waiting = len(pend["items"]) + len(pend["proposals"])
         body = (
-            "<h2>Moves waiting for your yes</h2>"
-            + (props or "<p class=muted>No open proposals.</p>")
+            "<h1>Pending</h1>"
+            + (
+                f"<p class=mono>{waiting} waiting for you</p>"
+                if waiting
+                else "<p class=muted>Nothing is waiting for you.</p>"
+            )
+            + "<h2>Moves waiting for your yes</h2>"
+            + (props or "")
             + "<h2>Captured items, unverified</h2>"
             + (
                 "<table><tr><th>kind</th><th>item</th><th>scope</th><th>from</th><th></th></tr>"
                 f"{items}</table>"
                 if items
-                else "<p class=muted>Nothing waiting.</p>"
+                else ""
             )
         )
         return 200, self.page(
             "Pending", body, active="pending", flash=flash, err=err, count=n
         )
 
-    def audit(self) -> tuple[int, str]:
-        token = self.c.require_token()
-        result = self.c.ledger.verify()
-        status = (
-            f"chain ok · {result['entries']} entries · head {str(result['head'])[:16]}…"
-            if result["ok"]
-            else f"CHAIN BROKEN at seq {result['broken_at']}: {result['reason']}"
-        )
-        rows = "".join(
-            f"<tr><td class=mono>{_e(e.get('seq'))}</td><td class=mono>{_e(e.get('ts'))}</td>"
-            f"<td class=mono>{_e(e.get('event'))}</td><td class=mono>{_e(e.get('principal'))}</td>"
-            f"<td class=mono>{_e(e.get('subject') or '')}</td></tr>"
-            for e in reversed(self.c.ledger.tail(50))
-        )
-        n = self._read(token, "audit", items=[], entries=result["entries"])
-        body = (
-            f"<div class='flash{'' if result['ok'] else ' err'}'>{_e(status)}</div>"
-            "<table><tr><th>seq</th><th>time</th><th>event</th><th>principal</th><th>subject</th>"
-            f"</tr>{rows}</table>"
-        )
-        return 200, self.page("Audit", body, active="audit", count=n)
-
     # -- acts ---------------------------------------------------------------------------------------
     def act(self, path: str, form: dict[str, str]) -> tuple[int, str, str]:
         """Returns (status, body, redirect). Redirect wins when set."""
-        token = self.c.require_token()
+        self.c.require_token()  # the owner session is required for every act
         back = form.get("back", "/pending")
         if not back.startswith("/") or back.startswith("//"):
             back = "/pending"
@@ -409,14 +392,6 @@ class Lifeboat:
                 if not act or act["kind"] != "proposal":
                     return (*self.not_found(), "")
                 msg = self._decide(act, "denied", False, via="lifeboat")
-            elif path == "/quarantine":
-                item = self.c.backend.get(form.get("item", ""))
-                if not item:
-                    return (*self.not_found(), "")
-                affected = self.c.trust.quarantine(
-                    item, token=token, actor=OWNER, reason=form.get("reason") or "via web"
-                )
-                msg = f"Quarantined {len(affected)} item(s)"
             else:
                 return (*self.not_found(), "")
         except TrustError as e:
@@ -430,10 +405,8 @@ class Lifeboat:
             status, body = self.items(query.get("q", ""), flash, err)
         elif path == "/pending":
             status, body = self.pending(flash, err)
-        elif path == "/audit":
-            status, body = self.audit()
-        elif path.startswith("/item/"):
-            status, body = self.item(path[len("/item/") :], flash, err)
+        elif path.startswith("/items/"):
+            status, body = self.item(path[len("/items/") :], flash, err)
         else:
             return self.not_found()
         return status, body

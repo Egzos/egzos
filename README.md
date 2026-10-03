@@ -35,7 +35,7 @@ egzos find commit                            # numbered results; act on them wit
 
 egzos connect                                # mints a token for Claude Code, prints the line to run
 egzos connect --apply                        # …or registers it with Claude Code for you
-egzos web                                    # browser: items, search, pending, audit (loopback only)
+egzos web                                    # browser: items, search, pending (loopback only)
 ```
 
 Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your context for a scope,
@@ -44,8 +44,8 @@ Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your 
 - **Agents propose, you dispose.** Anything an agent writes waits in `egzos web` → *pending* (or
   `egzos trust pending`) until you approve it. A move that would widen who can read something is
   parked until you say yes.
-- **Every read and every yes is on the record.** `egzos audit tail` / `egzos audit verify` (or the
-  *audit* tab) — a hash chain that verifies end to end.
+- **Every read and every yes is on the record.** `egzos audit tail` / `egzos audit verify` — a
+  hash chain that verifies end to end.
 - **Structure as you go.** `egzos mk project health`, `egzos mv %1 project:health`, `egzos fetch project:health`.
 
 ## Open core
