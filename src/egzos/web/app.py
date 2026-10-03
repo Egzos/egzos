@@ -157,35 +157,40 @@ class Lifeboat:
 
     def __init__(self, container: Container, *, key: str | None = None, host: str = "127.0.0.1"):
         self.c = container
+        # Three values, none of which stands in for another:
+        # - the launch key rides the URL once and is exchanged for a session, then is dead;
+        # - the session is the HttpOnly cookie, and never appears in a page;
+        # - the form key is in every page, and is never a credential on its own.
+        # Cursors are signed with a secret that never leaves this process.
         self.key = key or secrets.token_urlsafe(32)
+        self.redeemed = False
+        self.session = secrets.token_urlsafe(32)
+        self.form_key = secrets.token_urlsafe(32)
+        self._signing = secrets.token_bytes(32)
+        self._arms: dict[str, tuple[str, str, str, float]] = {}  # nonce → (purpose, ref, v, until)
         self.host = host
         self.since = time.time()
         self.presence = Presence(container)
         self.taps: dict[str, dict[str, Any]] = {}  # token → {tap, return}
         self.outcomes: dict[str, tuple[str, str]] = {}  # subject → (state, text), shown once
 
-    # -- arming: a server-signed token, valid 10 s (the tap spec §18; lifeboat.md §18) -------------
-    def _sig(self, purpose: str, ref: str, version: object, deadline: int) -> str:
-        msg = f"{purpose}|{ref}|{version}|{deadline}".encode()
-        return hmac.new(self.key.encode(), msg, hashlib.sha256).hexdigest()
-
+    # -- arming: a server-held nonce, single-use, valid 10 s, bound to one act (the tap's model) ---
     def arm(self, purpose: str, ref: str, version: object) -> str:
-        deadline = int(time.time()) + ARM_SECONDS
-        return f"{deadline}.{self._sig(purpose, ref, version, deadline)}"
+        now = time.time()
+        for nonce in [n for n, a in self._arms.items() if a[3] < now]:
+            del self._arms[nonce]
+        nonce = secrets.token_urlsafe(24)
+        self._arms[nonce] = (purpose, ref, str(version), now + ARM_SECONDS)
+        return nonce
 
     def armed(self, purpose: str, ref: str, version: object, token: str | None) -> bool:
-        try:
-            deadline_s, sig = (token or "").split(".", 1)
-            deadline = int(deadline_s)
-        except ValueError:
-            return False
-        return deadline >= time.time() and hmac.compare_digest(
-            sig, self._sig(purpose, ref, version, deadline)
-        )
+        """True once for the nonce `arm` issued for exactly this act, within its 10 s."""
+        entry = self._arms.pop(token or "", None)
+        return bool(entry) and entry[:3] == (purpose, ref, str(version)) and entry[3] >= time.time()
 
     # -- cursors: opaque, signed, carrying no scope or count in the clear (§15) ---------------------
     def cursor(self, q: str, offset: int) -> str:
-        sig = hmac.new(self.key.encode(), f"cursor|{q}|{offset}".encode(), hashlib.sha256)
+        sig = hmac.new(self._signing, f"cursor|{q}|{offset}".encode(), hashlib.sha256)
         return f"{offset:x}.{sig.hexdigest()[:24]}"
 
     def offset(self, q: str, cursor: str | None) -> int:
@@ -194,7 +199,7 @@ class Lifeboat:
             off = int(off_s, 16)
         except ValueError:
             return 0
-        good = hmac.new(self.key.encode(), f"cursor|{q}|{off}".encode(), hashlib.sha256)
+        good = hmac.new(self._signing, f"cursor|{q}|{off}".encode(), hashlib.sha256)
         return off if hmac.compare_digest(sig, good.hexdigest()[:24]) else 0  # R5: first page
 
     # -- reads ------------------------------------------------------------------------------------
@@ -251,7 +256,7 @@ class Lifeboat:
                 else None
             ),
             "scheme": (
-                {"current": self.scheme_of(request), "return": here, "csrf": self.key}
+                {"current": self.scheme_of(request), "return": here, "csrf": self.form_key}
                 if scheme
                 else None
             ),
@@ -293,7 +298,10 @@ class Lifeboat:
         )
 
     # -- the decision, shared by the pending page and the lifeboat-hosted tap ---------------------
-    def decide(self, act: dict[str, Any], outcome: str, *, windowed: bool, via: str) -> str:
+    def decide(self, act: dict[str, Any], outcome: str, *, windowed: bool,
+               via: str) -> tuple[str, str]:
+        """Perform the decision; returns (state, text): the state is what actually happened —
+        approved, denied, or invalid for a refusal — so a refusal never reads as a success."""
         token = self.token()
         at = time.strftime("%H:%M:%S")
         closes = self.presence.record(act, via=via, outcome=outcome, windowed=windowed)
@@ -301,29 +309,32 @@ class Lifeboat:
             if outcome == "denied":
                 if act["kind"] == "proposal":
                     self.c.trust.deny(act["subject"], token=token, actor=OWNER)
-                    return t("outcome.denied", at=at, user=OWNER, destination=act["dest"])
-                return t("tap.invalid")
+                    return "denied", t("outcome.denied", at=at, user=OWNER,
+                                       destination=act["dest"])
+                return "invalid", t("tap.invalid")
             if outcome not in ("approved", "window"):
-                return t("tap.invalid")
+                return "invalid", t("tap.invalid")
             if act["kind"] == "proposal":
                 p = self.c.trust.execute(act["subject"], token=token, actor=OWNER)
                 landed = {i.status for i in (self.c.backend.get(x) for x in p["items"]) if i}
                 trust = ", ".join(sorted(landed)) or "unverified"
                 if closes:
-                    return t("outcome.approved", at=at, user=OWNER, n=len(p["items"]),
-                             destination=act["dest"], trust=trust, closes=clock(closes))
-                return t("outcome.approved.nowindow", at=at, user=OWNER, n=len(p["items"]),
-                         destination=act["dest"], trust=trust)
+                    return "approved", t("outcome.approved", at=at, user=OWNER,
+                                         n=len(p["items"]), destination=act["dest"],
+                                         trust=trust, closes=clock(closes))
+                return "approved", t("outcome.approved.nowindow", at=at, user=OWNER,
+                                     n=len(p["items"]), destination=act["dest"], trust=trust)
             item = self.c.backend.get(act["subject"])
             if item is None or item.status != "unverified":
                 raise TrustError("no longer pending")
             self.c.trust.promote(item, token=token, actor=OWNER)
-            return t("act.promoted", at=at, user=OWNER)
+            return "approved", t("act.promoted", at=at, user=OWNER)
         except TrustError as e:
             # Presence was proven and the act was refused: on the chain, and the window that
             # signature opened closes with it — as the CLI does (presence.act_failed).
             self.presence.act_failed(act, e, reason="refused")
-            return t("outcome.invalid") if act["kind"] == "proposal" else t("tap.invalid")
+            return "invalid", (t("outcome.invalid") if act["kind"] == "proposal"
+                               else t("tap.invalid"))
         except Exception as e:
             # The act rolled back whole; the chain says so and the signature's window closes.
             self.presence.act_failed(act, e)
@@ -358,12 +369,15 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         key = request.query_params.get("k")
         if request.method == "GET" and key is not None:
-            if secrets.compare_digest(key, boat.key):
+            # The launch key works once: whoever redeems it first holds the session, and a copy
+            # read later from a launcher's argv or a terminal opens nothing.
+            if not boat.redeemed and secrets.compare_digest(key, boat.key):
+                boat.redeemed = True
                 resp: Response = RedirectResponse(path or "/", status_code=303)
-                resp.set_cookie(COOKIE, boat.key, httponly=True, samesite="strict", path="/")
+                resp.set_cookie(COOKIE, boat.session, httponly=True, samesite="strict", path="/")
                 return _harden(resp, path)
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
-        if not secrets.compare_digest(request.cookies.get(COOKIE, ""), boat.key):
+        if not secrets.compare_digest(request.cookies.get(COOKIE, ""), boat.session):
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         if request.method == "POST":
             # A missing Origin is refused too: every browser sends one on a form POST.
@@ -375,12 +389,14 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             response = boat.render(request, "error.html",
                                    {"shell": boat.shell(request, current=None),
                                     "title": S["title.notfound"],
-                                    "retry": str(request.url.path)}, status=500)
+                                    # D-C5: the retry link is a validated return, never the
+                                    # raw path (a `//host` path would leave this origin).
+                                    "retry": return_target(str(request.url.path))}, status=500)
         return _harden(response, path)
 
     async def form_of(request: Request) -> dict[str, str] | None:
         form = {k: str(v) for k, v in (await request.form()).items()}
-        if not secrets.compare_digest(form.get("csrf", ""), boat.key):
+        if not secrets.compare_digest(form.get("csrf", ""), boat.form_key):
             return None
         return form
 
@@ -521,7 +537,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             "can_promote": item.status == "unverified",
             "arm": arm,
             "version": item.lifecycle.get("version", 1),
-            "csrf": boat.key,
+            "csrf": boat.form_key,
             "message": message,
         }
 
@@ -560,16 +576,15 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         if act is None:
             return boat.not_found(request)
         if boat.presence.covers(act):
-            boat.outcomes[item.id] = ("approved",
-                                      boat.decide(act, "window", windowed=False, via="window"))
+            boat.outcomes[item.id] = boat.decide(act, "window", windowed=False, via="window")
             return RedirectResponse(f"/items/{item.id}", status_code=303)
         # Step-up required: a one-shot tap, its return bound now (the tap spec D-T9 (a)).
         boat.sweep()
 
         def perform(outcome: str, windowed: bool) -> str:
             # Runs inside the tap's own request: the container answers before anything is shown.
-            text = boat.decide(act, outcome, windowed=windowed, via="tap")
-            boat.outcomes[act["subject"]] = (outcome, text)
+            state, text = boat.decide(act, outcome, windowed=windowed, via="tap")
+            boat.outcomes[act["subject"]] = (state, text)
             return text
 
         tap = Tap(act, container=boat.c.home.name, host=boat.host, decide=perform)
@@ -692,7 +707,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
                     "nowindow": bool(seconds),
                     "blocked": act.get("blocked"),
                     "arm": arm,
-                    "csrf": boat.key,
+                    "csrf": boat.form_key,
                 }
         status = boat.presence.window_status()
         return {
@@ -743,8 +758,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             return boat.not_found(request)
         step = form.get("step", "")
         if step == "deny":  # one press: deny is the safe direction
-            boat.outcomes[pid] = ("denied", boat.decide(act, "denied", windowed=False,
-                                                        via="lifeboat"))
+            boat.outcomes[pid] = boat.decide(act, "denied", windowed=False, via="lifeboat")
             return RedirectResponse(f"/pending/{pid}", status_code=303)
         if act.get("blocked"):
             return RedirectResponse(f"/pending/{pid}", status_code=303)
@@ -753,13 +767,15 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             ctx = pending_context(request, pid, arm={"mode": mode,
                                                      "token": boat.arm(mode, pid, 0)},
                                   message=None)
+            # The armed page shows the whole proposal again: a read on the chain like any view.
+            boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]])
             return boat.render(request, "pending.html", {**ctx, "refresh": ARM_SECONDS})
         mode = form.get("mode", "window")
         if step == "confirm" and mode in ("once", "window") and boat.armed(
             mode, pid, 0, form.get("arm")
         ):
-            boat.outcomes[pid] = ("approved", boat.decide(
-                act, "approved", windowed=mode == "window", via="lifeboat"))
+            boat.outcomes[pid] = boat.decide(act, "approved", windowed=mode == "window",
+                                             via="lifeboat")
             return RedirectResponse(f"/pending/{pid}", status_code=303)
         return RedirectResponse(f"/pending/{pid}", status_code=303)  # lapsed arm: un-armed
 
