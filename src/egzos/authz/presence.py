@@ -30,7 +30,10 @@ to the chain directly can do what the user can — a shell running as the user i
 travels in the browser launcher's argv, readable by other local users on a shared host, as the
 client secret does in `claude mcp add`'s argv under `connect --apply`. The armed confirm reverts
 on 10 s only: §2.3 also names Escape and focus leaving the control, which a page with no script
-cannot observe — design-gap #119 holds the choice. Audience
+cannot observe — design-gap #119 holds the choice. This CLI host serves one answer after a
+decision and closes: the window's close time is stated once in the outcome line and *Close window
+now* is `egzos trust close-window`; the spec frames only the lifeboat and flagship hosts, so the
+CLI host's post-decision state, title wrap and measure are design-gap #126. Audience
 chips carry no contractor / external flag: tokens record no principal class yet. OS-backed
 presence (WebAuthn / platform authenticator) is the stronger tier the spec names for later.
 """
