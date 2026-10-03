@@ -181,7 +181,7 @@ def test_the_page_caps_long_reasons_and_long_manifests_with_reveals():
            "items": [{"kind": "memory", "title": f"t{i}", "trust": "x"} for i in range(15)]}
     page = Tap(act).page(armed=False)
     assert "r" * 480 + "…" in page and "<summary>Show full reason</summary>" in page
-    assert page.count("<tr>") == 15 and "<summary>+ 3 more</summary>" in page
+    assert page.count("<tr>") == 15 + 1 and "<summary>+ 3 more</summary>" in page  # + header
     assert "<span class=attr>agent:claude-code states:</span>" in page  # verbatim, no caps class
 
 
@@ -206,4 +206,45 @@ def test_a_quarantined_manifest_row_carries_its_stamp():
     act = {**ACT, "blocked": "Contains a quarantined item. It cannot move.",
            "items": [{"kind": "memory", "title": "bad", "quarantined": True}]}
     page = Tap(act).page(armed=False)
-    assert "<tr class=qrow>" in page and "<span class=qstamp>quarantined</span>" in page
+    assert "<tr class=qrow>" in page and "stamp--quarantined'>quarantined</span>" in page
+
+
+def test_the_page_shows_the_containers_answer_in_canonical_copy(box):
+    from egzos.authz.presence import Tap
+
+    act = {**ACT, "kind": "proposal", "dest": "org:acme", "items": [
+        {"kind": "memory", "title": "t", "now": "verified", "after": "unverified", "reset": True}]}
+    calls = []
+    tap = Tap(act, decide=lambda o, w: calls.append((o, w)) or "the container's answer")
+    tap.post("arm")
+    _, page = tap.post("confirm")
+    assert calls == [("approved", True)] and "the container&#x27;s answer" in page
+    plain = Tap(act)
+    plain.post("deny")
+    assert plain.outcome == "denied"
+    page = Tap(act).page(armed=False)
+    assert "<th scope=col>trust now</th>" in page and "<ul class=chips aria-label=Audience>" in page
+    assert "<section role=region aria-labelledby=presence-h" in page
+    assert "agent-run move resets" in page
+
+
+def test_canonical_outcome_strings():
+    from egzos.authz.presence import outcome_text
+
+    act = {"kind": "proposal", "dest": "org:acme",
+           "items": [{"after": "unverified"}, {"after": "unverified"}]}
+    assert outcome_text(act, "approved", closes=None).endswith(
+        "2 items at org:acme, unverified. No window opened.")
+    assert "Window open until" in outcome_text(act, "approved", closes="2026-10-03T20:00:00Z")
+    assert outcome_text(act, "denied", closes=None).endswith(
+        "The items never existed at org:acme. Logged. Staged bytes kept 30 days cold.")
+    assert outcome_text({"kind": "item"}, "approved", closes=None).endswith(
+        "Served as verified from now on.")
+
+
+def test_the_window_policy_is_whole_minutes(monkeypatch):
+    from egzos.authz.presence import presence_text, window_seconds
+
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "90")
+    assert window_seconds() == 120
+    assert "opens a 2-minute window" in presence_text({**ACT}, window_seconds())

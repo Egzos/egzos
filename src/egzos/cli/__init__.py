@@ -446,38 +446,50 @@ def _decide(c: Container, token, ref: str) -> None:
     act = build_act(c, prop["id"] if prop else _item_ref(c, ref).id)
     if act is None:
         _fail("nothing to decide: it is not pending")
-    outcome = Presence(c).require(act)
-    try:
-        if outcome == "denied":
+    from egzos.authz.presence import TAP_COPY, outcome_text
+
+    result: dict[str, Any] = {}
+
+    def perform(outcome: str, windowed: bool, closes: str | None) -> str:
+        """Runs while the page waits, so the page shows the container's answer, never a guess."""
+        try:
+            if outcome == "denied":
+                if prop:
+                    p = c.trust.deny(prop["id"], token=token, actor=OWNER)
+                    result["out"] = (p, f"denied {p['id']}")
+                else:
+                    result["out"] = ({"id": act["subject"], "denied": True},
+                                     f"{act['subject']} stays unverified")
+                return outcome_text(act, "denied", closes=None)
             if prop:
-                p = c.trust.deny(prop["id"], token=token, actor=OWNER)
-                _out(p, f"denied {p['id']}")
-            else:
-                _out({"id": act["subject"], "denied": True}, f"{act['subject']} stays unverified")
-            return
-        if outcome not in ("approved", "window"):
-            _fail(f"not approved: {outcome} in the presence check")
-        if prop:
-            p = c.trust.execute(prop["id"], token=token, actor=OWNER)
-            _out(
-                p,
-                f"executed proposal {p['id']} → {p['to_path']}  "
-                f"(manifest {p['manifest'][:12]}… matched)",
-            )
-            return
-        # Approve what you saw: the item the page showed, never `ref` resolved a second time
-        # (a `%n` map can be rewritten while the page waits).
-        item = c.store.get(act["subject"])
-        if not item or item.status != "unverified":
-            _fail("nothing to decide: it is no longer pending")
-        item = c.trust.promote(item, token=token, actor=OWNER)
-        _out(
-            item.to_dict(),
-            f"{item.id} → verified  (approved_by {item.provenance['approved_by']}, "
-            f"manifest {item.trust['manifest'][:12]}…)",
-        )
-    except TrustError as e:
-        _fail(str(e))
+                p = c.trust.execute(prop["id"], token=token, actor=OWNER)
+                landed = [i.status for i in (c.backend.get(x) for x in p["items"]) if i]
+                result["out"] = (p, f"executed proposal {p['id']} → {p['to_path']}  "
+                                    f"(manifest {p['manifest'][:12]}… matched)")
+                return outcome_text(act, "approved", closes=closes, landed=landed)
+            # Approve what you saw: the item the page showed, never `ref` resolved a second time
+            # (a `%n` map can be rewritten while the page waits).
+            item = c.store.get(act["subject"])
+            if not item or item.status != "unverified":
+                result["error"] = "nothing to decide: it is no longer pending"
+                return TAP_COPY["tap.invalid"]
+            item = c.trust.promote(item, token=token, actor=OWNER)
+            by = item.provenance["approved_by"]
+            result["out"] = (item.to_dict(), f"{item.id} → verified  (approved_by {by}, "
+                                             f"manifest {item.trust['manifest'][:12]}…)")
+            return outcome_text(act, "approved", closes=closes)
+        except TrustError as e:
+            result["error"] = str(e)
+            return TAP_COPY["outcome.invalid"] if prop else TAP_COPY["tap.invalid"]
+
+    outcome = Presence(c).require(act, decide=perform)
+    if outcome == "window":
+        perform("approved", False, None)
+    elif outcome not in ("approved", "denied"):
+        _fail(f"not approved: {outcome} in the presence check")
+    if "error" in result:
+        _fail(result["error"])
+    _out(*result["out"])
 
 
 @trust_app.command("approve")

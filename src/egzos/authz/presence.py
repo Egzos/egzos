@@ -62,7 +62,9 @@ def window_seconds() -> int:
     raw = os.environ.get("EGZOS_STEP_UP_WINDOW_SECONDS")
     if raw is None or raw == "":
         return DEFAULT_WINDOW_SECONDS
-    return max(0, int(raw))
+    seconds = max(0, int(raw))
+    # The policy is in whole minutes (§13 `presence.text` has only the N-minute form): round up.
+    return -(-seconds // 60) * 60
 
 
 def tap_timeout() -> float:
@@ -144,6 +146,13 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "items": [
                 {"kind": i.kind, "title": i.content.get("auto_title", i.id),
                  "quarantined": i.status == "quarantined",
+                 "now": i.status,
+                 "reset": by.get("principal") != "interactive" and i.status == "verified",
+                 "after": (
+                     "unverified"
+                     if by.get("principal") != "interactive" and i.status == "verified"
+                     else i.status
+                 ),
                  "trust": (
                      "verified → unverified · agent-run move resets"
                      if by.get("principal") != "interactive" and i.status == "verified"
@@ -177,7 +186,8 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "requester": f"agent:{client}" if client and client != "cli" else "you",
             "reason": None,
             "items": [{"kind": item.kind, "title": item.content.get("auto_title", item.id),
-                       "trust": "unverified → verified"}],
+                       "trust": "unverified → verified", "now": "unverified",
+                       "after": "verified", "reset": False, "quarantined": False}],
             "audience": c.trust.audience(node),
             "dest": path,
             "consequence": None,
@@ -261,8 +271,13 @@ class Presence:
         return closes
 
     # -- the CLI's tap: a loopback server for one page ----------------------------------------------
-    def require(self, act: dict[str, Any], *, timeout: float | None = None, opener=None) -> str:
-        """Ask for presence. Returns "window", "approved", "denied", "expired" or "unavailable"."""
+    def require(self, act: dict[str, Any], *, timeout: float | None = None, opener=None,
+                decide=None) -> str:
+        """Ask for presence. Returns "window", "approved", "denied", "expired" or "unavailable".
+
+        `decide(outcome, windowed, closes) -> str` performs the decision while the page waits and returns
+        the outcome line the page then shows — the container's answer, never a prediction. The
+        `step_up` entry is appended first, so the chain reads presence, then the act."""
         if timeout is None:
             timeout = tap_timeout()
         if self.covers(act):
@@ -270,7 +285,13 @@ class Presence:
             return "window"
         httpd = HTTPServer(("127.0.0.1", 0), BaseHTTPRequestHandler)
         host = f"127.0.0.1:{httpd.server_address[1]}"
-        tap = Tap(act, container=self.c.home.name, host=host)
+        def decided(outcome: str, windowed: bool) -> str:
+            closes = self.record(act, via="tap", outcome=outcome, windowed=windowed)
+            if decide is not None:
+                return decide(outcome, windowed, closes)
+            return outcome_text(act, outcome, closes=closes)
+
+        tap = Tap(act, container=self.c.home.name, host=host, decide=decided)
         httpd.RequestHandlerClass = tap.handler()
         url = f"http://{host}/tap/{tap.token}"
         # The opener runs on its own thread: some browsers' launchers wait for the browser, and the
@@ -300,9 +321,9 @@ class Presence:
         while tap.outcome is None and _now() < deadline:
             httpd.handle_request()
         httpd.server_close()
-        outcome = tap.outcome or "expired"
-        self.record(act, via="tap", outcome=outcome, windowed=tap.windowed)
-        return outcome
+        if tap.outcome is None:
+            self.record(act, via="tap", outcome="expired")
+        return tap.outcome or "expired"
 
 
 # --- the page --------------------------------------------------------------------------------------
@@ -313,6 +334,14 @@ TAP_STYLE = """
 body{margin:0;background:var(--egz-canvas);color:var(--egz-ink);font-family:var(--egz-font-ui);
  line-height:var(--egz-lh)}
 main{max-width:720px;margin:32px auto;padding:0 16px}
+h1{font-size:var(--egz-fs-6);font-weight:var(--egz-w-semibold)}
+h2{font-size:var(--egz-fs-4);font-weight:var(--egz-w-semibold)}
+.stamp{font-family:var(--egz-font-mono);font-size:.75rem;text-transform:uppercase;padding:0 6px;
+ border:var(--egz-hair) solid var(--egz-ink)}
+.stamp--verified{background:var(--egz-ink);color:var(--egz-canvas)}
+.stamp--quarantined{color:var(--egz-alarm);border-color:var(--egz-alarm)}
+.ink3{color:var(--egz-ink-3)}
+.chips{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:6px}
 .attr{font-family:var(--egz-font-mono);font-size:.8rem}
 summary{cursor:pointer;font-family:var(--egz-font-mono);font-size:.85rem}
 .ref,.shell,h2{font-family:var(--egz-font-mono);text-transform:uppercase;
@@ -353,12 +382,43 @@ def presence_text(act: dict[str, Any], seconds: int) -> str:
         return "Signing proves you are here. No window opens."
     frm, to = act["from"], act["to"]
     shape = shape_of(act)
-    span = f"{seconds // 60}-minute" if seconds >= 60 and seconds % 60 == 0 else f"{seconds}-second"
     return (
-        f"Approving is a human-only act. Signing proves you are here and opens a {span} window "
+        f"Approving is a human-only act. Signing proves you are here and opens a "
+        f"{seconds // 60}-minute window "
         f"for {frm} → {to}, bounded to this shape: up to {shape['max_items']} items of kinds "
         f"{', '.join(shape['kinds'])}. Moves inside the window pass without asking and are logged."
     )
+
+
+TAP_COPY = {
+    "outcome.approved": "Signed at {at} by {user}. {n} items at {destination}, {trust}. "
+    "Window open until {closes}.",
+    "outcome.approved.nowindow": "Signed at {at} by {user}. {n} items at {destination}, {trust}. "
+    "No window opened.",
+    "outcome.denied": "Denied at {at} by {user}. The items never existed at {destination}. "
+    "Logged. Staged bytes kept 30 days cold.",
+    "outcome.invalid": "This proposal is no longer valid.",
+    "act.promoted": "Promoted at {at} by {user}. Served as verified from now on.",
+    "tap.invalid": "This request is no longer valid.",
+}
+
+
+def outcome_text(act: dict[str, Any], outcome: str, *, closes: str | None,
+                 landed: list[str] | None = None) -> str:
+    """The canonical outcome line for a decision the container has answered."""
+    at = _clock(_now())
+    if outcome == "denied":
+        if act.get("kind") == "proposal":
+            return TAP_COPY["outcome.denied"].format(at=at, user=OWNER, destination=act["dest"])
+        return TAP_COPY["tap.invalid"]
+    if act.get("kind") != "proposal":
+        return TAP_COPY["act.promoted"].format(at=at, user=OWNER)
+    trust = ", ".join(sorted(set(landed or [r.get("after", "unverified")
+                                               for r in act.get("items", [])])))
+    key = "outcome.approved" if closes else "outcome.approved.nowindow"
+    return TAP_COPY[key].format(at=at, user=OWNER, n=len(act.get("items", [])),
+                                destination=act["dest"], trust=trust,
+                                closes=_local(closes) if closes else "")
 
 
 def _chip(a: dict[str, Any]) -> str:
@@ -369,8 +429,12 @@ def _chip(a: dict[str, Any]) -> str:
 class Tap:
     """One page, one decision. The token is single-use: after a decision every request is refused."""
 
-    def __init__(self, act: dict[str, Any], *, container: str = "egzos", host: str = ""):
+    def __init__(self, act: dict[str, Any], *, container: str = "egzos", host: str = "",
+                 decide=None):
         self.act = act
+        # The host's callback: performs the decision and returns the container's outcome line, so
+        # the page never shows an outcome before the container has answered (lifeboat.md §15).
+        self.decide = decide
         self.token = secrets.token_urlsafe(32)
         self.container = container
         self.host = host
@@ -384,22 +448,27 @@ class Tap:
         a = self.act
         e = _e
         seconds = window_seconds()
-        manifest = [
-            # R5: a quarantined row carries its stamp and reads red
-            (
-                f"<tr class=qrow><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
-                f"<td><span class=qstamp>quarantined</span></td></tr>"
-                if r.get("quarantined")
-                else f"<tr><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
-                f"<td>{e(r.get('trust'))}</td></tr>"
-            )
-            for r in a.get("items", [])
-        ]
-        rows = f"<table>{''.join(manifest[:ROWS])}</table>"
+        def stamp(word: str) -> str:
+            return f"<span class='stamp stamp--{e(word)}'>{e(word)}</span>"
+
+        def row(r: dict[str, Any]) -> str:
+            if r.get("quarantined"):  # R5: the row carries its stamp and reads red
+                return (f"<tr class=qrow><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
+                        f"<td>{stamp('quarantined')}</td><td>{stamp('quarantined')}</td></tr>")
+            now = r.get("now") or ""
+            after = r.get("after") or ""
+            note = " <span class=ink3>agent-run move resets</span>" if r.get("reset") else ""
+            return (f"<tr><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
+                    f"<td>{stamp(now)}</td><td>{stamp(after)}{note}</td></tr>")
+
+        head = ("<thead><tr><th scope=col>kind</th><th scope=col>item</th>"
+                "<th scope=col>trust now</th><th scope=col>after move</th></tr></thead>")
+        manifest = [row(r) for r in a.get("items", [])]
+        rows = f"<table>{head}<tbody>{''.join(manifest[:ROWS])}</tbody></table>"
         if len(manifest) > ROWS:  # expands in place, no script: a disclosure element
             rows += (
                 f"<details><summary>+ {len(manifest) - ROWS} more</summary>"
-                f"<table>{''.join(manifest[ROWS:])}</table></details>"
+                f"<table><tbody>{''.join(manifest[ROWS:])}</tbody></table></details>"
             )
         reason = a.get("reason") or "(no reason given)"
         said = f"“{e(reason)}”"
@@ -411,9 +480,15 @@ class Tap:
         audience = a.get("audience", [])
         people = sum(1 for x in audience if x.get("principal") == "interactive")
         agents = len(audience) - people
-        chips = "".join(f"<span class=chip>{e(_chip(x))}</span>" for x in audience[:CHIPS])
+        chips = "<ul class=chips aria-label=Audience>" + "".join(
+            f"<li>{e(_chip(x))}</li>" for x in audience[:CHIPS]
+        ) + "</ul>"
         if len(audience) > CHIPS:
-            chips += f"<span class=chip>+ {len(audience) - CHIPS} more</span>"
+            chips += (
+                f"<details><summary>+ {len(audience) - CHIPS} more</summary><ul class=chips>"
+                + "".join(f"<li>{e(_chip(x))}</li>" for x in audience[CHIPS:])
+                + "</ul></details>"
+            )
         consequence = (
             f"<div class=box><p>{e(a['consequence'])}</p></div>" if a.get("consequence") else ""
         )
@@ -425,7 +500,7 @@ class Tap:
             )
         blocked = a.get("blocked")
         if blocked:  # R5: the approve acts are absent, replaced by the red line
-            acts = f"<p class=alarm>{e(blocked)}</p>"
+            acts = f"<p class=alarm role=status>{e(blocked)}</p>"
         elif armed:
             acts = "<button name=step value=confirm class=act>Confirm signature</button>"
         else:
@@ -450,10 +525,11 @@ class Tap:
             f"<h2>what moves</h2>{rows}"
             f"<h2>who will see it at {e(a.get('dest', a['to']))}</h2>"
             f"<p>{people} people · {agents} agents · resolved from token grants and scope "
-            f"membership</p><p>{chips}</p>{consequence}"
-            f"<h2>presence</h2><div class=box><p>{e(presence_text(a, seconds))}</p>{terms}"
-            + (f"<p class=note>{e(note)}</p>" if note else "")
-            + f"<form method=post>{acts}</form></div></main></body></html>"
+            f"membership</p>{chips}{consequence}"
+            "<section role=region aria-labelledby=presence-h class=box>"
+            f"<h2 id=presence-h>presence</h2><p>{e(presence_text(a, seconds))}</p>{terms}"
+            + (f"<p class=note aria-live=polite>{e(note)}</p>" if note else "")
+            + f"<form method=post>{acts}</form></section></main></body></html>"
         )
 
     def outcome_page(self, text: str, back: str | None = None) -> str:
@@ -461,7 +537,8 @@ class Tap:
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
             f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
-            f"<body><main><div class=box><p>{_e(text)}</p></div>{link}</main></body></html>"
+            f"<body><main><div class=box><p role=status>{_e(text)}</p></div>{link}</main>"
+            "</body></html>"
         )
 
     # -- the decision, independent of which server hosts the page ------------------------------------
@@ -476,10 +553,11 @@ class Tap:
         return 200, self.page(armed=self.armed_until > _now())
 
     def post(self, step: str) -> tuple[int, str]:
-        """Apply one press. Sets `outcome` on a decision; the host performs the act."""
+        """Apply one press. On a decision, the host's `decide` performs it and the page shows the
+        container's answer in §13's canonical copy."""
         if step == "deny":
             self.outcome = "denied"
-            return 200, self.outcome_page(f"Denied at {_clock(_now())} by {OWNER}. Logged.")
+            return 200, self.outcome_page(self._decided())
         if self.act.get("blocked") and step in ("arm", "arm_once", "confirm"):
             return 200, self.page(armed=False)
         if step in ("arm", "arm_once"):
@@ -489,11 +567,17 @@ class Tap:
         if step == "confirm" and self.armed_until > _now():
             self.windowed = self.armed_mode == "window"
             self.outcome = "approved"
-            return 200, self.outcome_page(
-                f"Signed at {_clock(_now())} by {OWNER}. Return to your terminal."
-            )
+            return 200, self.outcome_page(self._decided())
         self.armed_until = 0.0
         return 200, self.page(armed=False, note="Not signed. Press Sign and approve, then Confirm.")
+
+    def _decided(self) -> str:
+        if self.decide is not None:
+            return self.decide(self.outcome, self.windowed)
+        seconds = window_seconds()
+        closes = (_iso(_now() + seconds)
+                  if self.outcome == "approved" and self.windowed and seconds else None)
+        return outcome_text(self.act, self.outcome or "", closes=closes)
 
     def handler(self):
         tap = self

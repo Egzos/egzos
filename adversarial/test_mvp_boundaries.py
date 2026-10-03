@@ -246,6 +246,7 @@ def test_cli_promotes_the_item_the_page_showed_even_if_percent_n_moves(tmp_path,
     def swap_then_approve(self, act, **kw):
         assert act["subject"] == seen.id
         (tmp_path / f"last-find-{owner.id}.json").write_text(json.dumps({"1": other.id}))
+        kw["decide"]("approved", False, None)  # the page's confirm, after the swap
         return "approved"
 
     monkeypatch.setattr(presence.Presence, "require", swap_then_approve)
