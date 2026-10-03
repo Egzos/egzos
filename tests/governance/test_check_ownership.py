@@ -298,7 +298,7 @@ def _run_main(repo, branch, env_extra=None):
     env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON", "PR_AUTHOR",
                                                             "SIZE_EXCEPTION_APPLIER",
                                                             "A6_BACKSTOP",
-                                                            "FIX_LANDED_APPLIER")}
+                                                            "A6_CLEARED_APPLIER")}
     env.update(env_extra or {})
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--base", "main", "--head", "HEAD",
@@ -439,70 +439,28 @@ def test_nested_claude_control_inputs_are_chief_only():
 # RD-005 backstop on every a6 branch (Egzos/egzos-platform#45)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize(
-    ("source", "live"),
-    [
-        ("def test_a():\n    assert 1\n", ["test_a"]),
-        ("import pytest\n@pytest.mark.xfail(reason='r', strict=True)\ndef test_a():\n    pass\n",
-         []),
-        ("import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n", []),
-        # Conditional marks leave the test live whenever the condition is false.
-        ("import pytest\n@pytest.mark.xfail(False, reason='r')\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        ("import pytest\n@pytest.mark.xfail(condition=False)\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        ("import pytest\n@pytest.mark.skipif(False, reason='xfail')\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        ("import pytest\npytestmark = pytest.mark.xfail(reason='r')\ndef test_a():\n    pass\n",
-         []),
-        ("import pytest\npytestmark = [pytest.mark.xfail(strict=True)]\ndef test_a():\n    pass\n",
-         []),
-        ("import pytest\n@pytest.mark.xfail\nclass TestA:\n    def test_b(self):\n        pass\n",
-         []),
-        ("class TestA:\n    def test_b(self):\n        pass\n    def helper(self):\n        pass\n",
-         ["TestA.test_b"]),
-        ("def helper():\n    pass\n", []),
-        ("def test_a(:\n", ["<unparseable>"]),
-    ],
-)
-def test_non_xfail_tests(source, live):
-    assert co.non_xfail_tests(source) == live
+def test_a6_backstop_failures_cover_the_scope_and_read_nothing():
+    changed = ["adversarial/test_a.py", "adversarial/data.bin", "adversarial/x/conftest.py",
+               "docs/a.md"]
+    out = co.a6_backstop_failures(changed, ["adversarial/**"])
+    assert [p for p, _ in out] == changed[:3]
+    assert all("a6-cleared" in reason for _, reason in out)
 
 
-def test_security_backstop_failures_scope():
-    files = {
-        "adversarial/test_live.py": "def test_a():\n    pass\n",
-        "adversarial/test_ok.py": "import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n",
-        "adversarial/conftest.py": "",
-        "adversarial/data.json": "{}",
-        "adversarial/blob.bin": None,
-        "adversarial/test_latin1.py": None,
-        "docs/test_elsewhere.py": "def test_a():\n    pass\n",
-    }
-
-    def mode_of(path):
-        return b"100644" if path in files else None
-
-    def text_of(path):
-        assert path.endswith(".py"), path  # a binary fixture is never decoded
-        return files[path]
-
-    out = co.security_backstop_failures([*files, "adversarial/test_deleted.py"], mode_of, text_of)
-    assert [p for p, _ in out] == [
-        "adversarial/test_live.py", "adversarial/conftest.py", "adversarial/test_latin1.py"]
-
-
-def _a6_live_test(repo):
+def _a6_change(repo, rel="adversarial/test_x.py"):
     _write(repo, "adversarial/__init__.py", "")
     _commit(repo, "base")
-    _branch_diff(repo, lambda r: _write(r, "adversarial/test_x.py", "def test_x():\n    pass\n"))
+    _branch_diff(repo, lambda r: _write(r, rel, "import pytest\n@pytest.mark.xfail\n"
+                                                "def test_x():\n    pass\n"))
 
 
-def test_main_backstop_refuses_a_live_test_on_an_a6_branch(repo):
-    _a6_live_test(repo)
+def test_main_backstop_refuses_any_a6_change_even_an_xfail_test(repo):
+    # Content is never read: an xfail test runs its body, and a denylist over what the branch
+    # writes cannot be completed (Egzos/egzos-platform#50 review).
+    _a6_change(repo)
     res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
     assert res.returncode == 1
-    assert "test_x is not unconditionally xfail" in res.stdout
+    assert "adversarial/test_x.py" in res.stdout and "a6-cleared" in res.stdout
 
 
 @pytest.mark.parametrize(
@@ -510,155 +468,31 @@ def test_main_backstop_refuses_a_live_test_on_an_a6_branch(repo):
     [
         {"A6_BACKSTOP": "false"},
         {},
-        {"A6_BACKSTOP": "true", "PR_LABELS_JSON": '["fix-landed"]',
-         "FIX_LANDED_APPLIER": "Gond-ul"},
+        {"A6_BACKSTOP": "true", "PR_LABELS_JSON": '["a6-cleared"]',
+         "A6_CLEARED_APPLIER": "Gond-ul"},
     ],
 )
-def test_main_backstop_passes_when_unset_or_after_the_fix(repo, env):
-    _a6_live_test(repo)
+def test_main_backstop_passes_when_unset_or_cleared(repo, env):
+    _a6_change(repo)
     res = _run_main(repo, "agent/a6-adversary/x", env)
     assert res.returncode == 0, res.stdout
 
 
-def test_main_backstop_waiver_needs_an_approver(repo):
-    _a6_live_test(repo)
+def test_main_backstop_clearance_needs_an_approver(repo):
+    _a6_change(repo)
     res = _run_main(repo, "agent/a6-adversary/x", {
-        "A6_BACKSTOP": "true", "PR_LABELS_JSON": '["fix-landed"]',
-        "FIX_LANDED_APPLIER": "egzos-forge[bot]"})
+        "A6_BACKSTOP": "true", "PR_LABELS_JSON": '["a6-cleared"]',
+        "A6_CLEARED_APPLIER": "egzos-forge[bot]"})
     assert res.returncode == 1
 
 
-def test_main_backstop_reads_a_renamed_test_at_its_new_path(repo):
-    xfail = "import pytest\n@pytest.mark.xfail\ndef test_x():\n    pass\n"
-    _write(repo, "adversarial/test_old.py", xfail)
-    _commit(repo, "base")
-
-    def mutate(r):
-        _git(r, "mv", "adversarial/test_old.py", "adversarial/test_new.py")
-        _write(r, "adversarial/test_new.py", "def test_x():\n    pass\n")
-
-    _branch_diff(repo, mutate)
-    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
-    assert res.returncode == 1
-    assert "adversarial/test_new.py" in res.stdout
-
-
-_PY = "import pytest\n"
-
-
-@pytest.mark.parametrize(
-    ("source", "live"),
-    [
-        # A later binding overrides an earlier xfail; one under an `if` may never run.
-        (_PY + "pytestmark = pytest.mark.xfail(reason='r')\npytestmark = []\n"
-               "def test_a():\n    pass\n", ["test_a"]),
-        (_PY + "if True:\n    pytestmark = pytest.mark.xfail\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        (_PY + "pytestmark = [pytest.mark.xfail]\npytestmark += []\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        (_PY + "pytestmark = pytest.mark.xfail\nfrom os import sep as pytestmark\n"
-               "def test_a():\n    pass\n", ["test_a"]),
-        # pytest collects tests at any statement depth, bound by assignment, and in any
-        # unittest.TestCase subclass whatever its name.
-        (_PY + "try:\n    def test_a():\n        pass\nexcept ImportError:\n    pass\n",
-         ["test_a"]),
-        (_PY + "def _mk():\n    return lambda: None\ntest_a = _mk()\n", ["test_a"]),
-        ("import unittest\nclass Foo(unittest.TestCase):\n    def test_a(self):\n        pass\n",
-         ["Foo.test_a"]),
-        # A function nested in a function is not collected.
-        (_PY + "@pytest.mark.xfail\ndef test_a():\n    def test_inner():\n        pass\n", []),
-        # raises= turns any other exception into a hard failure; run=False is the safest mark.
-        (_PY + "@pytest.mark.xfail(raises=KeyError)\ndef test_a():\n    pass\n", ["test_a"]),
-        (_PY + "@pytest.mark.xfail(run=False, reason='r')\ndef test_a():\n    pass\n", []),
-    ],
-)
-def test_non_xfail_tests_is_conservative(source, live):
-    assert co.non_xfail_tests(source) == live
-
-
-@pytest.mark.parametrize("mode", [b"120000", b"160000"])
-def test_security_backstop_refuses_links_and_submodules(mode):
-    out = co.security_backstop_failures(
-        ["adversarial/test_x.py", "adversarial/data"], lambda p: mode, lambda p: "")
-    assert [p for p, _ in out] == ["adversarial/test_x.py", "adversarial/data"]
-
-
-def test_main_backstop_passes_a_binary_fixture(repo):
-    _write(repo, "adversarial/__init__.py", "")
-    _commit(repo, "base")
-    _branch_diff(repo, lambda r: (r / "adversarial" / "fixture.bin").write_bytes(b"\xff\xfe\x00"))
-    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
-    assert res.returncode == 0, res.stdout + res.stderr
-
-
-def test_main_backstop_refuses_a_symlink(repo):
-    _write(repo, "adversarial/__init__.py", "")
-    _commit(repo, "base")
-
-    def mutate(r):
-        _write(r, "adversarial/payload.txt", "def test_x():\n    pass\n")
-        (r / "adversarial" / "test_x.py").symlink_to("payload.txt")
-
-    _branch_diff(repo, mutate)
-    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
-    assert res.returncode == 1
-    assert "adversarial/test_x.py" in res.stdout and "symlink" in res.stdout
-
-
-_LIVE = "def test_a():\n    pass\n"
-
-
-@pytest.mark.parametrize(
-    ("source", "live"),
-    [
-        # The mark must be the real pytest's: bound by `import pytest` and nothing else.
-        ("class _M:\n    class mark:\n        xfail = staticmethod(lambda f: f)\npytest = _M\n"
-         "@pytest.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
-        ("import pytest\npytest = object()\n@pytest.mark.xfail\ndef test_a():\n    pass\n",
-         ["test_a"]),
-        ("import pytest as pt\n@pt.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
-        ("from pytest import mark\n@mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
-        ("import pytest\ntry:\n    pass\nexcept Exception as pytest:\n    pass\n"
-         "@pytest.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
-        ("import pytest\nx = object()\n@x.mark.xfail\ndef test_a():\n    pass\n", ["test_a"]),
-        # Names pytest collects can arrive by import or by assignment, classes included.
-        ("from helpers import test_a\n", ["test_a"]),
-        ("import pytest\nTestA = type('TestA', (), {})\n", ["TestA"]),
-        # Run-time binding cannot be read statically, so the file is refused whole.
-        ("exec('def test_a(): pass')\n", ["<unreadable: exec>"]),
-        ("globals()['test_a'] = lambda: None\n", ["<unreadable: globals>"]),
-        ("import sys\nsetattr(sys.modules[__name__], 'test_a', print)\n",
-         ["<unreadable: modules>", "<unreadable: setattr>"]),
-        ("from helpers import *\n", ["<unreadable: import *>"]),
-        ("def __getattr__(name):\n    return None\n", ["<unreadable: __getattr__>"]),
-        ("class Meta(type):\n    pass\nclass TestA(metaclass=Meta):\n    pass\n",
-         ["<unreadable: metaclass>"]),
-        ("pytest_plugins = ['x']\n", ["<unreadable: pytest_plugins>"]),
-        ("import pytest\npytestmark = pytest.mark.xfail\nexec('')\n", ["<unreadable: exec>"]),
-    ],
-)
-def test_non_xfail_tests_reads_only_what_it_can_prove(source, live):
-    assert co.non_xfail_tests(source) == live
-
-
-def test_security_backstop_scope_and_pytest_shadowing():
-    ok = "import pytest\n@pytest.mark.xfail\ndef test_a():\n    pass\n"
-    files = {"adversarial/pytest.py": "", "adversarial/_pytest/x.py": "", "other/test_a.py": _LIVE,
-             "adversarial/test_ok.py": ok}
-    out = co.security_backstop_failures(
-        list(files), lambda p: b"100644", files.get, ["adversarial/**"])
-    assert [p for p, _ in out] == ["adversarial/pytest.py", "adversarial/_pytest/x.py"]
-    out = co.security_backstop_failures(list(files), lambda p: b"100644", files.get, ["other/**"])
-    assert [p for p, _ in out] == ["other/test_a.py"]
-
-
-def test_main_backstop_matches_paths_exactly(repo):
-    # A filename holding glob characters is a name, never a pattern that could read another entry.
-    _write(repo, "adversarial/__init__.py", "")
-    _write(repo, "adversarial/test_ok.py", "import pytest\n@pytest.mark.xfail\ndef test_a():\n"
-                                           "    pass\n")
-    _commit(repo, "base")
-    _branch_diff(repo, lambda r: _write(r, "adversarial/test_[ok].py", _LIVE))
-    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
-    assert res.returncode == 1
-    assert "adversarial/test_[ok].py" in res.stdout and "test_a is not" in res.stdout
+def test_main_backstop_scope_follows_the_agents_exclusive_globs(repo):
+    # The scope is read from OWNERSHIP.yml, so a narrower exclusive list narrows the gate.
+    saved = OWNERSHIP["agents"]["a6-adversary"]
+    OWNERSHIP["agents"]["a6-adversary"] = {"paths": ["adversarial/**"],
+                                          "exclusive": ["adversarial/live/**"]}
+    try:
+        _a6_change(repo)
+        assert _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"}).returncode == 0
+    finally:
+        OWNERSHIP["agents"]["a6-adversary"] = saved
