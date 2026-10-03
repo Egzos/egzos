@@ -84,7 +84,7 @@ freeze review; it is not decided here. The descriptor's other fields are
 
 ## 4 · `provenance`
 
-`{ actor, principal, client, derived_from, imported_from, approved_by }` — all five present, null
+`{ actor, principal, client, derived_from, imported_from, approved_by }` — **all six present**, null
 where unknown, so a reader never has to distinguish "absent" from "unset". **running**
 
 - `principal` is `interactive | client` (see `capabilities.md` §3).

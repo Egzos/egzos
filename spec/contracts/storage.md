@@ -262,6 +262,6 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-TODO(a1p): `Node` and `Proposal` are referenced by `ContainerState`'s signatures and are **issue
-#28's** to define (container contract). The signatures above are final; only the referent is
-outstanding. `src/egzos/_types.py` carries provisional aliases until #28 lands, and #30 removes them.
+`Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
+container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases
+this note once pointed at are gone; nothing here is outstanding.
