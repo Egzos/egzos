@@ -5,10 +5,17 @@ The lifeboat, MVP cut: `egzos web` — list, search, item detail, the pending qu
 tail, served in-process on loopback only, as the owner's interactive principal.
 
 Presence is the browser session: the URL opened at launch carries a per-launch key (printed only
-when no browser could be opened, so it stays out of the terminal); the first visit trades it for an HttpOnly, SameSite=Strict cookie, and every request needs that cookie. Every
+when no browser could be opened and stdout is a terminal — an agent's shell tool is not one); the
+first visit trades it for an HttpOnly, SameSite=Strict cookie, and every request needs that cookie. Every
 act (approve, deny, quarantine) is a POST that also carries the key in the form and must come from
 this origin, so another page in the same browser cannot drive it. Unknown ids and missing pages
 answer one uniform 404 (silence-not-errors). Everything rendered is escaped: item text is data.
+
+Approving is a human-only act under the step-up rule (`presence.py`): *Approve* arms, *Confirm
+signature* within 10 s performs it, unless an open window covers that ring pair. Every decision —
+approve, deny, window pass — appends `step_up` (via `lifeboat`), and every view is a read that
+appends `context.fetch` (the pending count in the header included). Owner-only: `egzos web` refuses
+a client principal.
 
 Standard library only, so the base install stays small. The full lifeboat (FastAPI + Jinja + htmx
 against spec/design/lifeboat.md) replaces this in Phase 4.
@@ -27,6 +34,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from egzos.container import OWNER, Container
+from egzos.presence import Presence, arm_deadline, armed, is_terminal
 from egzos.trust import TrustError
 
 COOKIE = "egzos_k"
@@ -69,7 +77,7 @@ th{font-family:var(--egz-font-mono);font-size:.75rem;text-transform:uppercase;
 .badge{font-family:var(--egz-font-mono);font-size:.75rem;padding:2px 6px;
  border:var(--egz-hair) solid var(--egz-ink);text-transform:uppercase}
 .badge.verified{background:var(--egz-ink);color:var(--egz-canvas)}
-.badge.quarantined{background:var(--egz-alarm);color:var(--egz-alarm-on);border-color:var(--egz-alarm)}
+.badge.quarantined{color:var(--egz-alarm);border-color:var(--egz-alarm)}
 .card{border:var(--egz-bw) solid var(--egz-rule);box-shadow:var(--egz-off) var(--egz-off) 0
  var(--egz-shadow-ink);padding:16px;margin:0 0 24px;background:var(--egz-canvas)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -86,17 +94,24 @@ class Lifeboat:
     def __init__(self, container: Container, key: str | None = None):
         self.c = container
         self.key = key or secrets.token_urlsafe(24)
+        self.presence = Presence(container)
+        self.armed: dict[str, float] = {}  # ref → deadline for the second press
 
     # -- shared chrome ----------------------------------------------------------------------------
     def page(
-        self, title: str, body: str, active: str = "", flash: str = "", err: bool = False
+        self,
+        title: str,
+        body: str,
+        active: str = "",
+        flash: str = "",
+        err: bool = False,
+        count: int | None = None,
     ) -> str:
         nav = "".join(
             f'<a href="{href}" class="{"on" if name == active else ""}">{name}</a>'
             for name, href in (("items", "/"), ("pending", "/pending"), ("audit", "/audit"))
         )
-        pending = self.c.trust.pending()
-        n = len(pending["items"]) + len(pending["proposals"])
+        counter = f'<span class="mono muted">{count} pending</span>' if count is not None else ""
         flash_html = f'<div class="flash{" err" if err else ""}">{_e(flash)}</div>' if flash else ""
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
@@ -105,9 +120,63 @@ class Lifeboat:
             '<link rel=stylesheet href="/static/tokens.css">'
             f"<style>{STYLE}</style></head><body><div class=frame>"
             f"<header><span class=mark>egzos</span><nav>{nav}</nav>"
-            f'<span class="mono muted">{n} pending</span></header>'
+            f"{counter}</header>"
             f"{flash_html}{body}</div></body></html>"
         )
+
+    def _count(self) -> int:
+        pend = self.c.trust.pending()
+        return len(pend["items"]) + len(pend["proposals"])
+
+    def _read(self, token, view: str, **details) -> int:
+        """Every view is a read: one `context.fetch`, the header's pending count included."""
+        n = self._count()
+        self.c.ledger.append(
+            "context.fetch",
+            actor=OWNER,
+            principal=token.principal,
+            subject=details.pop("subject", None),
+            scope=details.pop("scope", None),
+            client="web",
+            view=view,
+            pending_count=n,
+            layers=details.pop("layers", []),
+            withheld=0,
+            **details,
+        )
+        return n
+
+    def _act_for(self, ref: str) -> dict | None:
+        """What a decision on `ref` would do, keyed on its ring pair; None if there is nothing."""
+        prop = self.c.backend.get_proposal(ref)
+        if prop and prop.get("status") == "open":
+            frm, to = self.c.backend.get_node(prop["from"]), self.c.backend.get_node(prop["to"])
+            return {
+                "kind": "proposal",
+                "subject": prop["id"],
+                "from": prop["from_path"],
+                "to": prop["to_path"],
+                "pair": (frm.type if frm else "?", to.type if to else "?"),
+            }
+        item = self.c.backend.get(ref)
+        node = self.c.backend.get_node(item.scope) if item else None
+        if item and node and item.status == "unverified":
+            return {
+                "kind": "item",
+                "subject": item.id,
+                "from": self.c.nodes.path(node),
+                "to": self.c.nodes.path(node),
+                "pair": (node.type, node.type),
+            }
+        return None
+
+    def approve_button(self, ref: str, back: str, label: str) -> str:
+        """*Approve* arms; for 10 s it reads *Confirm signature*, which performs the act."""
+        if armed(self.armed.get(ref, 0.0)):
+            return self.form(
+                "/approve", {"ref": ref, "back": back, "step": "confirm"}, "Confirm signature", "act"
+            )
+        return self.form("/approve", {"ref": ref, "back": back, "step": "arm"}, label, "act")
 
     def _path(self, node_id: str) -> str:
         node = self.c.backend.get_node(node_id)
@@ -136,19 +205,7 @@ class Lifeboat:
             for item in self.c.backend.query([node.id], text=q or None):
                 rows.append((node, item))
         rows.sort(key=lambda t: t[1].lifecycle.get("updated_at", ""), reverse=True)
-        if q:
-            self.c.ledger.append(
-                "context.fetch",
-                actor=OWNER,
-                principal=token.principal,
-                subject=None,
-                scope=None,
-                client="web",
-                query=q,
-                items=[i.id for _, i in rows],
-                layers=[],
-                withheld=0,
-            )
+        n = self._read(token, "items", query=q or None, items=[i.id for _, i in rows])
         body_rows = "".join(
             f"<tr><td><span class='badge {_e(i.status)}'>{_e(i.status)}</span></td>"
             f"<td class=mono>{_e(i.kind)}</td>"
@@ -167,7 +224,9 @@ class Lifeboat:
             f'<input type=text name=q value="{_e(q)}" placeholder="Search everything you can see">'
             "<button>Search</button></form>"
         )
-        return 200, self.page("Items", search + table, active="items", flash=flash, err=err)
+        return 200, self.page(
+            "Items", search + table, active="items", flash=flash, err=err, count=n
+        )
 
     def item(self, item_id: str, flash: str = "", err: bool = False) -> tuple[int, str]:
         token = self.c.require_token()
@@ -175,27 +234,14 @@ class Lifeboat:
         node = self.c.backend.get_node(item.scope) if item else None
         if not item or not node or not self.c.trust.covers(token, node):
             return self.not_found()
-        self.c.ledger.append(
-            "context.fetch",
-            actor=OWNER,
-            principal=token.principal,
-            subject=item.id,
-            scope=item.scope,
-            client="web",
-            items=[item.id],
-            layers=[node.id],
-            withheld=0,
+        n = self._read(
+            token, "item", subject=item.id, scope=item.scope, items=[item.id], layers=[node.id]
         )
         content = item.content or {}
         text = content.get("body") or content.get("inline") or ""
         acts = ""
         if item.status == "unverified":
-            acts += self.form(
-                "/approve",
-                {"ref": item.id, "back": f"/item/{item.id}"},
-                "Approve — mark verified",
-                "act",
-            )
+            acts += self.approve_button(item.id, f"/item/{item.id}", "Approve — mark verified")
         if item.status != "quarantined":
             acts += self.form(
                 "/quarantine", {"item": item.id, "back": f"/item/{item.id}"}, "Quarantine", "alarm"
@@ -206,8 +252,7 @@ class Lifeboat:
             f"<span class=mono>{_e(self.c.nodes.path(node))}</span></div>"
             f"<h2>{_e(_title(item))}</h2>"
             + (f"<pre>{_e(text)}</pre>" if text else "")
-            + f"<div class=row>{acts}</div></div>"
-            "<table>"
+            + "</div><table>"
             + "".join(
                 f"<tr><th>{_e(k)}</th><td class=mono>{_e(v)}</td></tr>"
                 for k, v in (
@@ -219,13 +264,19 @@ class Lifeboat:
                     ("lifecycle", item.lifecycle),
                 )
             )
-            + "</table>"
+            + f"</table><div class=row style='margin-top:16px'>{acts}</div>"  # acts last (§3.1)
         )
-        return 200, self.page(_title(item), body, flash=flash, err=err)
+        return 200, self.page(_title(item), body, flash=flash, err=err, count=n)
 
     def pending(self, flash: str = "", err: bool = False) -> tuple[int, str]:
-        self.c.require_token()
+        token = self.c.require_token()
         pend = self.c.trust.pending()
+        n = self._read(
+            token,
+            "pending",
+            items=[i.id for i in pend["items"]],
+            proposals=[p["id"] for p in pend["proposals"]],
+        )
         props = "".join(
             "<div class=card>"
             f"<p><strong>Move {len(p['items'])} item(s)</strong> "
@@ -237,9 +288,7 @@ class Lifeboat:
             )
             + f"</p><p class=muted>{_e(p['blast_radius'])} container(s) under the target inherit it."
             f" Reason: {_e(p['reason'])}</p><div class=row>"
-            + self.form(
-                "/approve", {"ref": p["id"], "back": "/pending"}, "Approve this move", "act"
-            )
+            + self.approve_button(p["id"], "/pending", "Approve this move")
             + self.form("/deny", {"proposal": p["id"], "back": "/pending"}, "Deny")
             + "</div></div>"
             for p in pend["proposals"]
@@ -248,7 +297,7 @@ class Lifeboat:
             f'<tr><td class=mono>{_e(i.kind)}</td><td><a href="/item/{_e(i.id)}">'
             f"{_e(_title(i))}</a></td><td class=mono>{_e(self._path(i.scope))}</td>"
             f"<td class=mono>{_e((i.provenance or {}).get('client'))}</td><td>"
-            + self.form("/approve", {"ref": i.id, "back": "/pending"}, "Approve", "act")
+            + self.approve_button(i.id, "/pending", "Approve")
             + "</td></tr>"
             for i in pend["items"]
         )
@@ -263,7 +312,9 @@ class Lifeboat:
                 else "<p class=muted>Nothing waiting.</p>"
             )
         )
-        return 200, self.page("Pending", body, active="pending", flash=flash, err=err)
+        return 200, self.page(
+            "Pending", body, active="pending", flash=flash, err=err, count=n
+        )
 
     def audit(self) -> tuple[int, str]:
         self.c.require_token()
@@ -296,17 +347,35 @@ class Lifeboat:
         try:
             if path == "/approve":
                 ref = form.get("ref", "")
-                if self.c.backend.get_proposal(ref):
+                act = self._act_for(ref)
+                if not act:
+                    return (*self.not_found(), "")
+                if form.get("step") == "confirm" and armed(self.armed.pop(ref, 0.0)):
+                    via = "lifeboat"
+                elif self.presence.window_open(act["pair"]):
+                    via = "window"
+                else:
+                    # First press, or a confirm that came too late: arm, and ask for the second.
+                    self.armed[ref] = arm_deadline()
+                    return 200, "", f"{back}?{urlencode({'ok': 'Press Confirm signature within 10 s to sign.'})}"
+                self.presence.record(
+                    act, via=via, outcome="window" if via == "window" else "approved",
+                    windowed=via == "lifeboat",
+                )
+                if act["kind"] == "proposal":
                     p = self.c.trust.execute(ref, token=token, actor=OWNER)
                     msg = f"Approved: moved to {p['to_path']}"
                 else:
-                    item = self.c.backend.get(ref)
-                    if not item:
-                        return (*self.not_found(), "")
-                    item = self.c.trust.promote(item, token=token, actor=OWNER)
+                    item = self.c.trust.promote(self.c.backend.get(ref), token=token, actor=OWNER)
                     msg = f"Approved: {_title(item)} is verified"
             elif path == "/deny":
-                p = self.c.trust.deny(form.get("proposal", ""), token=token, actor=OWNER)
+                ref = form.get("proposal", "")
+                act = self._act_for(ref)
+                if not act or act["kind"] != "proposal":
+                    return (*self.not_found(), "")
+                self.armed.pop(ref, None)
+                self.presence.record(act, via="lifeboat", outcome="denied")
+                p = self.c.trust.deny(ref, token=token, actor=OWNER)
                 msg = f"Denied the move to {p['to_path']}"
             elif path == "/quarantine":
                 item = self.c.backend.get(form.get("item", ""))
@@ -420,19 +489,28 @@ def make_handler(boat: Lifeboat, origin: str):
     return Handler
 
 
-def _launch(url: str, open_browser: bool, opener=None) -> bool:
-    """Open the browser on the keyed URL. The key is printed only when no browser could be opened
-    (or with `--no-open`): a terminal is where an agent reads, so the key stays out of it when it can.
+def _launch(url: str, open_browser: bool, opener=None, terminal=None) -> bool:
+    """Open the browser on the keyed URL. The key is printed only when no browser was opened AND
+    stdout is a terminal: an agent's shell tool is not a terminal, so it never reads the key.
     Runs on its own thread — some launchers wait for the browser to exit."""
     if open_browser and (opener or webbrowser.open)(url):
         print("Opened in your browser.", flush=True)
         return True
-    print(f"Open this in your browser (it carries this session's key):\n  {url}", flush=True)
+    if (terminal if terminal is not None else is_terminal()):
+        print(f"Open this in your browser (it carries this session's key):\n  {url}", flush=True)
+    else:
+        print(
+            "No browser was opened and this is not a terminal, so the session key is not printed. "
+            "Run `egzos web` from a terminal on this machine.",
+            flush=True,
+        )
     return False
 
 
 def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
-    container.require_token()
+    token = container.require_token()
+    if token.principal != "interactive":
+        raise PermissionError("the lifeboat is the owner's; a client principal cannot open it")
     boat = Lifeboat(container)
     host = "127.0.0.1"
     httpd = HTTPServer((host, port), make_handler(boat, f"http://{host}:{port}"))

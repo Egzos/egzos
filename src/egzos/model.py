@@ -14,71 +14,48 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-# --- containers -----------------------------------------------------------------------
-# Ring rank is an ATTRIBUTE (UI order + outward test), not the chain (v0.4 §2).
-# `enterprise` is dropped from the v0.1 vocabulary (v0.5 §A); `uxo` is undefined and never
-# instantiated until defined (R11) — it keeps its slot so the ranks are stable.
-CONTAINER_TYPES: tuple[str, ...] = (
-    "inbox",
-    "thread",
-    "project",
-    "team",
-    "org",
-    "exo",
-    "uxo",
-    "global",
+# --- vocabularies -------------------------------------------------------------------------
+# Imported from the contract types, never restated: a second copy is a copy that drifts.
+from egzos._types import (
+    CAPABILITIES,
+    CONTAINER_TYPES,
+    HUMAN_ONLY_ACTS,
+    KINDS,
+    PRINCIPALS,
+    RING_RANK,
+    ROLE_BUNDLES,
+    ROOT_TYPES,
+    SERVING_POLICY,
+    TRUST_STATUSES,
+    VERIFIED_ONLY_KINDS,
 )
-RING_RANK: dict[str, int] = {t: i for i, t in enumerate(CONTAINER_TYPES)}
-# Tree roots. `user` is the personal tree (user:/self) — rooted at identity, peer to org trees,
-# riding along in every chain (v0.3 §2). It is not a ring.
-ROOT_TYPES: tuple[str, ...] = ("user", "global")
+
+__all__ = [
+    "BASELINE_CREATE",
+    "CAPABILITIES",
+    "CONTAINER_TYPES",
+    "HUMAN_ONLY_ACTS",
+    "INLINE_BLOB_LIMIT",
+    "KINDS",
+    "PRINCIPALS",
+    "RING_RANK",
+    "ROLE_BUNDLES",
+    "ROOT_TYPES",
+    "SERVING_POLICY",
+    "TRUST_STATUSES",
+    "VERIFIED_ONLY_KINDS",
+    "ContextItem",
+    "Node",
+    "Token",
+    "canonical",
+    "now_iso",
+]
+
 # Structure-creation is a permission (v0.3 §2): threads/projects baseline; the rest need admin.
 BASELINE_CREATE: frozenset[str] = frozenset({"thread", "project"})
-
-# --- items -------------------------------------------------------------------------------
-KINDS: tuple[str, ...] = (
-    "memory",
-    "preference",
-    "skill",
-    "artifact",
-    "integration",
-    "alias",
-    "rule",
-)
-TRUST_STATUSES: tuple[str, ...] = ("unverified", "verified", "quarantined")
-# Serving policy per container type (v0.3 §5): serve-unverified at thread/project (the stated
-# tradeoff), verified-only from team outward. Rules are verified-only at EVERY scope (v0.4 §4).
-# The personal root is verified-only (Chief, 2026-09-21, freeze decision F4): it rides along in
-# every chain, so an unverified item there reaches further than any org scope. Reach → verification.
-SERVING_POLICY: dict[str, str] = {
-    "inbox": "serve-unverified",
-    "thread": "serve-unverified",
-    "project": "serve-unverified",
-    "team": "verified-only",
-    "org": "verified-only",
-    "exo": "verified-only",
-    "uxo": "verified-only",
-    "global": "verified-only",
-    "user": "verified-only",
-}
-VERIFIED_ONLY_KINDS: frozenset[str] = frozenset({"rule"})
 # Small blobs inline on fetch; above the threshold the contract returns a BlobGrant descriptor
 # minted by Trust (F5). The number itself is container config at 0.2; 64 KiB is the skeleton's.
 INLINE_BLOB_LIMIT = 64 * 1024
-
-# --- capabilities and principals --------------------------------------------------------
-# Six capabilities are the ENTIRE vocabulary (v0.3 §5). Ordered as the ladder.
-CAPABILITIES: tuple[str, ...] = ("fetch", "remember", "organize", "publish", "curate", "admin")
-ROLE_BUNDLES: dict[str, frozenset[str]] = {
-    "reader": frozenset({"fetch"}),
-    "contributor": frozenset({"fetch", "remember"}),
-    "operator": frozenset({"fetch", "remember", "organize", "publish"}),
-    "curator": frozenset({"fetch", "remember", "organize", "publish", "curate"}),
-    "admin": frozenset(CAPABILITIES),
-}
-PRINCIPALS: tuple[str, ...] = ("interactive", "client")
-# Human-only acts sit OUTSIDE the capability vocabulary (v0.3 §5): no token reaches them.
-HUMAN_ONLY_ACTS: tuple[str, ...] = ("gate.confirm", "yes.consume", "approve.pending")
 
 
 def now_iso() -> str:

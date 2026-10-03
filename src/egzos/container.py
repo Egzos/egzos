@@ -30,7 +30,7 @@ class Container:
     def __init__(self, home: Path | None = None):
         self.home = Path(home or default_home())
         self.home.mkdir(parents=True, exist_ok=True)
-        # The database holds token ids, which are bearer secrets: the container is the owner's only.
+        # The database holds the chain, every item and the token hashes: the owner's only.
         os.chmod(self.home, 0o700)
         self.backend = SqliteBackend(self.home / "egzos.db")
         self.ledger = Ledger(self.backend)

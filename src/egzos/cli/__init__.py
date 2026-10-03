@@ -98,6 +98,15 @@ def _item_ref(c: Container, ref: str):
     return item
 
 
+def _owner(c: Container, what: str):
+    """The owner's views and acts: the interactive principal only. A client principal sees what its
+    scopes cover through `fetch` / `find` / `ls`, never the whole container."""
+    token = c.require_token()
+    if token.principal != "interactive":
+        _fail(f"{what} is the owner's; a client principal sees only what its scopes cover")
+    return token
+
+
 def _p(c: Container, node_id: str) -> str:
     node = c.backend.get_node(node_id)
     return c.nodes.path(node) if node else node_id
@@ -195,12 +204,26 @@ def ls(
 ):
     """List items. `ls --inbox` is the capture queue."""
     c = _container()
-    c.require_token()
+    token = c.require_token()
     node = _scope_or(c, scope, None)
+    if node and not c.trust.covers(token, node):
+        _fail("scope not found")  # the same answer as a scope that does not exist
     if node and not inbox:
         rows = [(node, i) for i in c.backend.query([node.id])]
     else:
-        rows = c.store.inbox_items()
+        rows = [(n, i) for n, i in c.store.inbox_items() if c.trust.covers(token, n)]
+    c.ledger.append(
+        "context.fetch",
+        actor=OWNER,
+        principal=token.principal,
+        subject=node.id if node and not inbox else None,
+        scope=node.id if node and not inbox else None,
+        client=token.client,
+        view="ls" if node and not inbox else "ls --inbox",
+        items=[i.id for _, i in rows],
+        layers=[],
+        withheld=0,
+    )
     _out(
         [{"scope": c.nodes.path(n), **i.to_dict()} for n, i in rows],
         "\n".join(
@@ -376,8 +399,19 @@ def mv(
 def trust_pending():
     """Unverified items awaiting promotion, and open proposals awaiting a human yes."""
     c = _container()
-    c.require_token()
+    token = _owner(c, "the pending queue")
     pend = c.trust.pending()
+    c.ledger.append(
+        "context.fetch",
+        actor=OWNER,
+        principal=token.principal,
+        client=token.client,
+        view="trust pending",
+        items=[i.id for i in pend["items"]],
+        proposals=[p["id"] for p in pend["proposals"]],
+        layers=[],
+        withheld=0,
+    )
     lines = ["items awaiting promotion:"] + [
         f"  {i.id}  {i.kind:<10} @{_p(c, i.scope)}  “{i.content.get('auto_title', '')}”"
         f"  by {i.provenance.get('client')}"
@@ -395,15 +429,15 @@ def trust_pending():
     )
 
 
-@trust_app.command("approve")
-def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal id")):
-    """Human-only: promote an item to verified, or execute a parked proposal (manifest-bound)."""
-    c = _container()
-    token = c.require_token()
-    if token.principal != "interactive":
-        _fail("approve is a human-only act; a client principal can only propose")
+def _decide(c: Container, token, ref: str) -> None:
+    """Open the decision page for an item or a proposal. The terminal only ASKS; the page — two
+    deliberate presses, or Deny — is where the human decides (the step-up tap)."""
+    from egzos.presence import Presence
+
     prop = c.backend.get_proposal(ref)
-    if prop and prop.get("status") == "open":
+    prop = prop if prop and prop.get("status") == "open" else None
+    if prop:
+        frm, to = c.backend.get_node(prop["from"]), c.backend.get_node(prop["to"])
         act = {
             "ref": f"PROPOSAL {prop['id'][:10]}…",
             "filed": prop.get("created_at", ""),
@@ -419,10 +453,13 @@ def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal 
             "audience": [f"{a['client']} · {a['role']}" for a in prop["audience_delta"]],
             "from": prop["from_path"],
             "to": prop["to_path"],
+            "pair": (frm.type if frm else "?", to.type if to else "?"),
             "subject": prop["id"],
         }
     else:
         it = _item_ref(c, ref)
+        node = c.backend.get_node(it.scope)
+        ring = node.type if node else "?"
         act = {
             "ref": f"ITEM {it.id[:10]}…",
             "title": f"Mark verified: “{it.content.get('auto_title', it.id)}”",
@@ -433,24 +470,29 @@ def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal 
             "audience": [],
             "from": _p(c, it.scope),
             "to": _p(c, it.scope),
+            "pair": (ring, ring),
             "subject": it.id,
         }
-    from egzos.presence import Presence
-
     outcome = Presence(c).require(act)
-    if outcome not in ("approved", "window"):
-        _fail(f"not approved: {outcome} in the presence check")
     try:
+        if outcome == "denied":
+            if prop:
+                p = c.trust.deny(prop["id"], token=token, actor=OWNER)
+                _out(p, f"denied {p['id']}")
+            else:
+                _out({"id": act["subject"], "denied": True}, f"{act['subject']} stays unverified")
+            return
+        if outcome not in ("approved", "window"):
+            _fail(f"not approved: {outcome} in the presence check")
         if prop:
-            p = c.trust.execute(ref, token=token, actor=OWNER)
+            p = c.trust.execute(prop["id"], token=token, actor=OWNER)
             _out(
                 p,
                 f"executed proposal {p['id']} → {p['to_path']}  "
                 f"(manifest {p['manifest'][:12]}… matched)",
             )
             return
-        item = _item_ref(c, ref)
-        item = c.trust.promote(item, token=token, actor=OWNER)
+        item = c.trust.promote(_item_ref(c, ref), token=token, actor=OWNER)
         _out(
             item.to_dict(),
             f"{item.id} → verified  (approved_by {item.provenance['approved_by']}, "
@@ -460,15 +502,38 @@ def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal 
         _fail(str(e))
 
 
-@trust_app.command("deny")
-def trust_deny(proposal: str):
+@trust_app.command("approve")
+def trust_approve(ref: str = typer.Argument(..., help="Item id, %n, or proposal id")):
+    """Human-only: promote an item, or execute a parked proposal — decided on the presence page."""
     c = _container()
     token = c.require_token()
-    try:
-        p = c.trust.deny(proposal, token=token, actor=OWNER)
-    except TrustError as e:
-        _fail(str(e))
-    _out(p, f"denied {p['id']}")
+    if token.principal != "interactive":
+        _fail("approve is a human-only act; a client principal can only propose")
+    _decide(c, token, ref)
+
+
+@trust_app.command("deny")
+def trust_deny(proposal: str):
+    """Human-only: deny a parked proposal — decided on the same presence page as approve."""
+    c = _container()
+    token = c.require_token()
+    if token.principal != "interactive":
+        _fail("deny is a human-only act; a client principal can only propose")
+    p = c.backend.get_proposal(proposal)
+    if not p or p.get("status") != "open":
+        _fail("no open proposal with that id")
+    _decide(c, token, proposal)
+
+
+@trust_app.command("close-window")
+def trust_close_window():
+    """Close every open presence window now: the next human-only act taps again."""
+    from egzos.presence import Presence
+
+    c = _container()
+    _owner(c, "closing a presence window")
+    Presence(c).close_windows()
+    _out({"closed": True}, "presence windows closed")
 
 
 @trust_app.command("quarantine")
@@ -497,7 +562,7 @@ def token_create(
 ):
     """Mint a CLIENT principal for a machine client. Machine clients never touch web auth."""
     c = _container()
-    token = c.require_token()
+    token = _owner(c, "minting a token")
     if not token.has("admin"):
         _fail("token create needs `admin`")
     if role == "admin":
@@ -535,7 +600,7 @@ def token_create(
 @token_app.command("ls")
 def token_ls():
     c = _container()
-    c.require_token()
+    _owner(c, "the token list")
     ts = c.backend.list_tokens()
     _out(
         [t.to_dict() for t in ts],
@@ -553,7 +618,7 @@ def token_ls():
 def audit_tail(n: int = typer.Option(20, "-n")):
     """The last n audit entries — reads included."""
     c = _container()
-    c.require_token()
+    _owner(c, "the audit chain")
     entries = c.ledger.tail(n)
     _out(
         entries,
@@ -571,7 +636,7 @@ def audit_tail(n: int = typer.Option(20, "-n")):
 def audit_verify():
     """Walk the hash chain from genesis. Exit 1 if it is broken."""
     c = _container()
-    c.require_token()
+    _owner(c, "the audit chain")
     result = c.ledger.verify()
     _out(
         result,
@@ -623,7 +688,7 @@ def web(
 ):
     """The lifeboat: list, search, pending queue and audit in your browser, on loopback only."""
     c = _container()
-    c.require_token()
+    _owner(c, "the lifeboat")
     from egzos.web import serve_web
 
     serve_web(c, port=port, open_browser=not no_open)
@@ -638,7 +703,9 @@ def connect(
 ):
     """Mint a client token for an MCP client and wire it up (Claude Code by default)."""
     c = _container()
-    token = c.require_token()
+    token = _owner(c, "minting a token")
+    if not token.has("admin"):
+        _fail("minting a token needs `admin`")
     if role == "admin":
         _fail("connect never mints admin for an agent; use `egzos token create` deliberately")
     scopes = []

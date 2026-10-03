@@ -4,7 +4,8 @@
 """Stands in for a person at a browser, for the demo and tests only: given a /tap/<token> URL it
 opens the page, presses *Sign and approve*, then *Confirm signature* — the same two deliberate
 presses the page asks of a human, over the same HTTP.
-Usage: BROWSER="python scripts/human_tap.py %s" (or `python scripts/human_tap.py --deny URL`).
+Usage: BROWSER="python scripts/human_tap.py %s" (or `--deny URL`, or `--once URL` to approve
+without a window).
 It is not a bypass: it holds no credential and does nothing a person's browser could not."""
 
 from __future__ import annotations
@@ -22,13 +23,13 @@ def press(url: str, step: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    deny = "--deny" in argv
+    deny, once = "--deny" in argv, "--once" in argv
     url = [a for a in argv if not a.startswith("--")][0]
     urllib.request.urlopen(url, timeout=10).read()
     if deny:
         press(url, "deny")
         return 0
-    press(url, "arm")
+    press(url, "arm_once" if once else "arm")
     press(url, "confirm")
     return 0
 

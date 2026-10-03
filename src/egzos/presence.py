@@ -6,23 +6,33 @@ The step-up tap, MVP cut (spec/design/step-up-tap-and-pending-approval.md §2, l
 A human-only act started from the CLI does not happen on the CLI's say-so: the terminal is where an
 agent, or an injected `--yes` / `echo y`, would type. The container opens a one-shot page on
 loopback at `/tap/<token>` (an opaque single-use token, no parameters, no-referrer, no-store), shows
-what moves and who will see it, and waits for two deliberate presses: *Sign and approve*, then
-*Confirm signature* within 10 s. *Deny* is one press. Signing appends `step_up` and opens a window
-for that source → destination ring pair (default 300 s; `0` means no window, every act taps).
+what moves and who will see it, and waits for a decision: *Sign and approve* then *Confirm
+signature* within 10 s, *Approve without a window* then the same confirm, or *Deny* (one press).
+The lifeboat's own approve acts use the same rule (`web/`), so neither surface completes on one
+request.
 
-Residual, named: anything running as the user that can drive a browser — or set `BROWSER` — can
-press the buttons; a shell running as the user is the user. What this removes is the act being
-completed by typing in a terminal (`y`, `--yes`); the page opens in the browser and its URL is
-printed only when no browser could be opened. OS-backed presence (WebAuthn / platform
-authenticator) is the stronger tier the spec names for later.
+Every presence check is one `step_up` entry, whatever its outcome (`approved`, `denied`, `expired`,
+`unavailable`, or `window` when an open window covered it), with the source → destination ring pair.
+A signature opens a window for that ring pair (`step_up.window_seconds`, default 300 s; `0` means
+no window, every act taps). The window is read back from the chain, never from a side file, and
+*Close window now* (`egzos trust close-window`) appends the entry that ends every open window.
+
+The page opens in the browser. Its URL is printed only when no browser could be opened AND stdout is
+a terminal: an agent's shell tool is not a terminal, so it never receives a URL it could press.
+
+Residuals, named: a process running as the user that drives a browser, fakes a terminal, or appends
+to the chain directly can do what the user can — a shell running as the user is the user. The URL
+travels in the browser launcher's argv, readable by other local users on a shared host. The window
+is not yet bounded to the manifest's shape (K items of kinds …). OS-backed presence (WebAuthn /
+platform authenticator) is the stronger tier the spec names for later.
 """
 
 from __future__ import annotations
 
 import html
-import json
 import os
 import secrets
+import sys
 import threading
 import time
 import webbrowser
@@ -45,6 +55,14 @@ def window_seconds() -> int:
     return max(0, int(raw))
 
 
+def is_terminal() -> bool:
+    """Whether a printed URL would reach a person at a terminal rather than a program's pipe."""
+    try:
+        return sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
 def _now() -> float:
     return time.time()
 
@@ -53,48 +71,130 @@ def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def arm_deadline() -> float:
+    """When a first press made now stops counting as the first of two."""
+    return _now() + ARM_SECONDS
+
+
+def armed(deadline: float) -> bool:
+    return deadline > _now()
+
+
+def pair_of(act: dict[str, Any]) -> tuple[str, str]:
+    """The source → destination RING pair (types, not paths) a window is keyed on."""
+    pair = act.get("pair") or (act["from"], act["to"])
+    return (pair[0], pair[1])
+
+
+def window_note(seconds: int, frm: str, to: str, esc=html.escape) -> str:
+    if not seconds:
+        return "Approving is a human-only act. Signing proves you are here. No window opens."
+    span = f"{seconds // 60}-minute" if seconds >= 60 else f"{seconds}-second"
+    return (
+        "Approving is a human-only act. Signing proves you are here and opens a "
+        f"{span} window for <code>{esc(frm)} → {esc(to)}</code>. "
+        "Close it early at any time: <code>egzos trust close-window</code>."
+    )
+
+
+# The page consumes the design tokens (spec/design/tokens.css, vendored at egzos/web/tokens.css) as
+# CSS variables, inlined because the page's CSP loads nothing; the scheme follows tokens.css's own
+# rule (data-scheme, else prefers-color-scheme). No literal colour lives here.
+TAP_STYLE = """
+body{margin:0;background:var(--egz-canvas);color:var(--egz-ink);font-family:var(--egz-font-ui);
+ line-height:var(--egz-lh)}
+main{max-width:720px;margin:32px auto;padding:0 16px}
+.ref{font-family:var(--egz-font-mono);text-transform:uppercase;
+ letter-spacing:var(--egz-tracking-caps);font-size:.8rem}
+.box{border:var(--egz-bw) solid var(--egz-rule);padding:16px;margin:16px 0}
+table{width:100%;border-collapse:collapse}
+td{padding:6px 4px;border-bottom:var(--egz-hair) solid var(--egz-rule-soft)}
+button{min-height:44px;padding:0 16px;border:var(--egz-bw) solid var(--egz-rule);
+ background:var(--egz-canvas);color:var(--egz-ink);font:inherit;cursor:pointer;margin:0 8px 8px 0}
+button.act{background:var(--egz-act);color:var(--egz-act-on);border-color:var(--egz-act)}
+button.ghost{border-color:transparent;text-decoration:underline}
+button:focus-visible{outline:var(--egz-focus);outline-offset:3px}
+.note{border:var(--egz-bw) solid var(--egz-act);padding:12px}
+"""
+
+
+def _tokens_css() -> str:
+    from importlib import resources
+
+    return resources.files("egzos.web").joinpath("tokens.css").read_text(encoding="utf-8")
+
+
 class Presence:
     def __init__(self, container: Container):
         self.c = container
-        self.path = container.home / "presence.json"
 
-    # -- windows ----------------------------------------------------------------------------------
-    def _windows(self) -> dict[str, float]:
-        try:
-            return json.loads(self.path.read_text())
-        except (OSError, ValueError):
-            return {}
-
-    @staticmethod
-    def _key(pair: tuple[str, str]) -> str:
-        return f"{pair[0]}→{pair[1]}"
+    # -- windows, read back from the chain ---------------------------------------------------------
+    def _recent_step_ups(self, seconds: int) -> list[dict[str, Any]]:
+        """`step_up` entries newer than `seconds` ago, newest first. Pages back through the tail
+        until it is older than that, so a busy chain cannot hide a window or a close."""
+        since = _iso(_now() - seconds - 1)
+        n = 256
+        while True:
+            rows = self.c.ledger.tail(n)
+            if len(rows) < n or not rows or rows[0]["ts"] < since:
+                break
+            n *= 4
+        return [r for r in reversed(rows) if r["ts"] >= since and r["event"] == "step_up"]
 
     def window_open(self, pair: tuple[str, str]) -> bool:
-        return self._windows().get(self._key(pair), 0) > _now()
-
-    def open_window(self, pair: tuple[str, str]) -> float | None:
         seconds = window_seconds()
         if seconds == 0:
-            return None
-        windows = {k: v for k, v in self._windows().items() if v > _now()}
-        closes = _now() + seconds
-        windows[self._key(pair)] = closes
-        fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as fh:
-            fh.write(json.dumps(windows))
-        return closes
+            return False
+        now = _iso(_now())
+        for e in self._recent_step_ups(seconds):
+            d = e.get("details") or {}
+            if d.get("outcome") == "closed":
+                return False  # Close window now ends every window opened before it
+            if (
+                d.get("outcome") == "approved"
+                and d.get("pair") == list(pair)
+                and (d.get("window_closes") or "") > now
+            ):
+                return True
+        return False
 
-    # -- the tap ------------------------------------------------------------------------------------
+    def close_windows(self, *, actor: str = OWNER) -> None:
+        self.c.ledger.append(
+            "step_up", actor=actor, principal="interactive", via="close", outcome="closed"
+        )
+
+    def record(
+        self,
+        act: dict[str, Any],
+        *,
+        via: str,
+        outcome: str,
+        windowed: bool = False,
+        actor: str = OWNER,
+    ) -> None:
+        """One `step_up` per presence check, whatever the outcome."""
+        closes = None
+        seconds = window_seconds()
+        if outcome == "approved" and windowed and seconds:
+            closes = _iso(_now() + seconds)
+        self.c.ledger.append(
+            "step_up",
+            actor=actor,
+            principal="interactive",
+            subject=act.get("subject"),
+            via=via,
+            outcome=outcome,
+            pair=list(pair_of(act)),
+            window_closes=closes,
+        )
+
+    # -- the tap ----------------------------------------------------------------------------------
     def require(self, act: dict[str, Any], *, timeout: float | None = None, opener=None) -> str:
-        """Ask for presence. Returns "window", "approved", "denied" or "expired"."""
+        """Ask for presence. Returns "window", "approved", "denied", "expired" or "unavailable"."""
         if timeout is None:
             timeout = float(os.environ.get("EGZOS_TAP_TIMEOUT_SECONDS") or 180)
-        pair = (act["from"], act["to"])
-        if self.window_open(pair):
-            self.c.ledger.append(
-                "step_up", actor=OWNER, principal="interactive", subject=act.get("subject"),
-                via="window", pair=list(pair),
-            )
+        if self.window_open(pair_of(act)):
+            self.record(act, via="window", outcome="window")
             return "window"
         tap = Tap(act)
         httpd = HTTPServer(("127.0.0.1", 0), tap.handler())
@@ -109,22 +209,25 @@ class Presence:
         launcher.join(2.0)
         opened = result[0] if result else True
         if opened:
-            print("A presence check opened in your browser. Approve or deny it there.", flush=True)
+            print("A presence check opened in your browser. Decide there.", flush=True)
+        elif is_terminal():
+            print(f"Open this to decide (it works once):\n  {url}", flush=True)
         else:
-            print(f"Open this to approve or deny (it works once):\n  {url}", flush=True)
+            httpd.server_close()
+            print(
+                "No browser could be opened and this is not a terminal, so the presence check "
+                "cannot be shown. Run the command from a terminal on this machine.",
+                flush=True,
+            )
+            self.record(act, via="tap", outcome="unavailable")
+            return "unavailable"
         httpd.timeout = 1.0
         deadline = _now() + timeout
         while tap.outcome is None and _now() < deadline:
             httpd.handle_request()
         httpd.server_close()
         outcome = tap.outcome or "expired"
-        if outcome == "approved":
-            closes = self.open_window(pair)
-            self.c.ledger.append(
-                "step_up", actor=OWNER, principal="interactive", subject=act.get("subject"),
-                via="tap", pair=list(pair),
-                window_closes=_iso(closes) if closes else None,
-            )
+        self.record(act, via="tap", outcome=outcome, windowed=tap.windowed)
         return outcome
 
 
@@ -135,7 +238,9 @@ class Tap:
         self.act = act
         self.token = secrets.token_urlsafe(32)
         self.outcome: str | None = None
+        self.windowed = True
         self.armed_until = 0.0
+        self.armed_mode = "window"
 
     def page(self, armed: bool, note: str = "") -> str:
         a = self.act
@@ -147,31 +252,18 @@ class Tap:
         )
         who = ", ".join(e(w) for w in a.get("audience", [])) or "no one new"
         seconds = window_seconds()
-        presence = (
-            "Approving is a human-only act. Signing proves you are here "
-            f"and opens a {seconds // 60 or seconds}-{'minute' if seconds >= 60 else 'second'} "
-            f"window for <code>{e(a['from'])} → {e(a['to'])}</code>."
-            if seconds
-            else "Approving is a human-only act. Signing proves you are here. No window opens."
-        )
-        act_button = (
-            '<button name=step value=confirm class=act>Confirm signature</button>'
-            if armed
-            else '<button name=step value=arm class=act>Sign and approve</button>'
-        )
+        frm, to = pair_of(a)
+        presence = window_note(seconds, frm, to, esc=e)
+        if armed:
+            acts = "<button name=step value=confirm class=act>Confirm signature</button>"
+        else:
+            acts = "<button name=step value=arm class=act>Sign and approve</button>"
+        acts += "<button name=step value=deny>Deny</button>"
+        if seconds and not armed:
+            acts += "<button name=step value=arm_once class=ghost>Approve without a window</button>"
         return f"""<!doctype html><html lang=en><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><title>egzos · presence</title>
-<style>
-body{{margin:0;background:#fff;color:#000;font:16px/1.5 "IBM Plex Sans",system-ui,sans-serif}}
-@media (prefers-color-scheme:dark){{body{{background:#0B0B0B;color:#F4F4F0}}}}
-main{{max-width:720px;margin:32px auto;padding:0 16px}}
-.ref{{font-family:"IBM Plex Mono",ui-monospace,monospace;text-transform:uppercase;letter-spacing:.12em;font-size:.8rem}}
-.box{{border:2px solid currentColor;padding:16px;margin:16px 0}}
-table{{width:100%;border-collapse:collapse}}td{{padding:6px 4px;border-bottom:1px solid #D6D6D2}}
-button{{min-height:44px;padding:0 16px;border:2px solid currentColor;background:transparent;color:inherit;font:inherit;cursor:pointer;margin-right:8px}}
-button.act{{background:#1D3FA8;color:#fff;border-color:#1D3FA8}}
-.note{{border:2px solid #1D3FA8;padding:12px}}
-</style></head><body><main>
+<style>{_tokens_css()}{TAP_STYLE}</style></head><body><main>
 <p class=ref>{e(a.get('ref', 'act'))} · {e(a.get('filed', ''))}</p>
 <h1>{e(a['title'])}</h1>
 <p><span class=ref>{e(a.get('requester', 'you'))} states:</span> “{e(a.get('reason') or '(no reason given)')}”</p>
@@ -179,7 +271,7 @@ button.act{{background:#1D3FA8;color:#fff;border-color:#1D3FA8}}
 <h2>Who will see it</h2><p>{who}</p>
 <div class=box><p>{presence}</p>
 {f'<p class=note>{e(note)}</p>' if note else ''}
-<form method=post>{act_button}<button name=step value=deny>Deny</button></form></div>
+<form method=post>{acts}</form></div>
 </main></body></html>"""
 
     def handler(self):
@@ -218,7 +310,7 @@ button.act{{background:#1D3FA8;color:#fff;border-color:#1D3FA8}}
             def do_GET(self):  # noqa: N802
                 if not self._ok_path():
                     return self._send(404, "<p>Nothing here.</p>")
-                self._send(200, tap.page(armed=tap.armed_until > _now()))
+                self._send(200, tap.page(armed=armed(tap.armed_until)))
 
             def do_POST(self):  # noqa: N802
                 if not self._ok_path():
@@ -232,10 +324,12 @@ button.act{{background:#1D3FA8;color:#fff;border-color:#1D3FA8}}
                 if step == "deny":
                     tap.outcome = "denied"
                     return self._send(200, "<p>Denied. You can close this tab.</p>")
-                if step == "arm":
-                    tap.armed_until = _now() + ARM_SECONDS
+                if step in ("arm", "arm_once"):
+                    tap.armed_until = arm_deadline()
+                    tap.armed_mode = "once" if step == "arm_once" else "window"
                     return self._send(200, tap.page(armed=True, note="Press again within 10 s to sign."))
-                if step == "confirm" and tap.armed_until > _now():
+                if step == "confirm" and armed(tap.armed_until):
+                    tap.windowed = tap.armed_mode == "window"
                     tap.outcome = "approved"
                     return self._send(200, "<p>Signed. Approved. You can close this tab.</p>")
                 tap.armed_until = 0.0

@@ -16,7 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SameSite=Strict cookie; every act is a same-origin POST carrying the key. Styled by `tokens.css`.
 - `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
   server with Claude Code at user scope.
-- The container home is owner-only (0700): its database holds bearer token ids.
+- The container home is owner-only (0700): it holds the chain, every item and the token hashes.
+- The presence tap: `egzos trust approve` / `trust deny` open a one-shot loopback decision page
+  (*Sign and approve* → *Confirm signature* within 10 s, *Approve without a window*, *Deny*); the
+  lifeboat's approve is the same two presses. Every check appends `step_up` with its outcome; a
+  signature opens a window per ring pair, read back from the chain; `egzos trust close-window`.
+- Token values are 256 random bits, stored only as a hash; the id is public (freeze item 19).
+- The gate: `organize` for a silent move, `publish` to propose a widening one; a manifest drift is
+  `approval.stale` (freeze items 3, 39); an ambiguous path resolves by latest activity (item 1).
+
+### Security
+
+- Minting is the owner's act (`connect`, `token create`, `Auth.mint`); the owner's views (`trust
+  pending`, `token ls`, `audit`, `egzos web`) refuse a client principal; `ls` checks coverage.
+- The MCP door answers identically for a scope that does not exist and one the token cannot see.
+- Every lifeboat view and `ls` / `trust pending` is an audited read; `blob_pull` checks coverage.
+- A keyed URL (lifeboat or tap) is printed only to a terminal, never to an agent's pipe.
 
 ### Changed
 

@@ -67,6 +67,9 @@ class Auth:
         actor: str,
         by_principal: str,
     ) -> Token:
+        if by_principal != "interactive":
+            # Minting is the owner's act: a client principal never widens itself (or anyone).
+            raise AuthError("minting a token is the owner's act")
         if role not in ROLE_BUNDLES:
             raise AuthError(f"unknown role {role!r}")
         token = Token(

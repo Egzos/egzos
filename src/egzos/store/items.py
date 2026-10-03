@@ -170,8 +170,12 @@ class Store:
     def blob_pull(
         self, item: ContextItem, *, token: Token, actor: str, principal: str
     ) -> bytes | None:
-        """Artifact download IS fetch (v0.3 §5); the pull is its own audit event."""
+        """Artifact download IS fetch (v0.3 §5): the same capability AND coverage check as a fetch,
+        one silent None when either fails; the pull is its own audit event."""
         if not token.has("fetch"):
+            return None
+        node = self.backend.get_node(item.scope)
+        if node is None or self.covers is None or not self.covers(token, node):
             return None
         sha = item.content.get("sha256")
         if not sha:

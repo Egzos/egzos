@@ -53,13 +53,46 @@ def test_item_detail_escapes_and_unknown_is_uniform(boat):
     assert b.item("01UNKNOWN")[0] == 404
 
 
-def test_approve_promotes_and_is_audited(boat):
+def _step_ups(c):
+    return [e["details"] for e in c.ledger.tail(200) if e["event"] == "step_up"]
+
+
+def test_approve_needs_two_presses_and_is_audited(boat, monkeypatch):
+    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
     b, item = boat
-    status, _, redirect = b.act("/approve", {"ref": item.id, "back": "/pending"})
-    assert redirect.startswith("/pending?ok=")
+    # One request — what a script holding the key would send — arms and does nothing else.
+    _, _, redirect = b.act("/approve", {"ref": item.id, "back": "/pending", "step": "arm"})
+    assert "Confirm+signature" in redirect and b.c.backend.get(item.id).status == "unverified"
+    assert "Confirm signature" in b.pending()[1]
+    _, _, redirect = b.act("/approve", {"ref": item.id, "back": "/pending", "step": "confirm"})
+    assert redirect.startswith("/pending?ok=Approved")
     assert b.c.backend.get(item.id).status == "verified"
     assert b.c.ledger.tail(1)[0]["event"] == "approval.promote"
-    assert b.c.ledger.verify()["ok"]
+    signed = _step_ups(b.c)[-1]
+    assert signed["via"] == "lifeboat" and signed["outcome"] == "approved"
+    assert signed["window_closes"] and b.c.ledger.verify()["ok"]
+
+
+def test_a_confirm_without_an_arm_only_arms(boat, monkeypatch):
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "0")
+    b, item = boat
+    b.act("/approve", {"ref": item.id, "back": "/pending", "step": "confirm"})
+    assert b.c.backend.get(item.id).status == "unverified"
+    assert _step_ups(b.c) == []
+
+
+def test_an_open_window_covers_the_next_approval_in_one_press(boat, monkeypatch):
+    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
+    b, item = boat
+    token = b.c.require_token()
+    other = b.c.store.add(body="second", token=token, actor=OWNER, principal=token.principal)
+    b.c.backend.put(other)
+    for step in ("arm", "confirm"):
+        b.act("/approve", {"ref": item.id, "back": "/pending", "step": step})
+    # `other` sits in its own inbox thread: the same ring pair (thread → thread)
+    b.act("/approve", {"ref": other.id, "back": "/pending", "step": "arm"})
+    assert b.c.backend.get(other.id).status == "verified"
+    assert _step_ups(b.c)[-1]["outcome"] == "window"
 
 
 def test_back_is_kept_on_this_origin(boat):
@@ -83,6 +116,16 @@ def test_proposal_approve_and_deny(boat):
     assert "Approve this move" in b.pending()[1]
     _, _, redirect = b.act("/deny", {"proposal": pid, "back": "/pending"})
     assert "Denied" in redirect.replace("+", " ")
+    assert c.ledger.tail(1)[0]["event"] == "approval.deny"
+    assert _step_ups(c)[-1]["outcome"] == "denied" and _step_ups(c)[-1]["pair"] == ["thread", "org"]
+
+
+def test_every_view_is_a_read_with_the_pending_count(boat):
+    b, item = boat
+    for view in (lambda: b.items(), lambda: b.pending(), lambda: b.item(item.id)):
+        view()
+        e = b.c.ledger.tail(1)[0]
+        assert e["event"] == "context.fetch" and e["details"]["pending_count"] == 1
 
 
 def _serve(tmp_path, ready, holder):
@@ -146,8 +189,18 @@ def test_the_session_key_stays_out_of_the_terminal_when_a_browser_opens(capsys):
     opened: list[str] = []
     assert _launch(url, True, opener=lambda u: opened.append(u) or True)
     assert opened == [url] and "s" * 32 not in capsys.readouterr().out
-    # no browser (or --no-open): the only way in is the printed URL
-    assert not _launch(url, True, opener=lambda u: False)
+    # no browser (or --no-open) at a terminal: the only way in is the printed URL
+    assert not _launch(url, True, opener=lambda u: False, terminal=True)
     assert url in capsys.readouterr().out
-    assert not _launch(url, False, opener=lambda u: pytest.fail("--no-open must not open"))
+    assert not _launch(url, False, opener=lambda u: pytest.fail("--no-open"), terminal=True)
     assert url in capsys.readouterr().out
+    # not a terminal (an agent's shell tool): the key is never printed
+    assert not _launch(url, False, terminal=False)
+    assert "s" * 32 not in capsys.readouterr().out
+
+
+def test_item_page_puts_the_acts_last_and_quarantine_is_an_outline(boat):
+    b, item = boat
+    body = b.item(item.id)[1]
+    assert body.index("lifecycle") < body.index("Approve — mark verified")
+    assert ".badge.quarantined{color:var(--egz-alarm);border-color:var(--egz-alarm)}" in body

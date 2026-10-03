@@ -4,11 +4,8 @@
 Append-only, hash-chained audit (v0.4 §15; a3-ledger charter). Each entry carries the hash of the
 previous one; verification fails loudly and specifically. Reads are logged, not just writes.
 
-Event taxonomy — the skeleton's vocabulary, for 0.2 to freeze:
-  container.init · node.create · item.add · blob.put · context.fetch · blob.pull · item.move
-  gate.pass.silent (audience_delta:none) · gate.propose · approval.promote · approval.execute
-  approval.deny · trust.quarantine · step_up (reserved; Phase 2.2)
-  token.mint · token.revoke · item.tombstone
+The event taxonomy is `_types.EVENTS` (spec/contracts/events.md §1); an append outside it is
+refused.
 """
 
 from __future__ import annotations
@@ -16,31 +13,15 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
+from egzos._types import EVENTS as CONTRACT_EVENTS
+from egzos._types import GENESIS_HASH
 from egzos.backends.base import Backend
 from egzos.model import canonical, now_iso
 
-GENESIS = "0" * 64
+GENESIS = GENESIS_HASH
 
-EVENTS: tuple[str, ...] = (
-    "container.init",
-    "node.create",
-    "item.add",
-    "blob.put",
-    "context.fetch",
-    "blob.pull",
-    "item.move",
-    "gate.pass.silent",
-    "gate.propose",
-    "approval.promote",
-    "approval.execute",
-    "approval.deny",
-    "approval.stale",
-    "trust.quarantine",
-    "step_up",
-    "token.mint",
-    "token.revoke",
-    "item.tombstone",
-)
+# The vocabulary is the contract's (`_types.py`, events.md §1), imported, never restated.
+EVENTS: tuple[str, ...] = CONTRACT_EVENTS
 
 
 def _hash(prev_hash: str, body: dict[str, Any]) -> str:
