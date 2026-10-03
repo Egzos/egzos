@@ -165,6 +165,16 @@ def test_a_remembered_title_is_one_path_segment(box):
     assert box.nodes.resolve_ref(kept["scope"], owner) is not None
 
 
+def test_an_inbox_read_records_what_the_policy_withheld(box):
+    owner = box.auth.interactive_token()
+    bad = box.store.add(body="b", token=owner, actor=OWNER, principal="interactive")
+    box.store.add(body="o", token=owner, actor=OWNER, principal="interactive")
+    box.trust.quarantine(bad, token=owner, actor=OWNER, reason="x")
+    _call(build_server(box, _client(box)), "egzos_inbox", {})
+    entry = box.ledger.tail(1)[0]
+    assert entry["event"] == "context.fetch" and entry["details"]["withheld"] == 1
+
+
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
     owner = box.auth.interactive_token()
     f = tmp_path / "secret.txt"

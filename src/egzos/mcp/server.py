@@ -181,7 +181,8 @@ def build_server(container: Container, token: Token):
             _probe(token, "inbox")
             return json.dumps({"banner": DATA_BANNER, "items": []})  # silence-not-errors
         # Served, not shown: quarantined never, rules verified-only — the same policy as fetch.
-        rows = [(n, i) for n, i in store.inbox_items() if container.resolver.serve(i, n)]
+        held = store.inbox_items()
+        rows = [(n, i) for n, i in held if container.resolver.serve(i, n)]
         container.ledger.append(
             "context.fetch",
             actor=actor,
@@ -191,7 +192,7 @@ def build_server(container: Container, token: Token):
             client=token.client,
             layers=["inbox"],
             items=[i.id for _, i in rows],
-            withheld=0,
+            withheld=len(held) - len(rows),  # what the policy kept back, as a fetch records it
         )
         return json.dumps(
             {
