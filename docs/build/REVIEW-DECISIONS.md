@@ -134,7 +134,7 @@ entry here settles it.
 1. the workflow's `--model` flag, through the `MODEL_*` env indirection — every call site that runs
    the agent (`a6-adversary.yml` has two; `a1r-reviewer` runs in `a1r-review.yml` and
    `nightly-integration.yml`);
-2. the definition's `model:` frontmatter **and** its prose tier line ("Opus 5, fixed.");
+2. the definition's `model:` frontmatter **and** its prose tier line ("Opus 5.5, fixed.");
 3. CLAUDE.md's model-pin table and the roster in `.claude/agents/README.md`;
 4. every dispatcher that special-cases the agent by name — here, the `case` arms in `core-queue.yml`.
 

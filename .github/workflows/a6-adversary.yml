@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_OPUS: claude-opus-5
+  MODEL_OPUS: claude-opus-5-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
   # One number for the model's --max-turns and for diagnose-failure's ceiling check, so the
