@@ -103,16 +103,17 @@ class TrustEngine:
         item.provenance["approved_by"] = actor
         item.lifecycle["updated_at"] = now_iso()
         item.lifecycle["version"] = int(item.lifecycle.get("version", 1)) + 1
-        self.backend.put(item)
-        self.ledger.append(
-            "approval.promote",
-            actor=actor,
-            principal=token.principal,
-            subject=item.id,
-            scope=item.scope,
-            manifest=manifest,
-            audience=[a["client"] for a in audience],
-        )
+        with self.backend.atomic():
+            self.backend.put(item)
+            self.ledger.append(
+                "approval.promote",
+                actor=actor,
+                principal=token.principal,
+                subject=item.id,
+                scope=item.scope,
+                manifest=manifest,
+                audience=[a["client"] for a in audience],
+            )
         return item
 
     def quarantine(self, item: ContextItem, *, token: Token, actor: str, reason: str) -> list[str]:
@@ -270,26 +271,29 @@ class TrustEngine:
             raise TrustError("manifest changed since the proposal was made — re-propose")
         proposer = (p.get("proposed_by") or {}).get("principal", "client")
         reset = []
-        for item_id in p["items"]:
-            item = self.backend.get(item_id)
-            if item:
-                if self._reset_if_agent_run(item, proposer):
-                    reset.append(item.id)
-                self._do_move(item, to, actor, token.principal)
-        p["status"] = "executed"
-        p["executed_at"] = now_iso()
-        p["approved_by"] = actor
-        self.backend.put_proposal(p)
-        self.ledger.append(
-            "approval.execute",
-            actor=actor,
-            principal=token.principal,
-            subject=p["id"],
-            scope=to.id,
-            items=p["items"],
-            manifest=p["manifest"],
-            reset=reset,
-        )
+        # Every move, the status and the chain entry land together: a failure on item k rolls back
+        # items 1…k-1 too, so a failed approval has moved nothing.
+        with self.backend.atomic():
+            for item_id in p["items"]:
+                item = self.backend.get(item_id)
+                if item:
+                    if self._reset_if_agent_run(item, proposer):
+                        reset.append(item.id)
+                    self._do_move(item, to, actor, token.principal)
+            p["status"] = "executed"
+            p["executed_at"] = now_iso()
+            p["approved_by"] = actor
+            self.backend.put_proposal(p)
+            self.ledger.append(
+                "approval.execute",
+                actor=actor,
+                principal=token.principal,
+                subject=p["id"],
+                scope=to.id,
+                items=p["items"],
+                manifest=p["manifest"],
+                reset=reset,
+            )
         return p
 
     def deny(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
@@ -298,8 +302,11 @@ class TrustEngine:
         if not p or p["status"] != "open":
             raise TrustError("no open proposal with that id")
         p["status"] = "denied"
-        self.backend.put_proposal(p)
-        self.ledger.append("approval.deny", actor=actor, principal=token.principal, subject=p["id"])
+        with self.backend.atomic():
+            self.backend.put_proposal(p)
+            self.ledger.append(
+                "approval.deny", actor=actor, principal=token.principal, subject=p["id"]
+            )
         return p
 
     # -- internals -------------------------------------------------------------------------------

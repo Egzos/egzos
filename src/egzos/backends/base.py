@@ -14,6 +14,7 @@ a third seam already: the blob store sits inside the store module (v0.5 §D, R5)
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
+from contextlib import AbstractContextManager
 from typing import Any, Protocol
 
 from egzos.model import ContextItem, Node, Token
@@ -25,6 +26,10 @@ class ChainConflict(Exception):
 
 
 class Backend(Protocol):
+    # A human-only act's writes (moves, the proposal's status, the chain) land together or not at
+    # all: a failure mid-act leaves nothing half-done for "Nothing changed" to misreport.
+    def atomic(self) -> AbstractContextManager[None]: ...
+
     # nodes
     def put_node(self, node: Node) -> None: ...
     def get_node(self, node_id: str) -> Node | None: ...

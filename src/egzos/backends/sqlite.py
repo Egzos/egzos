@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,29 @@ class SqliteBackend:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(_SCHEMA)
+        self._depth = 0  # > 0 inside atomic(): writes wait for its one commit
+
+    @contextmanager
+    def atomic(self):
+        """Every write inside lands together or not at all. BEGIN IMMEDIATE takes the write lock
+        up front, so no other process can move the chain head mid-act."""
+        if self._depth == 0 and not self.db.in_transaction:
+            self.db.execute("BEGIN IMMEDIATE")
+        self._depth += 1
+        try:
+            yield
+        except BaseException:
+            self._depth -= 1
+            if self._depth == 0:
+                self.db.rollback()
+            raise
+        self._depth -= 1
+        if self._depth == 0:
+            self.db.commit()
+
+    def _commit(self) -> None:
+        if self._depth == 0:
+            self.db.commit()
 
     # -- nodes --------------------------------------------------------------------------
     def put_node(self, node: Node) -> None:
@@ -53,7 +77,7 @@ class SqliteBackend:
             "INSERT OR REPLACE INTO nodes(id,type,name,parent,doc) VALUES(?,?,?,?,?)",
             (node.id, node.type, node.name, node.parent, json.dumps(node.to_dict())),
         )
-        self.db.commit()
+        self._commit()
 
     def get_node(self, node_id: str) -> Node | None:
         row = self.db.execute("SELECT doc FROM nodes WHERE id=?", (node_id,)).fetchone()
@@ -93,7 +117,7 @@ class SqliteBackend:
                 json.dumps(item.to_dict()),
             ),
         )
-        self.db.commit()
+        self._commit()
 
     def get(self, item_id: str) -> ContextItem | None:
         row = self.db.execute(
@@ -151,9 +175,10 @@ class SqliteBackend:
                 (entry["ts"], entry["hash"], entry["prev_hash"], json.dumps(entry)),
             )
         except sqlite3.IntegrityError as e:
-            self.db.rollback()
+            if self._depth == 0:  # inside atomic() the whole act unwinds, not just this entry
+                self.db.rollback()
             raise ChainConflict(str(e)) from e
-        self.db.commit()
+        self._commit()
         return {**entry, "seq": cur.lastrowid}
 
     def audit_last(self) -> dict[str, Any] | None:
@@ -176,7 +201,7 @@ class SqliteBackend:
             "INSERT OR REPLACE INTO tokens(id,doc) VALUES(?,?)",
             (token.id, json.dumps(token.to_dict(with_secret_hash=True))),
         )
-        self.db.commit()
+        self._commit()
 
     def get_token(self, token_id: str) -> Token | None:
         row = self.db.execute("SELECT doc FROM tokens WHERE id=?", (token_id,)).fetchone()
@@ -194,7 +219,7 @@ class SqliteBackend:
             "INSERT OR REPLACE INTO proposals(id,status,doc) VALUES(?,?,?)",
             (proposal["id"], proposal["status"], json.dumps(proposal)),
         )
-        self.db.commit()
+        self._commit()
 
     def get_proposal(self, proposal_id: str) -> dict[str, Any] | None:
         row = self.db.execute("SELECT doc FROM proposals WHERE id=?", (proposal_id,)).fetchone()

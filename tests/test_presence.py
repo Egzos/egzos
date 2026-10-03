@@ -348,3 +348,19 @@ def test_a_failed_act_reverts_to_ready_with_the_error_line_and_a_lapse_says_noth
     assert tap.live(f"/tap/{tap.token}")
     status, page = tap.post("confirm")  # never armed: reverts, with no invented line
     assert "Sign and approve" in page and "class=note" not in page and "class=alarm" not in page
+
+
+def test_a_failed_act_is_on_the_chain_and_closes_the_window_it_opened(box, capsys):
+    p = Presence(box)
+
+    def fails(outcome, windowed, closes):
+        raise OSError("disk went away")
+
+    # The person signs (window mode); the act fails; nobody signs again before the timeout.
+    assert p.require(ACT, timeout=3, opener=_person(), decide=fails) == "expired"
+    outcomes = [d["outcome"] for d in _step_ups(box)]
+    assert outcomes[-3:] == ["approved", "closed", "expired"]
+    failed = _step_ups(box)[-2]
+    assert failed["reason"] == "act failed" and failed["error"] == "OSError"
+    assert not p.window_open(("user", "user"))  # a failed act never leaves a window open
+    assert "That didn't go through. Nothing changed." in capsys.readouterr().err

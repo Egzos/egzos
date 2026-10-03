@@ -255,3 +255,34 @@ def test_a_proposal_into_an_exo_room_names_its_external_audience(box: Container)
     second = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
     to_project = box.trust.move(second, other, token=t, actor=OWNER)["proposal"]["id"]
     assert build_act(box, to_project)["consequence"].startswith("Consequence. Everything under ")
+
+
+def test_a_failure_mid_execute_moves_nothing(box: Container, monkeypatch):
+    t, org, proj, other = _tree(box)
+    _client(box, "watcher", "reader", [other.id])
+    a = box.store.add(body="a", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    b = box.store.add(body="b", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    pid = box.trust.move(a, other, token=t, actor=OWNER)["proposal"]["id"]
+    p = box.backend.get_proposal(pid)
+    p["items"] = [a.id, b.id]  # one proposal, two moves
+    p["manifest"] = box.trust.manifest_hash(p["items"], p["to"], box.trust.audience(other))
+    box.backend.put_proposal(p)
+    before = len(box.ledger.tail(1000))
+    real, calls = box.trust._do_move, []
+
+    def fail_on_second(item, to, actor, principal):
+        calls.append(item.id)
+        if len(calls) == 2:
+            raise OSError("disk went away")
+        real(item, to, actor, principal)
+
+    monkeypatch.setattr(box.trust, "_do_move", fail_on_second)
+    with pytest.raises(OSError):
+        box.trust.execute(pid, token=t, actor=OWNER)
+    # The first move rolled back with the second: nothing moved, nothing on the chain.
+    assert box.backend.get(a.id).scope == proj.id and box.backend.get(b.id).scope == proj.id
+    assert box.backend.get_proposal(pid)["status"] == "open"
+    assert len(box.ledger.tail(1000)) == before and box.ledger.verify()["ok"]
+    monkeypatch.setattr(box.trust, "_do_move", real)
+    box.trust.execute(pid, token=t, actor=OWNER)  # and the same approval lands whole after
+    assert box.backend.get(a.id).scope == other.id and box.backend.get(b.id).scope == other.id

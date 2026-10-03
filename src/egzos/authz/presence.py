@@ -253,6 +253,15 @@ class Presence:
     def covers(self, act: dict[str, Any]) -> bool:
         return self.window_open(pair_of(act), shape_of(act))
 
+    def act_failed(self, act: dict[str, Any], error: BaseException, *,
+                   actor: str = OWNER) -> None:
+        """The presence was proven and the act did not land (it rolled back whole). The chain says
+        so, and the window that signature opened closes with it: a failure never leaves one open."""
+        self.c.ledger.append(
+            "step_up", actor=actor, principal="interactive", subject=act.get("subject"),
+            via="tap", outcome="closed", reason="act failed", error=type(error).__name__,
+        )
+
     def close_windows(self, *, actor: str = OWNER) -> None:
         self.c.ledger.append(
             "step_up", actor=actor, principal="interactive", via="close", outcome="closed"
@@ -302,9 +311,15 @@ class Presence:
         host = f"127.0.0.1:{httpd.server_address[1]}"
         def decided(outcome: str, windowed: bool) -> str:
             closes = self.record(act, via="tap", outcome=outcome, windowed=windowed)
-            if decide is not None:
-                return decide(outcome, windowed, closes)
-            return outcome_text(act, outcome, closes=closes)
+            try:
+                if decide is not None:
+                    return decide(outcome, windowed, closes)
+                return outcome_text(act, outcome, closes=closes)
+            except Exception as e:
+                self.act_failed(act, e)
+                print(f"That didn't go through. Nothing changed. ({e})", file=sys.stderr,
+                      flush=True)
+                raise
 
         tap = Tap(act, container=self.c.home.name, host=host, decide=decided)
         httpd.RequestHandlerClass = tap.handler()
