@@ -86,6 +86,14 @@ def _clock(ts: float) -> str:
     return datetime.fromtimestamp(ts).astimezone().strftime("%H:%M:%S")
 
 
+def _local(iso: str | None) -> str:
+    """A stored UTC stamp as the page's other clocks read: local `HH:MM:SS`."""
+    try:
+        return _clock(datetime.strptime(iso or "", "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC).timestamp())
+    except ValueError:
+        return ""
+
+
 def _since(ts: float) -> str:
     """`HH:MM (UTC−07:00)` — local time with its zone, as `shell.viewer` renders it."""
     t = datetime.fromtimestamp(ts).astimezone()
@@ -126,13 +134,17 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         return {
             "kind": "proposal",
             "subject": prop["id"],
-            "ref": f"PROPOSAL {prop['id'][:10]}… · filed {prop.get('created_at', '')[11:19]}",
+            "ref": f"PROPOSAL {prop['id'][:10]}… · filed {_local(prop.get('created_at'))}",
             "title": f"Move {len(items)} items outward: {prop['from_path']} → {prop['to_path']}",
             "requester": f"agent:{by['client']}" if by.get("principal") == "client" else "you",
             "reason": prop.get("reason"),
             "items": [
                 {"kind": i.kind, "title": i.content.get("auto_title", i.id),
-                 "trust": f"{i.status} → {i.status}"}
+                 "trust": (
+                     f"{i.status} → unverified · agent-run move resets"
+                     if by.get("principal") == "client"
+                     else f"{i.status} → {i.status}"
+                 )}
                 for i in items
             ],
             "audience": prop.get("audience", []),

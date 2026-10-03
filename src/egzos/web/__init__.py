@@ -105,6 +105,7 @@ class Lifeboat:
         self.host = host
         self.since = time.time()
         self.taps: dict[str, dict[str, Any]] = {}  # tap token → {tap, back}
+        self.armed: dict[str, float] = {}  # item id → when *Confirm promotion* lapses (R9)
 
     # -- shared chrome ----------------------------------------------------------------------------
     def page(
@@ -115,6 +116,7 @@ class Lifeboat:
         flash: str = "",
         err: bool = False,
         count: int | None = None,
+        refresh: int | None = None,
     ) -> str:
         nav = "".join(
             f'<a href="{href}" class="{"on" if name == active else ""}">{name}</a>'
@@ -125,7 +127,8 @@ class Lifeboat:
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
             '<meta name=viewport content="width=device-width,initial-scale=1">'
-            f"<title>{_e(title)} · egzos</title>"
+            + (f'<meta http-equiv=refresh content="{refresh}">' if refresh else "")
+            + f"<title>{_e(title)} · egzos</title>"
             '<link rel=stylesheet href="/static/tokens.css">'
             f"<style>{STYLE}</style></head><body><div class=frame>"
             f"<p class='mono muted shell'>egzos · container {_e(self.c.home.name)} · "
@@ -211,7 +214,14 @@ class Lifeboat:
             )
             if act["kind"] == "proposal":
                 p = self.c.trust.execute(act["subject"], token=token, actor=OWNER)
-                return f"Signed at {at} by {OWNER}. {len(p['items'])} items at {act['dest']}. {window}"
+                landed = {
+                    i.status for i in (self.c.backend.get(x) for x in p["items"]) if i
+                }
+                trust = ", ".join(sorted(landed)) or "unverified"
+                return (
+                    f"Signed at {at} by {OWNER}. {len(p['items'])} items at {act['dest']}, "
+                    f"{trust}. {window}"
+                )
             item = self.c.backend.get(act["subject"])
             if item is None or item.status != "unverified":
                 return "This request is no longer valid."
@@ -289,7 +299,19 @@ class Lifeboat:
         text = content.get("body") or content.get("inline") or ""
         acts = ""
         if item.status == "unverified":
-            acts += self.approve_button(item.id, f"/items/{item.id}", "Approve — mark verified")
+            # R9: a local two-press act — *Promote to verified* arms in place, *Confirm promotion*
+            # within 10 s asks the container, which redirects to the tap when presence is needed.
+            back = f"/items/{item.id}"
+            if self.armed.get(item.id, 0.0) > time.time():
+                acts += self.form(
+                    "/promote", {"ref": item.id, "back": back, "step": "confirm"},
+                    "Confirm promotion", "act",
+                )
+            else:
+                acts += self.form(
+                    "/promote", {"ref": item.id, "back": back, "step": "arm"},
+                    "Promote to verified", "act",
+                )
         body = (
             f"<div class=card><div class=row><span class='badge {_e(item.status)}'>"
             f"{_e(item.status)}</span><span class=mono>{_e(item.kind)}</span>"
@@ -310,7 +332,10 @@ class Lifeboat:
             )
             + f"</table><div class=row style='margin-top:16px'>{acts}</div>"  # acts last (§3.1)
         )
-        return 200, self.page(_title(item), body, flash=flash, err=err, count=n)
+        armed = self.armed.get(item.id, 0.0) > time.time()
+        return 200, self.page(
+            _title(item), body, flash=flash, err=err, count=n, refresh=10 if armed else None
+        )
 
     def pending(self, flash: str = "", err: bool = False) -> tuple[int, str]:
         token = self.c.require_token()
@@ -375,6 +400,15 @@ class Lifeboat:
         if not back.startswith("/") or back.startswith("//"):
             back = "/pending"
         try:
+            if path == "/promote":
+                ref = form.get("ref", "")
+                act = build_act(self.c, ref)
+                if not act or act["kind"] != "item":
+                    return (*self.not_found(), "")
+                if form.get("step") != "confirm" or self.armed.pop(ref, 0.0) <= time.time():
+                    self.armed[ref] = time.time() + 10
+                    return 200, "", back
+                path = "/approve"  # confirmed in place: now the container decides on presence
             if path == "/approve":
                 ref = form.get("ref", "")
                 act = build_act(self.c, ref)

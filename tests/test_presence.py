@@ -191,3 +191,10 @@ def test_an_armed_page_reverts_itself_after_ten_seconds():
     tap = Tap(ACT)
     assert 'http-equiv=refresh content="10"' in tap.page(armed=True)
     assert "http-equiv=refresh" not in tap.page(armed=False)
+
+
+def test_the_filed_time_reads_in_local_time_like_the_other_clocks():
+    from egzos.authz.presence import _clock, _local
+
+    assert _local("2026-10-03T19:00:00Z") == _clock(1791054000.0)
+    assert _local(None) == ""

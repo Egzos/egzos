@@ -259,11 +259,16 @@ class TrustEngine:
                 else "manifest changed since proposal (TOCTOU)",
             )
             raise TrustError("manifest changed since the proposal was made — re-propose")
+        agent_run = (p.get("proposed_by") or {}).get("principal") != "interactive"
         for item_id in p["items"]:
             item = self.backend.get(item_id)
             if item:
+                if agent_run and item.status == "verified":
+                    # An agent-run move resets: the landing is a write, and writes land unverified
+                    # (step-up spec §11; the freeze's open trust-on-copy question, until it says
+                    # otherwise). Verifying it at the destination is approve.pending, separately.
+                    item.trust = {"status": "unverified", "reset_by": "agent-run move"}
                 self._do_move(item, to, actor, token.principal)
-                # Trust-on-copy: human-run keeps status; the human confirm is the promotion.
         p["status"] = "executed"
         p["executed_at"] = now_iso()
         p["approved_by"] = actor

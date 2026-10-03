@@ -231,7 +231,7 @@ def test_the_session_key_stays_out_of_the_terminal_when_a_browser_opens(capsys):
 def test_item_page_puts_the_acts_last_and_quarantine_is_an_outline(boat):
     b, item = boat
     body = b.item(item.id)[1]
-    assert body.index("lifecycle") < body.index("Approve — mark verified")
+    assert body.index("lifecycle") < body.index("Promote to verified")
     assert ".badge.quarantined{color:var(--egz-alarm);border-color:var(--egz-alarm)}" in body
 
 
@@ -259,3 +259,37 @@ def test_the_lifeboat_stays_inside_its_spec(boat):
 
 def _title_of(item):
     return item.content.get("auto_title")
+
+
+def test_item_promotion_is_a_local_two_press_then_the_tap(boat):
+    b, item = boat
+    back = f"/items/{item.id}"
+    # R9: the first press arms in place; nothing is asked of the container yet
+    assert b.act("/promote", {"ref": item.id, "back": back, "step": "arm"})[2] == back
+    page = b.item(item.id)[1]
+    assert "Confirm promotion" in page and 'http-equiv=refresh content="10"' in page
+    _, _, redirect = b.act("/promote", {"ref": item.id, "back": back, "step": "confirm"})
+    assert redirect.startswith("/tap/") and b.c.backend.get(item.id).status == "unverified"
+    # a confirm that was never armed only arms
+    b2 = b.act("/promote", {"ref": item.id, "back": back, "step": "confirm"})
+    assert b2[2] == back
+
+
+def test_an_agent_run_move_lands_unverified_and_the_outcome_says_so(boat, monkeypatch):
+    b, item = boat
+    c = b.c
+    owner = c.require_token()
+    c.trust.promote(item, token=owner, actor=OWNER)
+    org = c.nodes.create("org", "acme", c.nodes.user_root(), token=owner, actor=OWNER,
+                         principal="interactive")
+    c.auth.mint(principal="client", owner=OWNER, client="watcher", role="reader",
+                scopes=[org.id], actor=OWNER, by_principal="interactive")
+    agent = c.auth.mint(principal="client", owner=OWNER, client="bot", role="operator",
+                        scopes=["*"], actor=OWNER, by_principal="interactive")
+    pid = c.trust.move(c.backend.get(item.id), org, token=agent, actor="bot")["proposal"]["id"]
+    token = _to_tap(b, pid)
+    assert "verified → unverified · agent-run move resets" in b.tap_get(token)[1]
+    b.tap_post(token, "arm")
+    outcome = b.tap_post(token, "confirm")[1]
+    assert f"items at {c.nodes.path(org)}, unverified." in outcome
+    assert c.backend.get(item.id).status == "unverified"
