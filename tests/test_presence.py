@@ -198,3 +198,12 @@ def test_the_filed_time_reads_in_local_time_like_the_other_clocks():
 
     assert _local("2026-10-03T19:00:00Z") == _clock(1791054000.0)
     assert _local(None) == ""
+
+
+def test_a_quarantined_manifest_row_carries_its_stamp():
+    from egzos.authz.presence import Tap
+
+    act = {**ACT, "blocked": "Contains a quarantined item. It cannot move.",
+           "items": [{"kind": "memory", "title": "bad", "quarantined": True}]}
+    page = Tap(act).page(armed=False)
+    assert "<tr class=qrow>" in page and "<span class=qstamp>quarantined</span>" in page

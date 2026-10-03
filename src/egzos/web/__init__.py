@@ -128,7 +128,8 @@ class Lifeboat:
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
             '<meta name=viewport content="width=device-width,initial-scale=1">'
             + (f'<meta http-equiv=refresh content="{refresh}">' if refresh else "")
-            + f"<title>{_e(title)} · egzos</title>"
+            # §13: three fixed <title>s; a title never carries an item title, id, scope or count.
+            + f"<title>{_TAB_TITLES.get(title, 'egzos')}</title>"
             '<link rel=stylesheet href="/static/tokens.css">'
             f"<style>{STYLE}</style></head><body><div class=frame>"
             f"<p class='mono muted shell'>egzos · container {_e(self.c.home.name)} · "
@@ -206,7 +207,7 @@ class Lifeboat:
                     self.c.trust.deny(act["subject"], token=token, actor=OWNER)
                     return (
                         f"Denied at {at} by {OWNER}. The items never existed at {act['dest']}. "
-                        "Logged."
+                        "Logged. Staged bytes kept 30 days cold."
                     )
                 return f"Denied at {at} by {OWNER}. It stays unverified. Logged."
             window = (
@@ -226,7 +227,7 @@ class Lifeboat:
             if item is None or item.status != "unverified":
                 return "This request is no longer valid."
             item = self.c.trust.promote(item, token=token, actor=OWNER)
-            return f"Signed at {at} by {OWNER}. {_title(item)} is verified. {window}"
+            return f"Promoted at {at} by {OWNER}. Served as verified from now on."  # §13
         except TrustError:
             return (
                 "This proposal is no longer valid."
@@ -265,12 +266,15 @@ class Lifeboat:
         body_rows = "".join(
             f"<tr><td><span class='badge {_e(i.status)}'>{_e(i.status)}</span></td>"
             f"<td class=mono>{_e(i.kind)}</td>"
-            f'<td><a href="/items/{_e(i.id)}">{_e(_title(i))}</a></td>'
-            f"<td class=mono>{_e(self.c.nodes.path(n))}</td></tr>"
+            f'<td><a href="/items/{_e(i.id)}">{_e(_title(i))}</a>{_meta(i)}</td>'
+            f"<td class=mono>{_e(self.c.nodes.path(n))}</td>"
+            f"<td class=mono>{_e(_age(i.lifecycle.get('updated_at')))}</td></tr>"
             for n, i in rows
         )
+        header = f"Results · {len(rows)}" if q else f"Recent · {len(rows)} items"  # R3
         table = (
-            "<table><tr><th>trust</th><th>kind</th><th>item</th><th>scope</th></tr>"
+            f"<p class=mono>{header}</p>"
+            "<table><tr><th>trust</th><th>kind</th><th>item</th><th>scope</th><th>age</th></tr>"
             f"{body_rows}</table>"
             if rows
             else "<p class=muted>"
@@ -334,7 +338,7 @@ class Lifeboat:
         )
         armed = self.armed.get(item.id, 0.0) > time.time()
         return 200, self.page(
-            _title(item), body, flash=flash, err=err, count=n, refresh=10 if armed else None
+            "item", body, flash=flash, err=err, count=n, refresh=10 if armed else None
         )
 
     def pending(self, flash: str = "", err: bool = False) -> tuple[int, str]:
@@ -370,7 +374,7 @@ class Lifeboat:
         )
         items = "".join(
             f'<tr><td class=mono>{_e(i.kind)}</td><td><a href="/items/{_e(i.id)}">'
-            f"{_e(_title(i))}</a></td><td class=mono>{_e(self._path(i.scope))}</td>"
+            f"{_e(_title(i))}</a>{_meta(i)}</td><td class=mono>{_e(self._path(i.scope))}</td>"
             f"<td class=mono>{_e((i.provenance or {}).get('client'))}</td><td>"
             + self.approve_button(i.id, "/pending", "Approve")
             + "</td></tr>"
@@ -452,6 +456,34 @@ class Lifeboat:
         else:
             return self.not_found()
         return status, body
+
+
+_TAB_TITLES = {"Items": "egzos · search", "item": "egzos · item"}
+
+
+def _age(stamp: str | None) -> str:
+    """§2.4's age column: how long ago, in the largest whole unit."""
+    try:
+        then = time.mktime(time.strptime(stamp or "", "%Y-%m-%dT%H:%M:%SZ")) - time.timezone
+    except ValueError:
+        return ""
+    secs = max(0, int(time.time() - then))
+    for unit, size in (("d", 86400), ("h", 3600), ("m", 60)):
+        if secs >= size:
+            return f"{secs // size}{unit}"
+    return f"{secs}s"
+
+
+def _meta(item) -> str:
+    """§2.4's second line: `agent:<actor> · v<version>`, then the tags."""
+    who = (item.provenance or {}).get("client") or "cli"
+    version = (item.lifecycle or {}).get("version", 1)
+    tags = " ".join(f"#{t}" for t in (item.tags or []))
+    return (
+        f"<div class='mono muted'>agent:{_e(who)} · v{_e(version)}"
+        + (f" · {_e(tags)}" if tags else "")
+        + "</div>"
+    )
 
 
 def _since(ts: float) -> str:

@@ -78,7 +78,7 @@ def test_approve_redirects_to_the_tap_which_needs_two_presses(boat, monkeypatch)
     assert b.c.backend.get(item.id).status == "unverified"
     assert "Confirm signature" in b.tap_post(token, "arm")[1]
     status, outcome = b.tap_post(token, "confirm")
-    assert "Signed at" in outcome and 'href="/pending"' in outcome
+    assert "Served as verified from now on." in outcome and 'href="/pending"' in outcome
     assert b.c.backend.get(item.id).status == "verified"
     assert b.c.ledger.tail(1)[0]["event"] == "approval.promote"
     signed = _step_ups(b.c)[-1]
@@ -308,3 +308,15 @@ def test_the_tap_promises_a_reset_only_where_one_happens(boat):
     pid = c.trust.move(item, org, token=agent, actor="bot")["proposal"]["id"]  # unverified item
     page = b.tap_get(_to_tap(b, pid))[1]
     assert "unverified → unverified" in page and "agent-run move resets" not in page
+
+
+def test_tab_titles_are_fixed_and_rows_carry_their_anatomy(boat):
+    b, item = boat
+    page = b.item(item.id)[1]
+    head = page.split("</title>")[0]
+    assert "<title>egzos · item</title>" in page and _title_of(item) not in head
+    home = b.items()[1]
+    assert "<title>egzos · search</title>" in home and "Recent · 1 items" in home
+    assert "agent:" in home and " · v" in home  # §2.4 second line
+    assert "Results · 1" in b.items("imperative")[1]
+    assert "<title>egzos</title>" in b.pending()[1]

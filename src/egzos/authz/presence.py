@@ -140,6 +140,7 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
             "reason": prop.get("reason"),
             "items": [
                 {"kind": i.kind, "title": i.content.get("auto_title", i.id),
+                 "quarantined": i.status == "quarantined",
                  "trust": (
                      "verified → unverified · agent-run move resets"
                      if by.get("principal") != "interactive" and i.status == "verified"
@@ -327,6 +328,8 @@ button.ghost{border-color:transparent;text-decoration:underline}
 button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px}
 .note{border:var(--egz-bw) solid var(--egz-act);padding:12px}
 .alarm{border:var(--egz-bw) solid var(--egz-alarm);color:var(--egz-alarm);padding:12px}
+.qrow td{color:var(--egz-alarm)}
+.qstamp{border:var(--egz-hair) solid var(--egz-alarm);padding:2px 6px;text-transform:uppercase}
 .terms{font-family:var(--egz-font-mono);font-feature-settings:var(--egz-tabular);font-size:.85rem}
 """
 
@@ -379,8 +382,14 @@ class Tap:
         e = _e
         seconds = window_seconds()
         manifest = [
-            f"<tr><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
-            f"<td>{e(r.get('trust'))}</td></tr>"
+            # R5: a quarantined row carries its stamp and reads red
+            (
+                f"<tr class=qrow><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
+                f"<td><span class=qstamp>quarantined</span></td></tr>"
+                if r.get("quarantined")
+                else f"<tr><td>{e(r.get('kind'))}</td><td>{e(r.get('title'))}</td>"
+                f"<td>{e(r.get('trust'))}</td></tr>"
+            )
             for r in a.get("items", [])
         ]
         rows = f"<table>{''.join(manifest[:ROWS])}</table>"
