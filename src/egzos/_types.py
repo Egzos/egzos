@@ -210,6 +210,7 @@ Event = Literal[
     "approval.promote",
     "approval.execute",
     "approval.deny",
+    "approval.stale",
     "trust.quarantine",
     "step_up",
     "token.mint",
@@ -217,7 +218,8 @@ Event = Literal[
     "item.tombstone",
     "blob.grant",
 ]
-#: An append whose event name is not here MUST be rejected. `step_up` is reserved (Phase 2.2);
+#: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
+#: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
 #: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
 #: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
 #: code that emits it. events.md §1 says the same thing from the contract's side.

@@ -9,17 +9,15 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Eighteen names are listed
-below**: sixteen **run**, one (`step_up`) is **reserved** for Phase 2.2, and one (`blob.grant`) is
-**decided, not running** (F5). The typed vocabulary in this repository — `_types.py`'s `Event`, and
-the `EVENTS` tuple derived from it — carries **all eighteen**, `blob.grant` included:
-`AuditEntry.event` is typed `Event`, and F5's mint needs the member on the day it lands. So a
-validator written against `EVENTS` accepts a `blob.grant` append today, and **nothing in this tree
-rejects one** — what is not running is the *emitter*: no code path mints a `BlobGrant`, so no such
-entry is ever produced. The walking skeleton's own `ledger.py` tuple held seventeen — the sixteen
-running plus the reserved `step_up` — but that file is on `chief/walking-skeleton`, not on `main`,
-and its count is the skeleton's, not this tree's. Counted here because a count that disagrees with
-its own table, or with the constant beside it, is the kind of drift a reader resolves by guessing.
+An appended event whose name is not in this list MUST be rejected. **Nineteen names are listed
+below**: eighteen **run**, and one (`blob.grant`) is **decided, not running** (F5). The typed
+vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it —
+carries **all nineteen**, `blob.grant` included: `AuditEntry.event` is typed `Event`, and F5's mint
+needs the member on the day it lands. So a validator written against `EVENTS` accepts a `blob.grant`
+append today, and **nothing in this tree rejects one** — what is not running is the *emitter*: no
+code path mints a `BlobGrant`, so no such entry is ever produced. `ledger.py` imports this tuple
+rather than restating it. Counted here because a count that disagrees with its own table, or with
+the constant beside it, is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|
@@ -34,9 +32,10 @@ its own table, or with the constant beside it, is the kind of drift a reader res
 | `gate.propose` | a move with a nonzero audience delta is parked as a proposal | running |
 | `approval.promote` | an item is promoted to verified (human-only) | running |
 | `approval.execute` | a parked proposal is approved and executed (human-only) | running |
-| `approval.deny` | a proposal is denied, **or refused as `stale` on manifest mismatch** | running |
+| `approval.deny` | a proposal is denied — a human "no" | running |
+| `approval.stale` | a proposal is refused because its manifest changed since it was filed (TOCTOU; freeze item 39) | running |
 | `trust.quarantine` | an item is quarantined; carries every `affected` id | running |
-| `step_up` | **reserved** — Phase 2.2, the step-up tap | reserved |
+| `step_up` | a presence check concludes, whatever its `outcome` (the MVP tap, ahead of Phase 2.2) | running |
 | `token.mint` | a token is minted | running |
 | `token.revoke` | a token is revoked | running |
 | `item.tombstone` | an item is tombstoned | running |
@@ -138,7 +137,5 @@ The gate's delta rule and the manifest binding → `container.md`. Capabilities 
 `capabilities.md`. Anomaly primitives and `audit anomalies` are Ledger's to build on this taxonomy
 (Phase 1); they add no events.
 
-TODO(a1p): the skeleton emits `approval.deny` both for a denied proposal and for a `stale`
-manifest mismatch, distinguished only by a `stale` flag in `details`. Whether the freeze keeps one
-event with a flag or splits them is `[OPEN→0.3]` — a TOCTOU refusal and a human "no" are different
-facts, and anomaly detection later has to tell them apart.
+Decided at the 0.3 freeze (item 39): a TOCTOU refusal is `approval.stale`, its own event, and
+`approval.deny` is only a human "no" — anomaly detection tells them apart by name.

@@ -233,8 +233,8 @@ inward-ness the rule instead of its consequence. **running.**
 `manifest = sha256(canonical({items: sorted(item_ids), target, audience}))`. **running.**
 
 `trust approve <proposal>` **recomputes the manifest from current state and refuses on mismatch**:
-the proposal moves to status **`stale`**, an `approval.deny` event is written with `stale: true`, and
-nothing moves. The approver must re-propose against the audience they can actually see. `execute` and
+the proposal moves to status **`stale`**, an **`approval.stale`** event is written (a TOCTOU refusal
+is not a human "no" — freeze item 39, `events.md` §1), and nothing moves. The approver must re-propose against the audience they can actually see. `execute` and
 `deny` are both **human-only** (`gate.confirm`); a client principal can only propose. **running.**
 This is **contract text, not an implementation detail.** What the Chief approved was a named
 audience; a token minted between proposal and approval makes the approval one for a different act
@@ -244,8 +244,10 @@ every test that does not mint a token mid-flight — and would break the only th
 ### Proposing carries the same floor as moving — `organize` (#94)
 
 **Both branches of the gate require `organize` at the source scope.** Parking a proposal is not a
-cheaper way to touch an item than moving it. **decided, not running** (Chief, 2026-10-03, resolving
-#94) — the skeleton checks `organize` on the zero-delta path and checks nothing on the nonzero one.
+cheaper way to touch an item than moving it. **running** (Chief, 2026-10-03, resolving #94). A
+widening move also needs **`publish`** (freeze item 3, `capabilities.md` §1); that check comes after
+the delta, and it refuses with **the same text** as the `organize` floor, so neither refusal says
+which branch the move would have taken.
 
 **The capability is checked before the delta is computed**, and that order is part of the clause.
 A token without `organize` is refused identically whichever branch its move would have taken, so it
@@ -343,8 +345,7 @@ Four notes the table cannot carry:
   means no grace period** (above). Because the key is per pair, **the window that gates a human-only
   act is the window of the ring pair that act crosses**, source → destination — never a single
   global window; `authorization-server.md` §10 states this at `yes.consume`, where the window is
-  read. The flow is Phase 2.2 and `step_up` is a reserved event (`events.md` §1); only the *key* is
-  frozen.
+  read. `step_up` runs (`events.md` §1: the MVP tap, ahead of Phase 2.2); the *key* is frozen.
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
   written before this key existed: R11 ratifies 30 days cold, then purge. TODO(a1p): #30 should
   strike that TODO's "no source names" clause and point it here. It covers **staged** bytes only —
@@ -367,4 +368,4 @@ entry shape and the hash chain → `events.md`. How nodes, tokens and proposals 
 device-code, MCP clients, client registration and the redirect allowlist, AS metadata — is
 `authorization-server.md`** (issue #29); nothing above constrains it beyond §5's human-only clause.
 Presence, the localhost step-up tap and the consent pages are Phase 2.2 and A2's spec (issue #61);
-only `step_up.window_seconds` and the reserved `step_up` event are frozen now.
+only `step_up.window_seconds` and the `step_up` event (running since the MVP tap) are frozen now.
