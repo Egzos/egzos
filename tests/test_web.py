@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 import pytest
 
 from egzos.container import OWNER, Container
-from egzos.web import Lifeboat, make_handler
+from egzos.web import Lifeboat, _launch, make_handler
 
 
 @pytest.fixture
@@ -139,3 +139,15 @@ def test_session_guard(server):
     form_k = urlencode({"ref": "x", "csrf": "secret-key-for-tests"}).encode()
     evil = {"Cookie": cookie, "Origin": "http://evil.test"}
     assert _open(base + "/approve", form_k, evil)[0] == 403
+
+
+def test_the_session_key_stays_out_of_the_terminal_when_a_browser_opens(capsys):
+    url = "http://127.0.0.1:7425/?k=" + "s" * 32
+    opened: list[str] = []
+    assert _launch(url, True, opener=lambda u: opened.append(u) or True)
+    assert opened == [url] and "s" * 32 not in capsys.readouterr().out
+    # no browser (or --no-open): the only way in is the printed URL
+    assert not _launch(url, True, opener=lambda u: False)
+    assert url in capsys.readouterr().out
+    assert not _launch(url, False, opener=lambda u: pytest.fail("--no-open must not open"))
+    assert url in capsys.readouterr().out

@@ -4,8 +4,8 @@
 The lifeboat, MVP cut: `egzos web` — list, search, item detail, the pending queue and the audit
 tail, served in-process on loopback only, as the owner's interactive principal.
 
-Presence is the browser session: the URL printed at launch carries a per-launch key; the first
-visit trades it for an HttpOnly, SameSite=Strict cookie, and every request needs that cookie. Every
+Presence is the browser session: the URL opened at launch carries a per-launch key (printed only
+when no browser could be opened, so it stays out of the terminal); the first visit trades it for an HttpOnly, SameSite=Strict cookie, and every request needs that cookie. Every
 act (approve, deny, quarantine) is a POST that also carries the key in the form and must come from
 this origin, so another page in the same browser cannot drive it. Unknown ids and missing pages
 answer one uniform 404 (silence-not-errors). Everything rendered is escaped: item text is data.
@@ -420,15 +420,25 @@ def make_handler(boat: Lifeboat, origin: str):
     return Handler
 
 
+def _launch(url: str, open_browser: bool, opener=None) -> bool:
+    """Open the browser on the keyed URL. The key is printed only when no browser could be opened
+    (or with `--no-open`): a terminal is where an agent reads, so the key stays out of it when it can.
+    Runs on its own thread — some launchers wait for the browser to exit."""
+    if open_browser and (opener or webbrowser.open)(url):
+        print("Opened in your browser.", flush=True)
+        return True
+    print(f"Open this in your browser (it carries this session's key):\n  {url}", flush=True)
+    return False
+
+
 def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     container.require_token()
     boat = Lifeboat(container)
     host = "127.0.0.1"
     httpd = HTTPServer((host, port), make_handler(boat, f"http://{host}:{port}"))
     url = f"http://{host}:{port}/?k={boat.key}"
-    print(f"egzos web — loopback only. Open:\n  {url}\nCtrl-C to stop.", flush=True)
-    if open_browser:
-        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    print(f"egzos web on http://{host}:{port} — loopback only. Ctrl-C to stop.", flush=True)
+    threading.Thread(target=_launch, args=(url, open_browser), daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

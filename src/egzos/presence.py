@@ -10,9 +10,11 @@ what moves and who will see it, and waits for two deliberate presses: *Sign and 
 *Confirm signature* within 10 s. *Deny* is one press. Signing appends `step_up` and opens a window
 for that source → destination ring pair (default 300 s; `0` means no window, every act taps).
 
-Residual, named: anything that can drive a browser as the user can press the buttons. What this
-removes is the act being completed by typing in a terminal; the page opens in the browser and its
-URL is printed only when no browser could be opened.
+Residual, named: anything running as the user that can drive a browser — or set `BROWSER` — can
+press the buttons; a shell running as the user is the user. What this removes is the act being
+completed by typing in a terminal (`y`, `--yes`); the page opens in the browser and its URL is
+printed only when no browser could be opened. OS-backed presence (WebAuthn / platform
+authenticator) is the stronger tier the spec names for later.
 """
 
 from __future__ import annotations
