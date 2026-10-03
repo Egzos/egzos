@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"{% if scheme %} data-scheme="{{ scheme.scheme }}"{% if scheme.canvas %} data-canvas="{{ scheme.canvas }}"{% endif %}{% endif %}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"allowScriptTags": false, "selfRequestsOnly": true, "defaultSwapStyle": "outerHTML"}'>
+{%- if refresh %}
+<meta http-equiv="refresh" content="{{ refresh }}">
+{%- endif %}
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/lifeboat.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<div class="frame">
+{% include "_shell.html" %}
+{% block body %}{% endblock %}
+<p class="print-footer">{{ t("print.footer", at=printed, container=container_name) }}</p>
+</div>
+</body>
+</html>

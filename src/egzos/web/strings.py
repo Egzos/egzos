@@ -1,0 +1,95 @@
+# Copyright 2026 Ali Sasanian
+# SPDX-License-Identifier: Apache-2.0
+"""Every string the lifeboat renders, by its key in lifeboat.md §13 and the tap spec §13 — one place
+in the codebase (lifeboat.md §5). Rendered verbatim; a new string needs a spec revision."""
+
+from __future__ import annotations
+
+from egzos.authz.presence import TAP_COPY
+
+S: dict[str, str] = {
+    # lifeboat.md §13
+    "shell.container": "egzos · container {name} · {host}",
+    "shell.viewer": "you · {user} · principal: interactive · present since {since}",
+    "shell.window": "window open · {source} → {destination} · closes {closes}",
+    "shell.lapsed": "presence lapsed at {at}",
+    "nav.search": "search",
+    "nav.pending": "pending · {n}",
+    "nav.pending.zero": "pending",
+    "search.label": "Search",
+    "search.placeholder": "kind:rule scope:project:atlas vendor",
+    "search.button": "Search",
+    "search.clear": "Clear",
+    "search.hints": "kind: · scope: · trust: · tag: · key: · ring: — free text searches titles and bodies",
+    "search.invalid": "That query isn't valid. Check the prefixes below.",
+    "results.recent": "Recent · {n} items",
+    "results.count": "Results · {n}",
+    "results.uncounted": "Results",
+    "results.empty": "Nothing here yet. Items you can fetch will appear here.",
+    "results.none": "No results.",
+    "results.next": "Next 50",
+    "row.untitled": "(untitled)",
+    "item.ref": "ITEM {id} · {kind} · v{version}",
+    "item.titled": "titled by {engine}",
+    "section.content": "content",
+    "section.provenance": "provenance",
+    "section.trust": "trust",
+    "section.lifecycle": "lifecycle",
+    "section.tags": "tags and key",
+    "content.more": "Show all",
+    "content.empty": "(empty)",
+    "content.download": "Download",
+    "content.unavailable": "Download unavailable.",
+    "prov.null": "—",
+    "trust.promoted": "promoted {at} · manifest sha256 {prefix}…",
+    "act.promote": "Promote to verified",
+    "act.promote.confirm": "Confirm promotion",
+    "act.promote.sr": "Press again to confirm.",
+    "act.lapsed": "Presence lapsed at {at}. Nothing changed. Sign again to continue.",
+    "act.invalid": "This item changed. Reload to see it.",
+    "act.error": "That didn't go through. Nothing changed. Try again.",
+    "scheme.light": "light",
+    "scheme.darkNeutral": "dark · neutral",
+    "scheme.darkViolet": "dark · violet",
+    "notfound.title": "Nothing here.",
+    "fail.error": "Something went wrong on the container. Nothing changed. Try again.",
+    "fail.retry": "Retry",
+    "print.footer": "printed {at} · {container}",
+    "title.home": "egzos · search",
+    "title.item": "egzos · item",
+    "title.notfound": "egzos",
+    # the tap spec §13 (the pending pages, rendered by the lifeboat per lifeboat.md R11)
+    "title.pending": "egzos · pending",
+    "queue.title": "Pending",
+    "queue.count": "{n} waiting for you",
+    "queue.empty": "Nothing is waiting for you.",
+    "kind.publish": "publish · outward",
+    "kind.quarantine": "quarantined · propagated",
+    "ref.proposal": "PROPOSAL {id} · filed {at}",
+    "title.move": "Move {n} items outward: {source} → {destination}",
+    "reason.attr": "{who} states:",
+    "reason.none": "(no reason given)",
+    "reason.more": "Show full reason",
+    "section.moves": "what moves",
+    "section.audience": "who will see it at {destination}",
+    "section.presence": "presence",
+    "moves.reset": "agent-run move resets",
+    "moves.quarantined": "Contains a quarantined item. It cannot move.",
+    "audience.count": "{people} people · {agents} agents · resolved from token grants and scope membership",
+    "consequence": "Consequence. Everything under {destination} inherits this — every team, project and thread, now and in future.",
+    "presence.zero": "Signing proves you are here. No window opens.",
+    "act.sign": "Sign and approve",
+    "act.confirm": "Confirm signature",
+    "act.confirm.sr": "Press again to confirm.",
+    "act.deny": "Deny",
+    "act.nowindow": "Approve without a window",
+    "window.open": "window open · closes {closes}",
+    "tap.return": "Return to pending",
+    # The outcome lines, shared with the tap the CLI hosts — defined once, in presence.TAP_COPY.
+    **TAP_COPY,
+}
+
+
+def t(key: str, **values: object) -> str:
+    """The string for `key`, with its placeholders filled. Values are escaped by the template."""
+    return S[key].format(**values) if values else S[key]

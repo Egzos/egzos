@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block body %}
+<main>
+  <p class="ref"><span title="{{ item.id }}">{{ ref }}</span> <code class="sr">{{ item.id }}</code></p>
+  <h1{% if untitled %} class="ink-3"{% endif %}>{{ heading }}</h1>
+  <p class="where">in <a href="/?q=scope:{{ scope | urlencode }}"><code>{{ scope }}</code></a>{% if ring %} · ring {{ ring }}{% endif %}{% if engine %} · {{ t("item.titled", engine=engine) }}{% endif %} <span class="stamp stamp--{{ item.status }}">{{ item.status }}</span></p>
+
+  <section>
+    <h2>{{ S["section.content"] }}</h2>
+    {%- if artifact %}
+    <table class="meta-table">
+      <tr><th scope="row">filename</th><td><code>{{ artifact.filename or S["prov.null"] }}</code></td></tr>
+      <tr><th scope="row">size</th><td>{{ artifact.size }}</td></tr>
+      <tr><th scope="row">type</th><td><code>{{ artifact.mime }}</code></td></tr>
+      <tr><th scope="row">sha256</th><td><code>{{ artifact.sha }}</code></td></tr>
+    </table>
+    {%- if body %}<pre class="body" aria-label="Body">{{ body }}{% if cut %}…{% endif %}</pre>{% endif %}
+    {%- elif body %}
+    <pre class="body" aria-label="Body">{{ body }}{% if cut %}…{% endif %}</pre>
+    {%- else %}
+    <p class="ink-3">{{ S["content.empty"] }}</p>
+    {%- endif %}
+    {%- if cut %}
+    <p><a href="/items/{{ item.id }}?full=1">{{ S["content.more"] }}</a></p>
+    {%- endif %}
+  </section>
+
+  <section>
+    <h2>{{ S["section.provenance"] }}</h2>
+    <dl>
+      {%- for label, value in prov %}
+      <dt>{{ label }}</dt>
+      <dd>{% if label == "derived from" and derived_link %}<a href="/items/{{ derived_link }}"><code>{{ value }}</code></a>{% elif value %}<code>{{ value }}</code>{% else %}{{ S["prov.null"] }}{% endif %}</dd>
+      {%- endfor %}
+    </dl>
+  </section>
+
+  <section>
+    <h2>{{ S["section.trust"] }}</h2>
+    <dl>
+      <dt>status</dt><dd><span class="stamp stamp--{{ item.status }}">{{ item.status }}</span></dd>
+      {%- if promoted %}
+      <dt>promoted</dt><dd>{{ promoted }}</dd>
+      {%- endif %}
+    </dl>
+  </section>
+
+  <section>
+    <h2>{{ S["section.lifecycle"] }}</h2>
+    <dl>
+      {%- for label, value in life %}
+      <dt>{{ label }}</dt><dd>{{ value }}</dd>
+      {%- endfor %}
+    </dl>
+  </section>
+
+  <section>
+    <h2>{{ S["section.tags"] }}</h2>
+    <dl>
+      <dt>tags</dt><dd>{% if tags %}{% for tag in tags %}<code>#{{ tag }}</code> {% endfor %}{% else %}<span class="ink-3">{{ S["prov.null"] }}</span>{% endif %}</dd>
+      <dt>key</dt><dd>{% if key %}<code>{{ key }}</code>{% else %}{{ S["prov.null"] }}{% endif %}</dd>
+    </dl>
+  </section>
+
+  <section class="acts" id="acts">
+    {%- if message %}
+    <p class="outcome{% if message[0] in ('invalid', 'error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
+    {%- endif %}
+    {%- if can_promote %}
+    <form method="post" action="/items/{{ item.id }}/promote">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <input type="hidden" name="version" value="{{ version }}">
+      {%- if arm %}
+      <input type="hidden" name="arm" value="{{ arm }}">
+      <button class="act">{{ S["act.promote.confirm"] }}</button>
+      <span class="sr" aria-live="polite">{{ S["act.promote.sr"] }}</span>
+      {%- else %}
+      <button class="act">{{ S["act.promote"] }}</button>
+      {%- endif %}
+    </form>
+    {%- endif %}
+    {%- if artifact %}
+    <a class="ghost" href="/items/{{ item.id }}/download">{{ S["content.download"] }}</a>
+    {%- endif %}
+  </section>
+</main>
+{% endblock %}
