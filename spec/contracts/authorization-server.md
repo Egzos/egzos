@@ -670,21 +670,33 @@ The separation is worth the cost in both directions: a lapsed subscription must 
 access to their own data, and a revoked container token must not require a flagship account to
 restore. The container is the home; the subscription is a service.
 
-**Double login is the default posture. §K.** A deployment **MAY** configure its container to trust
-`egzos.io`, or any IdP, as OIDC identity to collapse the two logins into one — **never the default.**
+**Double login is the posture, and in v1.0 it is the only one. §K, narrowed by [0.3 · 8].** §K
+records that a deployment **MAY** configure its container to trust `egzos.io`, or any IdP, as OIDC
+identity to collapse the two logins into one — never the default. The review took the second of the
+two dispositions it was offered and **scoped the collapse out of v1.0 explicitly**:
 
-Stated as the document is required to state it, in terms an implementation can be tested against:
+- **There is no IdP collapse in v1.0. `[v1.1]`.** No container may be configured to accept an
+  external OIDC identity as its own, there is no config key that does so, and a deployment may not
+  add one. A container that collapses the two authorities is **non-conforming** — not
+  misconfigured, and not "configured unusually": the configuration that would make it conforming
+  does not exist in v1.0.
+- **Double login is therefore unconditional here**, not a default a deployment can move off. §K's
+  `MAY` is preserved above as the record of what was decided at §K and is **not** in force in v1.0.
+- **v1.0's browser identity for the container is a container secret. [0.3 · 7]**, stated at §11.7
+  where the login lives. That is what fills the space this clause declines to fill, and it is why
+  declining costs the product nothing it has today.
 
-- the collapse ships **off**, in every distribution, including the flagship's hosted containers;
-- it is enabled **only** by configuration inside the user's own container — there is no flagship-side
-  switch, and no remote party can turn it on;
-- **a container that collapses the two authorities without the owner having configured it to is
-  non-conforming.** Not misconfigured: non-conforming.
+The collapse was named by §K and never designed by it. What is missing is not a detail: which IdP
+claims map to which container identity, what happens to live tokens when the trust is withdrawn, and
+what an IdP compromise then reaches — all unanswered, and a half-specified identity bridge is worse
+than an absent one, because the absent one cannot be built against. Deferring it is also the cheaper
+direction to be wrong in: v1.1 can add the collapse behind the owner's own configuration without
+breaking any token this contract issues, while a v1.0 that shipped it could not take it back.
 
-`[OPEN→0.3]` The collapse is named by §K and not designed by it — which IdP claims map to which
-container identity, and what happens to live tokens when the trust is withdrawn, are unanswered. The
-review should either scope the collapse out of v1.0 explicitly or name the missing piece. It is not
-drafted here, because a half-specified identity bridge is worse than an absent one.
+**The separation above is not deferred with it.** Every clause earlier in this section — no token
+exchange, no assertion grant, no path from a flagship session to container access — is in force in
+v1.0 and is unaffected by this deferral. The collapse would have been an owner-configured exception
+to the *login*; it was never an exception to the authority boundary.
 
 ## 9 · Issuance, revocation, rotation and expiry
 
@@ -713,13 +725,31 @@ its own words — but the dependency runs one way only: rejecting option 1 does 
 requirement, because rotation clause 2 below hands the same reach to the same holder at the token
 endpoint, and §2's code binding, §3's device codes and every access token already rest on it.
 
-`[OPEN→0.3]` **Where the floor is pinned, and how high it is.** The requirement above is a property
-this document can state and cannot measure: no contract fixes a minimum entropy for a token value —
-`capabilities.md` §5 and `Token` say nothing about it, and `Token.id` is a token's *identifier*, not
-its value, which no contract names at all. The review should name a number (a1p's reading: not fewer
-than 128 bits of entropy per value, from the platform CSPRNG) and say which document carries it —
-a1p's reading is `capabilities.md`, because that is the document that mints tokens and the
-requirement is not the AS's alone. **What is not open is whether the requirement exists.**
+**The floor is 128 bits, and `capabilities.md` carries it. [0.3 · 19]** Every value this AS issues
+carries **at least 128 bits of entropy from the platform CSPRNG**. The number and the source are
+both normative: 128 bits of a weak generator is not 128 bits of entropy, which is why §9.1's opening
+clause names the source and this one names the amount.
+
+The requirement **lives in `capabilities.md` §5**, not here, because the container mints tokens by
+paths that are not the AS's — `token mint` is the owner's own — and a floor that only bound the AS
+would leave the same forgeable value reachable through a different verb. This section states the
+AS's instance of it and defers the normative clause; `capabilities.md` §5 is the citable one.
+
+Two readings the number does not have:
+
+1. **It is a floor, not a size.** A value may be longer, and a format that carries structure around
+   a random core (a prefix, a checksum) conforms as long as the random core meets the floor. The
+   entropy is what an attacker must search, never what the string's length suggests.
+2. **`user_code` is the one exception, and it is bounded differently.** [0.3 · 20] fixes it at eight
+   characters from a 20-consonant alphabet — roughly 34 bits, far under this floor, and deliberately
+   so, because a human types it. Its security comes from §3 mitigation 1's attempt bound and
+   expiry, not from entropy, and that substitution is stated at §11.8 where the code is specified.
+   No other value may use that argument: `user_code` is short because a human reads it aloud, and
+   nothing else this AS issues is.
+
+`Token.id` is a token's *identifier* and not its value; this clause governs values. **[0.3 · 11]**'s
+owner-path revocation keys on the identifier precisely because that is the half safe to render on a
+page the owner is reading.
 
 ### 9.2 · Revocation, rotation and expiry
 
@@ -731,15 +761,36 @@ A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and re
 **before** the capability set. `token.revoke` is written (`events.md` §1). **a1p** — the AS adds no
 second revocation semantics, which is the point.
 
-`[OPEN→0.3]` **Whether the AS exposes an RFC 7009 revocation endpoint at all.** §K names
-"revocation" as a Phase 0.2 freeze constraint and answers it with one verb — *"revocation is
-`token rm` like any client"* — which is an **owner** path, on the container's own CLI. §6 advertises
-a `revocation_endpoint` and §6 also forbids advertising an endpoint a container does not implement,
-so the metadata row and §9 cannot both stand as written. This is not cosmetic: **a browser or an MCP
-client cannot run `token rm`**, so an HTTP endpoint is the only revocation path those two of §1's
-three client types have. The review must pick one, and a1p does not pick for it:
+**The AS exposes an RFC 7009 revocation endpoint, and the owner additionally revokes by `Token.id`.
+[0.3 · 11]** The review took **both** halves: option 1 below as written, **plus** an owner path on
+the container's own pages. The reason both were needed is the one the question turned on — **a
+browser or an MCP client cannot run `token rm`**, so an HTTP endpoint is the only revocation path
+two of §1's three client types have, while an endpoint bounded by a token's value alone is not a
+path on which an owner should have to revoke *someone else's* live token. Each half covers what the
+other cannot:
 
-1. **Define the endpoint, per RFC 7009.** `POST` to `revocation_endpoint` with `token` and an
+- **The client path** (option 1) lets a holder revoke the token it holds, with the silence rule and
+  the defence-in-depth `client_id` comparison exactly as option 1 states them. It is bounded by
+  §9.1's entropy and by nothing else, and option 1's own text says so.
+- **The owner path** lets the owner revoke **any** token in `token ls` by its `Token.id`, from the
+  container's pages, inside an authenticated interactive session. It reaches a token whose value the
+  owner does not have — which is every token except the one in front of them — and `Token.id` is
+  safe to render for exactly the reason §9.1's closing clause gives: it is the identifier, not the
+  value, so a page listing it hands a reader no credential.
+
+**The owner path adds `revoke` to the closed `surface` vocabulary** (`AS_THROTTLE_SURFACES` in
+`_types.py`, §12.1), and **an entry on its refusal path**: a revocation attempt naming a `Token.id`
+that does not exist, or one the session may not reach, is refused uniformly — §7.1's rule applied to
+an identifier rather than a scope, since an owner page that answered differently for "no such token"
+and "not yours" would enumerate tokens to anyone who reached the page. The refusal appends like any
+other, and the throttle keyed on `revoke` bounds a caller walking the identifier space.
+
+Where the two paths meet: a token revoked by either is `capabilities.md` §5's revoked token, holds
+no capabilities, and writes one `token.revoke` (**[0.3 · 30]**, carrying the refresh-family id). The
+transport does not change the semantics, which is the point of stating revocation as `token rm`'s in
+the first place.
+
+1. **The endpoint, per RFC 7009 — in force, not an option.** `POST` to `revocation_endpoint` with `token` and an
    optional `token_type_hint`, over TLS (§2), with no client authentication because no client has a
    secret (§1, §6's `["none"]`). Two clauses would have to come with it, and both are this
    document's rather than the RFC's:
@@ -748,8 +799,8 @@ three client types have. The review must pick one, and a1p does not pick for it:
      asks for 200 on an invalid token; §7.1's "the AS is not an enumeration oracle" is why it is a
      MUST here, because an endpoint that answered differently would let any caller test whether a
      token value exists without holding one.
-   - **Whether a client may revoke a token not issued to it.** a1p's reading, for the review to
-     take or reject: the AS compares the presented token's `client` (`capabilities.md` §5) against
+   - **Whether a client may revoke a token not issued to it. [0.3 · 11]** takes a1p's reading
+     below as written, *including* its own statement of what the comparison is not: the AS compares the presented token's `client` (`capabilities.md` §5) against
      the presenting `client_id` and, when they differ, revokes nothing and returns the *same* 200 —
      a refusal indistinguishable from a success.
 
@@ -763,13 +814,14 @@ three client types have. The review must pick one, and a1p does not pick for it:
      must not be recorded anywhere as the thing that stops one client from revoking another's
      token, because it does not.
 
-     **What a real bound would require**, if the review wants one instead of entropy: proof that
+     **What a real bound would require**, which the review considered and did not take: proof that
      the caller holds the *grant*, not the string. Three shapes, none of them free — a
      confidential client, which §1 forbids in v1.0 and which downloadable software cannot be
      anyway; a **sender-constrained** token (DPoP, RFC 9449), which binds revocation to a key the
      caller proves per request and is therefore a change to every token this AS issues rather than
-     to this endpoint; or no endpoint at all, which is option 3. The cost of entropy-only is
-     bounded and should be stated as what it is: a token value that leaks can be revoked by
+     to this endpoint — a `[v1.1]` question if one is ever wanted, not a v1.0 one; or no endpoint
+     at all, which was option 3 and which the owner path above is what made unnecessary to accept.
+     The cost of entropy-only is accepted knowingly and is stated as what it is: a token value that leaks can be revoked by
      whoever holds it. For a leaked **access** token that is a denial of service against *that*
      token and nothing wider — a revocation cannot widen a grant, reveal whether the value was
      live (the silence rule above), or reach a token the value does not name. For a leaked
@@ -781,26 +833,29 @@ three client types have. The review must pick one, and a1p does not pick for it:
      SHOULD, not a premise**: it recommends that revoking a refresh token invalidate the access
      tokens issued under the same grant, and it is conditioned on an AS that supports revoking
      those tokens at all — which is the question option 1 exists to settle, so citing it as a
-     given would be circular. It corroborates; nothing above rests on it. The review should weigh
-     option 1 against the chain rotation clause 2 already reaches, which it adds nothing to, and
-     not against a single token.
+     given would be circular. It corroborates; nothing above rests on it. The endpoint was weighed
+     against the chain rotation clause 2 already reaches, which it adds nothing to, and not against
+     a single token — and taken on that basis.
 
      The entropy this bound rests on is required **unconditionally**, by §9.1 above,
-     and it is not option 1's to carry: whoever can produce a token's value holds the grant
-     whatever this section decides. Option 1 depends on that requirement; the requirement does not
-     depend on option 1, and a review that rejects option 1 does not close it.
-2. **Leave it `[OPEN→0.3]` and advertise the row conditionally** — which is what this document does,
-   pending the review.
-3. **Drop the row and say revocation is owner-path only in v1.0.** `token rm`, plus whatever the
-   owner is given in a browser by #61's surface. The cost is explicit: a client cannot revoke its
-   own token, and a UI's "log out" is a local forget, not a revocation — a stolen browser token
-   stays live until the owner removes it from `token ls`.
+     and it is not this endpoint's to carry: whoever can produce a token's value holds the grant
+     whatever this section decides. The endpoint depends on that requirement; the requirement does
+     not depend on the endpoint.
+2. **The owner path, by `Token.id`.** On the container's pages, inside an authenticated interactive
+   session, over the `revoke` surface named above. It reaches every token in `token ls`, needs no
+   token value, and refuses uniformly for an unknown and an unreachable identifier alike. `token rm`
+   is the same act on the CLI.
 
-**Until the review decides, this document takes (2).** `revocation_endpoint` is a conditional row in
-§6, advertised only if the endpoint exists, and **no endpoint is defined here** — a container that
-advertises one today is advertising something this contract does not specify. `token rm` is the
-revocation *semantics* under every option: whatever the transport, a revoked token is
-`capabilities.md` §5's and `token.revoke` is written.
+**Both paths are in force, and `revocation_endpoint` is an unconditional row in §6** (**[0.3 · 11]**,
+with §6's own clause). A container that advertises the endpoint is advertising something this
+contract specifies, which is what §6's conformance rule requires and what the conditional row could
+not deliver. `token rm` remains the revocation *semantics* under both transports: a revoked token is
+`capabilities.md` §5's, and `token.revoke` is written once, whichever path reached it.
+
+**What was given up, named rather than left for a reader to find:** a client holding only a token's
+value can revoke that token and nothing else, and the `client_id` it sends is not what stops it
+reaching further — §9.1's entropy is. That was the cost of having any client-reachable revocation at
+all, and the alternative on the table was leaving browsers and MCP clients with no revocation path.
 
 **Refresh tokens rotate. §K.** Made testable (**a1p**, from OAuth 2.1's rotation guidance):
 
@@ -814,43 +869,68 @@ revocation *semantics* under every option: whatever the transport, a revoked tok
    refresh that could add either would be §7's second permission system arriving through the back
    door.
 
-`[OPEN→0.3]` **Whether rotation is an audit event, whether a denied or abandoned authorization is one
-at all, and whether client registration is one.** `events.md` §1 closes its vocabulary by
-construction — *"an appended event whose name is not in this list MUST be rejected"* — and §4
-invariant 2 closes the other side: *"a surface that produces an effect without a corresponding event
-is non-conforming."* The AS produces **seven** effects with only two events between them, and they
-are enumerated here so a reader can count them instead of trusting the number: a token is **issued**
-(`token.mint`); a token is **revoked** (`token.revoke`); the owner **grants** consent (§2, §3); the
-owner **denies** it, or the request is rejected; a refresh token is **rotated**; a client is
-**registered** (§5); a **device authorization is requested** (§3). Only the first two have an event.
+### 9.3 · The AS's seven effects, each with its event
 
-**Registration (§5) is the sixth, and this document adds it to the question.** It is an owner act
-that writes the redirect-URI allowlist — the one piece of container state that decides where an
-authorization code may be delivered — and it currently leaves no entry in the chain. An allowlist
-entry added quietly is §5's exact-match rule undone without a trace, and the chain is where that
-would otherwise be visible; a registration is also, by §4 invariant 2's own vocabulary, closer to an
-approval than to a read. Filed as **#68** for the 0.3 batch, so grant, deny, rotate and registration
-are settled together with one edit to `events.md` rather than four (five, with device
-authorization below). a1p's recommendation is on the
-issue. **Not answered in this document.**
+**[0.3 · 29, 30, 31, 32]**, settling #68. `events.md` §1 closes its vocabulary by construction —
+*"an appended event whose name is not in this list MUST be rejected"* — and §4 invariant 2 closes
+the other side: *"a surface that produces an effect without a corresponding event is
+non-conforming."* The AS produces **seven** effects, enumerated so a reader can count them rather
+than trust the number, each now with its disposition:
 
-**Device authorization (§3) is the seventh, and it is in #68's scope too — stated because a reader
-counting §9's effects could not otherwise tell.** A device authorization request mints a `device_code`
-and a `user_code` and stores the pending authorization bound to them (§3, mitigation 3) — durable
-container state, created by a caller that holds no token and, since every client here is public
-(§1, §6's `["none"]`), authenticates nothing when it asks. An **initiated-then-abandoned** device
-authorization therefore leaves nothing in the chain at all: the same invisible-probe shape as a
-denied `/authorize`, and reachable with less, because it needs no registered redirect URI. Whether
-it is an event or is explicitly stated not to be is #68's to settle with the other four; a1p does
-**not** pick here, and does not read #68's option (b) as already covering it — (b) keys on a
-granted-or-denied *decision*, and an abandoned authorization never reaches one. Recorded as a
-comment on #68 rather than an edit to its body, the convention #73 used.
+| # | effect | event |
+|---|---|---|
+| 1 | a token is **issued** (§2, §3) | `token.mint`, carrying the refresh-family id |
+| 2 | a token is **revoked** (§9.2, either path) | `token.revoke`, carrying the refresh-family id |
+| 3 | the owner **grants** consent (§2, §3) | `authz.grant`, `decision: granted` |
+| 4 | the owner **denies** it, or the request is rejected | `authz.grant`, `decision: denied` |
+| 5 | a refresh token is **rotated** (§9.2) | **none** — see below |
+| 6 | a client is **registered**, amended or removed (§5) | `client.register` |
+| 7 | a **device authorization is requested** (§3) | **none** — covered by 3/4 plus §12's redemption row |
 
-`[OPEN→0.3]` **Default access-token lifetime.** `capabilities.md` §5 permits `expires_at: null`, and
-that is right for a long-lived script token the owner mints deliberately. It is **wrong as the AS
-default for a public browser client**, and no source names a number. The review should name one —
-a1p's reading is that an AS-issued public-client access token MUST carry a non-null `expires_at`,
-whatever the value, and that the null case stays available to `token mint` only.
+**`authz.grant {client_id, decision, scopes, capabilities}`. [0.3 · 29]** One row with a closed
+`decision` of `granted` · `denied`, rather than an `authz.grant`/`authz.deny` pair. One row because
+the two halves carry identical fields and differ only in outcome, and splitting them would make the
+*absence* of a deny row a signal in a log an owner reads by name. This closes the
+probe-leaves-no-trace hole in a single entry: a client that walks `/authorize` to see what a
+container holds now leaves a denied row per attempt, and §7.1's convergence means those rows are the
+only place that attempt is visible at all. `scopes` and `capabilities` record what was *requested*,
+including on a deny, since what a client asked for is the fact an owner reviewing the log needs.
+
+**Rotation emits no event. [0.3 · 30]** Clause 2 above revokes a reused chain and writes
+`token.revoke` like any revocation; a successful rotation writes `token.mint` for the token it
+issues. What is added instead of a `token.rotate` row is that **both carry the refresh-family id**,
+so a reuse-detection cascade revokes a chain the log can name and a reader can follow a family from
+its first mint to its last revocation. A `token.rotate` row was the alternative and was rejected for
+what it would turn the chain into: a rotation fires on a schedule the client picks, so a log
+carrying one is a session log, and an audit chain that fills with routine machine traffic is one an
+owner stops reading. The silence here is a decision, and §4 invariant 2's amendment
+(**[0.3 · 38]**, `events.md`) is what keeps it from being a conformance failure.
+
+**`client.register {client_id, op, redirect_uris}`. [0.3 · 31]** Specified at §5, named here so the
+count closes. Its own event rather than a member of the `authz.*` family: a registration produces no
+token and concerns no grant, and the allowlist it writes is the state §5.1's exact-match rule
+compares against.
+
+**A device authorization request gets no separate event. [0.3 · 32]** Effect 7 is covered twice
+over: §12's device-redemption row appends when a `user_code` is redeemed, and rows 3/4 append when
+the owner decides. What remains uncovered is the **initiated-then-abandoned** request — a
+`device_code` and `user_code` minted and never redeemed, by a caller holding no token — and that is
+accepted knowingly rather than overlooked. The reasoning: the state it creates is bounded (§3
+mitigation 1 expires it) and reaches nothing (an unredeemed `device_code` is not a grant), while an
+event on every device-authorization request would be an unauthenticated caller's write into the
+owner's hash chain at a rate the caller chooses. §12.1's throttle bounds the request rate; the
+append would have been the unbounded thing. A reader counting effects should read effect 7's silence
+as this trade and not as an omission.
+
+**Default access-token lifetime: 1 hour, and never null. [0.3 · 17]** An AS-issued access token
+**always** carries a non-null `expires_at`, defaulting to **1 hour** from issuance.
+`capabilities.md` §5 permits `expires_at: null`, which is right for a long-lived script token the
+owner mints deliberately and wrong for a token handed to a public client by a flow; **the null case
+stays available to `token mint` only**, where an owner is choosing it with the consequence in front
+of them. There is no AS path, parameter or config key by which a client obtains a non-expiring
+token, and a deployment may not add one. `AS_ACCESS_TOKEN_LIFETIME_SECONDS = 3600` in `_types.py`
+carries the default — **a1p**'s naming of a `[0.3]` number. Grant expiry, which is the longer clock
+over this one, is **[0.3 · 18]** at §11.5.
 
 ## 10 · Presence composition — where `principal: interactive` comes from
 
