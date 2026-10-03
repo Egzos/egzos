@@ -43,15 +43,14 @@ questions §§1–9 now decide are still written as open in Part B: the owner-pa
 **stale, not a second answer**, and the "three options" framing they argue from no longer exists.
 Likewise §§1–9's citations to §11.5, §11.7 and §11.8 name where that text **will** be written.
 
-**And the converse, stated because this override rule otherwise reads as wider than it is: §9.3 makes
-no §12 text stale.** §9.3's rows 3/4 are bounded to an owner's decision, so §12's row (d), its row (f)
-and its three `[OPEN→0.3]` markers — the invariant-2 read exception, the abandoned render, and the
-sub-threshold `/authorize` sweep that "leaves no trace at all" — are each **still live and still
-#86's**, not overridden by §§1–9. Two specific pairings a reader should not have to derive: §9.3 settles
-#68 for the five AS effects §9 names and **does not dispose of row (f)**, which stays raised to #68 and
-asked of #61 exactly as §12 says; and §9.3 does not close the sub-threshold-sweep gap, which §86's
-sitting still owes an answer. §9.3 says both in its own text (exclusions 3 and 4); this line puts them
-where a reader checking the override rule will look.
+**And the converse, because the override rule otherwise reads wider than it is: §9.3 makes no §12 text stale.** Its
+rows 3/4 are bounded to an owner's decision, so §12's row (d), its row (f) and its three `[OPEN→0.3]` markers — the
+invariant-2 read exception, the abandoned render, and the sub-threshold `/authorize` sweep that "leaves no trace at
+all" (#86) — are each **still live and still #86's**, not overridden by §§1–9. Two pairings a reader should not have to
+derive: §9.3 settles #68 for the five AS effects **§9** names and **does not dispose of row (f)**, which stays raised to
+#68 and asked of #61 exactly as §12 says; and §9.3 does not close the sub-threshold-sweep gap, which #86's sitting
+still owes. §9.3 states both in its exclusions (iii) and (iv); this line puts them where a reader checking the override
+rule will look.
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
 client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
@@ -321,24 +320,21 @@ name and `authz.grant` as decided-pending.**
 authorization spec expects (§4), and an open registration endpoint on a personal container lets any
 caller create a client entry — which is the direction that loses. Concretely:
 
-1. **Only the owner registers a client, and the owner-authenticated CLI path is the only one.** §11's
-   consent screen is **not** a second registration path, and clauses 1 and 3 agree because of it: §11.1
-   answers a request naming an unregistered `client_id` with §5.3's uniform pre-trust failure *and no
-   read at all*, so an unregistered client never reaches a page under §11 to be approved into existence.
-   A path that let it would need a pre-registration state reachable **before** §5.3's gate, which is
-   exactly the registry oracle §5.3 and §7.1 are written to close. **a1p**, binding item 10 to the only
-   reading clause 3 and §11.1 leave open; a consent-screen registration path would be a new decision and
-   a new §11 subsection, not an implication of this clause.
+1. **Only the owner registers a client, and the owner-authenticated CLI path is the only one.** §11's consent screen is
+   **not** a second registration path, and that is why clauses 1 and 3 agree: §11.1 answers an unregistered `client_id`
+   with §5.3's uniform pre-trust failure *and no read at all*, so an unregistered client never reaches a §11 page to be
+   approved into existence, and a path that let it would need a pre-registration state reachable **before** §5.3's gate
+   — the registry oracle §5.3 and §7.1 exist to close. **a1p**, binding item 10 to the one reading clause 3 and §11.1
+   leave open; a consent-screen path would be a new decision and a new §11 subsection, not an implication of this one.
 2. **`registration_endpoint` is not advertised** in the AS metadata (§6): the row is absent from the
    document, not present-and-empty.
 3. No unauthenticated path creates, amends or removes a client entry, and a deployment may not add one.
 
-What this costs is named rather than hidden, and clause 1 makes the cost larger rather than smaller: an
-MCP client that expects to self-register against an unknown AS does not work until the owner registers
-its `client_id` at the CLI — a config-file-class act, with the owner at a terminal rather than at the
-browser the client just opened, and no one-screen version of it in v1.0. Whether v1.1 adds an
-owner-gated RFC 7591 endpoint — the standard's shape, behind the consent screen — is a **`[v1.1]`**
-question at the Phase 5 contract boundary, not reopened here.
+What this costs is named rather than hidden, and clause 1 makes it larger rather than smaller: an MCP client that
+expects to self-register against an unknown AS does not work until the owner registers its `client_id` at the CLI — a
+config-file-class act, the owner at a terminal rather than at the browser the client just opened, with no one-screen
+version of it in v1.0. Whether v1.1 adds an owner-gated RFC 7591 endpoint — the standard's shape, behind the consent
+screen — is a **`[v1.1]`** question at the Phase 5 contract boundary, not reopened here.
 
 ### 5.1 · The matching rule is exact string comparison
 
@@ -392,6 +388,14 @@ and a name is something a resolver, a hosts file, a DNS answer or a hostile netw
 
 This is the one clause in §5 where **a1p's binding was overruled** rather than confirmed, marked so
 that a reader of the freeze record and a reader of this section see the same thing.
+
+**One committed design affordance this revises, named the way §5.3 names its six.** `consent.md` §120 gives the client
+block a *"localhost origin adds `· local development origin`"* rule, and its R-row fixture renders `redirects to
+http://localhost:5173 · local development origin` — a string no conforming container can produce, since clause 1
+refuses the entry that would hold it. What moves is the bullet's **trigger**, not the bullet: a loopback dev origin is
+`http://127.0.0.1:<port>` or `http://[::1]:<port>`, so the affordance keeps a case to fire on and the fixture needs its
+host replaced. **This document states no copy and revises none** — the words and the fixture are A2's and the edit is
+`consent.md`'s after the freeze. Named so a5-dinghy and A2 do not build the affordance against the refused host.
 
 ### 5.3 · The pre-trust uniform failure
 
@@ -470,10 +474,10 @@ under any cause.** Testable as written:
    oracle either, for the same reason the append asymmetry isn't one: a caller measuring an early
    exit learns only a fact about its own request — that it was throttled, or that it carried a
    credential — never a fact about the registry. Padding the registry read and the append asymmetry
-   alone still leaves this difference open, and unlike the first two this clause gives it no
-   disposition: whether it too must be padded to the full validation budget — a real cost, since
-   padding a cheap refusal to the price of a validated one gives up part of what a throttle is
-   for — **stands as a narrower, justified exception: padding it is a SHOULD, not a MUST.**
+   alone still leaves this difference open, and unlike the first two it gets a weaker disposition:
+   **padding this third difference to the full validation budget is a SHOULD, not a MUST** — a narrower,
+   justified exception, and the one normative demotion in this clause. Full padding is a real cost,
+   since pricing a cheap refusal like a validated request gives up part of what a throttle is for.
    **a1p**, on this clause's own reasoning and on no quotation: the first two differences leak a
    fact about the **registry** — what is registered, which is the owner's — while this one leaks
    only a fact about the **caller's own request**, that it was throttled or that it carried a
@@ -896,42 +900,29 @@ including on a deny. Where a request **is** decided and denied, §7.1's converge
 place that attempt is visible at all — so the owner's own view of a decided denial is this row and
 nothing else.
 
-**Rows 3 and 4 fire on an owner's decision and on nothing else. a1p**, bounding item 29 rather than
-widening it, because the row-4 cell above read "or the request is rejected" and that phrasing admitted a
-second, broader rule the rest of this document contradicts. The bound, stated as four exclusions a test
-can assert:
+**Rows 3 and 4 fire on an owner's decision and on nothing else. a1p**, bounding item 29 rather than widening it: the
+row-4 cell read "or the request is rejected", and that phrasing admitted a broader rule the rest of this document
+contradicts. Rows 3/4 append only where §11.4's deciding act happens — an owner answering a rendered consent screen
+inside a session §10.1 has already authenticated. Four exclusions follow, each assertable. **(i) §5.3's pre-trust set
+is not covered:** none of row (d)'s seven causes is a decision; each is a refusal taken before any screen renders and
+appends under §12's row (d) with its cause in `details`. A session-less `/authorize` is the clearest — §11.0 substep 3
+answers it with a 303 to `/login` having read, validated and decided nothing, so there is no denial to record and no
+`client_id` has been looked at. **(ii) A throttled attempt is not covered:** refused while a throttle already holds, it
+is counted and not appended at all (§12.1 rule 3), and this subsection claims no exception to that rule. **(iii) §12's
+row (f) is not covered and is not folded in:** a post-trust rejection — outcome `rejected`, closed causes `vocabulary`
+· `scope`, pinned as `AS_AUTHORIZE_POSTTRUST_CAUSES` — is refused against §7's vocabulary before the owner is asked, so
+it keeps its own row, its own outcome and **both causes**. `authz.grant`'s closed field set is deliberately **not**
+widened to carry them: `{client_id, decision, scopes, capabilities}` has no field a cause fits, and adding one would
+make a single row mean two different things. **Row (f)'s own event name is therefore not settled here** — item 29
+answers #68 for the five effects **§9** names, (f) is not one of them, and it stays raised to #68 and asked of #61
+exactly as §12 states. **(iv) §12's three `[OPEN→0.3]` markers stay open:** the invariant-2 read exception, the
+abandoned render and the **sub-threshold `/authorize` sweep**, all #86's. A sweep below the throttle's rate is
+session-less by construction, so exclusion (i) gives it no row 4 and §12's "leaves no trace at all" stands
+undiminished; item 29 did not decide it and this table does not claim to.
 
-1. **A decision is required.** Rows 3/4 append only where §11.4's deciding act happens — an owner,
-   inside an interactive session §10.1 has authenticated, answering a rendered consent screen. No owner
-   decision, no `authz.grant` row, whatever else the request earned.
-2. **§5.3's pre-trust set is not covered.** None of row (d)'s seven causes is a decision: they are
-   refusals taken before any screen renders, and they append under §12's row (d) with the cause in
-   `details`, never here. A session-less `/authorize` is the clearest case — §11.0 substep 3 answers it
-   with a 303 to `/login`, having read, validated and decided nothing (§5.3's own invariant-about-that-
-   redirect clause), so there is no denial to record and no `client_id` has been looked at. An attempt
-   refused while a throttle already holds is counted and not appended at all (§12.1 rule 3); this
-   subsection does not except itself from that rule.
-3. **§12 row (f) is not covered and is not folded in.** A post-trust rejection — outcome `rejected`,
-   closed causes `vocabulary` · `scope`, pinned as `AS_AUTHORIZE_POSTTRUST_CAUSES` — is not an owner
-   decision either: the AS refuses it against §7's vocabulary before the owner is asked. It keeps its own
-   row, its own outcome and both causes, and `authz.grant`'s closed field set is deliberately **not**
-   widened to carry them: `{client_id, decision, scopes, capabilities}` has no field a cause fits, and
-   adding one would make the same row mean two different things. **Row (f)'s own event name is therefore
-   not settled by this subsection.** §12 raises it to #68 and keeps it asked of #61 until #68 answers;
-   item 29 answers #68 for the five effects **§9** names, and (f) is not one of them, so (f) stays with
-   #86's sitting exactly as §12 states.
-4. **Nothing here closes §12's three `[OPEN→0.3]` markers**, and the narrow reading is why. §12 routes
-   the invariant-2 read exception, the abandoned render and the **sub-threshold `/authorize` sweep** (all
-   #86) to that sitting; a sub-threshold sweep is session-less by construction, so under exclusion 2 it
-   produces no row 4, and §12's statement that it "leaves no trace at all" stands undiminished. Item 29
-   did not decide it and this subsection does not claim to.
-
-What this gives up is said plainly: an unauthenticated probe at `/authorize` is visible to the owner only
-as far as §12 makes it visible, which below the throttle's rate is #86's open question and not this
-table's answer. The alternative — a row per probe — fails on what the row could contain rather than on
-cost: §11.0 substep 3 has read nothing, so `{client_id, decision, scopes, capabilities}` would carry only
-strings the caller itself chose, under a `decision` no one made. That is the shape #86 has to answer, and
-answering it needs a row of §12's kind, keyed on the surface, not a decision event reporting a decision
+What exclusion (iv) gives up fails on content rather than on cost, which is why the answer is #86's and not this
+table's: with nothing read, a row per probe could carry only strings the caller itself chose, under a `decision` no one
+made. Closing that gap needs a row of §12's kind, keyed on the surface — not a decision event reporting a decision
 that did not occur.
 
 **Rotation emits no event. [0.3 · 30]** Clause 2 above revokes a reused chain and writes
@@ -947,21 +938,19 @@ what will keep it from being a conformance failure is **[0.3 · 38]**, decided-p
 count closes. Its own event rather than a member of the `authz.*` family: a registration produces no
 token and concerns no grant, and what it writes is the state §5.1's exact-match rule compares against.
 
-**A device authorization request gets no separate event. [0.3 · 32]** Effect 7 is covered *where it goes
-anywhere*: §12's device-redemption row appends when a `user_code` is redeemed, and rows 3/4 append when
-the owner decides. What is **not** covered is the **initiated-then-abandoned** request — a `device_code`
-and `user_code` minted and never redeemed, by a caller holding no token — and it is accepted knowingly,
-so the table's row 7 says *partly*. **The reason is what the uncovered state is, not what the throttle
-does. a1p**: an abandoned device authorization creates a pending record that is bounded (§3 mitigation 1
-expires it), reaches nothing — no node, no capability, no token, no page — and is observable to the owner
-the moment it is used, at §12's redemption row. There is no effect to miss until there is a redemption,
-and a redemption appends. An event on the initiation would record a caller's intention to maybe return,
-which is the one thing in this table that changes no state the owner can be reached through. **This
-paragraph does not argue from §12.1's throttle, and an earlier draft that did had the mechanism
-backwards** — §12.1 rule 3 and §11.0 substep 2 bound the *append* more tightly than the request, since
-attempts refused while a throttle holds are counted and not appended, which is why §12 can keep rows
-(a), (b), (d) and (e) for unauthenticated callers at all. The throttle is therefore an argument *for*
-appending, not against it; effect 7's silence rests on the bounded, unreaching state alone.
+**A device authorization request gets no separate event. [0.3 · 32]** Effect 7 is covered wherever it goes anywhere:
+§12's device-redemption row appends when a `user_code` is redeemed, and rows 3/4 when the owner decides. The
+**initiated-then-abandoned** request — a `device_code` and `user_code` minted and never redeemed, by a caller holding
+no token — is **not** covered, is accepted knowingly, and is why row 7's cell reads *partly*. **The reason is what that
+state is, not what the throttle does. a1p**: the pending record is bounded (§3 mitigation 1 expires it), reaches
+nothing — no node, no capability, no token, no page — and becomes visible the moment it is used, at §12's redemption
+row; there is no effect to miss until a redemption, and a redemption appends. An event on the initiation would record
+an intention to maybe return, the one thing in this table that changes no state the owner can be reached through.
+**This paragraph does not argue from §12.1's throttle, and an earlier draft that did had the mechanism backwards:**
+rule 3 and §11.0 substep 2 bound the *append* more tightly than the request — attempts refused while a throttle holds
+are counted, not appended — which is how §12 keeps rows (a), (b), (d) and (e) for unauthenticated callers at all. The
+throttle is an argument *for* appending, not against it, so effect 7's silence rests on the bounded, unreaching state
+alone.
 
 **Default access-token lifetime: 1 hour, and never null. [0.3 · 17]** An AS-issued access token
 **always** carries a non-null `expires_at`, defaulting to **1 hour** from issuance.
