@@ -5,8 +5,11 @@ The lifeboat (`egzos web`), built to spec/design/lifeboat.md §0: server-rendere
 the container, FastAPI + Jinja + htmx, no JS toolchain, tokens as CSS variables only. The app is
 `egzos.web.app`; this module launches it on loopback.
 
-The URL opened at launch carries a per-launch key. It is printed only when no browser was opened
-AND stdout is a terminal: an agent's shell tool is not a terminal, so it never reads the key.
+The URL opened at launch carries a per-launch key, and the key works ONCE: the first browser to
+open it gets the session (an HttpOnly cookie, a different value) and the key is dead, so a copy
+read later from the launcher's argv or a terminal opens nothing. It is printed only when no
+browser was opened AND stdout is a terminal: an agent's shell tool is not a terminal. To reopen
+the lifeboat after closing the browser, restart `egzos web`.
 `tokens.css` (spec/design/tokens.css, vendored byte-for-byte) lives in this package.
 """
 

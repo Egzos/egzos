@@ -38,7 +38,7 @@ def lb(tmp_path, monkeypatch):
 def post(client, boat, url, data=None, origin=ORIGIN, csrf=True, **kw):
     form = dict(data or {})
     if csrf:
-        form["csrf"] = boat.key
+        form["csrf"] = boat.form_key
     headers = {"Origin": origin} if origin else {}
     return client.post(url, data=form, headers=headers, follow_redirects=False, **kw)
 
@@ -490,3 +490,23 @@ def test_copy_comes_from_strings_and_the_empty_header_drops_its_number(lb):
     boat.c.trust.quarantine(boat.c.backend.get(item.id), token=boat.c.require_token(),
                             actor=OWNER, reason="x")
     assert "<h2>Recent</h2>" in client.get("/").text  # R3 empty: the header without a number
+
+
+def test_the_armed_pending_page_is_a_read_and_a_refusal_is_styled_as_one(lb, monkeypatch):
+    from egzos.trust import TrustError
+
+    boat, client, item = lb
+    pid, org = _proposal(boat, item, agent=True, verified=True)
+    before = len(fetches(boat))
+    armed = post(client, boat, f"/pending/{pid}", {"step": "arm"})
+    assert len(fetches(boat)) == before + 1  # the armed page re-shows the proposal: audited
+
+    def refuse(*args, **kw):
+        raise TrustError("manifest changed since the proposal was made — re-propose")
+
+    monkeypatch.setattr(boat.c.trust, "execute", refuse)
+    tok = re.search(r'name="arm" value="([^"]+)"', armed.text).group(1)
+    post(client, boat, f"/pending/{pid}", {"step": "confirm", "arm": tok, "mode": "window"})
+    assert boat.outcomes[pid][0] == "invalid"
+    page = client.get(f"/pending/{pid}").text
+    assert 'class="outcome alarm-text"' in page  # a refusal never reads as a success

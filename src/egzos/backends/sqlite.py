@@ -43,12 +43,11 @@ class SqliteBackend:
     def __init__(self, path: Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        # One connection per container, used by one thread at a time: the CLI's, or the lifeboat's
-        # event loop and its test client's portal. Writers in other processes are serialised by
-        # sqlite itself, and the chain by its unique prev_hash.
         # One connection, shared: safe while every caller runs on one thread at a time — the CLI,
-        # and the lifeboat, whose handlers are all `async def` on the event loop. A sync handler
-        # would run in Starlette's threadpool; add a lock here before writing one.
+        # and the lifeboat, whose handlers are all `async def` on the event loop (its test client's
+        # portal included). A sync handler would run in Starlette's threadpool; add a lock here
+        # before writing one. Writers in other processes are serialised by sqlite itself, and the
+        # chain by its unique prev_hash.
         self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=10)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
