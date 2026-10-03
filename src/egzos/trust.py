@@ -155,9 +155,10 @@ class TrustEngine:
 
         if not delta:
             # Zero audience delta (true solo — counting agents) → instant, silently logged.
-            need = "organize"
-            if not token.has(need):
-                return self._park(item, frm, to, token, actor, delta, reason=f"missing `{need}`")
+            # Without `organize` the move is refused, never parked: parking let a fetch-only
+            # token fill the owner's pending queue (#94; freeze item 3).
+            if not token.has("organize"):
+                raise TrustError("moving items needs `organize`")
             self._do_move(item, to, actor, token.principal)
             self.ledger.append(
                 "gate.pass.silent",
@@ -171,8 +172,11 @@ class TrustEngine:
             )
             return {"moved": True, "gate": "silent", "audience_delta": []}
 
-        # Nonzero delta: this is a publish. Park it — even for the interactive owner the gate shows
-        # the RESOLVED audience; the confirm is a separate human act (`trust approve`).
+        # Nonzero delta: this is a publish. Proposing it needs `publish` (freeze item 3). Park it —
+        # even for the interactive owner the gate shows the RESOLVED audience; the confirm is a
+        # separate human act (`trust approve`, behind the presence tap).
+        if not token.has("publish"):
+            raise TrustError("proposing a wider audience needs `publish`")
         return self._park(item, frm, to, token, actor, delta, reason="audience widens")
 
     def _park(
@@ -230,13 +234,13 @@ class TrustEngine:
         if current != p["manifest"]:
             p["status"] = "stale"
             self.backend.put_proposal(p)
+            # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
             self.ledger.append(
-                "approval.deny",
+                "approval.stale",
                 actor=actor,
                 principal=token.principal,
                 subject=p["id"],
                 reason="manifest changed since proposal (TOCTOU)",
-                stale=True,
             )
             raise TrustError("manifest changed since the proposal was made — re-propose")
         for item_id in p["items"]:

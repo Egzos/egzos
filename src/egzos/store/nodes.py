@@ -147,9 +147,24 @@ class NodeService:
         if len(candidates) == 1:
             return candidates[0]
         if len(candidates) > 1:
-            # recency of activity disambiguates (v0.3 §4); SKELETON: most recently created
-            return max(candidates, key=lambda n: n.created_at)
+            # Recency of ACTIVITY disambiguates (v0.3 §4; freeze item 1): the latest write
+            # anywhere in the node's subtree, then its id, so the answer is deterministic.
+            return max(candidates, key=lambda n: (self.last_activity(n), n.id))
         return None
+
+    def last_activity(self, node: Node) -> str:
+        """The latest write anywhere under `node`: an item's updated_at, or a node's creation."""
+        subtree = [
+            n
+            for n in self.backend.list_nodes()
+            if n.id == node.id or node.id in {a.id for a in self.ancestors(n)}
+        ]
+        stamps = [n.created_at for n in subtree if n.created_at]
+        stamps += [
+            i.lifecycle.get("updated_at") or i.lifecycle.get("created_at") or ""
+            for i in self.backend.query([n.id for n in subtree])
+        ]
+        return max(stamps, default="")
 
 
 def _matches_tail(svc: NodeService, node: Node, parts: list[str]) -> bool:

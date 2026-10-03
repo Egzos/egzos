@@ -34,6 +34,7 @@ EVENTS: tuple[str, ...] = (
     "approval.promote",
     "approval.execute",
     "approval.deny",
+    "approval.stale",
     "trust.quarantine",
     "step_up",
     "token.mint",
