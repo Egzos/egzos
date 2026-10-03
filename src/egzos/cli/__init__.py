@@ -22,6 +22,7 @@ from typing import Any
 
 import typer
 
+from egzos._term import safe
 from egzos.container import OWNER, Container
 from egzos.model import Node
 from egzos.store.items import StoreError
@@ -43,10 +44,12 @@ _state: dict[str, Any] = {"json": False}
 
 # -- helpers -----------------------------------------------------------------------------------
 def _out(payload: Any, human: str | None = None) -> None:
+    """Everything the CLI prints goes through here, and through `safe`: stored text is data, and
+    a control character in it would be a command to the terminal. JSON escapes C0 itself."""
     if _state["json"]:
-        typer.echo(json.dumps(payload, indent=2, ensure_ascii=False, default=str))
+        typer.echo(safe(json.dumps(payload, indent=2, ensure_ascii=False, default=str), json=True))
     elif human is not None:
-        typer.echo(human)
+        typer.echo(safe(human))
 
 
 def _fail(msg: str, code: int = 1) -> None:
@@ -787,5 +790,5 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as e:
         return int(e.code or 0)
     except PermissionError as e:
-        typer.echo(str(e), err=True)
+        typer.echo(safe(str(e)), err=True)
         return 2

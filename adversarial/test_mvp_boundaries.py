@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -173,6 +174,20 @@ def test_an_inbox_read_records_what_the_policy_withheld(box):
     _call(build_server(box, _client(box)), "egzos_inbox", {})
     entry = box.ledger.tail(1)[0]
     assert entry["event"] == "context.fetch" and entry["details"]["withheld"] == 1
+
+
+def test_an_agent_write_reaches_the_owner_terminal_as_text_never_as_commands(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    c = Container(tmp_path)
+    planted = "note\x1b]52;c;ZXZpbA==\x07\x1b[2K\x9b1A\u202etxt"
+    _call(build_server(c, _client(c)), "egzos_remember", {"text": planted})
+    unsafe = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f\u202a-\u202e\u2066-\u2069]")
+    for args in (("ls", "--inbox"), ("--json", "ls", "--inbox"), ("find", "note")):
+        out = _egzos(tmp_path, *args).stdout
+        assert "note" in out and not unsafe.search(out), args
+    json.loads(_egzos(tmp_path, "--json", "ls", "--inbox").stdout)  # still valid JSON
+    bodies = [i.content.get("body") for _, i in c.store.inbox_items()]
+    assert planted in bodies  # the store keeps the data as written; only the terminal is guarded
 
 
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):

@@ -49,6 +49,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 from urllib.parse import parse_qs
 
+from egzos._term import safe
 from egzos.container import OWNER, Container
 
 # container.md §8's default is 300 s for a window bounded to the manifest's shape. Until the build
@@ -317,8 +318,8 @@ class Presence:
                 return outcome_text(act, outcome, closes=closes)
             except Exception as e:
                 self.act_failed(act, e)
-                print(f"That didn't go through. Nothing changed. ({e})", file=sys.stderr,
-                      flush=True)
+                print(safe(f"That didn't go through. Nothing changed. ({e})"),
+                      file=sys.stderr, flush=True)
                 raise
 
         tap = Tap(act, container=self.c.home.name, host=host, decide=decided)
