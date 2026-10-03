@@ -228,11 +228,15 @@ every test that does not mint a token mid-flight — and would break the only th
 
 ### Proposing carries the same floor as moving — `organize` (#94)
 
-**Both branches of the gate require `organize` at the source scope.** The capability is checked
-**before** the delta is computed, so the two paths are indistinguishable to a token that lacks it:
-parking a proposal is not a cheaper way to touch an item than moving it. **decided, not running**
-(Chief, 2026-10-03, resolving #94) — the skeleton checks `organize` on the zero-delta path and
-checks nothing on the nonzero one.
+**Both branches of the gate require `organize` at the source scope.** Parking a proposal is not a
+cheaper way to touch an item than moving it. **decided, not running** (Chief, 2026-10-03, resolving
+#94) — the skeleton checks `organize` on the zero-delta path and checks nothing on the nonzero one.
+
+**The capability is checked before the delta is computed**, and that order is part of the clause.
+A token without `organize` is refused identically whichever branch its move would have taken, so it
+never learns from the refusal whether the destination's audience is wider than the source's. Check
+the delta first and the gate answers a question about who can see what, to a caller that may not
+move the item at all — §4 invariant 3's rule arriving at the gate.
 
 The reason the floor is the *same* one rather than a lower one: a proposal **is** a move the mover
 is asking a human to confirm, so it cannot cost less than the move. Were the nonzero path uncapped,

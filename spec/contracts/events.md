@@ -64,8 +64,7 @@ hash = sha256( prev_hash || canonical(entry minus `hash` and minus `seq`) )
 - `||` is string concatenation of the previous hash's hex digest with the canonical body, encoded
   UTF-8.
 - The body hashed is the entry **without** `hash` and **without** `seq` — `seq` is the store's, not
-  the chain's. The formula above says so in the formula; it previously read *entry minus hash*,
-  which against §2's entry shape reads as *seq included*, and disagreed with this bullet.
+  the chain's, and the formula names both exclusions rather than leaving one to this bullet.
 
 `storage.md` §3 and `_types.py`'s `BackendProtocol` say the same thing from the store's side:
 `audit_append` receives an entry carrying no `seq`, and the store assigns one. **running.**
