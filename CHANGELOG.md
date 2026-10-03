@@ -11,15 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The walking skeleton's modules land as the MVP's running core: nodes, items and blobs (store),
   trust engine and the gate, hash-chained ledger, resolver, tokens, the CLI and the MCP stdio door.
-- `egzos web`: the lifeboat, MVP cut — items, search, item detail and the pending queue with approve /
-  deny (lifeboat.md §0's scope; audit and quarantine stay the CLI's). Loopback only; a per-launch key becomes an HttpOnly,
-  SameSite=Strict cookie; every act is a same-origin POST carrying the key. Styled by `tokens.css`.
 - `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
   server with Claude Code at user scope.
 - The container home is owner-only (0700): it holds the chain, every item and the token hashes.
 - The presence tap (`egzos.authz.presence`): `egzos trust approve` / `trust deny` open a one-shot
-  loopback decision page, and the lifeboat's *Approve* redirects to the same `/tap/<token>` page on
-  its own server — *Sign and approve* → *Confirm signature* within 10 s, *Approve without a
+  loopback decision page — *Sign and approve* → *Confirm signature* within 10 s, *Approve without a
   window*, or *Deny*. Every check appends `step_up` with its outcome. With
   `EGZOS_STEP_UP_WINDOW_SECONDS` set (default `0`: every act taps), a signature opens a window for
   that ring pair bounded to the signed shape, read back from the chain; `egzos trust close-window`.
@@ -30,10 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - Minting is the owner's act (`connect`, `token create`, `Auth.mint`); the owner's views (`trust
-  pending`, `token ls`, `audit`, `egzos web`) refuse a client principal; `ls` checks coverage.
+  pending`, `token ls`, `audit`) refuse a client principal; `ls` checks coverage.
 - The MCP door answers identically for a scope that does not exist and one the token cannot see.
-- Every lifeboat view and `ls` / `trust pending` is an audited read; `blob_pull` checks coverage.
-- A keyed URL (lifeboat or tap) is printed only to a terminal, never to an agent's pipe.
+- `ls` and `trust pending` are audited reads; `blob_pull` checks coverage.
+- The tap's one-shot URL is printed only to a terminal, never to an agent's pipe.
 - Coverage is checked in the engine (`resolve_ref`, node creation, moves, quarantine, the resolver)
   and on every CLI scope and item reference; a client's `ls` and the MCP inbox are served under the
   serving policy; `%n` belongs to the token whose `find` made it; `connect` prints its secret only

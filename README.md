@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **MVP preview (0.1.0a1).** Installable today — see the quickstart. The CLI, the MCP server, the browser lifeboat and the audit chain run end to end.
+> **MVP preview (0.1.0a1).** Installable today — see the quickstart. The CLI, the MCP server, the browser approval tap and the audit chain run end to end.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -35,15 +35,14 @@ egzos find commit                            # numbered results; act on them wit
 
 egzos connect                                # mints a token for Claude Code, prints the line to run
 egzos connect --apply                        # …or registers it with Claude Code for you
-egzos web                                    # browser: items, search, pending (loopback only)
 ```
 
 Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your context for a scope,
 `egzos_remember` writes (it lands **unverified** in your inbox), `egzos_inbox` lists the queue.
 
-- **Agents propose, you dispose.** Anything an agent writes waits in `egzos web` → *pending* (or
-  `egzos trust pending`) until you approve it. A move that would widen who can read something is
-  parked until you say yes.
+- **Agents propose, you dispose.** Anything an agent writes waits in `egzos trust pending` until you
+  approve it: `egzos trust approve <id>` opens a one-shot approval page in your browser. A move that
+  would widen who can read something is parked until you say yes.
 - **Every read and every yes is on the record.** `egzos audit tail` / `egzos audit verify` — a
   hash chain that verifies end to end.
 - **Structure as you go.** `egzos mk project health`, `egzos mv %1 project:health`, `egzos fetch project:health`.
@@ -86,8 +85,9 @@ See `SECURITY.md`. Report vulnerabilities privately via GitHub Security Advisori
 
 ## Status
 
-MVP preview. The CLI, MCP stdio server, browser lifeboat and audit chain run end to end on the walking
-skeleton's modules (Phase 0.1) plus the MVP additions (`egzos web`, `egzos connect`). The frozen-contract
+MVP preview. The CLI, MCP stdio server, browser approval tap and audit chain run end to end on the
+walking skeleton's modules (Phase 0.1) plus the MVP additions (`egzos connect`, the step-up tap). The
+lifeboat (`egzos web`, FastAPI + Jinja + htmx per `spec/design/lifeboat.md`) lands next, in its own PR. The frozen-contract
 build (`spec/contracts/`) replaces them module by module. Not yet included: the container's OAuth
 authorization server and remote MCP (Phase 5), embeddings, and the egzos.io flagship.
 

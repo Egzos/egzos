@@ -9,8 +9,8 @@ with §2.2's content — the container and viewer lines, what moves, who will se
 consequence, the presence block — and waits for a decision: *Sign and approve* then *Confirm
 signature* within 10 s, *Approve without a window* then the same confirm, or *Deny* (one press).
 
-Two hosts serve the same `Tap`: the CLI (`trust approve` / `trust deny`) opens a loopback server
-just for it, and the lifeboat redirects its *Approve* to `/tap/<token>` on its own server.
+The CLI (`trust approve` / `trust deny`) opens a loopback server just for the page. `Tap` is
+host-agnostic (`get` / `post` / `live`), so the lifeboat can serve the same page when it lands.
 
 Every presence check is one `step_up` entry, whatever its outcome (`approved`, `denied`, `expired`,
 `unavailable`, or `window` when an open window covered it), with the source → destination ring
@@ -21,6 +21,9 @@ act taps); `EGZOS_STEP_UP_WINDOW_SECONDS` opts in.
 
 The CLI's page opens in the browser; its URL is printed only when no browser could be opened AND
 stdout is a terminal: an agent's shell tool is not a terminal, so it never receives a URL to press.
+
+The page is a plain `<form method=post>` two-step on a loopback `http.server`: the tap spec's
+baseline, which "works without htmx" (§18); the htmx enhancement is optional there.
 
 Residuals, named: a process running as the user that drives a browser, fakes a terminal, or appends
 to the chain directly can do what the user can — a shell running as the user is the user. The URL

@@ -668,19 +668,6 @@ def serve(
 
 
 @app.command()
-def web(
-    port: int = typer.Option(7425, "--port", help="Loopback port."),
-    no_open: bool = typer.Option(False, "--no-open", help="Print the URL; don't open a browser."),
-):
-    """The lifeboat: list, search, pending queue and audit in your browser, on loopback only."""
-    c = _container()
-    _owner(c, "the lifeboat")
-    from egzos.web import serve_web
-
-    serve_web(c, port=port, open_browser=not no_open)
-
-
-@app.command()
 def connect(
     client: str = typer.Argument("claude-code", help="Client to connect: claude-code"),
     role: str = typer.Option("contributor", "--role", help="reader|contributor|operator|curator"),

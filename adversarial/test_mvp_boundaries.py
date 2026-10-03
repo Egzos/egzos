@@ -78,14 +78,6 @@ def test_owner_views_refuse_a_client_principal(tmp_path, argv):
     assert r.returncode != 0 and "owner" in (r.stdout + r.stderr)
 
 
-def test_the_lifeboat_refuses_a_client_principal(box, monkeypatch):
-    from egzos.web import serve_web
-
-    monkeypatch.setenv("EGZOS_TOKEN", _client(box).secret)
-    with pytest.raises(PermissionError):
-        serve_web(box, port=0, open_browser=False)
-
-
 def test_ls_of_an_uncovered_scope_answers_like_an_absent_one(tmp_path):
     assert _egzos(tmp_path, "init").returncode == 0
     assert _egzos(tmp_path, "mk", "project", "secret-plans").returncode == 0
@@ -322,18 +314,3 @@ def test_no_output_carries_the_secret_hash(tmp_path):
     _egzos(tmp_path, "--json", "token", "create", "--client", "bot", "--role", "reader")
     for argv in (("--json", "whoami"), ("--json", "token", "ls")):
         assert "secret_hash" not in _egzos(tmp_path, *argv).stdout
-
-
-def test_back_never_leaves_this_origin_even_with_a_backslash(boat_like=None):
-    import tempfile
-    from pathlib import Path
-
-    from egzos.web import Lifeboat
-
-    with tempfile.TemporaryDirectory() as d:
-        c = Container(Path(d))
-        t = c.init()
-        item = c.store.add(body="x", token=t, actor=OWNER, principal="interactive")
-        b = Lifeboat(c, key="k" * 32)
-        b.act("/approve", {"ref": item.id, "back": "/\\evil.example"})
-        assert all(e["back"] == "/pending" for e in b.taps.values())
