@@ -25,9 +25,10 @@ Clauses carry one of six markings instead:
   settled a question but left a detail unnamed — a config key's spelling, a constant's name, a
   section's number — a1p chose it and the choice is named in the PR that wrote it; such a detail is
   an **a1p** binding of a `[0.3]` decision and is marked as both.
-- `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately. **No marker of
-  this kind survives in this document**: the 0.3 record answered every one. Each was replaced by its
-  decision, or, where the record deferred it, by `[v1.1]` with the reason.
+- `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately. The 0.3 record
+  answered every one, but **this PR rewrote §§1–9 only**: **27 of these markers are still live
+  across §§10–13** and are to be read as genuinely open text until the Part B PR replaces each with
+  its decision, or with `[v1.1]` and the reason. That PR is tracked at **#PARTB**.
 - `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
   Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
   escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.
@@ -36,6 +37,14 @@ Clauses carry one of six markings instead:
   **not a decision**: no clause marked `[LEAN]` fixes a shape, and **a builder may not implement
   against one.** Part B carries exactly one (§10.5, the step-up tap riding these endpoints), and
   hardening it would be the one thing this marking exists to prevent.
+
+**Reading note — §§1–9 are revised, §§10–13 are not, and where they disagree §§1–9 govern.** Three
+questions §§1–9 now decide are still written as open in Part B: the owner-path revocation keyed on
+`Token.id` (§11.9, decided at §9.2), `verification_uri_complete` and the `user_code` alphabet
+(§11.8, decided at §3 and §9.1), and a non-null `expires_at` (§11.5, decided at §9.3). Those
+passages are **stale, not a second answer**, and the option framings they argue from (§9's "three
+options") no longer exist. In the same direction, §§1–9's forward citations to §11.5, §11.7 and
+§11.8 name where the decided Part B text **will** be written, not where it already is.
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
 client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
@@ -302,8 +311,9 @@ its own event rather than a member of the `authz.*` family: the redirect allowli
 hole, this section's exact-match rule is only as strong as the allowlist it compares against, and a
 change to that allowlist is a change to the AS's security posture whether or not any token is
 involved. `redirect_uris` carries the entry's URIs **after** the change (empty on `remove`), so the
-log states the allowlist as it then stood rather than the delta that produced it. `events.md` §1
-carries the row; this section is where a reader looks for why it exists.
+log states the allowlist as it then stood rather than the delta that produced it. This section is
+where a reader looks for why the event exists; **`events.md` §1 does not yet carry the row — see
+§9.3, where this name and `authz.grant` are both recorded as decided-pending.**
 
 **No open dynamic client registration. [0.3 · 10]** RFC 7591's endpoint is what the MCP
 authorization spec expects (§4), and an open registration endpoint on a personal container lets any
@@ -459,15 +469,15 @@ under any cause.** Testable as written:
    disposition: whether it too must be padded to the full validation budget — a real cost, since
    padding a cheap refusal to the price of a validated one gives up part of what a throttle is
    for — **stands as a narrower, justified exception: padding it is a SHOULD, not a MUST.**
-   **a1p**, binding **[0.3 · 42]**'s timing posture (`capabilities.md` §6 clause E3,
-   *"timing-insensitive where practical; stated as a SHOULD, not a MUST"*) onto the one difference
-   this section left without a disposition. The record settled the posture and not this instance, so
-   the binding is a1p's and is marked as both. It is the right side of the line for the reason the
-   clause already gives: the first two differences would leak a fact about the **registry** — what
-   is registered, which is the owner's — while this one leaks only a fact about the **caller's own
-   request**, that it was throttled or that it carried a credential, which the caller already knows.
-   An implementation that pads it fully is conforming; one that does not is conforming too, and
-   neither may use the exception to widen the first two, which stay MUSTs. **The first two differences' padding is a named
+   **a1p**, on this clause's own reasoning and on no quotation: the first two differences leak a
+   fact about the **registry** — what is registered, which is the owner's — while this one leaks
+   only a fact about the **caller's own request**, that it was throttled or that it carried a
+   credential, which the caller already knows. An implementation that pads it fully is conforming;
+   one that does not is conforming too, and neither may use the exception to widen the first two,
+   which stay MUSTs. **Decided-pending: [0.3 · 42]'s rewrite of `capabilities.md` §6 into numbered
+   binding clauses — where a container-wide timing posture is to be stated — lands in #109 PR 2 and
+   is not in this tree**, so nothing outside this clause carries the SHOULD today and the freeze
+   reading must re-read it against §6 there. **The first two differences' padding is a named
    spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
@@ -722,15 +732,16 @@ its own words — but the dependency runs one way only: rejecting option 1 does 
 requirement, because rotation clause 2 below hands the same reach to the same holder at the token
 endpoint, and §2's code binding, §3's device codes and every access token already rest on it.
 
-**The floor is 128 bits, and `capabilities.md` carries it. [0.3 · 19]** Every value this AS issues
-carries **at least 128 bits of entropy from the platform CSPRNG**. The number and the source are
-both normative: 128 bits of a weak generator is not 128 bits of entropy, which is why §9.1's opening
-clause names the source and this one names the amount.
+**The floor is 128 bits, and this clause carries it. [0.3 · 19]** Every value this AS issues carries
+**at least 128 bits of entropy from the platform CSPRNG**. The number and the source are both
+normative: 128 bits of a weak generator is not 128 bits of entropy, which is why §9.1's opening
+clause names the source and this one names the amount. **This is the citable clause, here, today.**
 
-The requirement **lives in `capabilities.md` §5**, not here, because the container mints tokens by
-paths that are not the AS's — `token mint` is the owner's own — and a floor that only bound the AS
-would leave the same forgeable value reachable through a different verb. This section states the
-AS's instance of it and defers the normative clause; `capabilities.md` §5 is the citable one.
+It is **not** the whole requirement, and the rest is **decided-pending**: the container mints tokens
+by paths that are not the AS's — `token mint` is the owner's own — so a floor binding only the AS
+leaves the same forgeable value reachable through a different verb, and `capabilities.md` §5 must
+carry the container-wide one. **That text lands in #109 PR 2 and is not in this tree**; nothing
+below defers to it in the meantime.
 
 Two readings the number does not have:
 
@@ -880,6 +891,15 @@ than trust the number, each now with its disposition:
 | 6 | a client is **registered**, amended or removed (§5) | `client.register` |
 | 7 | a **device authorization is requested** (§3) | **none** — covered by 3/4 plus §12's redemption row |
 
+**Three of this table's rows are decided-pending, and the pending half is `events.md`'s.**
+`authz.grant` (rows 3, 4) and `client.register` (row 6) are **not** among `events.md` §1's eighteen
+names, and §4 invariant 2's amendment that row 5 needs is not written either. **All three edits
+land in #109 PR 2 and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3 · 38]**).
+Until that PR merges `events.md` governs as it stands — an append under either new name MUST be
+rejected, and row 5's silence is a conformance failure — so **no implementation may be built
+against this table yet**. The decisions are fixed; only the text that makes them citable is absent,
+and this paragraph is here so a reader of the merged tree is not told otherwise.
+
 **`authz.grant {client_id, decision, scopes, capabilities}`. [0.3 · 29]** One row with a closed
 `decision` of `granted` · `denied`, rather than an `authz.grant`/`authz.deny` pair. One row because
 the two halves carry identical fields and differ only in outcome, and splitting them would make the
@@ -896,8 +916,8 @@ so a reuse-detection cascade revokes a chain the log can name and a reader can f
 its first mint to its last revocation. A `token.rotate` row was the alternative and was rejected for
 what it would turn the chain into: a rotation fires on a schedule the client picks, so a log
 carrying one is a session log, and an audit chain that fills with routine machine traffic is one an
-owner stops reading. The silence here is a decision, and §4 invariant 2's amendment
-(**[0.3 · 38]**, `events.md`) is what keeps it from being a conformance failure.
+owner stops reading. The silence here is a decision; what will keep it from being a conformance
+failure is §4 invariant 2's amendment (**[0.3 · 38]**), decided-pending above.
 
 **`client.register {client_id, op, redirect_uris}`. [0.3 · 31]** Specified at §5, named here so the
 count closes. Its own event rather than a member of the `authz.*` family: a registration produces no
