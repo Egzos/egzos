@@ -478,6 +478,8 @@ def test_quarantine_notices_pin_at_the_end_of_the_queue_without_a_link(lb):
     notice = page[page.index('<li class="notice">'):]
     assert "<a " not in notice[:notice.index("</li>")]  # a notice, not an act
     assert S["queue.empty"] in page  # nothing to act on; the notice still shows
+    # The page names that item, so the read records it, as home and item views record theirs.
+    assert fetches(boat)[-1]["details"]["notices"] == [copy.id]
 
 
 def test_copy_comes_from_strings_and_the_empty_header_drops_its_number(lb):

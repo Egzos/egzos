@@ -8,13 +8,17 @@ Pages: home / search (`/`), item detail (`/items/<id>`), the scheme switch (`/pr
 not-found page, and — rendered to the tap spec's L column (lifeboat.md R11) — the pending pages
 (`/pending`, `/pending/<id>`) and the tap page (`/tap/<token>`).
 
-The session: the URL opened at launch carries a per-launch key; the first visit trades it for an
-HttpOnly, SameSite=Strict cookie that every request then needs. Every POST also carries the key as
-a form field and must name this origin (a missing Origin is refused). The lifeboat is the owner's:
-it is served to the interactive principal only (lifeboat.md §14.6).
+The session is three values, none of them in a URL after the first visit: a launch key that works
+once (the first visit trades it for the session); the session itself, an HttpOnly, SameSite=Strict
+cookie that every request needs and no page carries; and a form key, a hidden field every POST
+carries alongside the cookie and an exact Origin (a missing Origin is refused). The tap POST
+carries its path token in place of the form key. A caller without the session gets one static
+page and nothing on the chain. The lifeboat is the owner's: it is served to the interactive
+principal only (lifeboat.md §14.6).
 
-Every page is an audited read (`context.fetch`), the not-found paths included. Human-only acts take
-two presses with a server-signed `arm` valid 10 s; promoting an item then asks the container, which
+Every page the session sees is an audited read (`context.fetch`), the not-found page included.
+Human-only acts take two presses: the first issues a server-held nonce, single-use, valid 10 s and
+bound to the act, the item and its version; promoting an item then asks the container, which
 passes an open window or redirects to `/tap/<token>`; the pending page embeds the tap block itself
 (the tap spec §3.2). Every decision appends `step_up`.
 
@@ -661,7 +665,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
                 source = (item.provenance or {}).get("derived_from")
                 if item.status == "quarantined" and source and \
                         str((item.trust or {}).get("reason", "")).startswith("derived from"):
-                    out.append({"title": item_title(item), "meta": t(
+                    out.append({"id": item.id, "title": item_title(item), "meta": t(
                         "queue.quarantine.meta", id=f"{source[:8]}…",
                         at=clock((item.trust or {}).get("at"))[:5])})
         return out
@@ -726,7 +730,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     @app.get("/pending", response_class=HTMLResponse)
     async def pending(request: Request):
         ctx = pending_context(request, None, arm=None, message=None)
-        boat.read("pending", proposals=[r["id"] for r in ctx["rows"]])
+        boat.read("pending", proposals=[r["id"] for r in ctx["rows"]],
+                  notices=[n["id"] for n in ctx["notices"]])
         return boat.render(request, "pending.html", ctx)
 
     @app.get("/pending/{pid}", response_class=HTMLResponse)
@@ -735,7 +740,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         ctx = pending_context(request, pid, arm=None, message=message)
         if ctx is None:
             return boat.not_found(request)
-        boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]])
+        boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]],
+                  notices=[n["id"] for n in ctx["notices"]])
         return boat.render(request, "pending.html", ctx)
 
     @app.get("/pending/{pid}/window", response_class=HTMLResponse)
@@ -768,7 +774,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
                                                      "token": boat.arm(mode, pid, 0)},
                                   message=None)
             # The armed page shows the whole proposal again: a read on the chain like any view.
-            boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]])
+            boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]],
+                      notices=[n["id"] for n in ctx["notices"]])
             return boat.render(request, "pending.html", {**ctx, "refresh": ARM_SECONDS})
         mode = form.get("mode", "window")
         if step == "confirm" and mode in ("once", "window") and boat.armed(
