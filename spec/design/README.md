@@ -14,7 +14,7 @@ Per R10 (decisions log §N), the following are public open-core surfaces. Every 
 | `step-up-tap-and-pending-approval.md` | 1.34 | 2026-09-28 | The step-up tap page and the pending-approval page (lifeboat and flagship). Consumers: a3-trust, a5-dinghy, a4s/a4g, a2-conformance, a6-adversary. |
 | `lifeboat.md` | 1.22 | 2026-09-28 | The lifeboat (`egzos web`): home/search, item detail, uniform not-found, scheme switch, pending parity rule. Consumer: a5-dinghy. |
 | `brand/BRAND.md` | 1.1 | 2026-09-28 | The egzos identity: the mark (Orb, dither), the wordmark and lockups, the size and texture laws, placements × contexts, the terminal forms, and the pipeline that emits every master under `brand/**` byte for byte. Consumers: the Chief, a5-dinghy, a3-doorman, a4s-atelier, a2-conformance, a6-adversary. |
-| `consent.md` | 1.27 | 2026-09-28 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
+| `consent.md` | 1.28 | 2026-10-03 | The authorization server's pages: `/login`, `/device`, `/authorize` (consent in `token ls` vocabulary), outcomes, the uniform failure page. Consumer: a3-trust. |
 
 **Version rule.** A file's own header is authoritative; this table is the index a builder checks first, and it is bumped in the same commit as the file.
 
