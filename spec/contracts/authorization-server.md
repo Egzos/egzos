@@ -340,8 +340,8 @@ to a registered entry, and MUST NOT implement:
 - **scheme or host normalisation** beyond the URI's own case rules — no "http where https was
   registered", no trailing-slash equivalence.
 
-A registered URI is absolute and `https`, with the loopback exception stated next: it relaxes the
-scheme to `http`, and — for the literal loopback address only — the port.
+A registered URI is absolute and `https`, with the loopback exception stated next: for the literal
+loopback address, and only there, it relaxes the scheme to `http` and ignores the port.
 
 ### 5.2 · The exception: loopback redirect URIs
 
@@ -354,19 +354,30 @@ time, so the port is the one component that varies. The exception is bounded to:
   every AS endpoint and grants no exception to it;
 - **only the port is ignored.** Path, query, scheme and host are compared exactly, as above.
 
-**`localhost` as a hostname is permitted — as an exact registered string, including the port. a1p**,
-binding §K's "localhost dev origins". RFC 8252 §8.3 prefers the literal IP precisely because
-`localhost` resolves through a name, and a name is something a resolver, a hosts file or a hostile
-network can move — so the name form gets the scheme relaxation and **no port exception**:
-`http://localhost:<port>/…` matches only the exact string registered, port included, and a developer
-registers the port they will actually bind. The port relaxation above stays bounded to `127.0.0.1`
-and `[::1]`.
+**`localhost` as a hostname is refused. [0.3 · 22]** The loopback host set is closed at the two
+literal addresses above: **`127.0.0.1` and `[::1]` only**. A draft of this section permitted
+`http://localhost:<port>/…` as an exact registered string with no port exception; the review dropped
+the hostname form entirely, and the reason is RFC 8252 §8.3's own — `localhost` resolves through a
+name, and a name is something a resolver, a hosts file, a DNS answer or a hostile network can move,
+while `127.0.0.1` is not a name and cannot be moved. The difference is between one hole and none.
 
-`[OPEN→0.3]` **Whether the hostname form is dropped entirely.** The clause above is a1p's binding,
-not a §K decision, and it is the only part of this rule left open: A6 and the freeze may rule that
-only the literal loopback address is registrable and `localhost` entries are refused. The scheme,
-the port and the matching are settled above, because this is the difference between one hole and
-none.
+Testably:
+
+1. **Registration refuses** a `redirect_uri` whose host is `localhost`, in any case spelling, with
+   or without a port. The refusal happens at registration (§5, an owner act with the owner present
+   to read it) and not at authorization time, so a developer learns of it when they can act on it.
+2. **An authorization request** naming a `localhost` `redirect_uri` is a request naming an
+   unregistered URI — clause (1) made sure no such entry exists — and takes §5.3's pre-trust uniform
+   failure like any other unregistered one. It gets no special error: a distinct "localhost is
+   refused" response at `/authorize` would be a registry oracle of exactly the kind §5.3 closes.
+3. **§K's "localhost dev origins"** are accommodated, which is what §K asked for. A dev client binds
+   to loopback and registers `http://127.0.0.1/…` or `http://[::1]/…`; the port exception above
+   means the ephemeral port it actually binds needs no second registration. Nothing a developer does
+   requires the name form — a browser follows `http://127.0.0.1:8731/cb` exactly as it follows the
+   name — so this costs a string and buys a resolver out of the trust path.
+
+This is also the one clause in §5 where **a1p's binding was overruled** rather than confirmed, and
+it is marked so a reader of the freeze record and a reader of this section see the same thing.
 
 ### 5.3 · The pre-trust uniform failure
 
@@ -448,10 +459,16 @@ under any cause.** Testable as written:
    alone still leaves this difference open, and unlike the first two this clause gives it no
    disposition: whether it too must be padded to the full validation budget — a real cost, since
    padding a cheap refusal to the price of a validated one gives up part of what a throttle is
-   for — or stands as a narrower, justified exception, is not decided here. `[OPEN→0.3]` **the
-   freeze review settles the third difference's disposition**; naming it here keeps this clause
-   honest about what "Testable as written" actually covers today, rather than leaving a reader to
-   infer a disposition the clause does not state. **The first two differences' padding is a named
+   for — **stands as a narrower, justified exception: padding it is a SHOULD, not a MUST.**
+   **a1p**, binding **[0.3 · 42]**'s timing posture (`capabilities.md` §6 clause E3,
+   *"timing-insensitive where practical; stated as a SHOULD, not a MUST"*) onto the one difference
+   this section left without a disposition. The record settled the posture and not this instance, so
+   the binding is a1p's and is marked as both. It is the right side of the line for the reason the
+   clause already gives: the first two differences would leak a fact about the **registry** — what
+   is registered, which is the owner's — while this one leaks only a fact about the **caller's own
+   request**, that it was throttled or that it carried a credential, which the caller already knows.
+   An implementation that pads it fully is conforming; one that does not is conforming too, and
+   neither may use the exception to widen the first two, which stay MUSTs. **The first two differences' padding is a named
    spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
@@ -475,9 +492,19 @@ under any cause.** Testable as written:
 The uniformity is owed to the caller and never to the owner's ledger: row (d)'s seven causes are
 exactly the distinctions §12 records and this page hides.
 
-`[OPEN→0.3]` **The status code and the page's copy** — the convergence is the contract; the number
-and the words are `consent.md`'s to render and the review's to confirm. A status that differed by
-cause breaks clause 1 whatever the page says.
+**The status code is HTTP 400, and the page carries one copy line. [0.3 · 23]** Every cause in
+clause 1's set answers `400` with the same single line of copy, and a status that differed by cause
+breaks clause 1 whatever the page says. `400` rather than `401` or `403`: those two are claims about
+the caller's *credential*, and this page is reached by causes that have nothing to do with one — a
+malformed request and a mismatched `redirect_uri` among them — so a status naming authentication
+would itself be a weak distinguisher and would invite a client to retry with a credential §11
+accepts none of. `404` is wrong for the opposite reason: the endpoint exists and is advertised
+(§6).
+
+**One copy line** means the body carries a single sentence, identical across causes, naming neither
+the client, nor the request, nor which check failed. `consent.md` renders the words, and the words
+are a spec revision there, not a clause here; the convergence — one status, one body, byte-identical
+— is this document's and is what clause 1 tests.
 
 ## 6 · AS metadata discovery
 
@@ -488,7 +515,7 @@ container" as a category unless every container announces itself identically —
 **is** the interoperability surface, and the rest of this document is only reachable through it.
 
 **Endpoint:** `/.well-known/oauth-authorization-server`, at the container's own origin, served
-**unauthenticated** over TLS (§2, whose `[OPEN→0.3]` governs any local exemption). **a1p** — RFC 8414's location; §K
+**unauthenticated** over TLS (§2, whose **[0.3 · 9]** loopback clause governs the one exemption). **a1p** — RFC 8414's location; §K
 names the requirement and not the path.
 
 Unauthenticated is deliberate and is not a leak: the document describes the *protocol* a container
@@ -503,8 +530,7 @@ container-specific — no node ids, no client names, no owner identity — may b
 | `authorization_endpoint` | §2 |
 | `token_endpoint` | §2, §3 |
 | `device_authorization_endpoint` | §3 |
-| `revocation_endpoint` | §9 — `[OPEN→0.3]`; **advertised only if** the endpoint exists |
-| `registration_endpoint` | §5 — `[OPEN→0.3]`; **advertised only if** dynamic registration is enabled |
+| `revocation_endpoint` | §9 — **[0.3 · 11]**: the endpoint exists, so the row is unconditional |
 | `response_types_supported` | `["code"]` — and nothing else, ever (§2) |
 | `grant_types_supported` | `["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"]` |
 | `code_challenge_methods_supported` | `["S256"]` — `plain` is never advertised (§2) |
@@ -516,20 +542,34 @@ method, grant or endpoint it does not implement, and MUST NOT implement one it d
 a fork's UI reads this document *through* the metadata, so a mismatch is a conformance failure and
 not a documentation bug.
 
-**Two of the eleven rows are therefore conditional, and the table says which: `revocation_endpoint`
-and `registration_endpoint`.** Both name an endpoint whose existence is an open question — §9's for
-revocation, §5's for dynamic registration — and the clause above forbids advertising either until
-the answer is yes. The other nine are unconditional: a container that omits one of them is
-non-conforming. **a1p** — the distinction is stated rather than left to the reader because the field
-list is what an implementation will copy, and copying a conditional row as an unconditional one is
-exactly the mismatch this paragraph forbids. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is the
-whole vocabulary of eleven; `AS_METADATA_CONDITIONAL_FIELDS` names these two.
+**All ten rows are unconditional, and the set is closed. [0.3 · 10, 11]** A draft of this section
+carried eleven rows, two of them conditional on questions the review has now closed in opposite
+directions:
 
-`[OPEN→0.3]` **Whether `scopes_supported` also advertises the `node:` form.** §7's node-scope
-strings are container-specific by construction; listing the *prefix* reveals nothing, listing any
-actual node id would break the "nothing container-specific" rule above. The review should say
-`node:` is advertised as a form, or that it is not advertised at all and clients learn it from this
-contract.
+- **`revocation_endpoint` is advertised, always.** Item 11 decided that the AS exposes an RFC 7009
+  endpoint (§9), so its existence is no longer a question and the row is like any other: a container
+  that omits it is non-conforming.
+- **`registration_endpoint` is not a row at all.** Item 10 decided there is no open dynamic client
+  registration (§5), and the clause above forbids advertising an endpoint a container does not
+  implement. The field is **absent from the document**, not present-and-null: a null would tell a
+  reader the container considered the question, and RFC 8414's rule is that an unsupported optional
+  field is omitted.
+
+A container therefore emits exactly these ten fields, no more and no fewer — the "MUST NOT advertise
+what it does not implement, MUST NOT implement what it does not advertise" clause above now runs in
+both directions with no exception to carry. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is the
+whole vocabulary of ten, and `AS_METADATA_CONDITIONAL_FIELDS`, which named the two exceptions, is
+removed: an empty constant would be a place for a later field to be quietly added.
+
+**`scopes_supported` does not advertise the `node:` form. [0.3 · 28]** It carries the six capability
+names from §7 and nothing else. Clients learn the node-scope form from this contract, which is where
+an interoperability surface's *vocabulary* belongs; the metadata announces what a container
+implements, and every container implements the same six. Advertising the bare `node:` prefix would
+reveal nothing on its own — the argument for it — but it would put a container-specific *form* in
+the one document whose rule is that nothing container-specific appears in it, and the next step from
+"the prefix is advertised" to "an example is advertised" is a short one. Listing an actual node id
+would break that rule outright, and this clause removes the position from which a reader could argue
+for it.
 
 ## 7 · The grant is six capabilities and node ids — nothing else
 
