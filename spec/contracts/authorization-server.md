@@ -41,10 +41,9 @@ Clauses carry one of six markings instead:
 **Reading note — §§1–9 are revised, §§10–13 are not, and where they disagree §§1–9 govern.** Three
 questions §§1–9 now decide are still written as open in Part B: the owner-path revocation keyed on
 `Token.id` (§11.9, decided at §9.2), `verification_uri_complete` and the `user_code` alphabet
-(§11.8, decided at §3 and §9.1), and a non-null `expires_at` (§11.5, decided at §9.3). Those
-passages are **stale, not a second answer**, and the option framings they argue from (§9's "three
-options") no longer exist. In the same direction, §§1–9's forward citations to §11.5, §11.7 and
-§11.8 name where the decided Part B text **will** be written, not where it already is.
+(§11.8, decided at §3 and §9.1), and a non-null `expires_at` (§11.5, decided at §9.3). Those are
+**stale, not a second answer**, and the "three options" framing they argue from no longer exists.
+Likewise §§1–9's citations to §11.5, §11.7 and §11.8 name where that text **will** be written.
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
 client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
@@ -206,11 +205,10 @@ so in its own words, and the two sections are consistent only if read that way.
 
 **The loopback exemption. [0.3 · 9]** The clause above is narrowed in exactly one way: **no TLS is
 required where the AS is bound to a loopback interface** — and for **any** user, not only a
-developer, and not behind a developer-mode flag. **TLS is required everywhere else.** The three
-candidates the review weighed were TLS always, this exemption, and a developer-mode exemption; the
-middle one was taken because a certificate story for every laptop container is a requirement the
-product cannot meet, and a mode a user can enable is a mode an attacker can talk a user into
-enabling.
+developer, and not behind a developer-mode flag. **TLS is required everywhere else.** Of the three
+candidates weighed — TLS always, this exemption, a developer-mode exemption — the middle was taken
+because a certificate story for every laptop container is a requirement the product cannot meet, and
+a mode a user can enable is a mode an attacker can talk a user into enabling.
 
 The exemption is a property of the **bind address**, not of a request, a header or a hostname:
 
@@ -226,9 +224,8 @@ The exemption is a property of the **bind address**, not of a request, a header 
 4. This exemption governs AS endpoints only. §5's `http` allowance for a *client's* registered
    loopback redirect URI is a separate clause with a separate reason, and neither widens the other.
 
-`serve --tls` (a3-doorman, build plan 5.3) therefore remains optional for a loopback bind and
-mandatory for every other one; enforcing that refusal is Doorman's, and requiring it is this
-document's.
+`serve --tls` (a3-doorman, build plan 5.3) is therefore optional for a loopback bind and mandatory
+for every other one; enforcing the refusal is Doorman's, requiring it is this document's.
 
 ## 3 · CLI and headless — device code
 
@@ -307,13 +304,12 @@ renders is a field the registry has to carry.
 
 **Registering, amending or removing a client writes `client.register`. [0.3 · 31]** The event
 carries `{client_id, op, redirect_uris}`, where `op` is one of `add` · `amend` · `remove`, and it is
-its own event rather than a member of the `authz.*` family: the redirect allowlist is the classic AS
-hole, this section's exact-match rule is only as strong as the allowlist it compares against, and a
-change to that allowlist is a change to the AS's security posture whether or not any token is
-involved. `redirect_uris` carries the entry's URIs **after** the change (empty on `remove`), so the
-log states the allowlist as it then stood rather than the delta that produced it. This section is
-where a reader looks for why the event exists; **`events.md` §1 does not yet carry the row — see
-§9.3, where this name and `authz.grant` are both recorded as decided-pending.**
+its own event rather than a member of the `authz.*` family: this section's exact-match rule is only
+as strong as the allowlist it compares against, so a change to that allowlist is a change to the
+AS's security posture whether or not any token is involved. `redirect_uris` carries the entry's URIs
+**after** the change (empty on `remove`), so the log states the allowlist as it then stood rather
+than the delta that produced it. **`events.md` §1 does not yet carry the row — §9.3 records this
+name and `authz.grant` as decided-pending.**
 
 **No open dynamic client registration. [0.3 · 10]** RFC 7591's endpoint is what the MCP
 authorization spec expects (§4), and an open registration endpoint on a personal container lets any
@@ -327,11 +323,10 @@ caller create a client entry — which is the direction that loses. Concretely:
    deployment may not add one.
 
 What this costs is named rather than hidden: an MCP client that expects to self-register against an
-unknown AS does not work until its `client_id` is registered by the owner. Phase 5 builds against
-that, and the owner-approval path in (1) is what makes it a one-screen act rather than a config-file
-edit. Whether v1.1 adds an owner-gated RFC 7591 endpoint — registration that follows the standard's
-shape but behind the consent screen rather than open — is a **`[v1.1]`** question at the Phase 5
-contract boundary, not reopened here.
+unknown AS does not work until its `client_id` is registered by the owner, and (1)'s consent-screen
+path is what makes that a one-screen act rather than a config-file edit. Whether v1.1 adds an
+owner-gated RFC 7591 endpoint — the standard's shape, behind the consent screen — is a **`[v1.1]`**
+question at the Phase 5 contract boundary, not reopened here.
 
 ### 5.1 · The matching rule is exact string comparison
 
@@ -367,23 +362,21 @@ time, so the port is the one component that varies. The exception is bounded to:
 **`localhost` as a hostname is refused. [0.3 · 22]** The loopback host set is closed at the two
 literal addresses above: **`127.0.0.1` and `[::1]` only**. A draft of this section permitted
 `http://localhost:<port>/…` as an exact registered string with no port exception; the review dropped
-the hostname form entirely, and the reason is RFC 8252 §8.3's own — `localhost` resolves through a
-name, and a name is something a resolver, a hosts file, a DNS answer or a hostile network can move,
-while `127.0.0.1` is not a name and cannot be moved. The difference is between one hole and none.
-
-Testably:
+the hostname form entirely, for RFC 8252 §8.3's own reason — `localhost` resolves through a name,
+and a name is something a resolver, a hosts file, a DNS answer or a hostile network can move, while
+`127.0.0.1` is not a name and cannot be moved. Testably:
 
 1. **Registration refuses** a `redirect_uri` whose host is `localhost`, in any case spelling, with
    or without a port. The refusal happens at registration (§5, an owner act with the owner present
    to read it) and not at authorization time, so a developer learns of it when they can act on it.
 2. **An authorization request** naming a `localhost` `redirect_uri` is a request naming an
    unregistered URI — clause (1) made sure no such entry exists — and takes §5.3's pre-trust uniform
-   failure like any other unregistered one. It gets no special error: a distinct "localhost is
-   refused" response at `/authorize` would be a registry oracle of exactly the kind §5.3 closes.
-3. **§K's "localhost dev origins"** are still accommodated, which is what §K asked for: a dev client
-   registers `http://127.0.0.1/…` or `http://[::1]/…`, and the port exception above means the
-   ephemeral port it binds needs no second registration. A browser follows `http://127.0.0.1:8731/cb`
-   exactly as it follows the name, so this costs a string and buys a resolver out of the trust path.
+   failure like any other. A distinct "localhost is refused" response at `/authorize` would be a
+   registry oracle of exactly the kind §5.3 closes.
+3. **§K's "localhost dev origins"** are still accommodated: a dev client registers
+   `http://127.0.0.1/…` or `http://[::1]/…`, and the port exception above means the ephemeral port
+   it binds needs no second registration. A browser follows `http://127.0.0.1:8731/cb` exactly as it
+   follows the name, so this costs a string and buys a resolver out of the trust path.
 
 This is the one clause in §5 where **a1p's binding was overruled** rather than confirmed, marked so
 that a reader of the freeze record and a reader of this section see the same thing.
@@ -561,22 +554,20 @@ directions:
 - **`registration_endpoint` is not a row at all.** Item 10 decided there is no open dynamic client
   registration (§5), and the clause above forbids advertising an endpoint a container does not
   implement. The field is **absent from the document**, not present-and-null: a null would tell a
-  reader the container considered the question, and RFC 8414's rule is that an unsupported optional
-  field is omitted.
+  reader the container considered the question, and RFC 8414 omits an unsupported optional field.
 
-A container therefore emits exactly these ten fields, no more and no fewer — the "MUST NOT advertise
-what it does not implement, MUST NOT implement what it does not advertise" clause above now runs in
-both directions with no exception to carry. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is the
-whole vocabulary of ten, and `AS_METADATA_CONDITIONAL_FIELDS`, which named the two exceptions, is
-removed: an empty constant would be a place for a later field to be quietly added.
+A container therefore emits exactly these ten fields, no more and no fewer, so the "MUST NOT
+advertise what it does not implement, MUST NOT implement what it does not advertise" clause above
+runs in both directions with no exception to carry. `AS_METADATA_FIELDS` in `src/egzos/_types.py` is
+the whole vocabulary of ten, and `AS_METADATA_CONDITIONAL_FIELDS`, which named the two exceptions,
+is removed: an empty constant would be a place for a later field to be quietly added.
 
 **`scopes_supported` does not advertise the `node:` form. [0.3 · 28]** It carries the six capability
 names from §7 and nothing else; clients learn the node-scope form from this contract, which is where
 an interoperability surface's *vocabulary* belongs. Advertising the bare prefix would reveal nothing
 on its own — the argument for it — but it would put a container-specific *form* in the one document
 whose rule is that nothing container-specific appears there, and the step from "the prefix is
-advertised" to "an example is advertised" is short. This clause removes the position from which a
-reader could argue for it.
+advertised" to "an example is advertised" is short.
 
 ## 7 · The grant is six capabilities and node ids — nothing else
 
@@ -685,25 +676,20 @@ two dispositions it was offered and **scoped the collapse out of v1.0 explicitly
 - **There is no IdP collapse in v1.0. `[v1.1]`.** No container may be configured to accept an
   external OIDC identity as its own, there is no config key that does so, and a deployment may not
   add one. A container that collapses the two authorities is **non-conforming** — not
-  misconfigured, and not "configured unusually": the configuration that would make it conforming
-  does not exist in v1.0.
-- **Double login is therefore unconditional here**, not a default a deployment can move off. §K's
-  `MAY` is preserved above as the record of what was decided at §K and is **not** in force in v1.0.
-- **v1.0's browser identity for the container is a container secret. [0.3 · 7]**, stated at §11.7
-  where the login lives. That is what fills the space this clause declines to fill, and it is why
-  declining costs the product nothing it has today.
+  misconfigured: the configuration that would make it conforming does not exist in v1.0.
+- **Double login is therefore unconditional here.** §K's `MAY` is preserved above as the record of
+  what was decided at §K and is **not** in force in v1.0.
+- **v1.0's browser identity for the container is a container secret. [0.3 · 7]**, to be stated at
+  §11.7 where the login lives — which is why declining costs the product nothing it has today.
 
-The collapse was named by §K and never designed by it. What is missing is not a detail: which IdP
-claims map to which container identity, what happens to live tokens when the trust is withdrawn, and
-what an IdP compromise then reaches — all unanswered, and a half-specified identity bridge is worse
-than an absent one, because the absent one cannot be built against. Deferring it is also the cheaper
-direction to be wrong in: v1.1 can add the collapse behind the owner's own configuration without
-breaking any token this contract issues, while a v1.0 that shipped it could not take it back.
-
-**The separation above is not deferred with it.** Every clause earlier in this section — no token
-exchange, no assertion grant, no path from a flagship session to container access — is in force in
-v1.0 and is unaffected by this deferral. The collapse would have been an owner-configured exception
-to the *login*; it was never an exception to the authority boundary.
+The collapse was named by §K and never designed by it, and what is missing is not a detail: which
+IdP claims map to which container identity, what happens to live tokens when the trust is withdrawn,
+and what an IdP compromise then reaches. Deferring is the cheaper direction to be wrong in: v1.1 can
+add the collapse behind the owner's own configuration without breaking any token this contract
+issues, while a v1.0 that shipped it could not take it back. **The separation above is not deferred
+with it**: no token exchange, no assertion grant, no path from a flagship session to container
+access — each is in force in v1.0. The collapse would have been an owner-configured exception to the
+*login*; it was never an exception to the authority boundary.
 
 ## 9 · Issuance, revocation, rotation and expiry
 
@@ -718,17 +704,17 @@ otherwise complete an exchange and leave no trace in the chain.
 **Every credential value the AS mints — an access token, a refresh token, an authorization code, a
 `device_code`, a `user_code` — is generated by a cryptographically secure random source, and no
 value is derived from a counter, a timestamp, a client id, an owner identity or any other
-predictable input. a1p.** Stated here, at the top of the section, and not inside any option below,
+predictable input. a1p.** Stated here, at the top of the section, and not inside any clause below,
 because **a guessable value is a forged grant under every outcome this section can have.** A bearer
-token *is* its value: whoever can produce the value holds the grant, whether the AS offers a
-revocation endpoint (option 1), offers none (option 3), or leaves the question open (option 2, what
-this document takes). §3 mitigation 1 already does this work for the `user_code`, where the value is
+token *is* its value: whoever can produce the value holds the grant, whichever way §9.2's revocation
+question went — and **[0.3 · 11]** took the endpoint, which makes the dependency below a live one.
+§3 mitigation 1 already does this work for the `user_code`, where the value is
 short by design and a human types it; the clause above says the same thing about every other value
 the AS issues, where nothing about the surface makes the requirement visible.
 
-Option 1 **additionally** depends on it — an endpoint that accepts a token value from an
-unauthenticated caller is bounded by that value's entropy and by nothing else, as the option says in
-its own words — but the dependency runs one way only: rejecting option 1 does not reduce this
+§9.2's endpoint **additionally** depends on it — an endpoint that accepts a token value from an
+unauthenticated caller is bounded by that value's entropy and by nothing else, as the clause says in
+its own words — but the dependency runs one way only: it is not the whole of this
 requirement, because rotation clause 2 below hands the same reach to the same holder at the token
 endpoint, and §2's code binding, §3's device codes and every access token already rest on it.
 
@@ -767,28 +753,26 @@ A revoked token is `capabilities.md` §5's: it holds **no** capabilities, and re
 second revocation semantics, which is the point.
 
 **The AS exposes an RFC 7009 revocation endpoint, and the owner additionally revokes by `Token.id`.
-[0.3 · 11]** The review took **both** halves: option 1 below as written, **plus** an owner path on
-the container's own pages. The reason both were needed is the one the question turned on — **a
-browser or an MCP client cannot run `token rm`**, so an HTTP endpoint is the only revocation path
-two of §1's three client types have, while an endpoint bounded by a token's value alone is not a
-path on which an owner should have to revoke *someone else's* live token. Each half covers what the
-other cannot:
+[0.3 · 11]** The review took **both** halves: clause 1 below as written, **plus** an owner path on
+the container's own pages. **A browser or an MCP client cannot run `token rm`**, so an HTTP endpoint
+is the only revocation path two of §1's three client types have; and an endpoint bounded by a
+token's value alone is no path on which an owner should have to revoke *someone else's* live token.
+Each half covers what the other cannot:
 
-- **The client path** (option 1) lets a holder revoke the token it holds, with the silence rule and
-  the defence-in-depth `client_id` comparison exactly as option 1 states them. It is bounded by
-  §9.1's entropy and by nothing else, and option 1's own text says so.
+- **The client path** (clause 1) lets a holder revoke the token it holds, with the silence rule and
+  the `client_id` comparison as clause 1 states them, bounded by §9.1's entropy and nothing else.
 - **The owner path** lets the owner revoke **any** token in `token ls` by its `Token.id`, from the
-  container's pages, inside an authenticated interactive session. It reaches a token whose value the
-  owner does not have — which is every token except the one in front of them — and `Token.id` is
-  safe to render for exactly the reason §9.1's closing clause gives: it is the identifier, not the
-  value, so a page listing it hands a reader no credential.
+  container's pages, inside an authenticated interactive session — reaching tokens whose values the
+  owner does not have. `Token.id` is safe to render for §9.1's closing reason: it is the identifier,
+  not the value, so a page listing it hands a reader no credential.
 
-**The owner path adds `revoke` to the closed `surface` vocabulary** (`AS_THROTTLE_SURFACES` in
-`_types.py`, §12.1), and **an entry on its refusal path**: a revocation attempt naming a `Token.id`
-that does not exist, or one the session may not reach, is refused uniformly — §7.1's rule applied to
-an identifier rather than a scope, since an owner page that answered differently for "no such token"
-and "not yours" would enumerate tokens to anyone who reached the page. The refusal appends like any
-other, and the throttle keyed on `revoke` bounds a caller walking the identifier space.
+**The owner path adds `revoke` to the closed `surface` vocabulary** — **decided-pending**: §12.1
+rule 5 and `AS_THROTTLE_SURFACES` in `_types.py` still pin four words (`login` · `device` ·
+`authorize` · `tap`), both land in the Part B PR, and so the fifth word is decided but written
+nowhere a test can read. It also adds **an entry on its refusal path**: an attempt naming a
+`Token.id` that does not exist, or one the session may not reach, is refused uniformly — §7.1
+applied to an identifier rather than a scope, since a page answering "no such token" differently
+from "not yours" would enumerate tokens. The throttle keyed on `revoke` bounds a walk of the id space.
 
 Where the two paths meet: a token revoked by either is `capabilities.md` §5's revoked token, holds
 no capabilities, and writes one `token.revoke` (**[0.3 · 30]**, carrying the refresh-family id). The
@@ -893,57 +877,50 @@ than trust the number, each now with its disposition:
 
 **Three of this table's rows are decided-pending, and the pending half is `events.md`'s.**
 `authz.grant` (rows 3, 4) and `client.register` (row 6) are **not** among `events.md` §1's eighteen
-names, and §4 invariant 2's amendment that row 5 needs is not written either. **All three edits
-land in #109 PR 2 and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3 · 38]**).
-Until that PR merges `events.md` governs as it stands — an append under either new name MUST be
-rejected, and row 5's silence is a conformance failure — so **no implementation may be built
-against this table yet**. The decisions are fixed; only the text that makes them citable is absent,
-and this paragraph is here so a reader of the merged tree is not told otherwise.
+names, and §4 invariant 2's amendment that row 5 needs is unwritten. **All three edits land in #109
+PR 2 and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3 · 38]**). Until it merges
+`events.md` governs as it stands — an append under either new name MUST be rejected, row 5's
+silence is a conformance failure — so **no implementation may be built against this table yet.**
 
 **`authz.grant {client_id, decision, scopes, capabilities}`. [0.3 · 29]** One row with a closed
-`decision` of `granted` · `denied`, rather than an `authz.grant`/`authz.deny` pair. One row because
-the two halves carry identical fields and differ only in outcome, and splitting them would make the
-*absence* of a deny row a signal in a log an owner reads by name. This closes the
-probe-leaves-no-trace hole in a single entry: a client that walks `/authorize` to see what a
-container holds now leaves a denied row per attempt, and §7.1's convergence means those rows are the
-only place that attempt is visible at all. `scopes` and `capabilities` record what was *requested*,
-including on a deny, since what a client asked for is the fact an owner reviewing the log needs.
+`decision` of `granted` · `denied`, not an `authz.grant`/`authz.deny` pair: the two halves carry
+identical fields and differ only in outcome, and splitting them would make the *absence* of a deny
+row a signal in a log an owner reads by name. It closes the probe-leaves-no-trace hole in a single
+entry — a client walking `/authorize` to see what a container holds leaves a denied row per attempt,
+and §7.1's convergence makes those rows the only place the attempt is visible at all. `scopes` and
+`capabilities` record what was *requested*, including on a deny.
 
 **Rotation emits no event. [0.3 · 30]** Clause 2 above revokes a reused chain and writes
-`token.revoke` like any revocation; a successful rotation writes `token.mint` for the token it
-issues. What is added instead of a `token.rotate` row is that **both carry the refresh-family id**,
-so a reuse-detection cascade revokes a chain the log can name and a reader can follow a family from
-its first mint to its last revocation. A `token.rotate` row was the alternative and was rejected for
-what it would turn the chain into: a rotation fires on a schedule the client picks, so a log
-carrying one is a session log, and an audit chain that fills with routine machine traffic is one an
-owner stops reading. The silence here is a decision; what will keep it from being a conformance
-failure is §4 invariant 2's amendment (**[0.3 · 38]**), decided-pending above.
+`token.revoke`; a successful rotation writes `token.mint` for the token it issues. What is added
+instead of a `token.rotate` row is that **both carry the refresh-family id**, so a reuse-detection
+cascade revokes a chain the log can name and a reader can follow a family from first mint to last
+revocation. A `token.rotate` row was rejected for what it would turn the chain into: a rotation
+fires on a schedule the client picks, so a log carrying one is a session log, and an audit chain
+that fills with routine machine traffic is one an owner stops reading. The silence is a decision;
+what will keep it from being a conformance failure is **[0.3 · 38]**, decided-pending above.
 
 **`client.register {client_id, op, redirect_uris}`. [0.3 · 31]** Specified at §5, named here so the
 count closes. Its own event rather than a member of the `authz.*` family: a registration produces no
-token and concerns no grant, and the allowlist it writes is the state §5.1's exact-match rule
-compares against.
+token and concerns no grant, and what it writes is the state §5.1's exact-match rule compares against.
 
 **A device authorization request gets no separate event. [0.3 · 32]** Effect 7 is covered twice
 over: §12's device-redemption row appends when a `user_code` is redeemed, and rows 3/4 append when
 the owner decides. What remains uncovered is the **initiated-then-abandoned** request — a
-`device_code` and `user_code` minted and never redeemed, by a caller holding no token — and that is
-accepted knowingly rather than overlooked. The reasoning: the state it creates is bounded (§3
-mitigation 1 expires it) and reaches nothing (an unredeemed `device_code` is not a grant), while an
-event on every device-authorization request would be an unauthenticated caller's write into the
-owner's hash chain at a rate the caller chooses. §12.1's throttle bounds the request rate; the
-append would have been the unbounded thing. A reader counting effects should read effect 7's silence
-as this trade and not as an omission.
+`device_code` and `user_code` minted and never redeemed, by a caller holding no token — and it is
+accepted knowingly. The state it creates is bounded (§3 mitigation 1 expires it) and reaches nothing
+(an unredeemed `device_code` is not a grant), while an event on every such request would be an
+unauthenticated caller's write into the owner's hash chain at a rate the caller chooses: §12.1's
+throttle bounds the request rate, and the append would have been the unbounded thing. Effect 7's
+silence is that trade, not an omission.
 
 **Default access-token lifetime: 1 hour, and never null. [0.3 · 17]** An AS-issued access token
 **always** carries a non-null `expires_at`, defaulting to **1 hour** from issuance.
-`capabilities.md` §5 permits `expires_at: null`, which is right for a long-lived script token the
+`capabilities.md` §5 permits `expires_at: null`, which is right for a long-lived script token an
 owner mints deliberately and wrong for a token handed to a public client by a flow; **the null case
-stays available to `token mint` only**, where an owner is choosing it with the consequence in front
-of them. There is no AS path, parameter or config key by which a client obtains a non-expiring
-token, and a deployment may not add one. `AS_ACCESS_TOKEN_LIFETIME_SECONDS = 3600` in `_types.py`
-carries the default — **a1p**'s naming of a `[0.3]` number. Grant expiry, which is the longer clock
-over this one, is **[0.3 · 18]** at §11.5.
+stays available to `token mint` only**. There is no AS path, parameter or config key by which a
+client obtains a non-expiring token, and a deployment may not add one.
+`AS_ACCESS_TOKEN_LIFETIME_SECONDS = 3600` in `_types.py` carries the default — **a1p**'s naming of a
+`[0.3]` number. Grant expiry, the longer clock over this one, is **[0.3 · 18]** at §11.5.
 
 ## 10 · Presence composition — where `principal: interactive` comes from
 
