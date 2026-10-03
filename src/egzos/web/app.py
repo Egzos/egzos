@@ -51,7 +51,7 @@ from egzos.authz.presence import (
 from egzos.container import OWNER, Container
 from egzos.store.find import QueryError, find
 from egzos.trust import TrustError
-from egzos.web.strings import S, t
+from egzos.web.strings import S, around, number_free, t
 
 COOKIE = "egzos_k"
 SCHEME_COOKIE = "egz-scheme"
@@ -272,6 +272,7 @@ class Lifeboat:
             {
                 "S": S,
                 "t": t,
+                "around": around,
                 "scheme": scheme,
                 "printed": time.strftime("%H:%M:%S"),
                 "container_name": self.c.home.name,
@@ -429,7 +430,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         if invalid:
             header = None
         elif not hits:
-            header = S["results.uncounted"] if q else "Recent"
+            header = S["results.uncounted"] if q else number_free("results.recent")  # R3 empty
         else:
             header = t("results.count", n=len(hits)) if q else t("results.recent", n=len(hits))
         nxt = boat.cursor(q, start + PAGE) if start + PAGE < len(hits) else None
@@ -499,21 +500,21 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
                         if content.get("sha256") else S["prov.null"]),
             } if item.kind == "artifact" else None,
             "prov": [
-                ("actor", prov.get("actor")),
-                ("principal", prov.get("principal")),
-                ("client", prov.get("client")),
-                ("derived from", derived),
-                ("imported from", prov.get("imported_from")),
-                ("approved by", prov.get("approved_by")),
+                (S["prov.actor"], prov.get("actor")),
+                (S["prov.principal"], prov.get("principal")),
+                (S["prov.client"], prov.get("client")),
+                (S["prov.derived"], derived),
+                (S["prov.imported"], prov.get("imported_from")),
+                (S["prov.approved"], prov.get("approved_by")),
             ],
             "derived_link": derived_link,
             "promoted": (t("trust.promoted", at=clock(trust.get("promoted_at")),
                            prefix=(trust.get("manifest") or "")[:8])
                          if item.status == "verified" and trust.get("promoted_at") else None),
             "life": [
-                ("created", clock(item.lifecycle.get("created_at")) or S["prov.null"]),
-                ("updated", clock(item.lifecycle.get("updated_at")) or S["prov.null"]),
-                ("version", f"v{item.lifecycle.get('version', 1)}"),
+                (S["life.created"], clock(item.lifecycle.get("created_at")) or S["prov.null"]),
+                (S["life.updated"], clock(item.lifecycle.get("updated_at")) or S["prov.null"]),
+                (S["life.version"], f"v{item.lifecycle.get('version', 1)}"),
             ],
             "tags": item.tags or [],
             "key": item.key,
@@ -632,6 +633,24 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             })
         return rows
 
+    def notices() -> list[dict[str, Any]]:
+        """Quarantine notices, pinned at the end of the queue (the tap spec §3.1, R3): an item
+        that stopped serving because what it was derived from was quarantined. A notice, not an
+        act — lifting a quarantine is the CLI's in this lifeboat (§0) — so it has no link."""
+        token = boat.token()
+        out = []
+        for node in boat.c.backend.list_nodes():
+            if not boat.c.trust.covers(token, node):
+                continue
+            for item in boat.c.backend.query([node.id]):
+                source = (item.provenance or {}).get("derived_from")
+                if item.status == "quarantined" and source and \
+                        str((item.trust or {}).get("reason", "")).startswith("derived from"):
+                    out.append({"title": item_title(item), "meta": t(
+                        "queue.quarantine.meta", id=f"{source[:8]}…",
+                        at=clock((item.trust or {}).get("at"))[:5])})
+        return out
+
     def pending_context(request: Request, pid: str | None, *, arm: dict[str, str] | None,
                         message: tuple[str, str] | None) -> dict[str, Any] | None:
         rows = queue()
@@ -680,6 +699,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             "shell": boat.shell(request, current="pending", scheme=False),
             "title": S["title.pending"],
             "rows": rows,
+            "notices": notices(),
             "open_id": open_id,
             "detail": detail,
             "message": message,

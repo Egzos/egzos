@@ -19,6 +19,9 @@ code, .mono, .kind, .scope, .ref, .meta, .hints, time, .shell, .viewer, .window 
 a { color: var(--egz-ink); }
 a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
   outline: var(--egz-focus); outline-offset: 3px; }
+/* The page heading takes first focus (R6, §12.2) as a landing point for assistive technology; it
+   is not a control, so it draws no ring. */
+h1[tabindex="-1"]:focus { outline: none; }
 
 /* R1 shell */
 header { border-bottom: var(--egz-hair) solid var(--egz-rule-soft); padding-bottom: var(--egz-sp-3);
@@ -104,6 +107,10 @@ dd { margin: 0; }
   padding: var(--egz-sp-3); text-decoration: none; border-bottom: var(--egz-hair) solid var(--egz-rule-soft); }
 .queue a.open { border: var(--egz-bw) solid var(--egz-rule); box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink); }
 .queue .kind { text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); font-size: var(--egz-fs-1); }
+/* Quarantine notices: pinned at the end, a notice not a link, the only red in the queue (R3). */
+.queue .notice { display: flex; flex-direction: column; gap: var(--egz-sp-1); padding: var(--egz-sp-2);
+  border-bottom: var(--egz-hair) solid var(--egz-rule-soft); }
+.queue .notice .kind { color: var(--egz-alarm); }
 blockquote.reason { margin: var(--egz-sp-3) 0; }
 blockquote.reason cite { font-family: var(--egz-font-mono); font-style: normal; font-size: var(--egz-fs-2); }
 table { width: 100%; border-collapse: collapse; }

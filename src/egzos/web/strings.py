@@ -41,6 +41,27 @@ S: dict[str, str] = {
     "content.download": "Download",
     "content.unavailable": "Download unavailable.",
     "prov.null": "—",
+    "prov.actor": "actor",
+    "prov.principal": "principal",
+    "prov.client": "client",
+    "prov.derived": "derived from",
+    "prov.imported": "imported from",
+    "prov.approved": "approved by",
+    "life.created": "created",
+    "life.updated": "updated",
+    "life.version": "version",
+    "meta.filename": "filename",
+    "meta.size": "size",
+    "meta.mime": "type",
+    "meta.sha": "sha256",
+    "row.meta": "{actor} · v{version}",
+    # R8's trust and tags <dt> labels: §13 names none (design-gap #129); one place until it does.
+    "dl.status": "status",
+    "dl.promoted": "promoted",
+    "dl.tags": "tags",
+    "dl.key": "key",
+    "item.scope": "in {scope} · ring {ring}",
+    "item.scope.root": "in {scope}",
     "trust.promoted": "promoted {at} · manifest sha256 {prefix}…",
     "act.promote": "Promote to verified",
     "act.promote.confirm": "Confirm promotion",
@@ -54,6 +75,8 @@ S: dict[str, str] = {
     "notfound.title": "Nothing here.",
     "fail.error": "Something went wrong on the container. Nothing changed. Try again.",
     "fail.retry": "Retry",
+    # R12's card label, verbatim (the card's word has no §13 key of its own).
+    "card.error": "error",
     "print.footer": "printed {at} · {container}",
     "title.home": "egzos · search",
     "title.item": "egzos · item",
@@ -65,6 +88,8 @@ S: dict[str, str] = {
     "queue.empty": "Nothing is waiting for you.",
     "kind.publish": "publish · outward",
     "kind.quarantine": "quarantined · propagated",
+    # The tap spec's R3 `quarantined` row, verbatim (its meta has no §13 key of its own).
+    "queue.quarantine.meta": "derived_from {id} · quarantined {at}",
     "ref.proposal": "PROPOSAL {id} · filed {at}",
     "title.move": "Move {n} items outward: {source} → {destination}",
     "reason.attr": "{who} states:",
@@ -88,6 +113,18 @@ S: dict[str, str] = {
     # The outcome lines, shared with the tap the CLI hosts — defined once, in presence.TAP_COPY.
     **TAP_COPY,
 }
+
+
+def around(key: str, slot: str, **values: object) -> tuple[str, str]:
+    """The text before and after `{slot}` in the string for `key`, the other placeholders filled:
+    for a string that wraps markup (a link) the template puts between the two halves."""
+    before, after = S[key].split("{" + slot + "}")
+    return before.format(**values), after.format(**values)
+
+
+def number_free(key: str) -> str:
+    """A counted header without its number (R3 `empty`): the string up to its first ` · `."""
+    return S[key].split(" · ")[0]
 
 
 def t(key: str, **values: object) -> str:

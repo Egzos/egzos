@@ -74,7 +74,7 @@ def test_home_lists_recent_with_row_anatomy_and_hints(lb):
     boat, client, item = lb
     page = client.get("/").text
     assert "<title>egzos · search</title>" in page
-    assert '<h1><label for="q">Search</label></h1>' in page
+    assert '<h1 tabindex="-1" autofocus><label for="q">Search</label></h1>' in page
     assert S["search.hints"] in page
     assert "Recent · 1 items" in page
     assert f'<a href="/items/{item.id}">' in page and "stamp--unverified" in page
@@ -133,7 +133,7 @@ def test_item_detail_sections_and_fixed_title(lb):
     page = client.get(f"/items/{item.id}").text
     assert "<title>egzos · item</title>" in page
     assert f"ITEM {item.id[:8]} … {item.id[-4:]} · preference · v1" in page
-    assert "<h1>Prefer imperative commit messages</h1>" in page
+    assert '<h1 tabindex="-1" autofocus>Prefer imperative commit messages</h1>' in page
     assert " · ring thread" in page
     for heading in ("content", "provenance", "trust", "lifecycle", "tags and key"):
         assert f"<h2>{heading}</h2>" in page
@@ -255,7 +255,7 @@ def test_the_uniform_not_found_page_for_every_cause(lb):
              ("01HZZZZZZZZZZZZZZZZZZZZZZZ", gone.id, bad.id, "not..an%2Fid", "%2e%2e")]
     assert {p.status_code for p in pages} == {404}
     bodies = {p.text for p in pages}
-    assert len(bodies) == 1 and "<h1>Nothing here.</h1>" in bodies.pop()
+    assert len(bodies) == 1 and '<h1 tabindex="-1" autofocus>Nothing here.</h1>' in bodies.pop()
     assert all(e["details"].get("view") for e in fetches(boat)[-5:])  # every cause is a read
 
 
@@ -463,3 +463,30 @@ def test_a_promote_of_an_item_no_longer_pending_is_refused_on_the_chain(lb):
     last = [e for e in boat.c.ledger.tail(10) if e["event"] == "step_up"][-1]["details"]
     assert last["outcome"] == "closed" and last["reason"] == "refused"
     assert boat.c.backend.get(item.id).status == "quarantined"
+
+
+def test_quarantine_notices_pin_at_the_end_of_the_queue_without_a_link(lb):
+    boat, client, item = lb
+    t = boat.c.require_token()
+    copy = boat.c.store.add(body="copy", token=t, actor=OWNER, principal="interactive")
+    copy.provenance["derived_from"] = item.id
+    boat.c.backend.put(copy)
+    boat.c.trust.quarantine(boat.c.backend.get(item.id), token=t, actor=OWNER, reason="x")
+    page = client.get("/pending").text
+    assert '<li class="notice"><span class="kind alarm">quarantined · propagated</span>' in page
+    assert f"derived_from {item.id[:8]}… · quarantined " in page
+    notice = page[page.index('<li class="notice">'):]
+    assert "<a " not in notice[:notice.index("</li>")]  # a notice, not an act
+    assert S["queue.empty"] in page  # nothing to act on; the notice still shows
+
+
+def test_copy_comes_from_strings_and_the_empty_header_drops_its_number(lb):
+    boat, client, item = lb
+    detail = client.get(f"/items/{item.id}").text
+    assert '<p class="where">in <a href=' in detail  # §13 item.scope.root, around the link
+    for key in ("prov.actor", "prov.approved", "life.created", "life.version", "dl.status"):
+        assert f"<dt>{S[key]}</dt>" in detail, key
+    assert "you · v1" in client.get("/").text  # §13 row.meta
+    boat.c.trust.quarantine(boat.c.backend.get(item.id), token=boat.c.require_token(),
+                            actor=OWNER, reason="x")
+    assert "<h2>Recent</h2>" in client.get("/").text  # R3 empty: the header without a number
