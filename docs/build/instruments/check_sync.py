@@ -44,7 +44,12 @@ def main(argv: list[str] | None = None) -> int:
     root = Path(git("rev-parse", "--show-toplevel").strip())
     local: dict[str, str] = {}
     for base in args.paths:
-        for p in sorted((root / base).rglob("*")):
+        target = root / base
+        # A path may name one file as well as a directory; rglob on a file yields nothing, and
+        # the remote side would then report it MISSING locally when it is in sync (found by
+        # this instrument on its own first push).
+        candidates = [target] if target.is_file() else sorted(target.rglob("*"))
+        for p in candidates:
             if p.is_file() and ".git" not in p.parts and "__pycache__" not in p.parts:
                 rel = p.relative_to(root).as_posix()
                 local[rel] = git("hash-object", str(p)).strip()
