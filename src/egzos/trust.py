@@ -124,26 +124,29 @@ class TrustEngine:
             raise TrustError("quarantine needs `curate`")
         affected = [item.id]
         item.trust = {"status": "quarantined", "reason": reason, "at": now_iso()}
-        self.backend.put(item)
-        # propagates immediately to descendants via derived_from (v0.3 §5)
-        for other in self._all_items():
-            if other.provenance.get("derived_from") == item.id and other.status != "quarantined":
-                other.trust = {
-                    "status": "quarantined",
-                    "reason": f"derived from {item.id}",
-                    "at": now_iso(),
-                }
-                self.backend.put(other)
-                affected.append(other.id)
-        self.ledger.append(
-            "trust.quarantine",
-            actor=actor,
-            principal=token.principal,
-            subject=item.id,
-            scope=item.scope,
-            reason=reason,
-            affected=affected,
-        )
+        # The item, every derived copy and the chain entry land together, or none of them.
+        with self.backend.atomic():
+            self.backend.put(item)
+            # propagates immediately to descendants via derived_from (v0.3 §5)
+            for other in self._all_items():
+                if (other.provenance.get("derived_from") == item.id
+                        and other.status != "quarantined"):
+                    other.trust = {
+                        "status": "quarantined",
+                        "reason": f"derived from {item.id}",
+                        "at": now_iso(),
+                    }
+                    self.backend.put(other)
+                    affected.append(other.id)
+            self.ledger.append(
+                "trust.quarantine",
+                actor=actor,
+                principal=token.principal,
+                subject=item.id,
+                scope=item.scope,
+                reason=reason,
+                affected=affected,
+            )
         # The caller learns only what it may see; the chain keeps the whole propagation.
         return [
             i
@@ -176,18 +179,19 @@ class TrustEngine:
             if not token.has("organize"):
                 raise TrustError("moving items needs `organize`")
             reset = self._reset_if_agent_run(item, token.principal)
-            self._do_move(item, to, actor, token.principal)
-            self.ledger.append(
-                "gate.pass.silent",
-                actor=actor,
-                principal=token.principal,
-                subject=item.id,
-                scope=to.id,
-                audience_delta="none",
-                from_=frm.id,
-                outward=outward,
-                reset=[item.id] if reset else [],
-            )
+            with self.backend.atomic():  # the move and its gate entry, together
+                self._do_move(item, to, actor, token.principal)
+                self.ledger.append(
+                    "gate.pass.silent",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=item.id,
+                    scope=to.id,
+                    audience_delta="none",
+                    from_=frm.id,
+                    outward=outward,
+                    reset=[item.id] if reset else [],
+                )
             return {"moved": True, "gate": "silent", "audience_delta": []}
 
         # Nonzero delta: this is a publish. Proposing it needs `publish` (freeze item 3). Park it —

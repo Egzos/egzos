@@ -490,9 +490,15 @@ def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
             # `tap.invalid`, as an item that is no longer pending does.
             return TAP_COPY["tap.invalid"]
 
-    outcome = Presence(c).require(act, decide=perform)
+    presence = Presence(c)
+    outcome = presence.require(act, decide=perform)
     if outcome == "window":
-        perform("denied" if asked == "deny" else "approved", False, None)
+        try:
+            perform("denied" if asked == "deny" else "approved", False, None)
+        except Exception as e:
+            # As on the tap: the act rolled back whole, and the chain says it did not land.
+            presence.act_failed(act, e)
+            _fail(f"That didn't go through. Nothing changed. ({e})")
     elif outcome not in ("approved", "denied"):
         _fail(f"not approved: {outcome} in the presence check")
     if "error" in result:

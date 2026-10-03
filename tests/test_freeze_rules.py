@@ -286,3 +286,50 @@ def test_a_failure_mid_execute_moves_nothing(box: Container, monkeypatch):
     monkeypatch.setattr(box.trust, "_do_move", real)
     box.trust.execute(pid, token=t, actor=OWNER)  # and the same approval lands whole after
     assert box.backend.get(a.id).scope == other.id and box.backend.get(b.id).scope == other.id
+
+
+def test_a_failure_mid_quarantine_quarantines_nothing(box: Container, monkeypatch):
+    t = box.auth.interactive_token()
+    src = box.store.add(body="src", token=t, actor=OWNER, principal=t.principal)
+    copy = box.store.add(body="copy", token=t, actor=OWNER, principal=t.principal)
+    copy.provenance["derived_from"] = src.id
+    box.backend.put(copy)
+    before = len(box.ledger.tail(1000))
+    real_put = box.backend.put
+
+    def fail_on_the_copy(item):
+        if item.id == copy.id:
+            raise OSError("disk went away")
+        real_put(item)
+
+    monkeypatch.setattr(box.backend, "put", fail_on_the_copy)
+    with pytest.raises(OSError):
+        box.trust.quarantine(box.backend.get(src.id), token=t, actor=OWNER, reason="x")
+    monkeypatch.setattr(box.backend, "put", real_put)
+    assert box.backend.get(src.id).status == "unverified"  # the source rolled back with the copy
+    assert box.backend.get(copy.id).status == "unverified"
+    assert len(box.ledger.tail(1000)) == before and box.ledger.verify()["ok"]
+
+
+def test_a_failed_act_under_an_open_window_is_on_the_chain(tmp_path, monkeypatch):
+    from egzos.authz.presence import Presence, build_act
+    from egzos.cli import main
+
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    assert main(["init"]) == 0
+    c = Container(tmp_path)
+    t = c.auth.interactive_token()
+    item = c.store.add(body="note", token=t, actor=OWNER, principal=t.principal)
+    act = build_act(c, item.id)
+    Presence(c).record(act, via="tap", outcome="approved", windowed=True)
+
+    def broken(*a, **kw):
+        raise OSError("disk went away")
+
+    monkeypatch.setattr("egzos.trust.TrustEngine.promote", broken)
+    assert main(["trust", "approve", item.id]) != 0
+    steps = [e["details"] for e in c.ledger.tail(10) if e["event"] == "step_up"]
+    assert [s["outcome"] for s in steps[-2:]] == ["window", "closed"]
+    assert steps[-1]["reason"] == "act failed" and c.backend.get(item.id).status == "unverified"
