@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "egzos"
-version = "0.0.0a0"
+version = "0.1.0a1"
 description = "MCP-first, CLI-first personal context layer"
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -12,8 +12,10 @@ requires-python = ">=3.11"
 authors = [
     { name = "Ali Sasanian" },
 ]
-dependencies = []
-# Nothing yet — the walking skeleton adds them (Phase 0.1).
+dependencies = [
+    "typer>=0.27",
+    "mcp>=2.2",
+]
 
 [project.optional-dependencies]
 # Local ONNX embeddings (lazy download via egzos[embed]).
@@ -32,6 +34,7 @@ egzos = "egzos.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/egzos"]
+artifacts = ["src/egzos/web/tokens.css"]
 
 [tool.ruff]
 line-length = 100
@@ -47,6 +50,12 @@ select = ["E", "F", "W", "I", "UP", "B", "C4", "FURB"]
 # Only the E-class style codes that style trips are waived; F, B and the rest still run there.
 # Its conformance gate is pipeline/check.py, run by tests/conformance/test_brand_pipeline.py.
 "spec/design/brand/pipeline/*.py" = ["E501", "E701", "E702", "E731", "E741"]
+# HTML template strings read better unwrapped.
+"src/egzos/web/*.py" = ["E501"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer declares CLI parameters as call defaults by design.
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["egzos"]

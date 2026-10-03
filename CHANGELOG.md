@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0a1] — MVP preview (2026-10-03)
+
+### Added
+
+- The walking skeleton's modules land as the MVP's running core: nodes, items and blobs (store),
+  trust engine and the gate, hash-chained ledger, resolver, tokens, the CLI and the MCP stdio door.
+- `egzos web`: the lifeboat, MVP cut — items, search, item detail, the pending queue with approve /
+  deny / quarantine, and the audit tail. Loopback only; a per-launch key becomes an HttpOnly,
+  SameSite=Strict cookie; every act is a same-origin POST carrying the key. Styled by `tokens.css`.
+- `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
+  server with Claude Code at user scope.
+- The container home is owner-only (0700): its database holds bearer token ids.
+
+### Changed
+
+- Opus-tier agents run on Opus 5.5 (`claude-opus-5-5`).
+
 ## [Unreleased] — Phase 0.0 scaffold
 
 ### Added

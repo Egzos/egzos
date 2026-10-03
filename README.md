@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **Pre-alpha. Phase 0 scaffold — nothing to install yet. `pipx install egzos` arrives with v0.1.**
+> **MVP preview (0.1.0a1).** Installable today — see the quickstart. The CLI, the MCP server, the browser lifeboat and the audit chain run end to end.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -22,6 +22,31 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 **The security model is the product.** The authorization server lives inside your container. Browsers authenticate via auth-code + PKCE; the CLI uses device-code; MCP clients follow the MCP authorization spec — all against your container's own AS. The egzos.io session proves your subscription; the container token proves your authorization. Those are two separate authorities, deliberately.
 
 **Signed `.xmb` export.** Leaving is easy. One command exports your container as a signed, portable archive you can import anywhere.
+
+## Quickstart (MVP preview)
+
+```bash
+pipx install "git+https://github.com/Egzos/egzos@main"
+
+egzos init                                   # your container at ~/.egzos, and your owner token
+egzos add "Prefer imperative commit messages" --kind preference --key commit.style
+egzos add ./notes.md                         # files work too; everything lands unverified
+egzos find commit                            # numbered results; act on them with %1, %2 …
+
+egzos connect                                # mints a token for Claude Code, prints the line to run
+egzos connect --apply                        # …or registers it with Claude Code for you
+egzos web                                    # browser: items, search, pending, audit (loopback only)
+```
+
+Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your context for a scope,
+`egzos_remember` writes (it lands **unverified** in your inbox), `egzos_inbox` lists the queue.
+
+- **Agents propose, you dispose.** Anything an agent writes waits in `egzos web` → *pending* (or
+  `egzos trust pending`) until you approve it. A move that would widen who can read something is
+  parked until you say yes.
+- **Every read and every yes is on the record.** `egzos audit tail` / `egzos audit verify` (or the
+  *audit* tab) — a hash chain that verifies end to end.
+- **Structure as you go.** `egzos mk project health`, `egzos mv %1 project:health`, `egzos fetch project:health`.
 
 ## Open core
 
@@ -61,7 +86,10 @@ See `SECURITY.md`. Report vulnerabilities privately via GitHub Security Advisori
 
 ## Status
 
-Pre-alpha. The walking skeleton (Phase 0.1) has not landed yet. Nothing here is installable or usable as a product. The spec (`spec/`) is a publishable artifact and is public from Phase 0.
+MVP preview. The CLI, MCP stdio server, browser lifeboat and audit chain run end to end on the walking
+skeleton's modules (Phase 0.1) plus the MVP additions (`egzos web`, `egzos connect`). The frozen-contract
+build (`spec/contracts/`) replaces them module by module. Not yet included: the container's OAuth
+authorization server and remote MCP (Phase 5), embeddings, and the egzos.io flagship.
 
 ## License
 
