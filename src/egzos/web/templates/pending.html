@@ -70,25 +70,27 @@
       {%- endif %}
     </section>
 
-    <section role="region" aria-labelledby="presence-h" class="box">
+    <section role="region" aria-labelledby="presence-h" class="box" id="presence" data-acts{% if detail.arm %} hx-get="/pending/{{ detail.id }}" hx-trigger="load delay:{{ refresh or 10 }}s" hx-select="#presence" hx-target="this" hx-swap="outerHTML"{% endif %}>
       <h2 id="presence-h">{{ S["section.presence"] }}</h2>
       {%- if message %}
       <p class="outcome{% if message[0] in ('error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
-      {%- else %}
+      {%- endif %}
+      {#- R9 error and lapsed revert to ready: the red line, and the acts again. #}
+      {%- if not message or message[0] in ('error', 'lapsed') %}
       <p>{{ detail.presence }}</p>
       {%- if detail.terms %}<p class="mono">{{ detail.terms }}</p>{% endif %}
       {% include "_window.html" %}
-      <form method="post" action="/pending/{{ detail.id }}" class="acts">
+      <form method="post" action="/pending/{{ detail.id }}" class="acts" hx-post="/pending/{{ detail.id }}" hx-target="#presence" hx-select="#presence" hx-swap="outerHTML" hx-indicator="#presence" hx-disabled-elt="#presence button">
         <input type="hidden" name="csrf" value="{{ detail.csrf }}">
         {%- if detail.blocked %}
         <p class="alarm-line" role="status">{{ detail.blocked }}</p>
         {%- elif detail.arm %}
         <input type="hidden" name="arm" value="{{ detail.arm.token }}">
         <input type="hidden" name="mode" value="{{ detail.arm.mode }}">
-        <button class="act" name="step" value="confirm">{{ S["act.confirm"] }}</button>
+        <button class="act" name="step" value="confirm"><span class="idle">{{ S["act.confirm"] }}</span><span class="busy">{{ S["act.inflight"] }}</span></button>
         <span class="sr" aria-live="polite">{{ S["act.confirm.sr"] }}</span>
         {%- else %}
-        <button class="act" name="step" value="arm">{{ S["act.sign"] }}</button>
+        <button class="act" name="step" value="arm"><span class="idle">{{ S["act.sign"] }}</span><span class="busy">{{ S["act.inflight"] }}</span></button>
         {%- endif %}
         <button name="step" value="deny">{{ S["act.deny"] }}</button>
         {%- if detail.nowindow and not detail.arm and not detail.blocked %}

@@ -63,20 +63,23 @@
     </dl>
   </section>
 
-  <section class="acts" id="acts">
+  {#- lifeboat.md §18: with htmx the form posts in place and the acts block is swapped; in flight
+       (R9) the button reads Promoting…, every act is disabled and the block is aria-busy. Without
+       JS the same form posts the whole page. An armed block lapses back after its 10 s. #}
+  <section class="acts" id="acts" data-acts{% if arm %} hx-get="/items/{{ item.id }}" hx-trigger="load delay:{{ refresh or 10 }}s" hx-select="#acts" hx-target="this" hx-swap="outerHTML"{% endif %}>
     {%- if message %}
     <p class="outcome{% if message[0] in ('error', 'lapsed') %} alarm-text{% endif %}" role="status">{{ message[1] }}</p>
     {%- endif %}
     {%- if can_promote %}
-    <form method="post" action="/items/{{ item.id }}/promote">
+    <form method="post" action="/items/{{ item.id }}/promote" hx-post="/items/{{ item.id }}/promote" hx-target="#acts" hx-select="#acts" hx-swap="outerHTML" hx-indicator="#acts" hx-disabled-elt="#acts button">
       <input type="hidden" name="csrf" value="{{ csrf }}">
       <input type="hidden" name="version" value="{{ version }}">
       {%- if arm %}
       <input type="hidden" name="arm" value="{{ arm }}">
-      <button class="act">{{ S["act.promote.confirm"] }}</button>
+      <button class="act"><span class="idle">{{ S["act.promote.confirm"] }}</span><span class="busy">{{ S["act.promote.inflight"] }}</span></button>
       <span class="sr" aria-live="polite">{{ S["act.promote.sr"] }}</span>
       {%- else %}
-      <button class="act">{{ S["act.promote"] }}</button>
+      <button class="act"><span class="idle">{{ S["act.promote"] }}</span><span class="busy">{{ S["act.promote.inflight"] }}</span></button>
       {%- endif %}
     </form>
     {%- endif %}

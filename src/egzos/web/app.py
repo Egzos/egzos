@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import re
 import secrets
 import time
@@ -161,33 +162,59 @@ def return_target(value: str | None) -> str:
 class Lifeboat:
     """Request handling, independent of the socket server so tests drive it through TestClient."""
 
-    def __init__(self, container: Container, *, key: str | None = None, host: str = "127.0.0.1"):
+    def __init__(self, container: Container, *, key: str | None = None, host: str = "127.0.0.1",
+                 launch_host: str | None = None):
         self.c = container
         # Three values, none of which stands in for another:
         # - the launch key rides the URL once and is exchanged for a session, then is dead;
         # - the session is the HttpOnly cookie, and never appears in a page;
         # - the form key is in every page, and is never a credential on its own.
         # Cursors are signed with a secret that never leaves this process.
+        #
+        # Two hosts when `launch_host` is set (`egzos web` always sets it). A browser does not
+        # isolate cookies by port, so a cookie for 127.0.0.1 would also reach any other server
+        # on 127.0.0.1 the owner's browser visits. The session therefore lives on `host`, a
+        # per-launch random `<label>.localhost`, minted here and never printed or put in argv:
+        # the launch key is redeemed on `launch_host` (127.0.0.1), which answers only with a
+        # single-use handoff to `host`, where the host-only cookie is set.
         self.key = key or secrets.token_urlsafe(32)
         self.redeemed = False
+        self.launch_host = launch_host
+        self._handoff: tuple[str, float] | None = None
         self.session = secrets.token_urlsafe(32)
         self.form_key = secrets.token_urlsafe(32)
         self._signing = secrets.token_bytes(32)
-        self._arms: dict[str, tuple[str, str, str, float]] = {}  # nonce → (purpose, ref, v, until)
+        # nonce → (purpose, ref, version, until, armed while a window covered the act)
+        self._arms: dict[str, tuple[str, str, str, float, bool]] = {}
         self.host = host
         self.since = time.time()
         self.presence = Presence(container)
         self.taps: dict[str, dict[str, Any]] = {}  # token → {tap, return}
         self.outcomes: dict[str, tuple[str, str]] = {}  # subject → (state, text), shown once
 
+    def hand_off(self) -> str:
+        """The single-use value that carries the redeemed launch to the session host (10 s)."""
+        token = secrets.token_urlsafe(32)
+        self._handoff = (token, time.time() + ARM_SECONDS)
+        return token
+
+    def take_handoff(self, token: str) -> bool:
+        held, self._handoff = self._handoff, None
+        return bool(held) and secrets.compare_digest(token, held[0]) and held[1] >= time.time()
+
     # -- arming: a server-held nonce, single-use, valid 10 s, bound to one act (the tap's model) ---
-    def arm(self, purpose: str, ref: str, version: object) -> str:
+    def arm(self, purpose: str, ref: str, version: object, *, windowed: bool = False) -> str:
         now = time.time()
         for nonce in [n for n, a in self._arms.items() if a[3] < now]:
             del self._arms[nonce]
         nonce = secrets.token_urlsafe(24)
-        self._arms[nonce] = (purpose, ref, str(version), now + ARM_SECONDS)
+        self._arms[nonce] = (purpose, ref, str(version), now + ARM_SECONDS, windowed)
         return nonce
+
+    def arm_was_windowed(self, token: str | None) -> bool:
+        """Whether a window covered the act when this nonce was armed (R9 lapsed needs it)."""
+        entry = self._arms.get(token or "")
+        return bool(entry) and entry[4]
 
     def armed(self, purpose: str, ref: str, version: object, token: str | None) -> bool:
         """True once for the nonce `arm` issued for exactly this act, within its 10 s."""
@@ -357,6 +384,12 @@ class Lifeboat:
                 del self.taps[token]
 
 
+def proposal_state(c: Container, pid: str) -> str:
+    """A digest of the proposal as stored: what a pending arm is bound to."""
+    p = c.backend.get_proposal(pid) or {}
+    return hashlib.sha256(json.dumps(p, sort_keys=True, default=str).encode()).hexdigest()[:16]
+
+
 def who_wrote(item) -> str:
     """Principals as §5 renders them: an agent by `agent:<client>`, the owner as `you`."""
     prov = item.provenance or {}
@@ -370,13 +403,31 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     @app.middleware("http")
     async def guard(request: Request, call_next):
         path = request.url.path
-        # Every refusal before the session is proven is the same static page: no shell, no
-        # container state, nothing written to the chain. Only the bound host is served, so a
-        # page elsewhere that rebinds a name to 127.0.0.1 reaches nothing.
-        if request.headers.get("host") != boat.host:
-            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
+        host = request.headers.get("host")
         key = request.query_params.get("k")
-        if request.method == "GET" and key is not None:
+        # Every refusal before the session is proven is the same static page: no shell, no
+        # container state, nothing written to the chain. Only the bound hosts are served, so a
+        # page elsewhere that rebinds a name to 127.0.0.1 reaches nothing.
+        if boat.launch_host is not None and host == boat.launch_host:
+            # The launch host does one thing: redeem the key, once, by handing the browser to the
+            # session host. It sets no cookie and serves no page.
+            if (request.method == "GET" and key is not None and not boat.redeemed
+                    and secrets.compare_digest(key, boat.key)):
+                boat.redeemed = True
+                to = f"http://{boat.host}/?{urlencode({'h': boat.hand_off()})}"
+                return _harden(RedirectResponse(to, status_code=303), path)
+            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
+        if host != boat.host:
+            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
+        handoff = request.query_params.get("h")
+        if boat.launch_host is not None and request.method == "GET" and handoff is not None:
+            if boat.take_handoff(handoff):
+                resp = RedirectResponse("/", status_code=303)
+                # Host-only (no Domain): sent to this label host alone, never to 127.0.0.1.
+                resp.set_cookie(COOKIE, boat.session, httponly=True, samesite="strict", path="/")
+                return _harden(resp, path)
+            return _harden(HTMLResponse(_LOCKED, status_code=403), path)
+        if boat.launch_host is None and request.method == "GET" and key is not None:
             # The launch key works once: whoever redeems it first holds the session, and a copy
             # read later from a launcher's argv or a terminal opens nothing.
             if not boat.redeemed and secrets.compare_digest(key, boat.key):
@@ -393,7 +444,13 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
                 return _harden(HTMLResponse(_REFUSED, status_code=403), path)
         try:
             response = await call_next(request)
+            if request.method == "POST" and request.headers.get("hx-request") == "true":
+                response = _for_htmx(response)
         except Exception:  # noqa: BLE001 — R12: never a code, path or exception text
+            try:
+                boat.read("error")  # the card is a view too, when the chain can still take it
+            except Exception:  # noqa: BLE001 — a broken container still gets its card
+                pass
             response = boat.render(request, "error.html",
                                    {"shell": boat.shell(request, current=None),
                                     "title": S["title.notfound"],
@@ -415,6 +472,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             "tokens.css": ("tokens.css", "text/css; charset=utf-8"),
             "lifeboat.css": ("static/lifeboat.css", "text/css; charset=utf-8"),
             "htmx.min.js": ("static/htmx.min.js", "text/javascript; charset=utf-8"),
+            "lifeboat.js": ("static/lifeboat.js", "text/javascript; charset=utf-8"),
         }
         if name not in files:
             return boat.not_found(request)
@@ -576,17 +634,29 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             return boat.render(request, "item.html", item_context(
                 request, item, node, full=False, arm=None,
                 message=("invalid", S["act.invalid"])))
+        under_window = boat.arm_was_windowed(form.get("arm"))
         if not boat.armed("promote", item.id, version, form.get("arm")):
             # The first press — or a confirm whose 10 s lapsed — arms in place (R9 confirming).
             boat.read("item", subject=item.id, scope=item.scope, items=[item.id])
-            ctx = item_context(request, item, node, full=False,
-                               arm=boat.arm("promote", item.id, version), message=None)
+            act = build_act(boat.c, item.id)
+            covered = act is not None and boat.presence.covers(act)
+            ctx = item_context(request, item, node, full=False, message=None,
+                               arm=boat.arm("promote", item.id, version, windowed=covered))
             return boat.render(request, "item.html", {**ctx, "refresh": ARM_SECONDS})
         act = build_act(boat.c, item.id)
         if act is None:
             return boat.not_found(request)
         if boat.presence.covers(act):
-            boat.outcomes[item.id] = boat.decide(act, "window", windowed=False, via="window")
+            try:
+                boat.outcomes[item.id] = boat.decide(act, "window", windowed=False, via="window")
+            except Exception:  # noqa: BLE001 — R9 error: decide recorded it; back to ready
+                boat.outcomes[item.id] = ("error", S["act.error"])
+            return RedirectResponse(f"/items/{item.id}", status_code=303)
+        status = boat.presence.window_status()
+        if under_window and status and status["state"] == "lapsed":
+            # R9 lapsed: the window that covered the first press closed before the second.
+            # Nothing changed; the acts return un-armed, and the next press asks for presence.
+            boat.outcomes[item.id] = ("lapsed", t("act.lapsed", at=clock(status["at"])))
             return RedirectResponse(f"/items/{item.id}", status_code=303)
         # Step-up required: a one-shot tap, its return bound now (the tap spec D-T9 (a)).
         boat.sweep()
@@ -769,15 +839,21 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         if act is None or act["kind"] != "proposal":
             return boat.not_found(request)
         step = form.get("step", "")
+        # The arm binds to the proposal as it stands: any change between the presses (its items,
+        # target or status) is a different state, and the confirm re-arms instead of acting.
+        state = proposal_state(boat.c, pid)
         if step == "deny":  # one press: deny is the safe direction
-            boat.outcomes[pid] = boat.decide(act, "denied", windowed=False, via="lifeboat")
+            try:
+                boat.outcomes[pid] = boat.decide(act, "denied", windowed=False, via="lifeboat")
+            except Exception:  # noqa: BLE001 — the tap spec R9 error: decide recorded it
+                boat.outcomes[pid] = ("error", S["act.error"])
             return RedirectResponse(f"/pending/{pid}", status_code=303)
         if act.get("blocked"):
             return RedirectResponse(f"/pending/{pid}", status_code=303)
         if step in ("arm", "arm_once"):
             mode = "once" if step == "arm_once" else "window"
             ctx = pending_context(request, pid, arm={"mode": mode,
-                                                     "token": boat.arm(mode, pid, 0)},
+                                                     "token": boat.arm(mode, pid, state)},
                                   message=None)
             # The armed page shows the whole proposal again: a read on the chain like any view.
             boat.read("pending", subject=pid, proposals=[r["id"] for r in ctx["rows"]],
@@ -785,10 +861,13 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             return boat.render(request, "pending.html", {**ctx, "refresh": ARM_SECONDS})
         mode = form.get("mode", "window")
         if step == "confirm" and mode in ("once", "window") and boat.armed(
-            mode, pid, 0, form.get("arm")
+            mode, pid, state, form.get("arm")
         ):
-            boat.outcomes[pid] = boat.decide(act, "approved", windowed=mode == "window",
-                                             via="lifeboat")
+            try:
+                boat.outcomes[pid] = boat.decide(act, "approved", windowed=mode == "window",
+                                                 via="lifeboat")
+            except Exception:  # noqa: BLE001 — the tap spec R9 error: decide recorded it
+                boat.outcomes[pid] = ("error", S["act.error"])
             return RedirectResponse(f"/pending/{pid}", status_code=303)
         return RedirectResponse(f"/pending/{pid}", status_code=303)  # lapsed arm: un-armed
 
@@ -822,9 +901,24 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     return app
 
 
+def _for_htmx(resp: Response) -> Response:
+    """An act posted through htmx swaps its acts block only when the answer is a page. A redirect
+    (an outcome, or the step-up's `/tap/<token>`) is a whole-page navigation instead, and a refusal
+    reloads the page, so a swap never lands a fragment the act did not render."""
+    if 300 <= resp.status_code < 400 and resp.headers.get("location"):
+        return Response(status_code=200, headers={"HX-Redirect": resp.headers["location"]})
+    if resp.status_code >= 400:
+        resp.headers["HX-Refresh"] = "true"
+    return resp
+
+
 def _harden(resp: Response, path: str) -> Response:
-    """lifeboat.md §18: every response is no-referrer, no-store, nosniff, framed by no one."""
-    resp.headers["Referrer-Policy"] = "no-referrer"
+    """lifeboat.md §18: no referrer leaves this origin; no-store, nosniff, framed by no one.
+
+    `same-origin`, not §18's `no-referrer`: under `no-referrer` a browser serialises a form POST's
+    Origin as `null` (Fetch, "serializing a request origin"), and the guard refuses any POST whose
+    Origin is not this one, so every act would fail in Chromium and Firefox (design-gap #130)."""
+    resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["X-Frame-Options"] = "DENY"
@@ -832,7 +926,8 @@ def _harden(resp: Response, path: str) -> Response:
     # page loads one stylesheet and one script, both from here.
     style = "'self' 'unsafe-inline'" if path.startswith("/tap/") else "'self'"
     resp.headers["Content-Security-Policy"] = (
-        f"default-src 'none'; script-src 'self'; style-src {style}; img-src 'self'; "
+        f"default-src 'none'; script-src 'self'; connect-src 'self'; style-src {style}; "
+        "img-src 'self'; "
         "form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
     return resp

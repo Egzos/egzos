@@ -89,6 +89,13 @@ dd { margin: 0; }
 .acts { display: flex; flex-wrap: wrap; gap: var(--egz-sp-3); align-items: center;
   margin-top: var(--egz-sp-5); }
 .outcome { flex-basis: 100%; }
+/* In flight (lifeboat.md R9, the tap spec R9): the primary act reads its in-flight word, pressed;
+   htmx disables every act; the block is aria-busy (lifeboat.js). No spinner, no motion. */
+.busy { display: none; }
+.htmx-request .busy { display: inline; }
+.htmx-request .idle { display: none; }
+.htmx-request button.act { transform: translate(var(--egz-off), var(--egz-off)); box-shadow: none; }
+.htmx-request a.ghost { pointer-events: none; color: var(--egz-ink-3); }
 .alarm-text { color: var(--egz-alarm); }
 .alarm-line { border: var(--egz-bw) solid var(--egz-alarm); color: var(--egz-alarm); padding: var(--egz-sp-3); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

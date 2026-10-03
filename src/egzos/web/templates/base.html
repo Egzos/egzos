@@ -3,13 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="htmx-config" content='{"allowScriptTags": false, "selfRequestsOnly": true, "defaultSwapStyle": "outerHTML"}'>
+<meta name="htmx-config" content='{"allowScriptTags": false, "selfRequestsOnly": true, "defaultSwapStyle": "outerHTML", "includeIndicatorStyles": false}'>
 {%- if refresh %}
 <meta http-equiv="refresh" content="{{ refresh }}">
 {%- endif %}
 <title>{{ title }}</title>
 <link rel="stylesheet" href="/static/lifeboat.css">
 <script src="/static/htmx.min.js" defer></script>
+<script src="/static/lifeboat.js" defer></script>
 </head>
 <body>
 <div class="frame">

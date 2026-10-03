@@ -6,8 +6,12 @@ the container, FastAPI + Jinja + htmx, no JS toolchain, tokens as CSS variables 
 `egzos.web.app`; this module launches it on loopback.
 
 The URL opened at launch carries a per-launch key, and the key works ONCE: the first browser to
-open it gets the session (an HttpOnly cookie, a different value) and the key is dead, so a copy
-read later from the launcher's argv or a terminal opens nothing. It is printed only when no
+open it is handed to this launch's own host, `<random>.localhost`, and gets the session there (an
+HttpOnly, host-only cookie, a different value); the key is dead, so a copy read later from the
+launcher's argv or a terminal opens nothing. The session lives on the random host because a
+browser does not isolate cookies by port: a cookie for 127.0.0.1 would reach every other server
+on 127.0.0.1 the owner's browser visits. The label is minted in this process and never printed.
+`*.localhost` resolves to loopback in Chromium and Firefox (RFC 6761). It is printed only when no
 browser was opened AND stdout is a terminal: an agent's shell tool is not a terminal. To reopen
 the lifeboat after closing the browser, restart `egzos web`.
 `tokens.css` (spec/design/tokens.css, vendored byte-for-byte) lives in this package.
@@ -15,6 +19,7 @@ the lifeboat after closing the browser, restart `egzos web`.
 
 from __future__ import annotations
 
+import secrets
 import threading
 import time
 import webbrowser
@@ -41,18 +46,25 @@ def _launch(url: str, open_browser: bool, opener=None, terminal=None) -> bool:
     return False
 
 
+def lifeboat_for(container: Container, port: int):
+    """The lifeboat, its app and its launch URL. The launch URL is on 127.0.0.1 and carries only
+    the single-use key; the session host's random label never leaves this process except in the
+    redirect that hands the redeemed launch to it."""
+    from egzos.web.app import Lifeboat, create_app
+
+    label = secrets.token_hex(10)
+    boat = Lifeboat(container, host=f"{label}.localhost:{port}", launch_host=f"127.0.0.1:{port}")
+    return boat, create_app(boat, f"http://{boat.host}"), f"http://127.0.0.1:{port}/?k={boat.key}"
+
+
 def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
     import uvicorn
-
-    from egzos.web.app import Lifeboat, create_app
 
     token = container.require_token()
     if token.principal != "interactive":
         raise PermissionError("the lifeboat is the owner's; a client principal cannot open it")
     host = "127.0.0.1"
-    boat = Lifeboat(container, host=f"{host}:{port}")
-    app = create_app(boat, f"http://{host}:{port}")
-    url = f"http://{host}:{port}/?k={boat.key}"
+    _boat, app, url = lifeboat_for(container, port)
     print(f"egzos web on http://{host}:{port} — loopback only. Ctrl-C to stop.", flush=True)
 
     def launch_when_up() -> None:

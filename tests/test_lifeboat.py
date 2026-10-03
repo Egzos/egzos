@@ -35,12 +35,18 @@ def lb(tmp_path, monkeypatch):
     return boat, client, item
 
 
-def post(client, boat, url, data=None, origin=ORIGIN, csrf=True, **kw):
+def post(client, boat, url, data=None, origin=ORIGIN, csrf=True, headers=None, **kw):
     form = dict(data or {})
     if csrf:
         form["csrf"] = boat.form_key
-    headers = {"Origin": origin} if origin else {}
+    headers = {**({"Origin": origin} if origin else {}), **(headers or {})}
     return client.post(url, data=form, headers=headers, follow_redirects=False, **kw)
+
+
+def unclocked(page: str) -> str:
+    """A page without its print footer, which carries the wall clock to the second: two renders a
+    second apart differ there and nowhere else."""
+    return re.sub(r'<p class="print-footer">[^<]*</p>', "", page)
 
 
 def fetches(boat):
@@ -55,10 +61,90 @@ def test_session_guard_and_headers(lb, tmp_path):
     assert fresh.get("/?k=wrong", follow_redirects=False).status_code == 403
     r = client.get("/")
     assert r.status_code == 200
-    for header, value in (("referrer-policy", "no-referrer"), ("cache-control", "no-store"),
+    # same-origin, not no-referrer: under no-referrer a browser sends a form POST's Origin as
+    # `null`, which the guard refuses, so no act would ever land from a real browser.
+    for header, value in (("referrer-policy", "same-origin"), ("cache-control", "no-store"),
                           ("x-content-type-options", "nosniff")):
         assert r.headers[header] == value
-    assert "script-src 'self'" in r.headers["content-security-policy"]
+    csp = r.headers["content-security-policy"]
+    assert "script-src 'self'" in csp and "connect-src 'self'" in csp  # htmx's own requests
+
+
+def test_the_session_lives_on_a_per_launch_label_host(tmp_path, monkeypatch):
+    from egzos.web import lifeboat_for
+    from egzos.web.app import COOKIE
+
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    c = Container(tmp_path / "home")
+    c.init()
+    boat, app, url = lifeboat_for(c, 7425)
+    assert re.fullmatch(r"[0-9a-f]{20}\.localhost:7425", boat.host)
+    assert url.startswith("http://127.0.0.1:7425/?k=") and boat.host not in url  # not in argv
+    launch = TestClient(app, base_url="http://127.0.0.1:7425")
+    r = launch.get(url, follow_redirects=False)
+    assert r.status_code == 303 and "set-cookie" not in r.headers  # nothing set on 127.0.0.1
+    to = r.headers["location"]
+    assert to.startswith(f"http://{boat.host}/?h=")
+    assert launch.get(url, follow_redirects=False).status_code == 403  # the key works once
+    home = TestClient(app, base_url=f"http://{boat.host}")
+    r = home.get(to, follow_redirects=False)
+    assert r.status_code == 303 and "domain=" not in r.headers["set-cookie"].lower()  # host-only
+    home.cookies.set(COOKIE, boat.session)
+    assert home.get("/").status_code == 200
+    assert TestClient(app, base_url=f"http://{boat.host}").get(to).status_code == 403  # once
+    launch.cookies.set(COOKIE, boat.session)
+    assert launch.get("/").status_code == 403  # the session opens nothing on 127.0.0.1
+    other = TestClient(app, base_url="http://other.localhost:7425")
+    other.cookies.set(COOKIE, boat.session)
+    assert other.get("/").status_code == 403  # nor on any other name
+
+
+def test_in_flight_reads_promoting_and_the_acts_block_swaps_through_htmx(lb):
+    # R9 in-flight: the primary act carries its in-flight word (§13), shown only while htmx has
+    # the request out; every act is disabled and the block is aria-busy (lifeboat.js).
+    boat, client, item = lb
+    page = client.get(f"/items/{item.id}").text
+    assert f'<span class="busy">{S["act.promote.inflight"]}</span>' in page
+    assert 'hx-post="/items/' in page and 'hx-target="#acts"' in page
+    assert 'hx-swap="outerHTML"' in page
+    assert 'hx-disabled-elt="#acts button"' in page and "data-acts" in page
+    script = client.get("/static/lifeboat.js").text
+    assert 'setAttribute("aria-busy", "true")' in script
+    assert 'removeAttribute("aria-busy")' in script
+    hx = {"HX-Request": "true"}
+    armed = post(client, boat, f"/items/{item.id}/promote", {"version": 1}, headers=hx)
+    assert armed.status_code == 200 and S["act.promote.confirm"] in armed.text
+    assert 'hx-trigger="load delay:10s"' in armed.text  # the armed block lapses back in place
+    token = re.search(r'name="arm" value="([^"]+)"', armed.text).group(1)
+    step = post(client, boat, f"/items/{item.id}/promote", {"version": 1, "arm": token}, headers=hx)
+    # A redirect is a whole-page navigation under htmx (here the step-up's tap), never a swap.
+    assert step.status_code == 200 and step.headers["HX-Redirect"].startswith("/tap/")
+    refused = post(client, boat, f"/items/{item.id}/promote", {"version": 1}, csrf=False,
+                   headers=hx)
+    assert refused.status_code == 403 and refused.headers["HX-Refresh"] == "true"
+
+
+def test_the_pending_acts_read_signing_in_flight(lb):
+    boat, client, item = lb
+    pid, _ = _proposal(boat, item, agent=True, verified=True)
+    page = client.get(f"/pending/{pid}").text
+    assert f'<span class="busy">{S["act.inflight"]}</span>' in page
+    assert 'hx-target="#presence"' in page and 'hx-disabled-elt="#presence button"' in page
+    denied = post(client, boat, f"/pending/{pid}", {"step": "deny"}, headers={"HX-Request": "true"})
+    assert denied.headers["HX-Redirect"] == f"/pending/{pid}"
+
+
+def test_vendored_htmx_is_the_published_2_0_11_build():
+    """`static/htmx.min.js` is byte-identical to `package/dist/htmx.min.js` in the npm tarball of
+    htmx.org@2.0.11, whose registry integrity is sha512-Thx/WtpeOQqSrqBCw/A1cwGJGg4UrVa3+sW0Gm
+    rM3p4gJgO89ecH4qtbnyzDDWFvBTqjnIMCgELTNt636dtamA== (verified when vendored). Any edit to the
+    file, or a version bump that does not update this digest, fails here."""
+    import hashlib
+    from importlib import resources
+
+    data = resources.files("egzos.web").joinpath("static/htmx.min.js").read_bytes()
+    assert hashlib.sha256(data).hexdigest() == (
+        "d6fdc75f204e6bdefa99b69bf1e6d4ac69b8a364f77929f45c13476b4000f717")
 
 
 def test_a_post_needs_the_origin_and_the_form_key(lb):
@@ -243,6 +329,63 @@ def test_an_open_window_covers_the_promote(lb, monkeypatch):
     assert "window open · thread → thread" in client.get("/").text  # R1 shell line
 
 
+def _arm(client, boat, url, version=1):
+    return re.search(r'name="arm" value="([^"]+)"',
+                     post(client, boat, url, {"version": version}).text).group(1)
+
+
+def test_an_act_that_fails_inside_a_window_reverts_to_ready_with_the_error_line(lb, monkeypatch):
+    # R9 error: back to ready, a red line, nothing changed — and decide put it on the chain.
+    boat, client, item = lb
+    monkeypatch.setattr(boat.presence, "covers", lambda act: True)
+
+    def broken(*a, **kw):
+        raise OSError("disk went away")
+
+    monkeypatch.setattr(boat.c.trust, "promote", broken)
+    url = f"/items/{item.id}/promote"
+    r = post(client, boat, url, {"version": 1, "arm": _arm(client, boat, url)})
+    assert r.headers["location"] == f"/items/{item.id}"
+    page = client.get(f"/items/{item.id}").text
+    assert "go through. Nothing changed. Try again." in page
+    assert 'class="outcome alarm-text"' in page
+    assert S["act.promote"] in page  # the act is back, enabled
+    assert boat.c.backend.get(item.id).status == "unverified"
+    last = [e for e in boat.c.ledger.tail(10) if e["event"] == "step_up"][-1]["details"]
+    assert last["outcome"] == "closed" and last["reason"] == "act failed"
+
+
+def test_a_window_that_lapses_between_the_presses_changes_nothing(lb, monkeypatch):
+    # R9 lapsed: armed while a window covered the act, confirmed after it closed.
+    boat, client, item = lb
+    url = f"/items/{item.id}/promote"
+    monkeypatch.setattr(boat.presence, "covers", lambda act: True)
+    arm = _arm(client, boat, url)
+    monkeypatch.setattr(boat.presence, "covers", lambda act: False)
+    monkeypatch.setattr(boat.presence, "window_status",
+                        lambda: {"state": "lapsed", "at": "2026-10-03T23:00:00Z"})
+    r = post(client, boat, url, {"version": 1, "arm": arm})
+    assert r.headers["location"] == f"/items/{item.id}"  # not the tap: the person decides again
+    page = client.get(f"/items/{item.id}").text
+    assert "Presence lapsed at " in page and "Nothing changed. Sign again to continue." in page
+    assert boat.c.backend.get(item.id).status == "unverified"
+    # Armed with no window, the same confirm asks for presence as before.
+    r = post(client, boat, url, {"version": 1, "arm": _arm(client, boat, url)})
+    assert r.headers["location"].startswith("/tap/")
+
+
+def test_a_pending_arm_is_bound_to_the_proposal_as_it_stood(lb):
+    boat, client, item = lb
+    pid, _ = _proposal(boat, item, agent=True, verified=True)
+    armed = post(client, boat, f"/pending/{pid}", {"step": "arm"})
+    token = re.search(r'name="arm" value="([^"]+)"', armed.text).group(1)
+    p = boat.c.backend.get_proposal(pid)
+    p["reason"] = "changed after the first press"
+    boat.c.backend.put_proposal(p)
+    post(client, boat, f"/pending/{pid}", {"step": "confirm", "arm": token, "mode": "window"})
+    assert boat.c.backend.get_proposal(pid)["status"] == "open"  # re-arms; nothing executed
+
+
 def test_artifact_download_is_an_audited_pull(lb, tmp_path):
     boat, client, _ = lb
     t = boat.c.require_token()
@@ -266,7 +409,7 @@ def test_the_uniform_not_found_page_for_every_cause(lb):
     pages = [client.get(f"/items/{ref}") for ref in
              ("01HZZZZZZZZZZZZZZZZZZZZZZZ", gone.id, bad.id, "not..an%2Fid", "%2e%2e")]
     assert {p.status_code for p in pages} == {404}
-    bodies = {p.text for p in pages}
+    bodies = {unclocked(p.text) for p in pages}
     assert len(bodies) == 1 and '<h1 tabindex="-1" autofocus>Nothing here.</h1>' in bodies.pop()
     assert all(e["details"].get("view") for e in fetches(boat)[-5:])  # every cause is a read
     # The cause goes to the owner's ledger, never to the page (R6, D-T8).
@@ -282,10 +425,10 @@ def test_a_method_no_route_declares_gets_the_uniform_page(lb):
     page = client.get("/items/01HZZZZZZZZZZZZZZZZZZZZZZZ")
     for method in ("PUT", "DELETE", "PATCH"):
         r = client.request(method, f"/items/{item.id}")
-        assert r.status_code == 404 and r.text == page.text
+        assert r.status_code == 404 and unclocked(r.text) == unclocked(page.text)
         assert fetches(boat)[-1]["details"]["cause"] == "method"
     r = client.get(f"/items/{item.id}?full=x")  # a parameter that does not parse: no 422 JSON
-    assert r.status_code == 404 and r.text == page.text
+    assert r.status_code == 404 and unclocked(r.text) == unclocked(page.text)
 
 
 def test_the_item_page_and_search_share_one_predicate(lb, monkeypatch):
@@ -314,6 +457,7 @@ def test_an_error_renders_the_card_and_no_detail(lb, monkeypatch):
     r = client.get("/")
     assert r.status_code == 500 and "Something went wrong on the container." in r.text
     assert "secret internal detail" not in r.text and 'role="alert"' in r.text
+    assert fetches(boat)[-1]["details"]["view"] == "error"  # the card is a read too
 
 
 # --- the pending pages (the tap spec, L column) ---
