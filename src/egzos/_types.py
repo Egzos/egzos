@@ -95,7 +95,7 @@ class ArtifactContent(TypedDict):
 
 
 class Provenance(TypedDict):
-    """All five keys present, null where unknown — never absent-vs-unset."""
+    """All six keys present, null where unknown — never absent-vs-unset."""
 
     actor: str | None
     principal: Principal | None
@@ -153,6 +153,34 @@ CONTEXT_ITEM_FIELDS: tuple[str, ...] = (
 )
 
 
+class ResolvedItem(TypedDict):
+    """One item as a resolution returns it (container.md §4).
+
+    `shadowed_by` is a property of THIS resolution, not of the item: the same item is shadowed in
+    one chain and the winner in another. It is the id of the item that beat this one on its
+    `(kind, key)` pair, or `None` for the winner and for every item without a `key`. `layer` and
+    `layer_type` are here for the same reason — where this copy was found is not the item's own
+    business. `layer_type` is a `ContainerType` or a `RootType`, as `Node.type` is, and is the key
+    `SERVING_POLICY` is read by. Nothing here is ever persisted onto the `ContextItem`.
+
+    The item's trust status is deliberately NOT a key here. It has one home,
+    `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
+    in two places with no rule for which wins when they differ — the copy a resolver snapshots
+    before serialisation, and serves a quarantined item under. Read it from the item. The walking
+    skeleton's resolver does emit a `trust` key here; container.md §4 states the removal as a1p's
+    reading, pending the freeze, with the Chief's confirmation as its TODO.
+
+    The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
+    here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is
+    `[OPEN->0.3]`, and typing the response would answer it by accident.
+    """
+
+    item: ContextItem
+    layer: str
+    layer_type: str
+    shadowed_by: str | None
+
+
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
@@ -190,7 +218,9 @@ Event = Literal[
     "blob.grant",
 ]
 #: An append whose event name is not here MUST be rejected. `step_up` is reserved (Phase 2.2);
-#: `blob.grant` is decided, not running (F5).
+#: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
+#: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
+#: code that emits it. events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
@@ -343,6 +373,28 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "step_up_window_seconds": 300,
 }
 
+#: Wire key -> `ContainerConfig` field. **The dotted names are canonical** (container.md §8): they
+#: are what a config file and the wire carry, and no other spelling of them is a key.
+#: `ContainerConfig` underscores them only because a dotted name is not a Python identifier — the
+#: same situation as the wire's `from` against `Proposal.from_`, named by `PROPOSAL_WIRE_KEY_FROM`.
+#:
+#: A loader that does not consult this mapping does not read §8's keys at all: it silently ignores
+#: every one of them and serves `CONTAINER_CONFIG_DEFAULTS`. That is the failure this constant
+#: exists to prevent — an org that sets `step_up.window_seconds` to `0` gets `0`, not the 300 it
+#: refused.
+#:
+#: Loading rule, from the same clause: **absence is tested by absence, never by truthiness.** `0`,
+#: `""` and `False` are values. `cfg.get(wire_key) or default` is wrong for every row below and
+#: silently wrong for the one row where it matters most.
+CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
+    "chain.personal_root": "chain_personal_root",
+    "org.policy.sovereign_chain": "org_policy_sovereign_chain",
+    "node.policy.structure_floor": "node_policy_structure_floor",
+    "blobs.inline_max_bytes": "blobs_inline_max_bytes",
+    "blobs.staging_retention_days": "blobs_staging_retention_days",
+    "step_up.window_seconds": "step_up_window_seconds",
+}
+
 
 # --- the authorization server (spec/contracts/authorization-server.md) ----------------------
 #
@@ -355,6 +407,27 @@ ASClientType = Literal["browser", "cli", "mcp"]
 #: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
 #: confidential type, which is why no registration below carries a `client_secret`.
 AS_CLIENT_TYPES: tuple[ASClientType, ...] = get_args(ASClientType)
+
+ConsentKind = Literal["browser", "device", "mcp"]
+#: The kind words the consent page renders (`spec/design/consent.md` §14 item 1, R4's client block,
+#: the `kind.*` copy keys). Three words, and they are NOT `AS_CLIENT_TYPES`.
+CONSENT_KINDS: tuple[ConsentKind, ...] = get_args(ConsentKind)
+
+#: `ASClientType` -> the kind word rendered beside the client name (authorization-server.md §11.1).
+#: The AS literal and the rendered word differ for exactly ONE type: `cli` renders as `device`,
+#: because the design names that client by its flow (device-code) rather than by its category,
+#: while this document's type predates Part B. A page renders the copy key `kind.device`, never
+#: `kind.cli`, which does not exist.
+#:
+#: Named here for the same reason as `CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY`: the mapping was
+#: prose-only (#10 F25), and a mapping that lives only in prose is one each surface re-derives. The
+#: AS-internal literal does not change; only its display name does, at the one place a display name
+#: is rendered.
+CONSENT_KIND_FROM_CLIENT_TYPE: dict[ASClientType, ConsentKind] = {
+    "browser": "browser",
+    "cli": "device",
+    "mcp": "mcp",
+}
 
 
 class ClientRegistration(TypedDict):
@@ -658,11 +731,15 @@ __all__ = [
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
+    "CONSENT_KINDS",
+    "CONSENT_KIND_FROM_CLIENT_TYPE",
     "CONTAINER_CONFIG_DEFAULTS",
+    "CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY",
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
     "ClientRegistration",
+    "ConsentKind",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
@@ -690,6 +767,7 @@ __all__ = [
     "RING_RANK",
     "ROLE_BUNDLES",
     "ROOT_TYPES",
+    "ResolvedItem",
     "Role",
     "RootType",
     "SERVING_POLICY",
