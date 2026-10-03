@@ -19,7 +19,9 @@ _spec = importlib.util.spec_from_file_location(
 human_tap = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(human_tap)
 
-ACT = {"title": "Mark verified", "from": "user:self", "to": "user:self", "subject": "X",
+# A parked proposal (gate.confirm): the tap's full act set, Deny included.
+ACT = {"kind": "proposal", "title": "Move 1 items outward", "from": "user:self",
+       "to": "user:self", "dest": "user:self", "subject": "X", "filed": "20:00:00",
        "pair": ("user", "user"),
        "items": [{"kind": "memory", "title": "<b>t</b>", "trust": "unverified → verified"}]}
 
@@ -284,13 +286,30 @@ def test_the_tap_page_carries_the_structure_law_and_the_id_format():
     from egzos.authz.presence import TAP_STYLE, Tap, short_id
 
     sid = "01J7Q4N8ABCDEFGHJKMNPQM3KD"
-    act = {**ACT, "subject": sid, "ref": "ITEM", "filed": None}
+    act = {**ACT, "subject": sid}
     page = Tap(act).page(armed=False)
     assert short_id(sid) == "01J7Q4N8 … M3KD"
-    assert f'<code title="{sid}">01J7Q4N8 … M3KD</code>' in page  # §5: full id on hover
+    assert (f'<p class=ref>PROPOSAL <code title="{sid}">01J7Q4N8 … M3KD</code> · filed '
+            "20:00:00</p>") in page  # §2.2 item 2, §5: full id on hover
+    assert "<h1 tabindex=-1 autofocus>" in page  # §2.2 item 8: focus on the heading
+    assert "button:active{transform:translate(var(--egz-off),var(--egz-off));box-shadow:none}" \
+        in TAP_STYLE  # §7: pressed = translate by the offset, offset removed
     # §7: structural containers and acts carry the hard offset; §8: h2 keeps the heading token.
     assert ".box,.note,.alarm,button{box-shadow:var(--egz-off) var(--egz-off) 0" in TAP_STYLE
     rules = [r for r in TAP_STYLE.replace("\n", "").split("}") if "h2" in r.split("{")[0]]
     assert rules == ["h2{font-size:var(--egz-fs-4);font-weight:var(--egz-w-semibold)"]
     ref = next(r for r in TAP_STYLE.split("}") if r.lstrip().startswith(".ref,"))
     assert "--egz-tabular" in ref
+
+
+def test_an_item_promotion_tap_renders_only_what_the_spec_defines():
+    from egzos.authz.presence import Tap
+
+    item = {**ACT, "kind": "item", "title": "Mark verified: x at user:self"}
+    tap = Tap(item)
+    page = tap.page(armed=False)
+    # approve.pending has no deny act (capabilities.md §4); its reference line is #122.
+    assert "value=deny" not in page and "class=ref" not in page
+    assert "Sign and approve" in page
+    status, again = tap.post("deny")
+    assert tap.outcome is None and "Sign and approve" in again  # a forged deny decides nothing

@@ -126,7 +126,8 @@ class Store:
             visibility={"ring": scope.type},
         )
         if opened_thread is not None:
-            opened_thread.name = content["auto_title"][:40]
+            # A name is one path segment: a "/" in writer-supplied text would split it.
+            opened_thread.name = content["auto_title"][:40].replace("/", "-")
             self.backend.put_node(opened_thread)
             self.ledger.append(
                 "node.create",

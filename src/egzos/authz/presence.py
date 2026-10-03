@@ -369,6 +369,7 @@ button{min-height:44px;padding:0 16px;border:var(--egz-bw) solid var(--egz-rule)
  background:var(--egz-canvas);color:var(--egz-ink);font:inherit;cursor:pointer;margin:0 8px 8px 0}
 button.act{background:var(--egz-act);color:var(--egz-act-on);border-color:var(--egz-act)}
 button.ghost{border-color:transparent;text-decoration:underline;box-shadow:none}
+button:active{transform:translate(var(--egz-off),var(--egz-off));box-shadow:none}
 button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px}
 .note{border:var(--egz-bw) solid var(--egz-act);padding:12px;margin:0 var(--egz-off) 16px 0}
 .alarm{border:var(--egz-bw) solid var(--egz-alarm);color:var(--egz-alarm);padding:12px;
@@ -456,6 +457,11 @@ class Tap:
         self.armed_until = 0.0
         self.armed_mode = "window"
 
+    @property
+    def gate(self) -> bool:
+        """A parked proposal (gate.confirm: approve or deny), not an item promotion."""
+        return self.act.get("kind") == "proposal"
+
     def page(self, armed: bool, note: str = "") -> str:
         a = self.act
         e = _e
@@ -517,7 +523,8 @@ class Tap:
             acts = "<button name=step value=confirm class=act>Confirm signature</button>"
         else:
             acts = "<button name=step value=arm class=act>Sign and approve</button>"
-        acts += "<button name=step value=deny>Deny</button>"
+        if self.gate:  # Deny is gate.confirm's; approve.pending has no deny (capabilities.md §4)
+            acts += "<button name=step value=deny>Deny</button>"
         if seconds and not armed and not blocked:
             acts += "<button name=step value=arm_once class=ghost>Approve without a window</button>"
         return (
@@ -531,11 +538,13 @@ class Tap:
             f"<p class=shell>egzos · container {e(self.container)} · {e(self.host)}</p>"
             f"<p class=shell>you · {e(OWNER)} · principal: interactive · present since "
             f"{e(_since(self.opened))}</p>"
-            f"<p class=ref>{e(a.get('ref', 'ACT'))} <code title=\"{e(a['subject'])}\">"
-            f"{e(short_id(a['subject']))}</code>"
-            + (f" · filed {e(a['filed'])}" if a.get("filed") else "")
-            + "</p>"
-            f"<h1>{e(a['title'])}</h1>"
+            # §2.2 item 2 defines the reference line for a proposal; the item-promotion tap's
+            # line is design-gap #122, so it renders none rather than an invented one.
+            + (f"<p class=ref>PROPOSAL <code title=\"{e(a['subject'])}\">"
+               f"{e(short_id(a['subject']))}</code> · filed {e(a.get('filed') or '')}</p>"
+               if self.gate else "")
+            # §2.2 item 8: initial focus on the page heading, never on an act.
+            + f"<h1 tabindex=-1 autofocus>{e(a['title'])}</h1>"
             f"<p><span class=attr>{e(a.get('requester', 'you'))} states:</span> {said}</p>"
             f"<h2>what moves</h2>{rows}"
             f"<h2>who will see it at {e(a.get('dest', a['to']))}</h2>"
@@ -570,7 +579,7 @@ class Tap:
     def post(self, step: str) -> tuple[int, str]:
         """Apply one press. On a decision, the host's `decide` performs it and the page shows the
         container's answer in §13's canonical copy."""
-        if step == "deny":
+        if step == "deny" and self.gate:
             self.outcome = "denied"
             return 200, self.outcome_page(self._decided())
         if self.act.get("blocked") and step in ("arm", "arm_once", "confirm"):

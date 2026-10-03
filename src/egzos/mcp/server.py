@@ -3,7 +3,8 @@
 """
 `egzos serve --mcp` — the stdio door (a3-doorman; v0.3 §10 step 3). Claude Code reads live state.
 
-The server runs as a CLIENT principal: whatever token it was started with. Item content is served
+The server runs as a CLIENT principal: whatever token it was started with, re-read on every call
+so a revoke or an expiry lands mid-session. Item content is served
 in delimited blocks as DATA, never instructions (v0.3 §3). Human-only acts do not exist here: no
 approve tool, no --yes. Every fetch is an audit event with the client's name on it.
 
@@ -29,6 +30,10 @@ DATA_BANNER = (
 )
 
 
+# Revoked or expired: one answer, the same for both, from every tool.
+NOT_LIVE = json.dumps({"ok": False, "reason": "this token is no longer valid"})
+
+
 def build_server(container: Container, token: Token):
     from mcp.server.mcpserver import MCPServer
 
@@ -40,7 +45,27 @@ def build_server(container: Container, token: Token):
     actor = token.owner
     nodes, store, resolver = container.nodes, container.store, container.resolver
 
-    def _scope(ref: str | None):
+    def _live() -> Token | None:
+        """The token as the container holds it NOW: the door is long-lived, so a revoke or an
+        expiry must land mid-session, not at the next restart."""
+        current = container.backend.get_token(token.id)
+        return current if current is not None and current.live else None
+
+    def _probe(tok: Token, ref: str | None) -> None:
+        """A probe is a read too: one identical entry for "absent" and "not yours", whichever
+        tool asked."""
+        container.ledger.append(
+            "context.fetch",
+            actor=actor,
+            principal=tok.principal,
+            client=tok.client,
+            ref=ref,
+            items=[],
+            layers=[],
+            withheld=0,
+        )
+
+    def _scope(ref: str | None, token: Token):
         """The node the token may see at `ref`, or None — one answer whether `ref` does not
         exist or exists outside the token's coverage (silence-not-errors)."""
         if ref:
@@ -59,19 +84,12 @@ def build_server(container: Container, token: Token):
     async def egzos_fetch(
         scope: str | None = None, query: str | None = None, kinds: list[str] | None = None
     ) -> str:
-        node = _scope(scope)
+        token = _live()
+        if token is None:
+            return NOT_LIVE
+        node = _scope(scope, token)
         if node is None:
-            # A probe is a read too: one identical entry for "absent" and "not yours".
-            container.ledger.append(
-                "context.fetch",
-                actor=actor,
-                principal=token.principal,
-                client=token.client,
-                ref=scope,
-                items=[],
-                layers=[],
-                withheld=0,
-            )
+            _probe(token, scope)
             return json.dumps({"banner": DATA_BANNER, "scope": scope, "chain": [], "items": []})
         result = resolver.resolve(node, token=token, actor=actor, kinds=kinds, text=query)
         # A fresh fence per response: an item body was written before this fetch, so it cannot
@@ -120,9 +138,13 @@ def build_server(container: Container, token: Token):
         key: str | None = None,
         tags: list[str] | None = None,
     ) -> str:
-        node = _scope(scope) if scope else None
+        token = _live()
+        if token is None:
+            return NOT_LIVE
+        node = _scope(scope, token) if scope else None
         if scope and node is None:
             # silence-not-errors: the same shape whether the scope is absent or not this token's
+            _probe(token, scope)
             return json.dumps({"ok": False, "reason": "scope not found"})
         try:
             item = store.add(
@@ -151,8 +173,12 @@ def build_server(container: Container, token: Token):
         name="egzos_inbox", description="What has been captured but not yet wrapped or promoted."
     )
     async def egzos_inbox() -> str:
+        token = _live()
+        if token is None:
+            return NOT_LIVE
         inbox = nodes.inbox()
         if inbox is None or not container.trust.covers(token, inbox):
+            _probe(token, "inbox")
             return json.dumps({"banner": DATA_BANNER, "items": []})  # silence-not-errors
         # Served, not shown: quarantined never, rules verified-only — the same policy as fetch.
         rows = [(n, i) for n, i in store.inbox_items() if container.resolver.serve(i, n)]

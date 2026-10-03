@@ -131,6 +131,40 @@ def test_a_body_cannot_forge_its_own_fence(box):
     assert _call(server, "egzos_fetch", where)["fence"] != fence  # fresh per response
 
 
+def test_a_revoke_lands_in_a_running_door(box):
+    bot = _client(box)
+    server = build_server(box, bot)  # the long-lived `serve --mcp`, already up
+    kept = _call(server, "egzos_remember", {"text": "before"})
+    assert kept["ok"]
+    box.auth.revoke(bot.id, actor=OWNER, principal="interactive")
+    dead = {"ok": False, "reason": "this token is no longer valid"}
+    assert _call(server, "egzos_fetch", {"scope": kept["scope"]}) == dead
+    assert _call(server, "egzos_remember", {"text": "after"}) == dead
+    assert _call(server, "egzos_inbox", {}) == dead
+    assert box.ledger.tail(1)[0]["event"] == "token.revoke"  # a dead token reads nothing
+
+
+def test_every_door_probe_is_on_the_chain(box):
+    owner = box.auth.interactive_token()
+    other = box.nodes.create("project", "other", box.nodes.user_root(), token=owner,
+                             actor=OWNER, principal="interactive")
+    server = build_server(box, _client(box, scopes=[other.id]))  # does not cover the inbox
+    assert _call(server, "egzos_inbox", {})["items"] == []
+    assert box.ledger.tail(1)[0]["event"] == "context.fetch"
+    before = len(box.ledger.tail(1000))
+    assert _call(server, "egzos_remember", {"text": "x", "scope": "project:nope"})["ok"] is False
+    entries = box.ledger.tail(1000)
+    assert len(entries) == before + 1 and entries[-1]["event"] == "context.fetch"
+
+
+def test_a_remembered_title_is_one_path_segment(box):
+    kept = _call(build_server(box, _client(box)), "egzos_remember",
+                 {"text": "../../org:acme/project:x"})
+    assert kept["scope"].count("/") == 2  # user:self / inbox:inbox / thread:<one segment>
+    owner = box.auth.interactive_token()
+    assert box.nodes.resolve_ref(kept["scope"], owner) is not None
+
+
 def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
     owner = box.auth.interactive_token()
     f = tmp_path / "secret.txt"
