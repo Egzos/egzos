@@ -33,7 +33,9 @@ run find commit
 run mv %1 project:health          # solo container: zero audience delta → silent gate pass
 
 say "4 · an agent that can see the org — now moving there is a publish"
-run token create --client ops-agent --role operator --scope org:acme
+CT=$($E --json token create --client ops-agent --role operator --scope org:acme | $PY -c "import json,sys; print(json.load(sys.stdin)['secret'])")
+printf '\033[2m$ egzos token create --client ops-agent --role operator --scope org:acme\033[0m\n'
+echo "  (client token minted; its value is shown once and handed to the client)"
 run find commit
 run mv %1 org:acme                # the gate: resolved audience + inheritance, parked in pending
 run trust pending
@@ -51,7 +53,6 @@ run find secrets; run trust approve %1
 run fetch "$RT" --no-global --kind rule
 
 say "6 · the door: Claude Code (stood in by scripts/mcp_client_probe.py) as the client principal"
-CT=$($E --json token ls | $PY -c "import json,sys; print([t['id'] for t in json.load(sys.stdin) if t['client']=='ops-agent'][0])")
 printf '\033[2m$ EGZOS_TOKEN=<ops-agent> python scripts/mcp_client_probe.py\033[0m\n'
 EGZOS_TOKEN="$CT" $PY scripts/mcp_client_probe.py
 printf '\033[2m$ egzos serve --mcp --token <interactive>\033[0m\n'

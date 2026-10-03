@@ -18,7 +18,8 @@ def test_connect_mints_a_client_token_and_prints_the_command(tmp_path, monkeypat
     assert out["client"] == "claude-code" and out["role"] == "contributor" and not out["applied"]
     cmd = out["command"]
     assert cmd[:6] == ["claude", "mcp", "add", "--scope", "user", "egzos"]
-    assert f"EGZOS_TOKEN={out['token']}" in cmd and cmd[-2:] == ["serve", "--mcp"]
+    assert any(a.startswith(f"EGZOS_TOKEN=egz_{out['token']}_") for a in cmd)
+    assert cmd[-2:] == ["serve", "--mcp"]
     assert main(["--json", "token", "ls"]) == 0
     tokens = json.loads(capsys.readouterr().out)
     minted = [t for t in tokens if t["id"] == out["token"]]

@@ -195,6 +195,10 @@ class Token:
     last_used: str | None = None
     revoked: bool = False
     expires_at: str | None = None
+    # sha256 of the bearer value; the value itself is shown once at mint and never stored.
+    secret_hash: str | None = None
+    # The bearer value, present only on the object `Auth.mint` returns. Never serialised.
+    secret: str | None = field(default=None, repr=False, compare=False)
 
     def has(self, capability: str) -> bool:
         return not self.revoked and capability in self.capabilities
@@ -211,6 +215,7 @@ class Token:
             "last_used": self.last_used,
             "revoked": self.revoked,
             "expires_at": self.expires_at,
+            "secret_hash": self.secret_hash,
         }
 
     @classmethod
@@ -229,6 +234,7 @@ class Token:
                     "last_used",
                     "revoked",
                     "expires_at",
+                    "secret_hash",
                 )
             }
         )

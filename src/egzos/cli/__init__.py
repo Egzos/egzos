@@ -484,10 +484,11 @@ def token_create(
         by_principal=token.principal,
     )
     _out(
-        t.to_dict(),
+        {**t.to_dict(), "secret": t.secret},
         f"{t.id}\n  client={client} principal=client role={role} "
         f"scopes={','.join(_p(c, s) if s != '*' else '*' for s in scopes)}\n"
-        f"  export EGZOS_TOKEN={t.id}   # hand this to the client; never to a human shell",
+        f"  export EGZOS_TOKEN={t.secret}\n"
+        "  # shown once: hand it to the client, never to a human shell",
     )
 
 
@@ -549,7 +550,7 @@ def audit_verify():
 def serve(
     mcp: bool = typer.Option(False, "--mcp", help="Speak MCP over stdio."),
     token: str | None = typer.Option(
-        None, "--token", help="Client token id; default: $EGZOS_TOKEN"
+        None, "--token", help="Client token value; default: $EGZOS_TOKEN"
     ),
 ):
     """Open the door. Runs as the CLIENT principal it was started with — never as you."""
@@ -618,7 +619,7 @@ def connect(
     egzos_bin = shutil.which("egzos") or "egzos"
     cmd = [
         "claude", "mcp", "add", "--scope", "user", "egzos",
-        "-e", f"EGZOS_TOKEN={t.id}",
+        "-e", f"EGZOS_TOKEN={t.secret}",
         "-e", f"EGZOS_HOME={c.home}",
         "--", egzos_bin, "serve", "--mcp",
     ]

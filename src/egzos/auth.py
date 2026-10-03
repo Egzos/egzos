@@ -11,8 +11,10 @@ never touch it; they receive their own client tokens.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 
 from egzos._ids import ulid
@@ -23,6 +25,28 @@ from egzos.model import ROLE_BUNDLES, Token, now_iso
 
 class AuthError(Exception):
     pass
+
+
+PREFIX = "egz_"
+
+
+def _hash(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def new_secret(token_id: str) -> str:
+    """The bearer value: `egz_<id>_<256 random bits>`. The id half finds the record; only the
+    sha256 of the whole value is stored, so the database and the audit chain never hold it."""
+    return f"{PREFIX}{token_id}_{secrets.token_urlsafe(32)}"
+
+
+def token_id_of(value: str) -> str | None:
+    """The public id inside a bearer value, or None when the value is not one."""
+    if not value.startswith(PREFIX):
+        return None
+    rest = value[len(PREFIX):]
+    tid, sep, _ = rest.partition("_")
+    return tid if sep and len(tid) == 26 else None
 
 
 class Auth:
@@ -53,7 +77,10 @@ class Auth:
             capabilities=sorted(ROLE_BUNDLES[role]),
             scopes=scopes,
         )
+        secret = new_secret(token.id)
+        token.secret_hash = _hash(secret)
         self.backend.put_token(token)
+        token.secret = secret
         self.ledger.append(
             "token.mint",
             actor=actor,
@@ -77,7 +104,11 @@ class Auth:
 
     # -- keychain stand-in -------------------------------------------------------------
     def keychain_store(self, token: Token) -> None:
-        self.keychain.write_text(json.dumps({"token": token.id, "stored_at": now_iso()}))
+        if not token.secret:
+            raise AuthError("only a freshly minted token can be stored; its value is not kept")
+        fd = os.open(self.keychain, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as fh:
+            fh.write(json.dumps({"token": token.secret, "stored_at": now_iso()}))
         os.chmod(self.keychain, 0o600)
 
     def interactive_token(self) -> Token | None:
@@ -89,9 +120,13 @@ class Auth:
             return None
         return self.use(json.loads(self.keychain.read_text())["token"])
 
-    def use(self, token_id: str) -> Token | None:
-        token = self.backend.get_token(token_id)
-        if not token or token.revoked:
+    def use(self, value: str) -> Token | None:
+        """The token a bearer value proves, or None. Every failure looks the same to the caller."""
+        tid = token_id_of(value or "")
+        token = self.backend.get_token(tid) if tid else None
+        if not token or token.revoked or not token.secret_hash:
+            return None
+        if not secrets.compare_digest(_hash(value), token.secret_hash):
             return None
         token.last_used = now_iso()
         self.backend.put_token(token)
