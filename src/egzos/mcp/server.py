@@ -41,8 +41,7 @@ def build_server(container: Container, token: Token):
         """The node the token may see at `ref`, or None — one answer whether `ref` does not
         exist or exists outside the token's coverage (silence-not-errors)."""
         if ref:
-            node = nodes.resolve_ref(ref)
-            return node if node and container.trust.covers(token, node) else None
+            return nodes.resolve_ref(ref, token)
         if token.scopes and token.scopes[0] != "*":
             return nodes.backend.get_node(
                 token.scopes[0]
@@ -145,7 +144,8 @@ def build_server(container: Container, token: Token):
         inbox = nodes.inbox()
         if inbox is None or not container.trust.covers(token, inbox):
             return json.dumps({"banner": DATA_BANNER, "items": []})  # silence-not-errors
-        rows = store.inbox_items()
+        # Served, not shown: quarantined never, rules verified-only — the same policy as fetch.
+        rows = [(n, i) for n, i in store.inbox_items() if container.resolver.serve(i, n)]
         container.ledger.append(
             "context.fetch",
             actor=actor,

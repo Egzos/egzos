@@ -15,7 +15,7 @@ from typing import Any
 
 from egzos._types import EVENTS as CONTRACT_EVENTS
 from egzos._types import GENESIS_HASH
-from egzos.backends.base import Backend
+from egzos.backends.base import Backend, ChainConflict
 from egzos.model import canonical, now_iso
 
 GENESIS = GENESIS_HASH
@@ -44,20 +44,27 @@ class Ledger:
     ) -> dict[str, Any]:
         if event not in EVENTS:
             raise ValueError(f"unknown audit event {event!r}")
-        last = self.backend.audit_last()
-        prev_hash = last["hash"] if last else GENESIS
-        body = {
-            "ts": now_iso(),
-            "event": event,
-            "actor": actor,
-            "principal": principal,
-            "subject": subject,
-            "scope": scope,
-            "details": details,
-            "prev_hash": prev_hash,
-        }
-        entry = {**body, "hash": _hash(prev_hash, body)}
-        return self.backend.audit_append(entry)
+        # Read the head, chain onto it, append. Two processes (the CLI and `serve --mcp`) can read
+        # the same head; the backend accepts one successor per entry, and the loser re-chains.
+        for _ in range(64):
+            last = self.backend.audit_last()
+            prev_hash = last["hash"] if last else GENESIS
+            body = {
+                "ts": now_iso(),
+                "event": event,
+                "actor": actor,
+                "principal": principal,
+                "subject": subject,
+                "scope": scope,
+                "details": details,
+                "prev_hash": prev_hash,
+            }
+            entry = {**body, "hash": _hash(prev_hash, body)}
+            try:
+                return self.backend.audit_append(entry)
+            except ChainConflict:
+                continue
+        raise ChainConflict("could not append after 64 attempts: the chain head keeps moving")
 
     def tail(self, n: int = 20) -> list[dict[str, Any]]:
         return self.backend.audit_tail(n)

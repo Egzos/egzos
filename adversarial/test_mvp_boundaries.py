@@ -128,3 +128,110 @@ def test_blob_pull_checks_coverage_like_a_fetch(box, tmp_path):
     bot = _client(box, role="reader", scopes=[box.nodes.global_root().id])
     assert box.store.blob_pull(item, token=bot, actor="bot", principal="client") is None
     assert box.store.blob_pull(item, token=owner, actor=OWNER, principal="interactive")
+
+
+# --- a client is served, never shown the store ---
+def _json(r):
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def test_a_clients_ls_is_served_under_the_policy(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    rule = _json(_egzos(tmp_path, "--json", "add", "unverified rule", "--kind", "rule"))
+    bad = _json(_egzos(tmp_path, "--json", "add", "poisoned"))
+    ok = _json(_egzos(tmp_path, "--json", "add", "plain memory"))
+    assert _egzos(tmp_path, "trust", "quarantine", bad["id"], "--reason", "x").returncode == 0
+    secret = _json(_egzos(tmp_path, "--json", "token", "create", "--client", "bot",
+                          "--role", "reader", "--scope", "inbox:inbox"))["secret"]
+    listed = {i["id"] for i in _json(_egzos(tmp_path, "--json", "ls", "--inbox", token=secret))}
+    assert ok["id"] in listed and rule["id"] not in listed and bad["id"] not in listed
+
+
+@pytest.mark.parametrize("argv", [
+    ("fetch", "{ref}"), ("cd", "{ref}"), ("mk", "thread", "t", "--in", "{ref}"),
+    ("ls", "--scope", "{ref}"),
+])
+def test_every_scope_verb_answers_uncovered_like_absent(tmp_path, argv):
+    assert _egzos(tmp_path, "init").returncode == 0
+    hidden = _json(_egzos(tmp_path, "--json", "mk", "project", "hidden"))
+    secret = _json(_egzos(tmp_path, "--json", "token", "create", "--client", "bot",
+                          "--role", "curator", "--scope", "inbox:inbox"))["secret"]
+    answers = []
+    for ref in (hidden["id"], "01HZZZZZZZZZZZZZZZZZZZZZZZ"):
+        r = _egzos(tmp_path, *(a.format(ref=ref) for a in argv), token=secret)
+        answers.append((r.returncode, r.stdout.replace(ref, "<ref>"), r.stderr))
+    assert answers[0] == answers[1] and "hidden" not in answers[0][1]
+
+
+def test_item_verbs_answer_uncovered_like_absent(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    proj = _json(_egzos(tmp_path, "--json", "mk", "project", "hidden"))
+    item = _json(_egzos(tmp_path, "--json", "add", "theirs", "--scope", proj["id"]))
+    secret = _json(_egzos(tmp_path, "--json", "token", "create", "--client", "bot",
+                          "--role", "curator", "--scope", "inbox:inbox"))["secret"]
+    for argv in (("mv", "{ref}", "inbox:inbox"), ("trust", "quarantine", "{ref}", "--reason", "x")):
+        answers = []
+        for ref in (item["id"], "01HZZZZZZZZZZZZZZZZZZZZZZZ"):
+            r = _egzos(tmp_path, *(a.format(ref=ref) for a in argv), token=secret)
+            answers.append((r.returncode, r.stdout, r.stderr))
+        assert answers[0] == answers[1] and answers[0][0] != 0
+    owner_view = _json(_egzos(tmp_path, "--json", "ls", "--scope", proj["id"]))
+    assert [i["trust"]["status"] for i in owner_view] == ["unverified"]  # untouched
+
+
+def test_the_engine_checks_coverage_whatever_the_surface(box):
+    owner = box.auth.interactive_token()
+    root = box.nodes.user_root()
+    hidden = box.nodes.create("project", "hidden", root, token=owner, actor=OWNER,
+                              principal="interactive")
+    item = box.store.add(body="theirs", scope=hidden, token=owner, actor=OWNER,
+                         principal="interactive")
+    bot = _client(box, role="curator")
+    from egzos.store.nodes import StructureError
+    from egzos.trust import TrustError
+
+    with pytest.raises(StructureError, match="scope not found"):
+        box.nodes.create("thread", "t", hidden, token=bot, actor="bot", principal="client")
+    with pytest.raises(TrustError, match="not found"):
+        box.trust.move(item, box.nodes.inbox(), token=bot, actor="bot")
+    with pytest.raises(TrustError, match="not found"):
+        box.trust.quarantine(item, token=bot, actor="bot", reason="x")
+    served = box.resolver.resolve(hidden, token=bot, actor="bot")
+    assert served == {"scope": None, "chain": [], "items": [], "withheld": 0}
+    assert box.nodes.resolve_ref("project:hidden", bot) is None
+    assert box.nodes.resolve_ref(hidden.id, bot) is None
+
+
+def test_an_invisible_node_never_breaks_a_tie(box):
+    owner = box.auth.interactive_token()
+    root = box.nodes.user_root()
+    mine = box.nodes.create("project", "p", box.nodes.inbox(), token=owner, actor=OWNER,
+                            principal="interactive")
+    theirs = box.nodes.create("project", "p", root, token=owner, actor=OWNER,
+                              principal="interactive")
+    box.store.add(body="recent", scope=theirs, token=owner, actor=OWNER, principal="interactive")
+    bot = _client(box)
+    assert box.nodes.resolve_ref("project:p", bot).id == mine.id
+
+
+def test_percent_n_belongs_to_the_principal_that_found_it(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    mine = _json(_egzos(tmp_path, "--json", "add", "owner picks this"))
+    _json(_egzos(tmp_path, "--json", "add", "bot would pick this"))
+    assert _egzos(tmp_path, "find", "owner picks").returncode == 0
+    secret = _json(_egzos(tmp_path, "--json", "token", "create", "--client", "bot",
+                          "--role", "reader", "--scope", "inbox:inbox"))["secret"]
+    assert _egzos(tmp_path, "find", "bot would", token=secret).returncode == 0
+    r = _egzos(tmp_path, "--json", "trust", "quarantine", "%1", "--reason", "owner's %1")
+    assert _json(r)["affected"] == [mine["id"]]
+
+
+def test_the_mcp_inbox_serves_no_quarantined_item_and_no_unverified_rule(box):
+    owner = box.auth.interactive_token()
+    rule = box.store.add(body="r", kind="rule", token=owner, actor=OWNER, principal="interactive")
+    bad = box.store.add(body="b", token=owner, actor=OWNER, principal="interactive")
+    ok = box.store.add(body="o", token=owner, actor=OWNER, principal="interactive")
+    box.trust.quarantine(bad, token=owner, actor=OWNER, reason="x")
+    ids = {i["id"] for i in _call(build_server(box, _client(box)), "egzos_inbox", {})["items"]}
+    assert ok.id in ids and rule.id not in ids and bad.id not in ids

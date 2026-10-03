@@ -66,23 +66,32 @@ def _sticky_scope(c: Container) -> Node | None:
     """Sticky scope per shell/project: the `.egzos` file in the working directory (v0.3 §4)."""
     f = _scope_file()
     if f.exists():
-        return c.nodes.resolve_ref(f.read_text().strip())
+        return c.nodes.resolve_ref(f.read_text().strip(), c.require_token())
     return None
 
 
 def _scope_or(c: Container, ref: str | None, default: Node | None) -> Node | None:
+    """Resolve a scope as the shell's token sees it: an uncovered scope is "scope not found",
+    exactly like an absent one (silence-not-errors), on every verb that takes a scope."""
     if ref:
-        node = c.nodes.resolve_ref(ref)
+        node = c.nodes.resolve_ref(ref, c.require_token())
         if not node:
             _fail("scope not found")
         return node
     return _sticky_scope(c) or default
 
 
+def _find_map(c: Container, token) -> Path:
+    """`%n` belongs to the principal whose `find` produced it: one map per token, so no other
+    principal's `find` can retarget what the owner's `%n` names."""
+    return c.home / f"last-find-{token.id}.json"
+
+
 def _item_ref(c: Container, ref: str):
     """Exact ids for machines, `%n` for humans (v0.3 §4); `%n` resolves to the real id."""
+    token = c.require_token()
     if ref.startswith("%"):
-        f = c.home / "last-find.json"
+        f = _find_map(c, token)
         if not f.exists():
             _fail("no previous `find` to take %n from")
         mapping = json.loads(f.read_text())
@@ -91,10 +100,9 @@ def _item_ref(c: Container, ref: str):
             _fail(f"{ref} is not in the last find")
         ref = real
     item = c.store.get(ref)
-    if not item:
-        _fail(
-            "not found"
-        )  # silence-not-errors: the same answer whether it exists or is out of scope
+    node = c.backend.get_node(item.scope) if item else None
+    if not item or not node or not c.trust.covers(token, node):
+        _fail("not found")  # silence-not-errors: the same answer whether absent or out of scope
     return item
 
 
@@ -212,6 +220,10 @@ def ls(
         rows = [(node, i) for i in c.backend.query([node.id])]
     else:
         rows = [(n, i) for n, i in c.store.inbox_items() if c.trust.covers(token, n)]
+    if token.principal != "interactive":
+        # A client is SERVED, never shown the store: the same policy as fetch — rules
+        # verified-only everywhere, quarantined never, each layer's serving policy.
+        rows = [(n, i) for n, i in rows if c.resolver.serve(i, n)]
     c.ledger.append(
         "context.fetch",
         actor=OWNER,
@@ -287,7 +299,7 @@ def find(
                 hits.append((n, item))
     hits.sort(key=lambda t: t[1].lifecycle.get("updated_at", ""), reverse=True)
     mapping = {str(i + 1): item.id for i, (_, item) in enumerate(hits)}
-    (c.home / "last-find.json").write_text(json.dumps(mapping))
+    _find_map(c, token).write_text(json.dumps(mapping))
     c.ledger.append(
         "context.fetch",
         actor=OWNER,
@@ -323,10 +335,7 @@ def cd(
 ):
     """Sticky scope: writes `.egzos` in the working directory (alias for `scope use`)."""
     c = _container()
-    c.require_token()
-    node = c.nodes.resolve_ref(scope)
-    if not node:
-        _fail("scope not found")
+    node = _scope_or(c, scope, None)
     _scope_file().write_text(node.id)
     _out({"scope": node.id, "path": c.nodes.path(node)}, c.nodes.path(node))
 
@@ -371,9 +380,7 @@ def mv(
     c = _container()
     token = c.require_token()
     it = _item_ref(c, item)
-    target = c.nodes.resolve_ref(to)
-    if not target:
-        _fail("scope not found")
+    target = _scope_or(c, to, None)
     try:
         r = c.trust.move(it, target, token=token, actor=OWNER)
     except TrustError as e:
@@ -432,47 +439,13 @@ def trust_pending():
 def _decide(c: Container, token, ref: str) -> None:
     """Open the decision page for an item or a proposal. The terminal only ASKS; the page — two
     deliberate presses, or Deny — is where the human decides (the step-up tap)."""
-    from egzos.presence import Presence
+    from egzos.authz.presence import Presence, build_act
 
     prop = c.backend.get_proposal(ref)
     prop = prop if prop and prop.get("status") == "open" else None
-    if prop:
-        frm, to = c.backend.get_node(prop["from"]), c.backend.get_node(prop["to"])
-        act = {
-            "ref": f"PROPOSAL {prop['id'][:10]}…",
-            "filed": prop.get("created_at", ""),
-            "title": f"Move {len(prop['items'])} item(s) outward: "
-            f"{prop['from_path']} → {prop['to_path']}",
-            "requester": f"{prop.get('proposed_by', {}).get('client', 'cli')}",
-            "reason": prop.get("reason"),
-            "items": [
-                {"kind": i.kind, "title": i.content.get("auto_title", i.id), "trust": i.status}
-                for i in (c.backend.get(x) for x in prop["items"])
-                if i
-            ],
-            "audience": [f"{a['client']} · {a['role']}" for a in prop["audience_delta"]],
-            "from": prop["from_path"],
-            "to": prop["to_path"],
-            "pair": (frm.type if frm else "?", to.type if to else "?"),
-            "subject": prop["id"],
-        }
-    else:
-        it = _item_ref(c, ref)
-        node = c.backend.get_node(it.scope)
-        ring = node.type if node else "?"
-        act = {
-            "ref": f"ITEM {it.id[:10]}…",
-            "title": f"Mark verified: “{it.content.get('auto_title', it.id)}”",
-            "requester": it.provenance.get("client") or "cli",
-            "reason": "promote to verified, so it is served where unverified items are withheld",
-            "items": [{"kind": it.kind, "title": it.content.get("auto_title", it.id),
-                       "trust": f"{it.status} → verified"}],
-            "audience": [],
-            "from": _p(c, it.scope),
-            "to": _p(c, it.scope),
-            "pair": (ring, ring),
-            "subject": it.id,
-        }
+    act = build_act(c, prop["id"] if prop else _item_ref(c, ref).id)
+    if act is None:
+        _fail("nothing to decide: it is not pending")
     outcome = Presence(c).require(act)
     try:
         if outcome == "denied":
@@ -528,7 +501,7 @@ def trust_deny(proposal: str):
 @trust_app.command("close-window")
 def trust_close_window():
     """Close every open presence window now: the next human-only act taps again."""
-    from egzos.presence import Presence
+    from egzos.authz.presence import Presence
 
     c = _container()
     _owner(c, "closing a presence window")
@@ -618,8 +591,12 @@ def token_ls():
 def audit_tail(n: int = typer.Option(20, "-n")):
     """The last n audit entries — reads included."""
     c = _container()
-    _owner(c, "the audit chain")
+    token = _owner(c, "the audit chain")
     entries = c.ledger.tail(n)
+    c.ledger.append(
+        "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
+        view="audit tail", items=[], layers=[], withheld=0, entries=len(entries),
+    )
     _out(
         entries,
         "\n".join(
@@ -636,8 +613,12 @@ def audit_tail(n: int = typer.Option(20, "-n")):
 def audit_verify():
     """Walk the hash chain from genesis. Exit 1 if it is broken."""
     c = _container()
-    _owner(c, "the audit chain")
+    token = _owner(c, "the audit chain")
     result = c.ledger.verify()
+    c.ledger.append(
+        "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
+        view="audit verify", items=[], layers=[], withheld=0, entries=result["entries"],
+    )
     _out(
         result,
         (
@@ -708,6 +689,12 @@ def connect(
         _fail("minting a token needs `admin`")
     if role == "admin":
         _fail("connect never mints admin for an agent; use `egzos token create` deliberately")
+    from egzos.authz.presence import is_terminal
+
+    if not apply and not is_terminal():
+        # The printed command carries the client secret: it goes to a person at a terminal, or
+        # straight to `claude mcp add` with --apply — never to a program's pipe.
+        _fail("connect prints a secret: run it from a terminal, or pass --apply")
     scopes = []
     for ref in scope or ["user:self"]:
         n = c.nodes.resolve_ref(ref)

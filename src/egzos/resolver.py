@@ -46,8 +46,19 @@ class Resolver:
         text: str | None = None,
         include_global: bool = True,
     ) -> dict[str, Any]:
-        if not token.has("fetch"):
-            return {"scope": None, "chain": [], "items": []}  # silence, not an error
+        if not token.has("fetch") or not self.trust.covers(token, scope):
+            # Silence, not an error: an uncovered scope answers like an absent one, and the probe
+            # is still a read on the record (no path, no layers, nothing that names the node).
+            self.ledger.append(
+                "context.fetch",
+                actor=actor,
+                principal=token.principal,
+                client=token.client,
+                items=[],
+                layers=[],
+                withheld=0,
+            )
+            return {"scope": None, "chain": [], "items": [], "withheld": 0}
         chain = self.nodes.chain(scope, include_global=include_global)
         layers: list[dict[str, Any]] = []
         items: list[dict[str, Any]] = []

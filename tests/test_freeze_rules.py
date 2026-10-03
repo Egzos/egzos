@@ -136,3 +136,38 @@ def test_ambiguous_path_resolves_to_the_most_recently_active_node(box: Container
     assert box.nodes.resolve_ref("project:health").id == older.id
     # a qualified path is never ambiguous
     assert box.nodes.resolve_ref("org:b/project:health").id == newer.id
+
+
+# --- the chain never forks; the manifest binds the source; roles come from ROLE_BUNDLES ---------
+def test_a_lost_append_race_re_chains_instead_of_forking(box: Container):
+    real = box.backend.audit_last
+    stale = real()
+    calls = {"n": 0}
+
+    def racing_head():
+        calls["n"] += 1
+        return stale if calls["n"] == 1 else real()
+
+    box.ledger.append("context.fetch", actor=OWNER, principal="interactive")  # the other writer
+    box.backend.audit_last = racing_head
+    box.ledger.append("context.fetch", actor=OWNER, principal="interactive")
+    assert calls["n"] == 2 and box.ledger.verify()["ok"]
+
+
+def test_an_item_moved_after_the_proposal_makes_it_stale(box: Container):
+    t, org, proj, other = _tree(box)
+    _client(box, "watcher", "reader", [other.id])
+    item = box.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    pid = box.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
+    box.trust._do_move(item, org, OWNER, "interactive")  # moved under the proposal's feet
+    with pytest.raises(TrustError, match="re-propose"):
+        box.trust.execute(pid, token=t, actor=OWNER)
+    assert box.ledger.tail(1)[0]["event"] == "approval.stale"
+
+
+def test_role_names_are_read_from_the_bundles():
+    from egzos._types import ROLE_BUNDLES
+    from egzos.trust import _role_name
+
+    for role, bundle in ROLE_BUNDLES.items():
+        assert _role_name(sorted(bundle)) == role

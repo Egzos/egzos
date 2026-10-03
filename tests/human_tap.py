@@ -4,9 +4,11 @@
 """Stands in for a person at a browser, for the demo and tests only: given a /tap/<token> URL it
 opens the page, presses *Sign and approve*, then *Confirm signature* — the same two deliberate
 presses the page asks of a human, over the same HTTP.
-Usage: BROWSER="python scripts/human_tap.py %s" (or `--deny URL`, or `--once URL` to approve
+Usage: BROWSER="python tests/human_tap.py %s" (or `--deny URL`, or `--once URL` to approve
 without a window).
-It is not a bypass: it holds no credential and does nothing a person's browser could not."""
+It holds no credential and does nothing a person's browser could not — which is exactly why it
+lives with the tests: it is the named residual (anything running as the user can press), made
+explicit, not a feature of the product."""
 
 from __future__ import annotations
 

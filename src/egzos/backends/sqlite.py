@@ -10,6 +10,7 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
+from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
 _SCHEMA = """
@@ -24,6 +25,9 @@ CREATE INDEX IF NOT EXISTS items_kind_key ON items(kind, key);
 CREATE TABLE IF NOT EXISTS audit (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, hash TEXT NOT NULL UNIQUE,
   prev_hash TEXT NOT NULL, doc TEXT NOT NULL);
+-- One successor per entry: two writers (the CLI and `serve --mcp` are separate processes) that read
+-- the same head cannot both append after it; the loser re-reads and re-chains (Ledger.append).
+CREATE UNIQUE INDEX IF NOT EXISTS audit_prev_hash ON audit(prev_hash);
 CREATE TABLE IF NOT EXISTS tokens (id TEXT PRIMARY KEY, doc TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS proposals (id TEXT PRIMARY KEY, status TEXT NOT NULL, doc TEXT NOT NULL);
 -- append-only is a PROPERTY of the design (a3-ledger charter): no update or delete path exists.
@@ -141,10 +145,14 @@ class SqliteBackend:
 
     # -- audit --------------------------------------------------------------------------
     def audit_append(self, entry: dict[str, Any]) -> dict[str, Any]:
-        cur = self.db.execute(
-            "INSERT INTO audit(ts,hash,prev_hash,doc) VALUES(?,?,?,?)",
-            (entry["ts"], entry["hash"], entry["prev_hash"], json.dumps(entry)),
-        )
+        try:
+            cur = self.db.execute(
+                "INSERT INTO audit(ts,hash,prev_hash,doc) VALUES(?,?,?,?)",
+                (entry["ts"], entry["hash"], entry["prev_hash"], json.dumps(entry)),
+            )
+        except sqlite3.IntegrityError as e:
+            self.db.rollback()
+            raise ChainConflict(str(e)) from e
         self.db.commit()
         return {**entry, "seq": cur.lastrowid}
 

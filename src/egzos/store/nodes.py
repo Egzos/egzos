@@ -11,6 +11,8 @@ global (v0.4 §2) — with the personal root slotted between org and global by d
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from egzos._ids import ulid
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
@@ -25,6 +27,15 @@ class NodeService:
     def __init__(self, backend: Backend, ledger: Ledger):
         self.backend = backend
         self.ledger = ledger
+        # Trust's coverage check, wired by the container. Unwired, every token-scoped lookup
+        # fails closed: a node nobody can prove coverage of is a node nobody sees.
+        self.covers: Callable[[Token, Node], bool] | None = None
+
+    def visible(self, token: Token | None, node: Node) -> bool:
+        """Whether `token` may see `node`; `None` is the container itself (no principal)."""
+        if token is None:
+            return True
+        return self.covers is not None and self.covers(token, node)
 
     # -- roots ---------------------------------------------------------------------------
     def ensure_roots(self, *, actor: str, principal: str) -> dict[str, Node]:
@@ -68,6 +79,8 @@ class NodeService:
     def create(
         self, type: str, name: str, parent: Node, *, token: Token, actor: str, principal: str
     ) -> Node:
+        if not self.visible(token, parent):
+            raise StructureError("scope not found")  # the same answer as a parent that is absent
         if type not in CONTAINER_TYPES or type in ("inbox", "global"):
             raise StructureError(f"cannot create a container of type {type!r}")
         if type == "uxo":
@@ -137,13 +150,19 @@ class NodeService:
                 chain.append(g)
         return chain
 
-    def resolve_ref(self, ref: str) -> Node | None:
-        """Accept a node id or a path like `project:health` / `user:self/project:health`."""
+    def resolve_ref(self, ref: str, token: Token | None = None) -> Node | None:
+        """Accept a node id or a path like `project:health` / `user:self/project:health`. With a
+        token, only nodes it covers exist: an uncovered node answers exactly like an absent one,
+        and never takes part in breaking a tie between nodes the token can see."""
         node = self.backend.get_node(ref)
         if node:
-            return node
+            return node if self.visible(token, node) else None
         parts = ref.strip("/").split("/")
-        candidates = [n for n in self.backend.list_nodes() if _matches_tail(self, n, parts)]
+        candidates = [
+            n
+            for n in self.backend.list_nodes()
+            if _matches_tail(self, n, parts) and self.visible(token, n)
+        ]
         if len(candidates) == 1:
             return candidates[0]
         if len(candidates) > 1:

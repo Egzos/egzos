@@ -20,7 +20,7 @@ from typing import Any
 from egzos._ids import ulid
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
-from egzos.model import RING_RANK, ContextItem, Node, Token, canonical, now_iso
+from egzos.model import RING_RANK, ROLE_BUNDLES, ContextItem, Node, Token, canonical, now_iso
 from egzos.store.nodes import NodeService
 
 
@@ -116,6 +116,9 @@ class TrustEngine:
         return item
 
     def quarantine(self, item: ContextItem, *, token: Token, actor: str, reason: str) -> list[str]:
+        node = self.backend.get_node(item.scope)
+        if node is None or not self.covers(token, node):
+            raise TrustError("not found")  # the same answer as an item that does not exist
         if not token.has("curate"):
             raise TrustError("quarantine needs `curate`")
         affected = [item.id]
@@ -146,8 +149,10 @@ class TrustEngine:
     def move(self, item: ContextItem, to: Node, *, token: Token, actor: str) -> dict[str, Any]:
         """cp/mv landing at a different audience halts at the gate (v0.3 §5). Inward = instant."""
         frm = self.backend.get_node(item.scope)
-        if frm is None:
-            raise TrustError("item's scope no longer exists")
+        if frm is None or not self.covers(token, frm) or not self.covers(token, to):
+            # Coverage lives here, not per surface: an item or target the token cannot see answers
+            # exactly like one that does not exist (silence-not-errors).
+            raise TrustError("not found")
         before = self.audience(frm)
         after = self.audience(to)
         delta = [a for a in after if a["token"] not in {b["token"] for b in before}]
@@ -231,7 +236,9 @@ class TrustEngine:
             raise TrustError("target scope no longer exists")
         # Manifest binding: execute only if items + target + audience still match what was approved.
         current = self.manifest_hash(p["items"], p["to"], self.audience(to))
-        if current != p["manifest"]:
+        items = [self.backend.get(x) for x in p["items"]]
+        moved = [i for i in items if not i or i.scope != p["from"]]  # the source is bound too
+        if current != p["manifest"] or moved:
             p["status"] = "stale"
             self.backend.put_proposal(p)
             # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
@@ -240,7 +247,9 @@ class TrustEngine:
                 actor=actor,
                 principal=token.principal,
                 subject=p["id"],
-                reason="manifest changed since proposal (TOCTOU)",
+                reason="an item moved since the proposal (TOCTOU)"
+                if moved
+                else "manifest changed since proposal (TOCTOU)",
             )
             raise TrustError("manifest changed since the proposal was made — re-propose")
         for item_id in p["items"]:
@@ -291,13 +300,8 @@ class TrustEngine:
 
 
 def _role_name(capabilities: list[str]) -> str:
+    """The largest role bundle the capabilities hold, read from `ROLE_BUNDLES` — never a second
+    mapping beside it."""
     caps = set(capabilities)
-    if "admin" in caps:
-        return "admin"
-    if "curate" in caps:
-        return "curator"
-    if "publish" in caps:
-        return "operator"
-    if "remember" in caps:
-        return "contributor"
-    return "reader"
+    held = [role for role, bundle in ROLE_BUNDLES.items() if bundle <= caps]
+    return max(held, key=lambda role: len(ROLE_BUNDLES[role]), default="reader")

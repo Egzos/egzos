@@ -29,8 +29,9 @@ def default_home() -> Path:
 class Container:
     def __init__(self, home: Path | None = None):
         self.home = Path(home or default_home())
-        self.home.mkdir(parents=True, exist_ok=True)
-        # The database holds the chain, every item and the token hashes: the owner's only.
+        # The database holds the chain, every item and the token hashes: the owner's only. Created
+        # 0700 (no window at the umask's mode), then pinned 0700 if it already existed.
+        self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.home, 0o700)
         self.backend = SqliteBackend(self.home / "egzos.db")
         self.ledger = Ledger(self.backend)
@@ -41,6 +42,7 @@ class Container:
         self.trust = TrustEngine(self.backend, self.ledger, self.nodes)
         self.resolver = Resolver(self.backend, self.ledger, self.nodes, self.trust)
         self.store.covers = self.trust.covers
+        self.nodes.covers = self.trust.covers
 
     @property
     def initialized(self) -> bool:

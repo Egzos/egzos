@@ -1,9 +1,11 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: Apache-2.0
-"""Standing target: an injected `--yes` / `echo y` cannot complete a human-only act.
+"""Standing target: typing into the terminal cannot complete a human-only act.
 
-An agent with a shell can run the CLI as the user and type into it. Approving still needs two
-presses on a loopback page; typing `y` into the terminal, or answering nothing, approves nothing.
+An agent with a shell can run the CLI as the user and type into it: `y`, `yes`, `--yes`, or
+nothing at all. Approving needs a decision on the presence page, so terminal input approves
+nothing. What this does NOT claim: a process running as the user that drives that page itself (a
+browser, or tests/human_tap.py) can press it — the named residual in `egzos.authz.presence`.
 """
 
 from __future__ import annotations

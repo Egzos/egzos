@@ -10,11 +10,11 @@ from pathlib import Path
 
 import pytest
 
+from egzos.authz.presence import Presence
 from egzos.container import Container
-from egzos.presence import Presence
 
 _spec = importlib.util.spec_from_file_location(
-    "human_tap", Path(__file__).resolve().parents[1] / "scripts" / "human_tap.py"
+    "human_tap", Path(__file__).resolve().parent / "human_tap.py"
 )
 human_tap = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(human_tap)
@@ -33,7 +33,7 @@ def _person(*flags):
 
 @pytest.fixture
 def box(tmp_path, monkeypatch):
-    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
     c = Container(tmp_path)
     c.init()
     return c
@@ -93,7 +93,7 @@ def test_deny_and_expiry_leave_a_trace_and_open_no_window(box):
 
 
 def test_no_browser_and_no_terminal_prints_no_url(box, monkeypatch, capsys):
-    monkeypatch.setattr("egzos.presence.is_terminal", lambda: False)
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: False)
     p = Presence(box)
     assert p.require(ACT, timeout=10, opener=lambda u: False) == "unavailable"
     out = capsys.readouterr().out
@@ -102,7 +102,7 @@ def test_no_browser_and_no_terminal_prints_no_url(box, monkeypatch, capsys):
 
 
 def test_no_browser_at_a_terminal_prints_the_one_shot_url(box, monkeypatch, capsys):
-    monkeypatch.setattr("egzos.presence.is_terminal", lambda: True)
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: True)
     p = Presence(box)
     assert p.require(ACT, timeout=1, opener=lambda u: False) == "expired"
     assert "/tap/" in capsys.readouterr().out
@@ -124,7 +124,7 @@ def test_confirm_without_arming_does_not_sign(box):
 
 
 def test_page_escapes_and_wrong_token_is_404(box):
-    from egzos.presence import Tap
+    from egzos.authz.presence import Tap
 
     tap = Tap(ACT)
     page = tap.page(armed=False)
@@ -135,8 +135,40 @@ def test_page_escapes_and_wrong_token_is_404(box):
 def test_page_consumes_the_design_tokens_not_literal_colours():
     import re
 
-    from egzos.presence import TAP_STYLE, Tap
+    from egzos.authz.presence import TAP_STYLE, Tap
 
     page = Tap(ACT).page(armed=False)
     assert "--egz-act:" in page and "var(--egz-act)" in page  # the token file, then its use
     assert not re.search(r"#[0-9A-Fa-f]{3,8}\b", TAP_STYLE)
+
+
+def test_the_default_is_no_window_until_windows_bind_to_the_manifest(box, monkeypatch):
+    from egzos.authz.presence import window_seconds
+
+    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
+    assert window_seconds() == 0
+    p = Presence(box)
+    assert p.require(ACT, timeout=10, opener=_person()) == "approved"
+    assert _step_ups(box)[-1]["window_closes"] is None and not p.window_open(("user", "user"))
+
+
+def test_the_standalone_tap_refuses_a_post_without_origin(box):
+    import urllib.error
+    import urllib.request
+
+    from egzos.authz.presence import Presence
+
+    def no_origin(url):
+        def run():
+            urllib.request.urlopen(url, timeout=5).read()
+            for step in ("arm", "confirm"):
+                try:
+                    urllib.request.urlopen(
+                        urllib.request.Request(url, data=f"step={step}".encode()), timeout=5
+                    )
+                except urllib.error.HTTPError as e:
+                    assert e.code == 403
+        threading.Thread(target=run, daemon=True).start()
+        return True
+
+    assert Presence(box).require(ACT, timeout=2, opener=no_origin) == "expired"

@@ -57,49 +57,69 @@ def _step_ups(c):
     return [e["details"] for e in c.ledger.tail(200) if e["event"] == "step_up"]
 
 
-def test_approve_needs_two_presses_and_is_audited(boat, monkeypatch):
-    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
+def _to_tap(b, ref, back="/pending"):
+    _, _, redirect = b.act("/approve", {"ref": ref, "back": back})
+    assert redirect.startswith("/tap/")
+    return redirect[len("/tap/") :]
+
+
+def test_approve_redirects_to_the_tap_which_needs_two_presses(boat, monkeypatch):
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
     b, item = boat
-    # One request — what a script holding the key would send — arms and does nothing else.
-    _, _, redirect = b.act("/approve", {"ref": item.id, "back": "/pending", "step": "arm"})
-    assert "Confirm+signature" in redirect and b.c.backend.get(item.id).status == "unverified"
-    assert "Confirm signature" in b.pending()[1]
-    _, _, redirect = b.act("/approve", {"ref": item.id, "back": "/pending", "step": "confirm"})
-    assert redirect.startswith("/pending?ok=Approved")
+    # The lifeboat's Approve never performs: it hands the decision to a one-shot tap page.
+    token = _to_tap(b, item.id)
+    assert b.c.backend.get(item.id).status == "unverified"
+    status, page = b.tap_get(token)
+    for required in ("egzos · container", "principal: interactive", "what moves",
+                     "who will see it at", "presence", "Sign and approve", "window would close"):
+        assert required in page, required
+    b.tap_post(token, "confirm")  # a confirm with no arm signs nothing
+    assert b.c.backend.get(item.id).status == "unverified"
+    assert "Confirm signature" in b.tap_post(token, "arm")[1]
+    status, outcome = b.tap_post(token, "confirm")
+    assert "Signed at" in outcome and 'href="/pending"' in outcome
     assert b.c.backend.get(item.id).status == "verified"
     assert b.c.ledger.tail(1)[0]["event"] == "approval.promote"
     signed = _step_ups(b.c)[-1]
-    assert signed["via"] == "lifeboat" and signed["outcome"] == "approved"
-    assert signed["window_closes"] and b.c.ledger.verify()["ok"]
+    assert signed["via"] == "tap" and signed["outcome"] == "approved"
+    assert signed["shape"] == {"max_items": 1, "kinds": ["preference"]}
+    assert b.tap_get(token)[0] == 404 and b.c.ledger.verify()["ok"]  # one decision, one page
 
 
-def test_a_confirm_without_an_arm_only_arms(boat, monkeypatch):
-    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "0")
-    b, item = boat
-    b.act("/approve", {"ref": item.id, "back": "/pending", "step": "confirm"})
-    assert b.c.backend.get(item.id).status == "unverified"
-    assert _step_ups(b.c) == []
-
-
-def test_an_open_window_covers_the_next_approval_in_one_press(boat, monkeypatch):
-    monkeypatch.delenv("EGZOS_STEP_UP_WINDOW_SECONDS", raising=False)
+def test_a_window_covers_only_what_fits_the_signed_shape(boat, monkeypatch):
+    monkeypatch.setenv("EGZOS_STEP_UP_WINDOW_SECONDS", "300")
     b, item = boat
     token = b.c.require_token()
-    other = b.c.store.add(body="second", token=token, actor=OWNER, principal=token.principal)
-    b.c.backend.put(other)
-    for step in ("arm", "confirm"):
-        b.act("/approve", {"ref": item.id, "back": "/pending", "step": step})
-    # `other` sits in its own inbox thread: the same ring pair (thread → thread)
-    b.act("/approve", {"ref": other.id, "back": "/pending", "step": "arm"})
-    assert b.c.backend.get(other.id).status == "verified"
+    same = b.c.store.add(body="tabs", kind="preference", token=token, actor=OWNER,
+                         principal=token.principal)
+    other = b.c.store.add(body="a memory", token=token, actor=OWNER, principal=token.principal)
+    t = _to_tap(b, item.id)
+    b.tap_post(t, "arm")
+    b.tap_post(t, "confirm")
+    # same ring pair (thread → thread), same shape: one press, logged as a window pass
+    _, _, redirect = b.act("/approve", {"ref": same.id, "back": "/pending"})
+    assert redirect.startswith("/pending?ok=") and b.c.backend.get(same.id).status == "verified"
     assert _step_ups(b.c)[-1]["outcome"] == "window"
+    # a different kind is outside the signed shape: back to the tap
+    assert _to_tap(b, other.id) and b.c.backend.get(other.id).status == "unverified"
+
+
+def test_an_undecided_tap_expires_on_the_record(boat, monkeypatch):
+    b, item = boat
+    token = _to_tap(b, item.id)
+    monkeypatch.setenv("EGZOS_TAP_TIMEOUT_SECONDS", "0.001")
+    import time
+
+    time.sleep(0.01)
+    assert b.tap_get(token)[0] == 404
+    assert _step_ups(b.c)[-1]["outcome"] == "expired"
 
 
 def test_back_is_kept_on_this_origin(boat):
     b, item = boat
     for back in ("https://evil.test/", "//evil.test/x"):
-        _, _, redirect = b.act("/approve", {"ref": item.id, "back": back})
-        assert redirect.startswith("/pending?")
+        token = _to_tap(b, item.id, back=back)
+        assert b.taps[token]["back"] == "/pending"
 
 
 def test_proposal_approve_and_deny(boat):
@@ -114,6 +134,8 @@ def test_proposal_approve_and_deny(boat):
     r = c.trust.move(item, org, token=token, actor=OWNER)
     pid = r["proposal"]["id"]
     assert "Approve this move" in b.pending()[1]
+    page = b.tap_get(_to_tap(b, pid))[1]
+    assert "Consequence. Everything under" in page and "1 people · 1 agents" in page
     _, _, redirect = b.act("/deny", {"proposal": pid, "back": "/pending"})
     assert "Denied" in redirect.replace("+", " ")
     assert c.ledger.tail(1)[0]["event"] == "approval.deny"
@@ -182,6 +204,12 @@ def test_session_guard(server):
     form_k = urlencode({"ref": "x", "csrf": "secret-key-for-tests"}).encode()
     evil = {"Cookie": cookie, "Origin": "http://evil.test"}
     assert _open(base + "/approve", form_k, evil)[0] == 403
+    # A missing Origin is refused as well; only this origin reaches the act (here: no such ref).
+    assert _open(base + "/approve", form_k, {"Cookie": cookie})[0] == 403
+    same = {"Cookie": cookie, "Origin": "http://127.0.0.1"}
+    assert _open(base + "/approve", form_k, same)[0] == 404
+    # The tap path answers nothing to a token that was never issued, cookie or not.
+    assert _open(base + "/tap/not-a-token", headers={"Cookie": cookie})[0] == 404
 
 
 def test_the_session_key_stays_out_of_the_terminal_when_a_browser_opens(capsys):

@@ -19,6 +19,11 @@ from typing import Any, Protocol
 from egzos.model import ContextItem, Node, Token
 
 
+class ChainConflict(Exception):
+    """`audit_append` lost a race: another writer appended after the same head. The ledger
+    re-reads the head and re-chains; the chain never forks."""
+
+
 class Backend(Protocol):
     # nodes
     def put_node(self, node: Node) -> None: ...
@@ -41,7 +46,8 @@ class Backend(Protocol):
     ) -> list[ContextItem]: ...
     def tombstone(self, item_id: str) -> bool: ...
 
-    # audit (append-only; the ledger computes the chain, the backend only appends)
+    # audit (append-only; the ledger computes the chain, the backend only appends). A second
+    # append after the same `prev_hash` raises ChainConflict, so the chain cannot fork.
     def audit_append(self, entry: dict[str, Any]) -> dict[str, Any]: ...
     def audit_last(self) -> dict[str, Any] | None: ...
     def audit_iter(self) -> Iterator[dict[str, Any]]: ...

@@ -17,10 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
   server with Claude Code at user scope.
 - The container home is owner-only (0700): it holds the chain, every item and the token hashes.
-- The presence tap: `egzos trust approve` / `trust deny` open a one-shot loopback decision page
-  (*Sign and approve* → *Confirm signature* within 10 s, *Approve without a window*, *Deny*); the
-  lifeboat's approve is the same two presses. Every check appends `step_up` with its outcome; a
-  signature opens a window per ring pair, read back from the chain; `egzos trust close-window`.
+- The presence tap (`egzos.authz.presence`): `egzos trust approve` / `trust deny` open a one-shot
+  loopback decision page, and the lifeboat's *Approve* redirects to the same `/tap/<token>` page on
+  its own server — *Sign and approve* → *Confirm signature* within 10 s, *Approve without a
+  window*, or *Deny*. Every check appends `step_up` with its outcome. With
+  `EGZOS_STEP_UP_WINDOW_SECONDS` set (default `0`: every act taps), a signature opens a window for
+  that ring pair bounded to the signed shape, read back from the chain; `egzos trust close-window`.
 - Token values are 256 random bits, stored only as a hash; the id is public (freeze item 19).
 - The gate: `organize` for a silent move, `publish` to propose a widening one; a manifest drift is
   `approval.stale` (freeze items 3, 39); an ambiguous path resolves by latest activity (item 1).
@@ -32,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The MCP door answers identically for a scope that does not exist and one the token cannot see.
 - Every lifeboat view and `ls` / `trust pending` is an audited read; `blob_pull` checks coverage.
 - A keyed URL (lifeboat or tap) is printed only to a terminal, never to an agent's pipe.
+- Coverage is checked in the engine (`resolve_ref`, node creation, moves, quarantine, the resolver)
+  and on every CLI scope and item reference; a client's `ls` and the MCP inbox are served under the
+  serving policy; `%n` belongs to the token whose `find` made it; `connect` prints its secret only
+  to a terminal.
+- The audit chain cannot fork: one successor per entry, and a writer that loses the race re-chains.
+- A proposal goes stale if an item moved since it was filed; POSTs without an `Origin` are refused.
 
 ### Changed
 

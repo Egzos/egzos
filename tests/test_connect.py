@@ -11,6 +11,7 @@ from egzos.cli import main
 
 def test_connect_mints_a_client_token_and_prints_the_command(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: True)  # a person at a terminal
     assert main(["init"]) == 0
     capsys.readouterr()
     assert main(["--json", "connect"]) == 0
@@ -24,6 +25,17 @@ def test_connect_mints_a_client_token_and_prints_the_command(tmp_path, monkeypat
     tokens = json.loads(capsys.readouterr().out)
     minted = [t for t in tokens if t["id"] == out["token"]]
     assert minted and minted[0]["principal"] == "client"
+
+
+def test_connect_prints_its_secret_only_to_a_terminal(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: False)  # an agent's pipe
+    assert main(["init"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "connect"]) != 0
+    assert "egz_" not in capsys.readouterr().out
+    assert main(["--json", "token", "ls"]) == 0
+    assert [t for t in json.loads(capsys.readouterr().out) if t["principal"] == "client"] == []
 
 
 def test_connect_refuses_admin(tmp_path, monkeypatch, capsys):

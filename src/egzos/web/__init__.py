@@ -11,11 +11,11 @@ act (approve, deny, quarantine) is a POST that also carries the key in the form 
 this origin, so another page in the same browser cannot drive it. Unknown ids and missing pages
 answer one uniform 404 (silence-not-errors). Everything rendered is escaped: item text is data.
 
-Approving is a human-only act under the step-up rule (`presence.py`): *Approve* arms, *Confirm
-signature* within 10 s performs it, unless an open window covers that ring pair. Every decision —
-approve, deny, window pass — appends `step_up` (via `lifeboat`), and every view is a read that
-appends `context.fetch` (the pending count in the header included). Owner-only: `egzos web` refuses
-a client principal.
+Approving is a human-only act under the step-up rule (`authz/presence.py`): *Approve* redirects to
+a one-shot `/tap/<token>` page served here (lifeboat.md R9), where *Sign and approve* then *Confirm
+signature* within 10 s performs it — unless an open window covers that ring pair and shape. Every
+decision appends `step_up`, and every view is a read that appends `context.fetch` (the header's
+pending count included). Owner-only: `egzos web` refuses a client principal.
 
 Standard library only, so the base install stays small. The full lifeboat (FastAPI + Jinja + htmx
 against spec/design/lifeboat.md) replaces this in Phase 4.
@@ -26,6 +26,7 @@ from __future__ import annotations
 import html
 import secrets
 import threading
+import time
 import webbrowser
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -33,8 +34,14 @@ from importlib import resources
 from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse
 
+from egzos.authz.presence import (
+    Presence,
+    Tap,
+    build_act,
+    is_terminal,
+    tap_timeout,
+)
 from egzos.container import OWNER, Container
-from egzos.presence import Presence, arm_deadline, armed, is_terminal
 from egzos.trust import TrustError
 
 COOKIE = "egzos_k"
@@ -91,11 +98,13 @@ pre{white-space:pre-wrap;background:var(--egz-paper);padding:12px;margin:8px 0}
 class Lifeboat:
     """Request handling, independent of the socket server so tests can drive it directly."""
 
-    def __init__(self, container: Container, key: str | None = None):
+    def __init__(self, container: Container, key: str | None = None, host: str = "127.0.0.1"):
         self.c = container
         self.key = key or secrets.token_urlsafe(24)
         self.presence = Presence(container)
-        self.armed: dict[str, float] = {}  # ref → deadline for the second press
+        self.host = host
+        self.since = time.time()
+        self.taps: dict[str, dict[str, Any]] = {}  # tap token → {tap, back}
 
     # -- shared chrome ----------------------------------------------------------------------------
     def page(
@@ -119,6 +128,9 @@ class Lifeboat:
             f"<title>{_e(title)} · egzos</title>"
             '<link rel=stylesheet href="/static/tokens.css">'
             f"<style>{STYLE}</style></head><body><div class=frame>"
+            f"<p class='mono muted shell'>egzos · container {_e(self.c.home.name)} · "
+            f"{_e(self.host)}<br>you · {_e(OWNER)} · principal: interactive · present since "
+            f"{_e(_since(self.since))}</p>"
             f"<header><span class=mark>egzos</span><nav>{nav}</nav>"
             f"{counter}</header>"
             f"{flash_html}{body}</div></body></html>"
@@ -146,37 +158,64 @@ class Lifeboat:
         )
         return n
 
-    def _act_for(self, ref: str) -> dict | None:
-        """What a decision on `ref` would do, keyed on its ring pair; None if there is nothing."""
-        prop = self.c.backend.get_proposal(ref)
-        if prop and prop.get("status") == "open":
-            frm, to = self.c.backend.get_node(prop["from"]), self.c.backend.get_node(prop["to"])
-            return {
-                "kind": "proposal",
-                "subject": prop["id"],
-                "from": prop["from_path"],
-                "to": prop["to_path"],
-                "pair": (frm.type if frm else "?", to.type if to else "?"),
-            }
-        item = self.c.backend.get(ref)
-        node = self.c.backend.get_node(item.scope) if item else None
-        if item and node and item.status == "unverified":
-            return {
-                "kind": "item",
-                "subject": item.id,
-                "from": self.c.nodes.path(node),
-                "to": self.c.nodes.path(node),
-                "pair": (node.type, node.type),
-            }
-        return None
-
     def approve_button(self, ref: str, back: str, label: str) -> str:
-        """*Approve* arms; for 10 s it reads *Confirm signature*, which performs the act."""
-        if armed(self.armed.get(ref, 0.0)):
-            return self.form(
-                "/approve", {"ref": ref, "back": back, "step": "confirm"}, "Confirm signature", "act"
+        """*Approve* asks the container; when presence is required it redirects to the tap."""
+        return self.form("/approve", {"ref": ref, "back": back}, label, "act")
+
+    # -- the tap, served here (lifeboat.md R9) -------------------------------------------------------
+    def _sweep(self) -> None:
+        """A tap left undecided past its timeout expires, and says so on the record."""
+        for token, entry in list(self.taps.items()):
+            tap = entry["tap"]
+            if tap.outcome is None and time.time() - tap.opened > tap_timeout():
+                self.presence.record(tap.act, via="tap", outcome="expired")
+                del self.taps[token]
+
+    def tap_get(self, token: str) -> tuple[int, str]:
+        self._sweep()
+        entry = self.taps.get(token)
+        if not entry or not entry["tap"].live(f"/tap/{token}"):
+            return 404, "<p>This request is no longer valid.</p>"
+        return entry["tap"].get()
+
+    def tap_post(self, token: str, step: str) -> tuple[int, str]:
+        self._sweep()
+        entry = self.taps.get(token)
+        if not entry or not entry["tap"].live(f"/tap/{token}"):
+            return 404, "<p>This request is no longer valid.</p>"
+        tap, back = entry["tap"], entry["back"]
+        status, body = tap.post(step)
+        if tap.outcome is None:
+            return status, body
+        del self.taps[token]
+        return 200, tap.outcome_page(self._decide(tap.act, tap.outcome, tap.windowed), back)
+
+    def _decide(self, act: dict[str, Any], outcome: str, windowed: bool, via: str = "tap") -> str:
+        """Record the presence check, then perform the decision. Returns the outcome line."""
+        token = self.c.require_token()
+        at = time.strftime("%H:%M:%S")
+        closes = self.presence.record(act, via=via, outcome=outcome, windowed=windowed)
+        try:
+            if outcome not in ("approved", "window", "denied"):
+                return "Nothing changed."
+            if outcome == "denied":
+                if act["kind"] == "proposal":
+                    self.c.trust.deny(act["subject"], token=token, actor=OWNER)
+                    return (
+                        f"Denied at {at} by {OWNER}. The items never existed at {act['dest']}. "
+                        "Logged."
+                    )
+                return f"Denied at {at} by {OWNER}. It stays unverified. Logged."
+            window = (
+                f"Window open until {_clock_of(closes)}." if closes else "No window opened."
             )
-        return self.form("/approve", {"ref": ref, "back": back, "step": "arm"}, label, "act")
+            if act["kind"] == "proposal":
+                p = self.c.trust.execute(act["subject"], token=token, actor=OWNER)
+                return f"Signed at {at} by {OWNER}. {len(p['items'])} items at {act['dest']}. {window}"
+            item = self.c.trust.promote(self.c.backend.get(act["subject"]), token=token, actor=OWNER)
+            return f"Signed at {at} by {OWNER}. {_title(item)} is verified. {window}"
+        except TrustError:
+            return "This proposal is no longer valid."
 
     def _path(self, node_id: str) -> str:
         node = self.c.backend.get_node(node_id)
@@ -317,7 +356,7 @@ class Lifeboat:
         )
 
     def audit(self) -> tuple[int, str]:
-        self.c.require_token()
+        token = self.c.require_token()
         result = self.c.ledger.verify()
         status = (
             f"chain ok · {result['entries']} entries · head {str(result['head'])[:16]}…"
@@ -330,12 +369,13 @@ class Lifeboat:
             f"<td class=mono>{_e(e.get('subject') or '')}</td></tr>"
             for e in reversed(self.c.ledger.tail(50))
         )
+        n = self._read(token, "audit", items=[], entries=result["entries"])
         body = (
             f"<div class='flash{'' if result['ok'] else ' err'}'>{_e(status)}</div>"
             "<table><tr><th>seq</th><th>time</th><th>event</th><th>principal</th><th>subject</th>"
             f"</tr>{rows}</table>"
         )
-        return 200, self.page("Audit", body, active="audit")
+        return 200, self.page("Audit", body, active="audit", count=n)
 
     # -- acts ---------------------------------------------------------------------------------------
     def act(self, path: str, form: dict[str, str]) -> tuple[int, str, str]:
@@ -347,36 +387,21 @@ class Lifeboat:
         try:
             if path == "/approve":
                 ref = form.get("ref", "")
-                act = self._act_for(ref)
+                act = build_act(self.c, ref)
                 if not act:
                     return (*self.not_found(), "")
-                if form.get("step") == "confirm" and armed(self.armed.pop(ref, 0.0)):
-                    via = "lifeboat"
-                elif self.presence.window_open(act["pair"]):
-                    via = "window"
-                else:
-                    # First press, or a confirm that came too late: arm, and ask for the second.
-                    self.armed[ref] = arm_deadline()
-                    return 200, "", f"{back}?{urlencode({'ok': 'Press Confirm signature within 10 s to sign.'})}"
-                self.presence.record(
-                    act, via=via, outcome="window" if via == "window" else "approved",
-                    windowed=via == "lifeboat",
-                )
-                if act["kind"] == "proposal":
-                    p = self.c.trust.execute(ref, token=token, actor=OWNER)
-                    msg = f"Approved: moved to {p['to_path']}"
-                else:
-                    item = self.c.trust.promote(self.c.backend.get(ref), token=token, actor=OWNER)
-                    msg = f"Approved: {_title(item)} is verified"
+                if self.presence.covers(act):
+                    msg = self._decide(act, "window", False, via="window")
+                    return 200, "", f"{back}?{urlencode({'ok': msg})}"
+                self._sweep()
+                tap = Tap(act, container=self.c.home.name, host=self.host)
+                self.taps[tap.token] = {"tap": tap, "back": back}
+                return 200, "", f"/tap/{tap.token}"
             elif path == "/deny":
-                ref = form.get("proposal", "")
-                act = self._act_for(ref)
+                act = build_act(self.c, form.get("proposal", ""))
                 if not act or act["kind"] != "proposal":
                     return (*self.not_found(), "")
-                self.armed.pop(ref, None)
-                self.presence.record(act, via="lifeboat", outcome="denied")
-                p = self.c.trust.deny(ref, token=token, actor=OWNER)
-                msg = f"Denied the move to {p['to_path']}"
+                msg = self._decide(act, "denied", False, via="lifeboat")
             elif path == "/quarantine":
                 item = self.c.backend.get(form.get("item", ""))
                 if not item:
@@ -405,6 +430,23 @@ class Lifeboat:
         else:
             return self.not_found()
         return status, body
+
+
+def _since(ts: float) -> str:
+    t = time.localtime(ts)
+    off = time.strftime("%z", t) or "+0000"
+    sign = "−" if off[0] == "-" else "+"
+    return f"{time.strftime('%H:%M', t)} (UTC{sign}{off[1:3]}:{off[3:5]})"
+
+
+def _clock_of(iso: str | None) -> str:
+    if not iso:
+        return ""
+    from datetime import UTC, datetime
+
+    return datetime.strptime(iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC).astimezone().strftime(
+        "%H:%M:%S"
+    )
 
 
 def _tokens_css() -> bytes:
@@ -472,13 +514,21 @@ def make_handler(boat: Lifeboat, origin: str):
                 )
             if url.path == "/static/tokens.css":
                 return self._send(200, _tokens_css(), "text/css; charset=utf-8")
+            if url.path.startswith("/tap/"):
+                return self._send(*boat.tap_get(url.path[len("/tap/") :]))
             return self._send(*boat.get(url.path, query))
 
         def do_POST(self):  # noqa: N802
-            if not self._authed() or self.headers.get("Origin", origin) != origin:
+            # A missing Origin is refused too: every browser sends one on a form POST.
+            if not self._authed() or self.headers.get("Origin") != origin:
                 return self._send(403, boat.page("Locked", "<p>Refused.</p>"))
             length = min(int(self.headers.get("Content-Length") or 0), 64 * 1024)
             form = {k: v[0] for k, v in parse_qs(self.rfile.read(length).decode()).items()}
+            path = urlparse(self.path).path
+            if path.startswith("/tap/"):
+                # The tap's own form carries no csrf field: its unguessable one-shot path, the
+                # cookie and the Origin are the guard (the page is the same whichever host serves it).
+                return self._send(*boat.tap_post(path[len("/tap/") :], form.get("step", "")))
             if not secrets.compare_digest(form.get("csrf", ""), boat.key):
                 return self._send(403, boat.page("Locked", "<p>Refused.</p>"))
             status, body, redirect = boat.act(urlparse(self.path).path, form)
@@ -511,8 +561,8 @@ def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool
     token = container.require_token()
     if token.principal != "interactive":
         raise PermissionError("the lifeboat is the owner's; a client principal cannot open it")
-    boat = Lifeboat(container)
     host = "127.0.0.1"
+    boat = Lifeboat(container, host=f"{host}:{port}")
     httpd = HTTPServer((host, port), make_handler(boat, f"http://{host}:{port}"))
     url = f"http://{host}:{port}/?k={boat.key}"
     print(f"egzos web on http://{host}:{port} — loopback only. Ctrl-C to stop.", flush=True)

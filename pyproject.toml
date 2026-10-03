@@ -52,7 +52,7 @@ select = ["E", "F", "W", "I", "UP", "B", "C4", "FURB"]
 "spec/design/brand/pipeline/*.py" = ["E501", "E701", "E702", "E731", "E741"]
 # HTML template strings read better unwrapped.
 "src/egzos/web/*.py" = ["E501"]
-"src/egzos/presence.py" = ["E501"]
+"src/egzos/authz/presence.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # Typer declares CLI parameters as call defaults by design.
