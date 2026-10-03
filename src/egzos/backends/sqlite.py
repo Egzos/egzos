@@ -174,7 +174,7 @@ class SqliteBackend:
     def put_token(self, token: Token) -> None:
         self.db.execute(
             "INSERT OR REPLACE INTO tokens(id,doc) VALUES(?,?)",
-            (token.id, json.dumps(token.to_dict())),
+            (token.id, json.dumps(token.to_dict(with_secret_hash=True))),
         )
         self.db.commit()
 

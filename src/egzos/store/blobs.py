@@ -12,6 +12,7 @@ check (a3-store charter). The skeleton serves small blobs inline and records eve
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 
@@ -38,6 +39,7 @@ class BlobStore:
         return sha
 
     def promote(self, sha: str) -> None:
+        _check(sha)
         """approve → blob moves from staging to the real store (v0.3 §5)."""
         src = self.root / "staging" / sha
         if src.exists():
@@ -45,8 +47,26 @@ class BlobStore:
             src.unlink()
 
     def get(self, sha: str) -> bytes | None:
+        if not _is_digest(sha):
+            return None  # never a path built from a value that is not a digest
         path = self.root / "sha256" / sha
         return path.read_bytes() if path.exists() else None
 
     def exists(self, sha: str) -> bool:
+        if not _is_digest(sha):
+            return False
         return (self.root / "sha256" / sha).exists()
+
+
+_DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
+def _is_digest(sha: object) -> bool:
+    """A blob name is a lowercase sha256 hex digest and nothing else, so no caller-supplied value
+    can become a path component (`..`, `/`, a drive) under the store's root."""
+    return isinstance(sha, str) and _DIGEST.fullmatch(sha) is not None
+
+
+def _check(sha: object) -> None:
+    if not _is_digest(sha):
+        raise ValueError("not a sha256 digest")

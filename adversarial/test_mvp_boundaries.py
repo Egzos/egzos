@@ -307,3 +307,33 @@ def test_init_never_calls_a_client_token_the_owners(tmp_path):
                           "--role", "reader"))["secret"]
     r = _egzos(tmp_path, "init", token=secret)
     assert r.returncode != 0 and "client principal" in (r.stdout + r.stderr)
+
+
+# --- a6 hardening on b62fa4d ---
+@pytest.mark.parametrize("bad", ["../keychain.json", "/etc/passwd", "..", "A" * 64, "0" * 63, ""])
+def test_blob_names_are_digests_or_nothing(box, bad):
+    assert box.blobs.get(bad) is None and box.blobs.exists(bad) is False
+    with pytest.raises(ValueError):
+        box.blobs.promote(bad)
+
+
+def test_no_output_carries_the_secret_hash(tmp_path):
+    assert _egzos(tmp_path, "init").returncode == 0
+    _egzos(tmp_path, "--json", "token", "create", "--client", "bot", "--role", "reader")
+    for argv in (("--json", "whoami"), ("--json", "token", "ls")):
+        assert "secret_hash" not in _egzos(tmp_path, *argv).stdout
+
+
+def test_back_never_leaves_this_origin_even_with_a_backslash(boat_like=None):
+    import tempfile
+    from pathlib import Path
+
+    from egzos.web import Lifeboat
+
+    with tempfile.TemporaryDirectory() as d:
+        c = Container(Path(d))
+        t = c.init()
+        item = c.store.add(body="x", token=t, actor=OWNER, principal="interactive")
+        b = Lifeboat(c, key="k" * 32)
+        b.act("/approve", {"ref": item.id, "back": "/\\evil.example"})
+        assert all(e["back"] == "/pending" for e in b.taps.values())

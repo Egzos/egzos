@@ -407,7 +407,7 @@ class Lifeboat:
         """Returns (status, body, redirect). Redirect wins when set."""
         self.c.require_token()  # the owner session is required for every act
         back = form.get("back", "/pending")
-        if not back.startswith("/") or back.startswith("//"):
+        if not back.startswith("/") or back.startswith("//") or "\\" in back:
             back = "/pending"
         try:
             if path == "/promote":

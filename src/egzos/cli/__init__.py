@@ -553,7 +553,7 @@ def token_create(
         if ref == "*":
             scopes.append("*")
             continue
-        n = c.nodes.resolve_ref(ref)
+        n = c.nodes.resolve_ref(ref, token)
         if not n:
             _fail(f"scope not found: {ref}")
         scopes.append(n.id)
@@ -702,7 +702,7 @@ def connect(
         _fail("connect prints a secret: run it from a terminal, or pass --apply")
     scopes = []
     for ref in scope or ["user:self"]:
-        n = c.nodes.resolve_ref(ref)
+        n = c.nodes.resolve_ref(ref, token)
         if not n:
             _fail(f"scope not found: {ref}")
         scopes.append(n.id)

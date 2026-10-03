@@ -180,8 +180,10 @@ class Token:
     def has(self, capability: str) -> bool:
         return not self.revoked and capability in self.capabilities
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
+    def to_dict(self, *, with_secret_hash: bool = False) -> dict[str, Any]:
+        """The token's public view. `secret_hash` is credential-derived: only the backend's own
+        row carries it (`with_secret_hash=True`); no output a caller sees does."""
+        d = {
             "id": self.id,
             "principal": self.principal,
             "owner": self.owner,
@@ -192,8 +194,10 @@ class Token:
             "last_used": self.last_used,
             "revoked": self.revoked,
             "expires_at": self.expires_at,
-            "secret_hash": self.secret_hash,
         }
+        if with_secret_hash:
+            d["secret_hash"] = self.secret_hash
+        return d
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Token:
