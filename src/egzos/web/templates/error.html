@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block body %}
+<section role="alert" class="card card--alarm">
+  <p class="kind">{{ S["card.error"] }}</p>
+  <p>{{ S["fail.error"] }}</p>
+  <a class="ghost" href="{{ retry }}">{{ S["fail.retry"] }}</a>
+</section>
+{% endblock %}

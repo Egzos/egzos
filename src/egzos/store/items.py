@@ -43,6 +43,8 @@ class Store:
         self.titler = titler or DegradedTitler()
         # coverage predicate, wired by the container once the trust engine exists
         self.covers: Callable[[Token, Node], bool] | None = None
+        # the serving predicate search uses (`find.shown`), wired by the container likewise
+        self.shown: Callable[[Token, ContextItem, Node], bool] | None = None
 
     # -- add ------------------------------------------------------------------------------
     def add(
@@ -171,12 +173,18 @@ class Store:
     def blob_pull(
         self, item: ContextItem, *, token: Token, actor: str, principal: str
     ) -> bytes | None:
-        """Artifact download IS fetch (v0.3 §5): the same capability AND coverage check as a fetch,
-        one silent None when either fails; the pull is its own audit event."""
+        """Artifact download IS fetch (v0.3 §5): the same capability, coverage AND serving check
+        as a fetch, one silent None when any fails; the pull is its own audit event. Serving here
+        is search's own predicate, so bytes never leave by a path the item itself would not: a
+        quarantined or tombstoned item never, an unpromoted rule only to the curator (#135)."""
         if not token.has("fetch"):
             return None
         node = self.backend.get_node(item.scope)
         if node is None or self.covers is None or not self.covers(token, node):
+            return None
+        if item.status == "quarantined" or item.lifecycle.get("tombstoned"):
+            return None
+        if self.shown is None or not self.shown(token, item, node):
             return None
         sha = item.content.get("sha256")
         if not sha:

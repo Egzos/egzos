@@ -1,0 +1,140 @@
+/* Copyright 2026 Ali Sasanian · SPDX-License-Identifier: Apache-2.0
+ * The lifeboat's one stylesheet (lifeboat.md §18). Tokens only (§16): no literal colour, radius,
+ * weight or duration. Two colours (§6): --egz-act on the human-only act and focus; --egz-alarm on
+ * quarantined, lapsed, error, quota. Structure, not colour (§7). No motion (§9). */
+@import url("/static/tokens.css");
+
+html { background: var(--egz-canvas); }
+/* D-T6: the page reserves the frame's offset on its right and bottom edges. */
+body { margin: 0; background: var(--egz-canvas); color: var(--egz-ink);
+  padding: 0 calc(var(--egz-sp-4) + var(--egz-off-lg)) var(--egz-off-lg) var(--egz-sp-4);
+  font-family: var(--egz-font-ui); font-size: var(--egz-fs-3); line-height: var(--egz-lh); }
+/* D-T4: two weights exist; a browser's default bold is a third that is never loaded. */
+h1, h2, h3, b, strong { font-weight: var(--egz-w-semibold); }
+.frame { box-sizing: border-box; max-width: 1180px; margin: var(--egz-sp-5) auto; padding: var(--egz-sp-4) var(--egz-sp-5);
+  border: var(--egz-bw) solid var(--egz-rule); box-shadow: var(--egz-off-lg) var(--egz-off-lg) 0 var(--egz-shadow-ink);
+  border-radius: var(--egz-radius); }
+code, .mono, .kind, .scope, .ref, .meta, .hints, time, .shell, .viewer, .window {
+  font-family: var(--egz-font-mono); font-feature-settings: var(--egz-tabular); }
+a { color: var(--egz-ink); }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+  outline: var(--egz-focus); outline-offset: 3px; }
+/* The page heading takes first focus (R6, §12.2) as a landing point for assistive technology; it
+   is not a control, so it draws no ring. */
+h1[tabindex="-1"]:focus { outline: none; }
+
+/* R1 shell */
+header { border-bottom: var(--egz-hair) solid var(--egz-rule-soft); padding-bottom: var(--egz-sp-3);
+  margin-bottom: var(--egz-sp-5); }
+.shell, .viewer, .window { margin: 0; font-size: var(--egz-fs-2); color: var(--egz-ink-2); }
+nav[aria-label="egzos"] { display: flex; gap: var(--egz-sp-4); margin-top: var(--egz-sp-3); }
+nav[aria-label="egzos"] a { display: inline-flex; align-items: center; min-height: 44px;
+  text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); font-size: var(--egz-fs-2);
+  font-family: var(--egz-font-mono); text-decoration: none; }
+nav[aria-label="egzos"] a[aria-current="page"] { border-bottom: var(--egz-bw) solid var(--egz-ink); }
+.scheme { display: flex; gap: var(--egz-sp-2); margin-top: var(--egz-sp-3); }
+.scheme button { min-height: 44px; }
+.scheme button[aria-pressed="true"] { transform: translate(var(--egz-off), var(--egz-off)); box-shadow: none; }
+
+/* controls */
+button, .ghost, .next, .clear { min-height: 44px; padding: 0 var(--egz-sp-4); font: inherit;
+  color: var(--egz-ink); background: var(--egz-canvas); border: var(--egz-bw) solid var(--egz-rule);
+  box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink); border-radius: var(--egz-radius);
+  cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
+button:active { transform: translate(var(--egz-off), var(--egz-off)); box-shadow: none; }
+button.act { background: var(--egz-act); color: var(--egz-act-on); border-color: var(--egz-act); }
+.ghost { box-shadow: none; border-color: transparent; text-decoration: underline; }
+
+/* R2 search */
+form[role="search"] h1 { font-size: var(--egz-fs-5); margin: 0 0 var(--egz-sp-3); }
+.searchrow { display: flex; gap: var(--egz-sp-3); }
+.searchrow input { flex: 1; min-height: 44px; padding: 0 var(--egz-sp-3); font: inherit;
+  color: var(--egz-ink); background: var(--egz-paper); border: var(--egz-bw) solid var(--egz-rule);
+  border-radius: var(--egz-radius); }
+.hints { font-size: var(--egz-fs-2); color: var(--egz-ink-2); }
+.ink-2 { color: var(--egz-ink-2); }
+.ink-3 { color: var(--egz-ink-3); }
+
+/* R3–R5 results */
+/* Section headings: 16 / semibold in the UI face (the tap spec §8) — never the mono label style. */
+h2 { font-size: var(--egz-fs-4); font-weight: var(--egz-w-semibold); margin: var(--egz-sp-5) 0 var(--egz-sp-3); }
+.rows { list-style: none; margin: 0; padding: 0; }
+.rows li { border-bottom: var(--egz-hair) solid var(--egz-rule-soft); padding: var(--egz-sp-3) 0; }
+.rows a { display: flex; flex-wrap: wrap; gap: var(--egz-sp-3); align-items: baseline;
+  text-decoration: none; min-height: 44px; }
+.rows .kind { text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); font-size: var(--egz-fs-2); }
+.rows .title { flex: 1 1 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { margin: var(--egz-sp-1) 0 0; font-size: var(--egz-fs-2); color: var(--egz-ink-3); }
+@media (max-width: 700px) { .rows .title { flex-basis: 100%; } }
+
+/* §7 stamps: verified solid ink with its word in canvas; unverified outline; quarantined red outline */
+.stamp { font-family: var(--egz-font-mono); font-size: var(--egz-fs-1); text-transform: uppercase;
+  letter-spacing: var(--egz-tracking-caps); padding: 0 var(--egz-sp-2);
+  border: var(--egz-hair) solid var(--egz-ink); border-radius: var(--egz-radius); }
+.stamp--verified { background: var(--egz-ink); color: var(--egz-canvas); }
+.stamp--quarantined { color: var(--egz-alarm); border-color: var(--egz-alarm); }
+
+/* §3 detail */
+.ref { text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); font-size: var(--egz-fs-2);
+  margin: 0; }
+main h1 { font-size: var(--egz-fs-6); margin: var(--egz-sp-2) 0; }
+.where { font-size: var(--egz-fs-2); }
+pre.body { font-family: var(--egz-font-mono); font-size: var(--egz-fs-3); line-height: var(--egz-lh);
+  white-space: pre-wrap; background: var(--egz-paper); padding: var(--egz-sp-4);
+  border: var(--egz-bw) solid var(--egz-rule); box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink); }
+dl { display: grid; grid-template-columns: minmax(8rem, max-content) 1fr; gap: var(--egz-sp-1) var(--egz-sp-4); }
+dt { font-family: var(--egz-font-mono); font-size: var(--egz-fs-2); color: var(--egz-ink-2); }
+dd { margin: 0; }
+@media (max-width: 700px) { dl { grid-template-columns: 1fr; } }
+.acts { display: flex; flex-wrap: wrap; gap: var(--egz-sp-3); align-items: center;
+  margin-top: var(--egz-sp-5); }
+.outcome { flex-basis: 100%; }
+/* In flight (lifeboat.md R9, the tap spec R9): the primary act reads its in-flight word, pressed;
+   htmx disables every act; the block is aria-busy (lifeboat.js). No spinner, no motion. */
+.busy { display: none; }
+.htmx-request .busy { display: inline; }
+.htmx-request .idle { display: none; }
+.htmx-request button.act { transform: translate(var(--egz-off), var(--egz-off)); box-shadow: none; }
+.htmx-request a.ghost { pointer-events: none; color: var(--egz-ink-3); }
+.alarm-text { color: var(--egz-alarm); }
+.alarm-line { border: var(--egz-bw) solid var(--egz-alarm); color: var(--egz-alarm); padding: var(--egz-sp-3); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* R12 */
+.card--alarm { border: var(--egz-bw) solid var(--egz-alarm);
+  box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-alarm); padding: var(--egz-sp-4); }
+.card--alarm .kind { color: var(--egz-alarm); text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); }
+
+/* the pending pages (the tap spec §3) */
+.pending { display: grid; grid-template-columns: 320px 1fr; gap: var(--egz-sp-5); }
+@media (max-width: 900px) { .pending { grid-template-columns: 1fr; } }
+.queue { background: var(--egz-paper); padding: var(--egz-sp-3); }
+.queue ul { list-style: none; margin: 0; padding: 0; }
+.queue a { display: flex; flex-direction: column; gap: var(--egz-sp-1); min-height: 44px;
+  padding: var(--egz-sp-3); text-decoration: none; border-bottom: var(--egz-hair) solid var(--egz-rule-soft); }
+.queue a.open { border: var(--egz-bw) solid var(--egz-rule); box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink); }
+.queue .kind { text-transform: uppercase; letter-spacing: var(--egz-tracking-caps); font-size: var(--egz-fs-1); }
+/* Quarantine notices: pinned at the end, a notice not a link, the only red in the queue (R3). */
+.queue .notice { display: flex; flex-direction: column; gap: var(--egz-sp-1); padding: var(--egz-sp-2);
+  border-bottom: var(--egz-hair) solid var(--egz-rule-soft); }
+.queue .notice .kind { color: var(--egz-alarm); }
+blockquote.reason { margin: var(--egz-sp-3) 0; }
+blockquote.reason cite { font-family: var(--egz-font-mono); font-style: normal; font-size: var(--egz-fs-2); }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: var(--egz-sp-2); border-bottom: var(--egz-hair) solid var(--egz-rule-soft); }
+th { font-family: var(--egz-font-mono); font-size: var(--egz-fs-2); font-weight: var(--egz-w-regular); }
+tr.qrow td { color: var(--egz-alarm); }
+.chips { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: var(--egz-sp-2); }
+.chips li { font-family: var(--egz-font-mono); font-size: var(--egz-fs-2);
+  border: var(--egz-hair) solid var(--egz-rule); padding: 0 var(--egz-sp-2); }
+.box { border: var(--egz-bw) solid var(--egz-rule); box-shadow: var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink);
+  padding: var(--egz-sp-4); margin: var(--egz-sp-4) 0; }
+details summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
+
+/* §5 print: records print; acts and controls don't */
+.print-footer { display: none; }
+@media print {
+  .acts, form, nav, .scheme, .next, .clear, .hints { display: none !important; }
+  .frame { box-shadow: none; border: 0; }
+  .print-footer { display: block; font-family: var(--egz-font-mono); font-size: var(--egz-fs-1); }
+}

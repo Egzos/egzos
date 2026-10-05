@@ -273,7 +273,7 @@ def test_an_open_window_never_turns_a_deny_into_an_approval(tmp_path, monkeypatc
                 scopes=[other.id], actor=OWNER, by_principal="interactive")
     item = c.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
     pid = c.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
-    act = build_act(c, pid)
+    act = build_act(c, pid, token=t)
     p = Presence(c)
     p.record(act, via="tap", outcome="approved", windowed=True)  # a window this proposal fits
     assert p.covers(act)

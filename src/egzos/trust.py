@@ -98,9 +98,13 @@ class TrustEngine:
     # -- promotion / quarantine ------------------------------------------------------------------
     def promote(self, item: ContextItem, *, token: Token, actor: str) -> ContextItem:
         self._human_only(token, "approve.pending")
+        node = self.backend.get_node(item.scope)
+        # Human is not enough: the human must also cover the item (#131). An uncovered item gets
+        # the answer an absent one gets, before anything about it (even quarantine) is said.
+        if node is None or not self.covers(token, node):
+            raise TrustError("not found")
         if item.status == "quarantined":
             raise TrustError("quarantined items are not promoted; lift the quarantine deliberately")
-        node = self.backend.get_node(item.scope)
         audience = self.audience(node) if node else []
         manifest = self.manifest_hash([item.id], item.scope, audience)
         item.trust = {"status": "verified", "promoted_at": now_iso(), "manifest": manifest}
@@ -250,7 +254,7 @@ class TrustEngine:
     def execute(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
         self._human_only(token, "gate.confirm")
         p = self.backend.get_proposal(proposal_id)
-        if not p or p["status"] != "open":
+        if not p or p["status"] != "open" or not self.decides_over(token, p):
             raise TrustError("no open proposal with that id")
         to = self.backend.get_node(p["to"])
         if not to:
@@ -310,7 +314,7 @@ class TrustEngine:
     def deny(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
         self._human_only(token, "gate.confirm")
         p = self.backend.get_proposal(proposal_id)
-        if not p or p["status"] != "open":
+        if not p or p["status"] != "open" or not self.decides_over(token, p):
             raise TrustError("no open proposal with that id")
         p["status"] = "denied"
         with self.backend.atomic():
@@ -319,6 +323,13 @@ class TrustEngine:
                 "approval.deny", actor=actor, principal=token.principal, subject=p["id"]
             )
         return p
+
+    def decides_over(self, token: Token, proposal: dict[str, Any]) -> bool:
+        """Whether `token` may decide (or see) this proposal: it covers both ends of the move,
+        as `move` requires of whoever proposes one (#131). A token that does not is answered as
+        if the proposal did not exist."""
+        frm, to = self.backend.get_node(proposal["from"]), self.backend.get_node(proposal["to"])
+        return bool(frm and to and self.covers(token, frm) and self.covers(token, to))
 
     # -- internals -------------------------------------------------------------------------------
     @staticmethod

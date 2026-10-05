@@ -15,6 +15,10 @@ authors = [
 dependencies = [
     "typer>=0.27",
     "mcp>=2.2",
+    # the lifeboat (spec/design/lifeboat.md §0): FastAPI + Jinja + htmx, in-process
+    "fastapi>=0.115",
+    "jinja2>=3.1",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +31,7 @@ dev = [
     "pytest>=8",
     "pyyaml>=6",  # tests/governance imports .github/scripts/check_ownership.py
     "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change
+    "httpx>=0.27",  # FastAPI's TestClient drives the lifeboat in tests
 ]
 
 [project.scripts]
@@ -34,7 +39,11 @@ egzos = "egzos.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/egzos"]
-artifacts = ["src/egzos/web/tokens.css"]
+artifacts = [
+    "src/egzos/web/tokens.css",
+    "src/egzos/web/templates/*.html",
+    "src/egzos/web/static/*",
+]
 
 [tool.ruff]
 line-length = 100

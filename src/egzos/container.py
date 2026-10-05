@@ -17,6 +17,7 @@ from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
 from egzos.store import BlobStore, NodeService, Store
+from egzos.store.find import shown
 from egzos.trust import TrustEngine
 
 OWNER = "self"
@@ -42,6 +43,7 @@ class Container:
         self.trust = TrustEngine(self.backend, self.ledger, self.nodes)
         self.resolver = Resolver(self.backend, self.ledger, self.nodes, self.trust)
         self.store.covers = self.trust.covers
+        self.store.shown = lambda token, item, node: shown(self, token, item, node)
         self.nodes.covers = self.trust.covers
 
     @property
@@ -50,7 +52,15 @@ class Container:
 
     def init(self) -> Token:
         """Create the roots and the owner's interactive token; put it in the keychain stand-in.
-        `login` (device-code) replaces this step from Phase 2; the skeleton is single-user."""
+        `login` (device-code) replaces this step from Phase 2; the skeleton is single-user.
+
+        The check and the creation are one transaction (#136): BEGIN IMMEDIATE takes the write
+        lock first, so a second `init` racing this one waits, then finds the container
+        initialized, and never mints a second owner or a second set of roots."""
+        with self.backend.atomic():
+            return self._init_locked()
+
+    def _init_locked(self) -> Token:
         if self.initialized:
             token = self.auth.interactive_token()
             if token and token.principal == "interactive":
@@ -79,6 +89,7 @@ class Container:
             actor=OWNER,
             by_principal="interactive",
         )
+        # Inside the lock, so a racing init that waits on it finds the keychain already written.
         self.auth.keychain_store(token)
         return token
 

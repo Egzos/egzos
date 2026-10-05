@@ -4,7 +4,7 @@
 The step-up tap, MVP cut (spec/design/step-up-tap-and-pending-approval.md §2, lifeboat baseline).
 
 A human-only act does not happen on a terminal's or a form's say-so. The container serves a
-one-shot page at `/tap/<token>` (an opaque single-use token, no parameters, no-referrer, no-store)
+one-shot page at `/tap/<token>` (an opaque single-use token, no parameters, no referrer off-origin, no-store)
 with §2.2's content — the container and viewer lines, what moves, who will see it and the
 consequence, the presence block — and waits for a decision: *Sign and approve* then *Confirm
 signature* within 10 s, *Approve without a window* then the same confirm, or *Deny* (one press).
@@ -55,6 +55,7 @@ from urllib.parse import parse_qs
 from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_DEFAULTS
 from egzos.container import OWNER, Container
+from egzos.model import Token
 
 # The one default, from the typed contract (container.md §8, 300 s for a window bounded to the
 # manifest's shape): no second constant beside it. `EGZOS_STEP_UP_WINDOW_SECONDS=0` opts out.
@@ -141,11 +142,17 @@ def short_id(value: str) -> str:
     return f"{value[:8]} … {value[-4:]}" if len(value) > 12 else value
 
 
-def build_act(c: Container, ref: str) -> dict[str, Any] | None:
+def build_act(c: Container, ref: str, *, token: Token) -> dict[str, Any] | None:
     """The tap's content for an open proposal or an unverified item; None if there is nothing to
-    decide. Everything the page shows comes from here, for the CLI and the lifeboat alike."""
+    decide. Everything the page shows comes from here, for the CLI and the lifeboat alike.
+
+    `token` is the deciding token, and the content is scoped to it (#131): a proposal whose ends
+    it does not both cover, or an item it does not cover, is None, the answer for no ref at all.
+    The page shows paths, titles and the audience, so building it is a read."""
     prop = c.backend.get_proposal(ref)
     if prop and prop.get("status") == "open":
+        if not c.trust.decides_over(token, prop):
+            return None
         frm, to = c.backend.get_node(prop["from"]), c.backend.get_node(prop["to"])
         items = [i for i in (c.backend.get(x) for x in prop["items"]) if i]
         by = prop.get("proposed_by", {})
@@ -192,7 +199,7 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         }
     item = c.backend.get(ref)
     node = c.backend.get_node(item.scope) if item else None
-    if item and node and item.status == "unverified":
+    if item and node and item.status == "unverified" and c.trust.covers(token, node):
         path = c.nodes.path(node)
         client = (item.provenance or {}).get("client")
         return {
@@ -254,6 +261,24 @@ class Presence:
             ):
                 return True
         return False
+
+    def window_status(self) -> dict[str, Any] | None:
+        """For the lifeboat shell (R1): the newest signed window, open or lapsed. A lapsed window
+        shows until the next act or tap, i.e. until a newer presence check is on the chain."""
+        seconds = window_seconds()
+        if seconds == 0:
+            return None
+        now = _iso(_now())
+        for e in self._recent_step_ups(max(seconds, 3600)):
+            d = e.get("details") or {}
+            if d.get("outcome") == "window":
+                continue  # a pass inside the window; the window itself is further back
+            if d.get("outcome") != "approved" or not d.get("window_closes"):
+                return None  # the newest act opened no window, or closed them
+            if d["window_closes"] > now:
+                return {"state": "open", "pair": d.get("pair"), "closes": d["window_closes"]}
+            return {"state": "lapsed", "at": d["window_closes"]}
+        return None
 
     def covers(self, act: dict[str, Any]) -> bool:
         # A manifest holding a quarantined item cannot be approved (R5): no window stands in for it.
@@ -419,6 +444,19 @@ button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px
 """
 
 
+def tap_css() -> str:
+    """The tap page's whole stylesheet: the tokens and TAP_STYLE, for a host that serves it."""
+    return _tokens_css() + TAP_STYLE
+
+
+def _style(stylesheet: str | None) -> str:
+    """Inline for the CLI's own one-page server; a link to the host's copy of `tap_css()` when the
+    lifeboat hosts the page, so the lifeboat's CSP stays `style-src 'self'` (lifeboat.md §18)."""
+    if stylesheet:
+        return f'<link rel=stylesheet href="{_e(stylesheet)}">'
+    return f"<style>{_tokens_css()}{TAP_STYLE}</style>"
+
+
 def _tokens_css() -> str:
     from importlib import resources
 
@@ -491,8 +529,9 @@ class Tap:
     """One page, one decision. The token is single-use: after a decision every request is refused."""
 
     def __init__(self, act: dict[str, Any], *, container: str = "egzos", host: str = "",
-                 decide=None):
+                 decide=None, stylesheet: str | None = None):
         self.act = act
+        self.stylesheet = stylesheet
         # The host's callback: performs the decision and returns the container's outcome line, so
         # the page never shows an outcome before the container has answered (lifeboat.md §15).
         self.decide = decide
@@ -582,7 +621,7 @@ class Tap:
             # lapses, and the server (which enforces the 10 s regardless) answers un-armed.
             # Escape and focus-loss need script; the baseline has none (design-gap #119).
             + (f'<meta http-equiv=refresh content="{ARM_SECONDS}">' if armed else "")
-            + f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+            + f"<title>egzos · presence</title>{_style(self.stylesheet)}</head>"
             "<body><main>"
             f"<p class=shell>egzos · container {e(self.container)} · {e(self.host)}</p>"
             f"<p class=shell>you · {e(OWNER)} · principal: interactive · present since "
@@ -613,7 +652,7 @@ class Tap:
         link = f'<p><a href="{_e(back)}">Return to pending</a></p>' if back else ""
         return (
             "<!doctype html><html lang=en><head><meta charset=utf-8>"
-            f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+            f"<title>egzos · presence</title>{_style(self.stylesheet)}</head>"
             f"<body><main><div class=box><p role=status>{_e(text)}</p></div>{link}</main>"
             "</body></html>"
         )
@@ -725,7 +764,9 @@ def send_page(request: BaseHTTPRequestHandler, status: int, body: str) -> None:
     request.send_header("Content-Type", "text/html; charset=utf-8")
     request.send_header("Content-Length", str(len(data)))
     request.send_header("Cache-Control", "no-store")
-    request.send_header("Referrer-Policy", "no-referrer")
+    # same-origin, not no-referrer: under no-referrer a browser sends a form POST's Origin as
+    # `null`, and same_origin() refuses it, so the tap's own buttons would never land (#130).
+    request.send_header("Referrer-Policy", "same-origin")
     request.send_header("X-Frame-Options", "DENY")
     request.send_header(
         "Content-Security-Policy",
