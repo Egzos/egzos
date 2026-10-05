@@ -136,7 +136,7 @@ jobs:
           mkdir -p docs/build
           git show "${B}:docs/build/REVIEW-DECISIONS.md" > docs/build/REVIEW-DECISIONS.md
 
-      - uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
+      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
@@ -437,7 +437,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a2-conformance.md
           test -s /tmp/charter-a2-conformance.md
 
-      - uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
+      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

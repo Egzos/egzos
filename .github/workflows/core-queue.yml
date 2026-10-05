@@ -156,7 +156,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter.md
           test -s /tmp/charter.md
 
-      - uses: anthropics/claude-code-action@756cc22e19660d20e8cc9496b4f242475a7f7790 # v1
+      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
