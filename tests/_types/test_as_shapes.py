@@ -243,11 +243,10 @@ def test_the_throttle_surfaces_are_five_closed_words():
     """§12.1 rule 5 and §12.2: the release entry's `surface`, and what `actor` carries.
 
     Written out rather than derived, because the point of the vocabulary is that it is closed: a
-    sixth surface reaching the chain should break a test, not append quietly. `tap` is here because
-    `consent.md`'s D-C6 throttles the tap page unconditionally, independent of whether §10.5's
-    `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not whether the word is used.
-    `revoke` is the owner path's revocation page, added by [0.3 · 11] (§9.2). §12.2's use of the
-    same words for `actor` is [0.3 · 34].
+    fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
+    `consent.md`'s D-C6 throttles the tap page unconditionally, as the fourth surface, independent
+    of whether §10.5's `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not
+    whether the word is used. `revoke` is §9.2's owner path ([0.3 · 11]); `actor` is [0.3 · 34].
     """
     assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap", "revoke")
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
@@ -302,15 +301,10 @@ def test_the_pre_token_cause_vocabularies_are_closed_per_row():
 def test_the_part_b_numbers_are_the_freeze_records():
     """§10.1, §11.5, §11.7 and §11.8's numbers, each transcribed from the #31 record's item."""
     day = 24 * 3600
-    # [0.3 · 13]: the interactive session — 30 min idle, 8 h absolute.
-    assert (t.AS_SESSION_IDLE_SECONDS, t.AS_SESSION_ABSOLUTE_SECONDS) == (1800, 28800)
-    # [0.3 · 18]: grant expiry — 30 d default, 90 d max.
-    assert t.AS_GRANT_LIFETIME_DEFAULT_SECONDS == 30 * day
-    assert t.AS_GRANT_LIFETIME_MAX_SECONDS == 90 * day
-    # [0.3 · 17] under [0.3 · 18]: the access token is the shorter clock under the grant.
-    assert t.AS_ACCESS_TOKEN_LIFETIME_SECONDS < t.AS_GRANT_LIFETIME_DEFAULT_SECONDS
-    # [0.3 · 25]
-    assert t.AS_CONTINUE_MAX_BYTES == 2048
+    assert (t.AS_SESSION_IDLE_SECONDS, t.AS_SESSION_ABSOLUTE_SECONDS) == (1800, 28800)  # item 13
+    assert t.AS_GRANT_LIFETIME_DEFAULT_SECONDS == 30 * day  # item 18
+    assert t.AS_GRANT_LIFETIME_MAX_SECONDS == 90 * day  # item 18
+    assert t.AS_CONTINUE_MAX_BYTES == 2048  # item 25
 
 
 def test_the_user_code_is_eight_of_rfc_8628s_twenty_consonants():

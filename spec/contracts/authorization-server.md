@@ -1268,28 +1268,23 @@ ordering. [0.3 · 45]** `consent.md` D-C6 and its affected §14.8 rows and §20 
 the session check precedes both tiers; the edit is A2's and lands with #100's back-pointers after the
 freeze, and until it does this clause governs where the two disagree.
 
-**What a throttle keys on: two buckets, both enforced. [0.3 · 24]** §12.1 rule 3 makes the throttle
-the **only** bound on the chain's growth from unauthenticated callers, so the key is contract:
-
-1. **An outer bucket per surface, container-global** — one counter per `surface` word, shared by
-   every caller, bounding the ledger absolutely whatever the number of sources.
-2. **An inner bucket per surface and transport source address** — so one noisy source cannot spend
-   the global budget and lock the owner out.
-
-An attempt is refused when **either** bucket holds, and that is the throttle "holding" everywhere
-§11.0 and §12.1 use the word. Each bucket alone fails where the other holds. The rates and windows
-are not in the record. TODO(chief): the two buckets' rates and windows, and whether config may set
-them. Until then they are an implementation's to choose under the floor below. **A network identifier
-may key a throttle and never enters the chain** (§12.2): the source address lives in the inner
-bucket's counter and nowhere else. The floor every bucket clears, unchanged:
+**What a throttle keys on. [0.3 · 24]** It cannot be left unsaid: §12.1
+rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
+two containers keying differently have different bounds on an append-only log the owner cannot prune,
+and §12.2's pairing key is derived from whatever this is. The floor every bucket below clears:
 
 - **Never a value the caller supplies and can vary at no cost** — not a `client_id`, not a
   `user_code`, not a form field, not a caller-chosen header. A throttle keyed on caller-supplied data
   is no bound at all; the caller lifts it by changing the value.
 - **One surface's counter is one surface's**, so exhausting `/device` cannot lock the owner out of
   `/login`.
-- **The transport source address is the socket's peer**, never a forwarded header — the same rule
-  §2's loopback clause 2 states, for the same reason. **a1p.**
+
+**Two buckets, both enforced**, as a1p read it and the record took — an outer per-surface
+container-global one bounding the ledger absolutely, and an inner one keyed on the transport source
+address so a single noisy source cannot spend the global budget. Each alone fails where the other
+holds. An attempt is refused when **either** holds, which is what "holds" means throughout §11.0 and
+§12.1, and **a network identifier may key a throttle and may never enter the chain.** TODO(chief):
+the buckets' rates and windows are not in the record; until named they are an implementation's.
 
 ### 11.1 · The client-registry read (§14 item 1)
 
@@ -1843,19 +1838,23 @@ token exists; and (e) fires on **no attempt at all** — a timer releasing, with
 request. The record closes the gap as follows; the text that carries it is `events.md`'s and
 `capabilities.md`'s.
 
-**`principal` gains `none`, and `actor` carries the surface. [0.3 · 34, 35]**
+**a1p's reading, taken by the record. [0.3 · 34, 35]**
 
-- **`principal` gains a third closed value, `none`** — not a nullable field: `principal` being
-  mandatory is what makes the chain readable in one pass, and a nullable one is a branch every
-  reader and every `audit` query must carry forever.
-- **`actor` carries the *surface*, not the caller** — one of rule 5's five closed words. **The
-  caller's network identifier MUST NOT be the actor**, nor appear anywhere in the entry: an IP or a
-  client hint there writes network identity into an append-only chain the owner cannot prune. A
-  network identifier may key §11.0's inner bucket and never enters the chain (**[0.3 · 24]**).
-- **The engage entry and the release entry are paired by `details.window_key`** (**[0.3 · 35]**; the
-  key's name is **a1p**'s) — an opaque per-container, per-window value derived from the bucket that
-  engaged, never the bucket's key itself, rotating with the window. It correlates the entries of one
-  sweep and nothing across time.
+- **`principal` gains a third closed value — `none`.** Not a nullable field: `principal` being
+  mandatory is what makes the chain readable in one pass, and a nullable one is a branch every reader
+  and every `audit` query must carry forever. A third word costs one row in `capabilities.md` §3 and
+  says exactly what is true.
+- **`actor` carries the *surface*, not the caller** — the same closed five as (e)'s `surface`. It is
+  the only honest thing known about the append, and it is what pairs (e) with the entries it
+  summarises. **The caller's network identifier MUST NOT be the actor.** An IP or a client hint in
+  `actor` writes network identity into an append-only chain the owner cannot prune, which turns the
+  audit log into a surveillance record of everyone who ever touched the container's front door — a
+  cost the owner never agreed to and cannot undo.
+- **The engage entry and the release entry are paired by an opaque throttle key in `details`**,
+  `window_key` (**a1p**'s name) — a per-container, per-window value derived from the bucket that
+  engaged (§11.0), never the key itself,
+  rotating with the window. It correlates the entries of one sweep and correlates nothing across
+  time, which is the whole of what pairing needs.
 
 **Which rows carry `none`. a1p**, binding item 34, which names the value and not its rows: (a), (b),
 (e) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its session

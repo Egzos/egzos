@@ -586,23 +586,19 @@ AS_CODE_LIFETIME_SECONDS: int = 60
 #: non-expiring token.
 AS_ACCESS_TOKEN_LIFETIME_SECONDS: int = 3600
 
-#: §11.5 — grant expiry, the longer clock over the access token's: 30 days by default, 90 days at
-#: most, and a request beyond the maximum is CLAMPED to it, never refused ([0.3 · 18]).
+#: §11.5 — grant expiry: 30 d default, 90 d max; longer is CLAMPED, never refused ([0.3 · 18]).
 AS_GRANT_LIFETIME_DEFAULT_SECONDS: int = 30 * 24 * 3600
 AS_GRANT_LIFETIME_MAX_SECONDS: int = 90 * 24 * 3600
 
-#: §10.1 — the interactive session's two clocks ([0.3 · 13]): it ends after 30 minutes without a
-#: request, and 8 hours after the login that established it, whichever comes first.
+#: §10.2 — the interactive session ends at 30 min idle or 8 h absolute ([0.3 · 13]).
 AS_SESSION_IDLE_SECONDS: int = 30 * 60
 AS_SESSION_ABSOLUTE_SECONDS: int = 8 * 3600
 
-#: §11.8 — a `user_code` is 8 characters from RFC 8628 §6.1's 20-consonant alphabet, shown
-#: `XXXX-XXXX` ([0.3 · 20]). No vowels, so no word; no digits, so no 0/O or 1/I pair.
+#: §11.8 — a `user_code` is 8 of RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX` ([0.3 · 20]).
 AS_USER_CODE_ALPHABET: str = "BCDFGHJKLMNPQRSTVWXZ"
 AS_USER_CODE_LENGTH: int = 8
 
-#: §11.7 — `continue` is at most 2048 bytes, measured still percent-encoded, as received; a longer
-#: value is dropped for the container's root like any other non-matching one ([0.3 · 25]).
+#: §11.7 — `continue` is at most 2048 bytes, still percent-encoded, as received ([0.3 · 25]).
 AS_CONTINUE_MAX_BYTES: int = 2048
 
 #: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
