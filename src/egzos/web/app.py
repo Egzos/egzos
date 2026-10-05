@@ -160,6 +160,14 @@ def return_target(value: str | None) -> str:
     return "/"
 
 
+
+def _same(given: str, held: str) -> bool:
+    """Constant-time equality for caller-supplied text. `compare_digest` raises on a non-ASCII
+    str, which would turn a forged key, cookie or cursor into a 500 instead of the one refusal;
+    as UTF-8 bytes any text compares, and a mismatch is just False."""
+    return secrets.compare_digest(given.encode("utf-8", "surrogatepass"), held.encode("utf-8"))
+
+
 class Lifeboat:
     """Request handling, independent of the socket server so tests drive it through TestClient."""
 
@@ -201,7 +209,7 @@ class Lifeboat:
 
     def take_handoff(self, token: str) -> bool:
         held, self._handoff = self._handoff, None
-        return bool(held) and secrets.compare_digest(token, held[0]) and held[1] >= time.time()
+        return bool(held) and _same(token, held[0]) and held[1] >= time.time()
 
     # -- arming: a server-held nonce, single-use, valid 10 s, bound to one act (the tap's model) ---
     def arm(self, purpose: str, ref: str, version: object, *, windowed: bool = False) -> str:
@@ -234,7 +242,7 @@ class Lifeboat:
         except ValueError:
             return 0
         good = hmac.new(self._signing, f"cursor|{q}|{off}".encode(), hashlib.sha256)
-        return off if hmac.compare_digest(sig, good.hexdigest()[:24]) else 0  # R5: first page
+        return off if _same(sig, good.hexdigest()[:24]) else 0  # R5: first page
 
     # -- reads ------------------------------------------------------------------------------------
     def token(self):
@@ -335,9 +343,11 @@ class Lifeboat:
 
     # -- the decision, shared by the pending page and the lifeboat-hosted tap ---------------------
     def decide(self, act: dict[str, Any], outcome: str, *, windowed: bool,
-               via: str) -> tuple[str, str]:
+               via: str, version: object = None) -> tuple[str, str]:
         """Perform the decision; returns (state, text): the state is what actually happened —
-        approved, denied, or invalid for a refusal — so a refusal never reads as a success."""
+        approved, denied, or invalid for a refusal — so a refusal never reads as a success. A
+        promote carries the version that was armed, and an item changed since is refused: the
+        act is the one the person saw (tap spec §2.5)."""
         token = self.token()
         at = time.strftime("%H:%M:%S")
         closes = self.presence.record(act, via=via, outcome=outcome, windowed=windowed)
@@ -363,6 +373,8 @@ class Lifeboat:
             item = self.c.backend.get(act["subject"])
             if item is None or item.status != "unverified":
                 raise TrustError("no longer pending")
+            if version is not None and str(item.lifecycle.get("version", 1)) != str(version):
+                raise TrustError("changed since it was armed")
             self.c.trust.promote(item, token=token, actor=OWNER)
             return "approved", t("act.promoted", at=at, user=OWNER)
         except TrustError as e:
@@ -413,7 +425,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             # The launch host does one thing: redeem the key, once, by handing the browser to the
             # session host. It sets no cookie and serves no page.
             if (request.method == "GET" and key is not None and not boat.redeemed
-                    and secrets.compare_digest(key, boat.key)):
+                    and _same(key, boat.key)):
                 boat.redeemed = True
                 to = f"http://{boat.host}/?{urlencode({'h': boat.hand_off()})}"
                 return _harden(RedirectResponse(to, status_code=303), path)
@@ -431,13 +443,13 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         if boat.launch_host is None and request.method == "GET" and key is not None:
             # The launch key works once: whoever redeems it first holds the session, and a copy
             # read later from a launcher's argv or a terminal opens nothing.
-            if not boat.redeemed and secrets.compare_digest(key, boat.key):
+            if not boat.redeemed and _same(key, boat.key):
                 boat.redeemed = True
                 resp: Response = RedirectResponse(path or "/", status_code=303)
                 resp.set_cookie(COOKIE, boat.session, httponly=True, samesite="strict", path="/")
                 return _harden(resp, path)
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
-        if not secrets.compare_digest(request.cookies.get(COOKIE, ""), boat.session):
+        if not _same(request.cookies.get(COOKIE, ""), boat.session):
             return _harden(HTMLResponse(_LOCKED, status_code=403), path)
         if request.method == "POST":
             # A missing Origin is refused too: every browser sends one on a form POST.
@@ -462,7 +474,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
     async def form_of(request: Request) -> dict[str, str] | None:
         form = {k: str(v) for k, v in (await request.form()).items()}
-        if not secrets.compare_digest(form.get("csrf", ""), boat.form_key):
+        if not _same(form.get("csrf", ""), boat.form_key):
             return None
         return form
 
@@ -651,7 +663,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
             return boat.not_found(request)
         if boat.presence.covers(act):
             try:
-                boat.outcomes[item.id] = boat.decide(act, "window", windowed=False, via="window")
+                boat.outcomes[item.id] = boat.decide(act, "window", windowed=False, via="window",
+                                                     version=version)
             except Exception:  # noqa: BLE001 — R9 error: decide recorded it; back to ready
                 boat.outcomes[item.id] = ("error", S["act.error"])
             return RedirectResponse(f"/items/{item.id}", status_code=303)
@@ -666,7 +679,8 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
 
         def perform(outcome: str, windowed: bool) -> str:
             # Runs inside the tap's own request: the container answers before anything is shown.
-            state, text = boat.decide(act, outcome, windowed=windowed, via="tap")
+            state, text = boat.decide(act, outcome, windowed=windowed, via="tap",
+                                      version=version)
             boat.outcomes[act["subject"]] = (state, text)
             return text
 

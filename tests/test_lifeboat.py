@@ -727,3 +727,60 @@ def test_every_lifeboat_route_runs_on_the_event_loop():
     app = create_app(Lifeboat(Container.__new__(Container), host="testserver"), ORIGIN)
     routes = [r for r in app.routes if isinstance(r, APIRoute)]
     assert routes and all(inspect.iscoroutinefunction(r.endpoint) for r in routes)
+
+
+def test_a_tap_refuses_an_item_changed_since_it_was_armed(lb):
+    # Tap spec §2.5: the act is the one the person saw. The armed version rides into the tap's
+    # decision, and a change between the issue and the signature lands nothing.
+    boat, client, item = lb
+    url = f"/items/{item.id}/promote"
+    arm = re.search(r'name="arm" value="([^"]+)"',
+                    post(client, boat, url, {"version": 1}).text).group(1)
+    tap_url = post(client, boat, url, {"version": 1, "arm": arm}).headers["location"]
+    changed = boat.c.backend.get(item.id)
+    changed.lifecycle["version"] = 2
+    boat.c.backend.put(changed)
+    post(client, boat, tap_url, {"step": "arm"}, csrf=False)
+    post(client, boat, tap_url, {"step": "confirm"}, csrf=False)
+    assert boat.outcomes[item.id][0] == "invalid"
+    assert boat.c.backend.get(item.id).status == "unverified"
+
+
+@pytest.mark.parametrize("where", ["key", "handoff", "cookie", "form", "cursor"])
+def test_non_ascii_credentials_get_the_one_refusal_not_a_500(tmp_path, monkeypatch, where):
+    from egzos.web import lifeboat_for
+    from egzos.web.app import COOKIE
+
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    c = Container(tmp_path / "home")
+    c.init()
+    boat, app, url = lifeboat_for(c, 7425)
+    launch = TestClient(app, base_url="http://127.0.0.1:7425")
+    home = TestClient(app, base_url=f"http://{boat.host}")
+    bad = "é" * 8
+    if where == "key":
+        r = launch.get(f"/?k={bad}", follow_redirects=False)
+    elif where == "handoff":
+        launch.get(url, follow_redirects=False)  # a hand-off is now held, so it is compared
+        r = home.get(f"/?h={bad}", follow_redirects=False)
+    elif where == "cookie":
+        r = home.get("/", headers={"cookie": f"{COOKIE}={bad}".encode()})
+    else:
+        home.get(launch.get(url, follow_redirects=False).headers["location"])
+        if where == "form":
+            r = home.post("/items/x/promote", data={"csrf": bad, "version": "1"},
+                          headers={"Origin": f"http://{boat.host}"}, follow_redirects=False)
+        else:
+            r = home.get("/", params={"q": "x", "cursor": f"1.{bad}"})
+    assert r.status_code in (200, 403)
+    if where == "cursor":
+        assert r.status_code == 200  # a forged cursor is the first page (R5)
+
+
+def test_the_launch_says_what_to_do_when_localhost_does_not_resolve(capsys):
+    from egzos.web import LOCALHOST_HINT, _launch
+
+    assert _launch("http://127.0.0.1:1/?k=x", True, opener=lambda u: True)
+    assert _launch("http://127.0.0.1:1/?k=x", False, terminal=True) is False
+    out = capsys.readouterr().out
+    assert out.count(LOCALHOST_HINT) == 2 and "egzos web --no-open" in LOCALHOST_HINT

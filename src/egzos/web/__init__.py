@@ -11,7 +11,8 @@ HttpOnly, host-only cookie, a different value); the key is dead, so a copy read 
 launcher's argv or a terminal opens nothing. The session lives on the random host because a
 browser does not isolate cookies by port: a cookie for 127.0.0.1 would reach every other server
 on 127.0.0.1 the owner's browser visits. The label is minted in this process and never printed.
-`*.localhost` resolves to loopback in Chromium and Firefox (RFC 6761). It is printed only when no
+`*.localhost` resolves to loopback in Chromium and Firefox (RFC 6761); the launch output says what
+to do when the browser does not (`LOCALHOST_HINT`). The keyed URL is printed only when no
 browser was opened AND stdout is a terminal: an agent's shell tool is not a terminal. To reopen
 the lifeboat after closing the browser, restart `egzos web`.
 `tokens.css` (spec/design/tokens.css, vendored byte-for-byte) lives in this package.
@@ -28,15 +29,24 @@ from egzos.authz.presence import is_terminal
 from egzos.container import Container
 
 DEFAULT_PORT = 7425
+# a1r minor on #127: the key is spent once the launch host hands off, so a browser that cannot
+# resolve the session host must be told what to do instead of being left on a dead page.
+LOCALHOST_HINT = (
+    "The session moves to a private *.localhost address. If that page does not load, this "
+    "browser does not resolve *.localhost: stop egzos web, run `egzos web --no-open`, and open "
+    "the printed link in Chromium or Firefox."
+)
 
 
 def _launch(url: str, open_browser: bool, opener=None, terminal=None) -> bool:
     """Open the browser on the keyed URL; print the key only to a person at a terminal."""
     if open_browser and (opener or webbrowser.open)(url):
         print("Opened in your browser.", flush=True)
+        print(LOCALHOST_HINT, flush=True)
         return True
     if terminal if terminal is not None else is_terminal():
         print(f"Open this in your browser (it carries this session's key):\n  {url}", flush=True)
+        print(LOCALHOST_HINT, flush=True)
     else:
         print(
             "No browser was opened and this is not a terminal, so the session key is not printed. "
