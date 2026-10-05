@@ -253,7 +253,7 @@ Because the flow's weakness is a human typing a code, three mitigations are cont
 
 **`verification_uri_complete` is not issued. [0.3 · 21]** The device authorization response MUST NOT carry the key at all
 — not empty, not null, absent — and `/device` MUST ignore a `user_code` query parameter, rendering the empty entry form as
-if none had been supplied (§11.8, still stale on this point). Including the `user_code` in a URL removes the typing step
+if none had been supplied (§11.8). Including the `user_code` in a URL removes the typing step
 and with it some of the phishing surface the browser retirement was about, but it makes the code pasteable into a chat
 window: a code a user can forward is a code a user can be asked to forward. The typing step is the mitigation.
 
@@ -1507,22 +1507,15 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
   form field is caller-controlled input whatever put it there. A form that round-trips an
   unvalidated value is the same hole one hop later.
 
-  Two clauses of that carrier are **not** settled by the text above, and each is marked rather than
-  written, because every available answer is a new requirement and this document is at its narrowing
-  round:
+  **The POST-hop re-match covers step 3 too. [0.3 · 26]** On the POST the value is re-matched
+  against D-C5 steps 1, 2 **and 3**: the query is re-scoped to step 3's two carrying patterns, never
+  whatever the form posts back.
 
-  `[OPEN→0.3]` **What the POST-hop re-match covers.** It names D-C5 steps 1 and 2 and is silent on
-  **step 3**, so whether the query the GET carried is re-scoped to step 3's two carrying patterns on
-  the POST hop as well, or is whatever the form posts back, is undecided here.
-
-  `[OPEN→0.3]` **Step 4's disposition on a POST-hop failure.** Step 4 fixes what a value failing *at
-  the GET* gets — dropped for the container's root — and this document does not say whether a value
-  failing the POST-hop re-match takes that same 303 with the login otherwise completed, or fails the
-  POST itself. The two options cost differently at §12, and the sitting should carry the cost along
-  with the pick: the first leaves the login's own entry `established`, with the carrier's failure
-  recorded nowhere of its own; the second has no cause to append under — row (a) closes at `wrong` ·
-  `unknown` · `throttled` (`AS_LOGIN_CAUSES`), and a POST-hop carrier failure is none of the three, so
-  taking it reopens that closed vocabulary rather than fitting inside it.
+  **A POST-hop failure takes step 4's disposition, with the login established. [0.3 · 26]** A
+  credential that verifies establishes the session and appends row (a) `established`; a `continue`
+  failing the re-match is then dropped for a 303 to the container's root, exactly as at the GET. The
+  cost is accepted as named: the carrier's failure is recorded nowhere of its own, and row (a) keeps
+  its three closed causes.
 
 - **`continue` is also how the pending authorization request survives the login, and it is the only
   thing that carries it. a1p.** §11.0's substep 3 redirects a session-less `/authorize` request here
@@ -1565,37 +1558,42 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
     could have called directly — so the allowlist still bounds *where* a freshly authenticated
     browser can be sent, which is the whole of what it is for.
 
-  `[OPEN→0.3]` **A length bound on `continue`.** No source names one, and a carrier that accepts an
-  unbounded query is a cheap way to make a redirect large; the review should pin a ceiling, above
-  which the value is dropped for the container's root like any other non-matching value.
+  **`continue` is at most 2048 bytes. [0.3 · 25]** Measured as received, still percent-encoded,
+  query included (**a1p**); a longer value is dropped for the container's root like any other
+  non-matching value, at the GET and at the POST alike. `AS_CONTINUE_MAX_BYTES` in `_types.py`.
 - **The login is throttled per caller**, on §12's terms, and its failures are uniform: wrong
   credential, unknown user and a throttled attempt produce one message, one status and one timing
   class. A login page that distinguishes *unknown* from *wrong* has published the container's user
   list.
 
-`[OPEN→0.3 / Chief]` **The credential mechanism itself.** No source names it, and the skeleton has
-none: `init` mints an owner token and there is no login. The review must name what the human presents
-— a container secret, an OS keychain unlock, a local passkey, or an IdP under §8's opt-in collapse —
-and it is a Chief decision as much as a review one, because it is the product's front door.
-`consent.md` §2.1 renders a single *Container secret* field as its stated default and says the
-contract owns the choice; if the review picks otherwise, that region is a spec revision. Everything
-above holds whichever is picked.
+**The credential is a container secret: v1.0's browser identity. [0.3 · 7]** The human presents the
+container's secret at `/login`, and that is the whole of v1.0's login — `consent.md` §2.1's single
+*Container secret* field stands as written. Three bounds come with it:
+
+- **More authenticators can be added later without a break.** The rest of this section is stated
+  in terms of "the login establishes an interactive session", never in terms of the secret, so a
+  passkey or an IdP bridge is a new way to reach the same session, not a new session.
+- **Firebase is `egzos.io`'s browser identity, not the container's.** It is the platform's
+  subscription session (§8's double login, unchanged); the open-core container has no dependency on
+  it, and §8's IdP collapse stays `[v1.1]` (**[0.3 · 8]**).
+- **The secret never enters the chain or a page.** §12.1 rule 7 already keeps it out of `details`.
+
+TODO(a1p): how the secret is provisioned at `init`, how it is stored, and how it is rotated are not in
+the record. They are a3-trust's at Phase 0.4, under §13's state-persistence TODO.
 
 ### 11.8 · The device-code entry (§14 item 5)
 
 §3 fixes the flow, the endpoints and the three mitigations. This fixes what the entry page needs:
 
-- **The `user_code`'s length and alphabet are the contract's, not the page's — a seventh divergence,
-  named in the opening register: `consent.md`'s own D-C4 already committed to a number, this
-  reopens it rather than restating a rendering.** D-C4 is *"Device codes are 8 characters, shown
-  `XXXX-XXXX`,"* rejecting shorter codes by name for the brute-force surface they would open — the
-  same reason this clause gives for taking ownership of the length and alphabet here. They set the
-  brute-force floor §3 mitigation 1 bounds from the other side, and a page that chose them could
-  weaken the flow by rendering it. `[OPEN→0.3]`: the review should pin the length and the alphabet
-  (a1p's reading: eight characters — D-C4's own number — from an alphabet with no visually ambiguous
-  pairs, which is what makes a short code typable and is the reason it is short; D-C4 fixes the
-  length and leaves the alphabet open). §9.1's entropy clause covers the *source*; this covers the
-  *size*.
+- **The `user_code` is 8 characters, shown `XXXX-XXXX`, from RFC 8628 §6.1's 20-consonant
+  alphabet `BCDFGHJKLMNPQRSTVWXZ`. [0.3 · 20]** The length is `consent.md` D-C4's own number, so
+  the contract confirms that decision rather than reopening it; the alphabet is the record's addition,
+  which D-C4 left open. No vowels, so no code spells a word; no digits, so no `0`/`O` or `1`/`I`
+  pair. `AS_USER_CODE_ALPHABET` and `AS_USER_CODE_LENGTH` in `_types.py` carry it. Each character
+  is drawn from §9.1's CSPRNG. The hyphen is display only, and the entry form matches
+  case-insensitively with the hyphen ignored, per RFC 8628 §6.1 (**a1p**). The code is about 34.6
+  bits, far under §9.1's floor and deliberately so; §3 mitigation 1's attempt bound and expiry carry
+  its security (§9.1 reading 2).
 - **Redemption is single-use and throttled**, per §3 mitigation 1 and §12: a code that has been
   redeemed is spent whether or not the authorization it belongs to was approved. **Its failures are
   uniform**, on §11.7's terms and for §11.7's reason: §12 row (b)'s five causes — `invalid`,
@@ -1614,51 +1612,35 @@ above holds whichever is picked.
   attacker controls, and the honest handling is to carry it as untrusted, bounded and escaped, the
   same posture `item.add` takes toward content (`unverified-by-default`, applied to a page).
 
-`[OPEN→0.3]` **`/device?user_code=…` — the prefilled entry, and §3's `verification_uri_complete`.**
-`consent.md` §14.5 makes a point §3 did not: **the decision bites on what `/device` accepts, not only
-on whether the AS issues the field**, because the CLI can build the link itself from a code it was
-given. §3's marker is therefore read as covering both halves, and the review must answer both:
-
-- if the review declines the code in a URL, the AS does not issue `verification_uri_complete`
-  **and** `/device` ignores a `user_code` query parameter — the CLI's home-made link then does
-  nothing, which is the only version of "declined" that holds;
-- if it accepts, both stand, and `consent.md` R3's prefilled row and its §20 fixture stand with them.
+**No prefilled entry: `/device` ignores a `user_code` query parameter. [0.3 · 21]**, stated at §3.
+`consent.md` §14.5's point is why both halves were needed: the CLI can build the link itself from a
+code it was given, so not issuing `verification_uri_complete` holds only if `/device` also ignores
+the parameter. It does, so the CLI's home-made link renders the empty form. `consent.md` R3's
+prefilled row and its §20 fixture are a spec revision, A2's after the freeze.
 
 ### 11.9 · Revocation the owner can reach from a browser (§14 item 13)
 
-`[OPEN→0.3]` **An owner-path revocation keyed on `Token.id`.** `consent.md` §14 item 13 raises a hole
-§9 does not cover, and it is a real one: §9's three options are all about an **RFC 7009 endpoint,
-keyed on the token *value***, and the browser never sees a token value. So no §9 option serves the
-one act the owner most obviously wants from a browser — *revoke that token in the list* — and under
-option 3 the flagship dashboard's revoke act is **dead**, not merely unsupported.
+**The owner revokes by `Token.id` on the container's own pages, and a client also gets the RFC 7009
+endpoint. [0.3 · 11]** Both halves were taken, so the two questions this section once kept apart are
+both answered: §9.2's client path keyed on the token *value*, and this owner path keyed on the
+*identifier*, which the browser can see and which is no credential (§9.1). Concretely:
 
-The two questions are separate, and the review should take them separately:
+1. **On the container's own pages, inside an interactive session (§10.1),** the owner revokes any
+   token in `token ls` by its `Token.id`. It is `token rm` reached from a page — no new authority —
+   and writes one `token.revoke` (**[0.3 · 30]**, carrying the refresh-family id).
+2. **It is throttled on the fifth `surface` word, `revoke`** (§12.1 rule 5, `AS_THROTTLE_SURFACES`),
+   with §11.0's two buckets, so a walk of the id space is bounded.
+3. **A refusal is uniform and appends.** An id that does not exist and one the session may not reach
+   get the same response, §7.1's rule applied to an identifier; the attempt appends once with its
+   cause in `details`, so the refusal path leaves a trace as the success path does. TODO(a1p): the
+   record names no event for that entry; it is named with §12's six in #109 PR 2's `events.md`
+   amendment.
 
-1. **§9's question** — does a *client* get a value-keyed endpoint to revoke its own token.
-2. **This one** — does the *owner* get an id-keyed revocation on the container's own pages (§11's
-   surface), authenticated by the interactive session of §10.1, refusing a token the viewer does not
-   own with §7's silence rule and `events.md`'s `token.revoke` on success.
-
-**a1p's reading, for the review to take or reject: yes to (2), independently of (1).** It needs no
-new authority — it is `token rm` reached from the page instead of the CLI, by a session that has
-already proved presence — and it never handles a value, so it does not reopen what §9's option 1
-opens. What it does *not* do is serve `consent.md` §19: the flagship dashboard is a separate origin
-reaching this AS as a browser client, and a session on the container's pages is not a session it
-holds. **If the review takes (2) and declines (1), §19's sentence is a spec revision** — the owner
-revokes on the container's page and the dashboard drops the act. The owner holds `token rm` under
-every outcome, so `consent.md` §13's `expiry.none` string stands as written either way.
-
-**Taking (2) opens a fifth surface, and the review should cost that in the same breath. a1p** —
-§12.1 rule 5's `surface` is a closed four-word vocabulary (`login` · `device` · `authorize` ·
-`tap`; §12 itself covers only the first three plus a timer, the fourth being out of this section's
-scope) and `AS_THROTTLE_SURFACES` pins the same four. An owner-path revocation reached from §11's
-own page is none of the four, so taking (2) reopens the closed vocabulary at both places that pin
-it — rule 5 and the constant — and, if §12.2's `actor`-from-`surface` reading is taken alongside
-it, `actor`'s vocabulary too. It also needs an entry on the **refusal** path, not only the success
-one:
-`events.md`'s `token.revoke` records the revoke, but a viewer who does not own the token is refused
-under §7's silence rule, and a code path that can be exercised and leaves no trace is the shape §12
-exists to catch. Written down here so the freeze does not have to rediscover it.
+**The flagship dashboard.** It is a separate origin reaching this AS as a browser client, so it holds
+no session on the container's pages and cannot use the owner path. It can revoke the token it holds
+through §9.2's endpoint, and nothing else. `consent.md` §19's broader revoke sentence is therefore a
+spec revision (A2's, after the freeze): the owner revokes other tokens on the container's page or with
+`token rm`. `consent.md` §13's `expiry.none` string stands.
 
 ## 12 · The pre-authorization audit surface
 
