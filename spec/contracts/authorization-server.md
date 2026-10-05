@@ -1655,26 +1655,33 @@ keeps them with #68's batch and `events.md` rather than here.
 
 **The effects those three pages produce before any token exists** — (a), (b), (e) and (d)'s
 `throttled` and `token_presented` causes before any session exists either, (e) on no request at all
-(§12.2), the rest inside a session §11.0's substep 3 has already required — **and the drafted
-taxonomy has no name for any of them.** `events.md` §4 invariant 2: *"A surface that produces an
-effect without a corresponding event is non-conforming."* `events.md` §1 closes the vocabulary by
-construction. Both cannot hold here today.
+(§12.2), the rest inside a session §11.0's substep 3 has already required — **each now has an event
+name. [0.3 · 33, 36]** `events.md` §4 invariant 2 (*"A surface that produces an effect without a
+corresponding event is non-conforming"*) and §1's closed vocabulary can both hold here once the names
+are in `events.md` §1.
 
-**Raised, not invented.** The five below are `spec/design/consent.md` §14.8's (a), (b), (d), (e) and
-(f). That spec routes (a), (b), (d) and (e) to this document and explicitly **not** to #68; (f) is
-raised to #68 as well, with its own distinct outcome `rejected`, and stays asked of #61 until #68
-says which. Its (c), a consent denial, is #68's with the other four AS effects §9 names. **The naming and the `events.md` amendment
-are `[OPEN→0.3]`, batched as #86, to be decided in the same sitting as #68** — #68's option (b)
-`authz.grant` *is* (c), so splitting the two sittings leaves the denial in neither. **This section
-proposes no event names.** What it fixes is what must be recorded, and what each entry carries.
+**Five `authz.*` events for the pre-authorization surfaces, and a sixth for the render. [0.3 · 33,
+36]** The rows are `spec/design/consent.md` §14.8's (a), (b), (d), (e) and (f); its (c), a consent
+denial, is `authz.grant` with `decision: denied` (§9.3, **[0.3 · 29]**). Row (g) is the record's
+sixth row: a rendered consent screen appends. The record fixes the five effects and leaves the names
+to a1p; **the names are a1p's**, in `events.md`'s `noun.verb` shape. **Decided-pending:** the six
+names enter `events.md` §1 and `_types.py`'s `Event` with #109 PR 2, and until it merges an append
+under any of them MUST be rejected, as §9.3 states for its own two.
 
-| | the effect | outcome | `details.cause`, a closed word |
-|---|---|---|---|
-| **(a)** | a login attempt at `/login` | `established` · `failed` | `wrong` · `unknown` · `throttled` |
-| **(b)** | a device-code redemption at `/device` | `found` · `failed` | `invalid` · `expired` · `used` · `malformed` · `throttled` |
-| **(d)** | a pre-trust uniform failure at `/authorize` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` · `token_presented` |
-| **(e)** | a throttle releasing | `released` | — (see below) |
-| **(f)** | a post-trust rejection at `/authorize` | `rejected` | `vocabulary` · `scope` |
+| | the effect | event | outcome | `details.cause`, a closed word |
+|---|---|---|---|---|
+| **(a)** | a login attempt at `/login` | `authz.login` | `established` · `failed` | `wrong` · `unknown` · `throttled` |
+| **(b)** | a device-code redemption at `/device` | `authz.redeem` | `found` · `failed` | `invalid` · `expired` · `used` · `malformed` · `throttled` |
+| **(d)** | a pre-trust uniform failure at `/authorize` | `authz.refuse` | `failed` | `unknown_client` · `redirect_mismatch` · `malformed` · `missing_pkce` · `throttled` · `replayed` · `token_presented` |
+| **(e)** | a throttle releasing | `authz.release` | `released` | — (see below) |
+| **(f)** | a post-trust rejection at `/authorize` | `authz.reject` | `rejected` | `vocabulary` · `scope` |
+| **(g)** | a consent screen rendered at `/authorize` | `authz.render` | `rendered` | — |
+
+**Row (f) is one of the five, which settles what §9.3's exclusion (iii) left raised to #68:** a
+post-trust rejection keeps its own row, outcome and both causes, under its own name, and
+`authz.grant`'s field set is not widened. **Row (g) carries `client_id`. a1p** — so the owner can
+see which client put a screen in front of them. It appends once per render, inside a session §10.1
+has authenticated, and §11.0's throttle bounds its volume.
 
 **Row (d) has a seventh closed cause `consent.md` does not carry — named as the addition it is, not
 left for the freeze review to discover.** `consent.md` §14.8 (d) closes at six causes —
@@ -1717,60 +1724,35 @@ the same way `AS_THROTTLE_SURFACES` already fixes rule 5's — so a cause arrivi
 its row's tuple breaks a test rather than appending quietly, which is exactly the gap this Part's
 own row (d) addition sat in until this review caught it by hand.
 
-**A successfully rendered consent screen appends nothing, deliberately. a1p.** The five above are
-four failures and a release; a screen that renders performs §11.1's registry read and §11.3's
-existing-tokens read and produces no entry, which sits oddly beside `events.md` §4 invariant 2
-(*"Every read … is an event"*) until the reason is said: **both are the owner reading their own
-container's state, inside an interactive session §10.1 has already authenticated, to decide an act they
-are performing.** Not a caller's reads, and not taxonomy reads — the entry recording the moment is
-the decision's own, §9's and #68's. Both are bounded (§11.1 one keyed entry, §11.3 a count and a
-timestamp), so neither carries anything out that an unrecorded read would hide. **A third read of
-container state carries the same argument, and this paragraph names it rather than leaving it to be
-found elsewhere**: §11.0 substep 1's match against §11.4's decided-request record, taken ahead of the
-counter to recognise the deciding session's own re-submission. It is bounded the same way (one
-record, keyed on the interactive session) and read for the same reason — the owner's own session,
-deciding whether the act in front of it was already decided — so where it matches, `replayed`'s
-append is the entry that records the read; where it falls through, the read itself leaves no trace
-of its own either way, and the request it accompanies is decided on its own terms — the ordinary
-case, every authenticated request that is not this session's first re-submission, is evaluated and
-appends once under rule 1, whatever cause it earns; only where a throttle already holds does rule 3's
-exception govern instead, counted and not appended. Neither entry is the read's own, the same shape
-as the two reads above. `[OPEN→0.3]` **#86's
-sitting should record an explicit amendment to `events.md` §4 invariant 2**, naming the
-owner-inside-an-authenticated-session read exception and its three instances by name — confirming
-this document's argument is not the same act as amending the invariant it carves an exception into,
-and as the two documents stand today a builder reading `events.md` alone and a builder reading this
-document write different things for the same read. If the sitting disagrees the answer is a sixth
-row, not a changed read.
+**The reads a decision rests on, and `events.md` §4 invariant 2's exception. [0.3 · 36, 38]** A
+rendered screen performs §11.1's registry read and §11.3's existing-tokens read, and row (g) is the
+entry that records them — so the **abandoned** render, where no decision follows and which a client
+can drive at will by initiating `/authorize` and never being answered, leaves a trace. **Invariant 2
+is amended** with one exception: a read the owner makes of their own container's state, inside a
+session §10.1 has authenticated, to decide an act they are performing, gets no read event of its
+own. Its three instances are named:
 
-`[OPEN→0.3]` **The argument above holds only where a decision follows, and a rendered screen the
-owner abandons is the case where none does — §11.1's registry read and §11.3's existing-tokens read
-happen, no decision entry ever arrives to be the entry that records them, and a client can drive the
-case at will by initiating `/authorize` and never being answered. Routed to #86's sitting with the
-rest of this section**, which decides it as it decides the naming: either the render is itself a
-sixth row, or the decision entry covers the decided case and the abandoned one is named and justified
-separately. **This document does not decide it and states no clause for it. a1p.**
+1. §11.1's registry read — recorded by row (g);
+2. §11.3's existing-tokens read — recorded by row (g);
+3. §11.0 substep 1's match against §11.4's decided-request record — recorded by row (d) `replayed`
+   where it matches; where it falls through, the request goes on to an entry of its own (rule 1,
+   or rule 3's count while a throttle holds).
 
-`[OPEN→0.3]` **A sub-threshold sweep at `/authorize` leaves no trace at all, and D-C6 rejected that
-outcome by name.** Compose §11.0 substep 3 with §12.1 rules 3 and 5 for an unauthenticated,
-session-less caller holding its rate just under the throttle: substep 2 admits every attempt, so
-the throttle never engages and no (d) `throttled` entry is written; substep 3 answers each one with
-a 303 to `/login`, appending nothing and storing nothing; no engagement means no release, so no (e)
-entry and no `refused` count either. The chain records nothing — not a bounded trace, none — and
-rule 5's own rationale is that (e) is the only entry that carries a sweep's size, which a
-sub-threshold sweep never produces. `consent.md`'s D-C6 lists exactly this outcome among its
-rejected alternatives (*"no append for refused attempts and none at release — the sweep leaves no
-trace at all, and a throttled credential sweep against `/login` becomes invisible to the one person
-entitled to see it"*), and §15 names ledger growth from unauthenticated callers as the threat the
-throttle answers. §11.0's substep ordering is right for the enumeration reason it gives — a
-session-less `/authorize` naming an unregistered client used to be a row (d) `unknown_client`
-append, which told an implementer whether a client id existed before validating anything, and
-substep 3 closing that oracle is correct — but it also removes the owner's only view of
-reconnaissance at that endpoint below the throttle's rate, and this document states neither the
-gap nor a reason to accept it. **Routed to #86's sitting with the rest of this section**: either a
-sixth row for a sub-threshold sweep's own visibility, or a named and justified blind spot the way
-the abandoned-render case above is named rather than decided. **This document does not decide it
-and states no clause for it. a1p.**
+Each is bounded — one keyed entry, a count and a timestamp, one record — so none carries out
+anything an unrecorded read would hide. **§11.4's request-keyed read, §12's fourth (**[0.3 · 27]**),
+is not an instance**: every path through it appends — row (d) `replayed` on a match, otherwise the
+request goes on to (d), (f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in
+`events.md` §4 with #109 PR 2.
+
+**A session-less 303 to `/login` counts toward the throttle. [0.3 · 37]** Substep 3 runs after
+substep 2, so every session-less `/authorize` adds to both §11.0 buckets. A sweep that engages
+either appends row (d) `throttled` once and row (e) once at release, whose `refused` count carries its
+size. **What stays unrecorded, stated as it is. a1p:** a sweep that stays under both buckets for its
+whole life appends nothing, since a redirect that reads and decides nothing has no effect to record.
+This is what item 37 leaves of `consent.md` D-C6's rejected "no trace at all", named rather than
+hidden: the container-global bucket caps such a sweep's volume, and each redirect tells it nothing
+(§11.0). A sweep large enough to matter engages the throttle and is seen. If the Chief wants the
+residue closed, that is a `contract-change` at the next phase boundary, not a reading of item 37.
 
 ### 12.1 · The rules, which are not open
 
