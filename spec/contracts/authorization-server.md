@@ -1190,7 +1190,7 @@ ordering is fixed, and it is the step that decides whether §5.3's tier is reach
    §3's device redemption has no substep 3 below. Two halves, and the
    document means them separately. The read is **keyed on the interactive session of §10.1 — never on
    anything the request carries**, because a key the caller can vary at no cost is no bound, which is
-   this section's own `[OPEN→0.3]` floor below. The **match** is then against the decided request
+   the floor this section's throttle-key clause below states. The **match** is then against the decided request
    *that session's record names*: one interactive session can decide more than one authorization
    request — a second client, a second tab, a re-authorization after an expiry — so the session does
    not by itself identify a decided request, and the once-per-decided-request accounting below is per
@@ -1284,27 +1284,33 @@ and (f) out of an unauthenticated caller's reach except for (d)'s `throttled` an
 causes, which is the
 direct negation of `consent.md` D-C6's premise that *the post-trust tier is as reachable as the
 pre-trust one*. That premise is the design side's to revise; this document does not edit it, and the
-revision is filed as **#98** (`design-gap`), which names the affected regions and states the options
-for the Chief's pick. `[OPEN→0.3]` the freeze review should confirm the two documents were reconciled
-rather than left disagreeing — #98's pick recorded, not merely raised.
+revision is filed as **#98** (`design-gap`). **#98 takes option (a): D-C6 is revised, not this
+ordering. [0.3 · 45]** `consent.md` D-C6 and its affected §14.8 rows and §20 fixtures are revised so
+the session check precedes both tiers; the edit is A2's and lands with #100's back-pointers after the
+freeze, and until it does this clause governs where the two disagree.
 
-`[OPEN→0.3]` **What a throttle keys on.** No source names it and it cannot be left unsaid: §12.1
-rule 3 makes the throttle the **only** bound on the chain's growth from unauthenticated callers, so
-two containers keying differently have different bounds on an append-only log the owner cannot prune,
-and §12.2's pairing key is derived from whatever this is. The floor any answer must clear is **not**
-open:
+**What a throttle keys on: two buckets, both enforced. [0.3 · 24]** §12.1 rule 3 makes the throttle
+the **only** bound on the chain's growth from unauthenticated callers, so the key is contract:
+
+1. **An outer bucket per surface, container-global** — one counter per `surface` word, shared by
+   every caller, bounding the ledger absolutely whatever the number of sources.
+2. **An inner bucket per surface and transport source address** — so one noisy source cannot spend
+   the global budget and lock the owner out.
+
+An attempt is refused when **either** bucket holds, and that is the throttle "holding" everywhere
+§11.0 and §12.1 use the word. Each bucket alone fails where the other holds. The rates and windows
+are not in the record. TODO(chief): the two buckets' rates and windows, and whether config may set
+them. Until then they are an implementation's to choose under the floor below. **A network identifier
+may key a throttle and never enters the chain** (§12.2): the source address lives in the inner
+bucket's counter and nowhere else. The floor every bucket clears, unchanged:
 
 - **Never a value the caller supplies and can vary at no cost** — not a `client_id`, not a
   `user_code`, not a form field, not a caller-chosen header. A throttle keyed on caller-supplied data
   is no bound at all; the caller lifts it by changing the value.
 - **One surface's counter is one surface's**, so exhausting `/device` cannot lock the owner out of
   `/login`.
-
-a1p's reading, to take or reject: **two buckets, both enforced** — an outer per-surface
-container-global one bounding the ledger absolutely, and an inner one keyed on the transport source
-address so a single noisy source cannot spend the global budget. Each alone fails where the other
-holds. Whichever is picked, §12.2's constraint stands: **a network identifier may key a throttle and
-may never enter the chain.**
+- **The transport source address is the socket's peer**, never a forwarded header — the same rule
+  §2's loopback clause 2 states, for the same reason. **a1p.**
 
 ### 11.1 · The client-registry read (§14 item 1)
 
@@ -1397,23 +1403,21 @@ MUST NOT mint. a1p.** §2 makes the *code* single-use; this makes the *request* 
 a different object and the one the back button re-submits. A re-submission renders §5.3's uniform
 failure and appends once, §12's cause `replayed`.
 
-**A re-submission is recognised as one only on the deciding session — and that is the whole of the
-stated mechanism, which does not reach every case this section's MUST NOT covers. a1p / `[OPEN→0.3]`**
-— a decided request is bound to the interactive session (§10.1) that decided it, and only that
-session's **first** re-submission is §12.1 rule 6's unthrottled `replayed` path — recognised inside
-§11.0's substep 1, which is where the ordering that exempts it is fixed and the only place this
-document states a read of the decided-request record. Substep 1's key is the session, never anything
-the request carries, so the same request arriving on **another** session, or a second time on the
-deciding session, matches nothing in substep 1 and falls through to the ordinary pre-trust tier —
-and no clause here states a second, request-keyed read that would recognise either case as the
-decided request once it gets there. As written, neither case is mechanised: this document asserts
-the requirement (the opening paragraph's MUST NOT reach a second decision, MUST NOT mint) without
-stating what makes it true outside the one session substep 1 reads. `[OPEN→0.3]` **the freeze
-review settles the mechanism**: a request-keyed read at the pre-trust tier — which carries none of
-substep 1's "a key the caller can vary at no cost is no bound" objection, since it would run *after*
-the counter — is one answer, and would be §12's fourth read of container state, extending the
-paragraph that today states three; a different mechanism is the freeze sitting's to propose instead.
-This document does not decide it and states no clause for it beyond this marker.
+**Two reads recognise a decided request, one per case. a1p, then [0.3 · 27].** A decided request is
+bound to the interactive session (§10.1) that decided it, and only that session's **first**
+re-submission is §12.1 rule 6's unthrottled `replayed` path, recognised inside §11.0's substep 1,
+keyed on the session. The same request arriving on **another** session, or a second time on the
+deciding session, falls through substep 1 — and is recognised by **a request-keyed read at the
+pre-trust tier, after the counter**: the AS reads §11.4's decided-request record by the request's own
+identity, and a match is §5.3's uniform failure with row (d) cause `replayed`, appended under rule 1
+and subject to rule 3 like any other row (d) cause. It never mints and never reaches a second
+decision, which is what makes the opening paragraph's MUST NOT true in every case. Keying on the
+request is safe here and not in substep 1 because this read runs *after* the counter, so a caller
+varying the key at no cost is still throttled. **This is §12's fourth read of container state.**
+**What identifies a request** is not in the record. **a1p**: the tuple `(client_id, redirect_uri,
+state, code_challenge)` the request carries, since `code_challenge` is client-generated per request
+and §2 already binds the code to it; for `consent.md` R3's device hand-off, the pending authorization
+§3 mitigation 3 binds to the `device_code`.
 
 **A re-submission carrying no session at all is not one this section ever sees. a1p** — it is
 substep 3's redirect like any other session-less `/authorize` request, and nothing here applies to
@@ -1431,8 +1435,7 @@ different object at a later moment.
 
 ### 11.5 · Expiry: the container's default and maximum, and the clamp rule (§14 item 6)
 
-**A container carries an AS-issued-token default lifetime and a maximum lifetime in its own config,
-and a request for a longer expiry is clamped to the maximum — never silently granted, never refused
+**An AS grant has a default lifetime and a maximum lifetime, and a request for a longer expiry is clamped to the maximum — never silently granted, never refused
 for that reason alone. a1p**, answering `consent.md` §14.6's `[OPEN→a1p]` on the rule.
 
 Clamping rather than refusing, for a stated reason: a refusal here is an error shape a caller can
@@ -1441,11 +1444,14 @@ reveals the same fact **to the owner, on the screen, in the value being minted**
 screen to render the clamped expiry — and reveals it to the client only in the token it receives,
 which it is entitled to know. A client that needs longer asks the owner, not the AS.
 
-`[OPEN→0.3]` **The two numbers, and the config keys that carry them.** No source names either, and
-§9's `[OPEN→0.3]` on a non-null `expires_at` for public-client tokens is the same question seen from
-the default's side — the review should settle them together. What is not open is the clamp rule
-above, or that the maximum exists: a container with no maximum grants `expires_at: null` to any
-client that asks for it, which §9 already calls wrong as an AS default.
+**The two numbers: grant expiry defaults to 30 days and is clamped at 90. [0.3 · 18]** The expiry
+this section governs is the **grant's** — how long the refresh-token chain §9.2 rotates stays
+redeemable — and §9.3's 1-hour access token (**[0.3 · 17]**) is the shorter clock under it; the screen
+renders the grant's expiry, clamped. `AS_GRANT_LIFETIME_DEFAULT_SECONDS` and
+`AS_GRANT_LIFETIME_MAX_SECONDS` in `_types.py` carry them, **a1p**'s naming. No AS grant is
+non-expiring: `null` is `token mint`'s alone (§9.3). The record names the numbers and no config key.
+TODO(chief): whether a container's config may lower either number. Until decided, both are contract
+values with no config key, the stricter reading.
 
 ### 11.6 · A standard error redirect carries no description, at all (§14 item 4)
 
