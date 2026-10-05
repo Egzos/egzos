@@ -1861,52 +1861,33 @@ naming decision:
 closes `principal` to `interactive` · `client`. None of the five can satisfy that: (a) fires on
 `/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before any
 token exists; and (e) fires on **no attempt at all** — a timer releasing, with no caller in any
-request. The gap is real and it is this document's to raise, `events.md`'s to close.
+request. The record closes the gap as follows; the text that carries it is `events.md`'s and
+`capabilities.md`'s.
 
-**A consequence of §11.0's substep 3 that #86 must take with the rest. a1p** — the gap is narrower
-than "none of the five" for two of them. (d)'s five causes that are neither `throttled` nor
-`token_presented`, and the whole of (f), are
-now reached only inside an interactive session, so an `interactive` principal is available and
-truthful there; the entries with no principal to carry are (a), (b), (d) with cause `throttled` or
-`token_presented`, and
-(e) — and the two (d) causes reach "no principal to carry" for different reasons, not one. A
-`token_presented` entry is the sharpest case of the second reading's point: the caller held a
-credential, the AS deliberately did not look at it (§10.2), and a principal derived from it would be
-asserting exactly what that clause refuses to determine — its reason is **availability**, and there
-genuinely is none. `throttled` is not the same: §11.0 substep 2 gives that response "for a caller
-with a session and a caller without one alike," so an `interactive` principal is sometimes available
-and truthful there, exactly as it is for (d)'s other five causes. What governs `throttled` is
-**uniformity**, not availability — a principal that varied would tell a throttled caller whether it
-held a session, the same distinguisher §5.3's page is already built to refuse the caller.
-This document does not pick: a taxonomy that used `interactive` where it is known and the
-reading below where it is not is one answer, and a taxonomy that used the reading below uniformly
-across all five — so that a reader cannot infer from the principal which cause a uniform page had —
-is another, and the second may matter more than the first. **#86's sitting chooses**; §5.3's
-uniformity is owed to the caller and never to the owner's ledger (§12.1 rule 1), so neither reading
-is blocked by it.
+**`principal` gains `none`, and `actor` carries the surface. [0.3 · 34, 35]**
 
-`[OPEN→0.3]` **a1p's reading, for #86 to take or reject:**
+- **`principal` gains a third closed value, `none`** — not a nullable field: `principal` being
+  mandatory is what makes the chain readable in one pass, and a nullable one is a branch every
+  reader and every `audit` query must carry forever.
+- **`actor` carries the *surface*, not the caller** — one of rule 5's five closed words. **The
+  caller's network identifier MUST NOT be the actor**, nor appear anywhere in the entry: an IP or a
+  client hint there writes network identity into an append-only chain the owner cannot prune. A
+  network identifier may key §11.0's inner bucket and never enters the chain (**[0.3 · 24]**).
+- **The engage entry and the release entry are paired by `details.window_key`** (**[0.3 · 35]**; the
+  key's name is **a1p**'s) — an opaque per-container, per-window value derived from the bucket that
+  engaged, never the bucket's key itself, rotating with the window. It correlates the entries of one
+  sweep and nothing across time.
 
-- **`principal` gains a third closed value — `none`.** Not a nullable field: `principal` being
-  mandatory is what makes the chain readable in one pass, and a nullable one is a branch every reader
-  and every `audit` query must carry forever. A third word costs one row in `capabilities.md` §3 and
-  says exactly what is true.
-- **`actor` carries the *surface*, not the caller** — the same closed four as (e)'s `surface`. It is
-  the only honest thing known about the append, and it is what pairs (e) with the entries it
-  summarises. **The caller's network identifier MUST NOT be the actor.** An IP or a client hint in
-  `actor` writes network identity into an append-only chain the owner cannot prune, which turns the
-  audit log into a surveillance record of everyone who ever touched the container's front door — a
-  cost the owner never agreed to and cannot undo.
-- **The engage entry and the release entry are paired by an opaque throttle key in `details`** — a
-  per-container, per-window value derived from whatever the throttle keyed on (§11.0, where that is
-  `[OPEN→0.3]` above a stated floor), never the key itself,
-  rotating with the window. It correlates the entries of one sweep and correlates nothing across
-  time, which is the whole of what pairing needs.
+**Which rows carry `none`. a1p**, binding item 34, which names the value and not its rows: (a), (b),
+(e) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its session
+exists, (b) is not an owner act, and (e) has no caller. (d) is uniform across all seven causes,
+although five are reached only inside a session, so that a reader cannot infer from the principal
+which cause a uniform page had, or whether a throttled caller held a session. (f) and (g) are not
+uniform pages and are reached only inside a session, where `interactive` is available and true.
 
-Nothing on any page depends on any of the three; `consent.md` §14.8 says so in its own words.
-Whatever the review picks, `events.md` §2's description of the entry must say it — an implementation
-reading §2 alone today would have to invent a value for a mandatory field, and two implementations
-would invent different ones and break the chain across them (`events.md` §3).
+**Decided-pending:** `none` enters `capabilities.md` §3 and `_types.py`'s `Principal`, and
+`events.md` §2's entry description states all of the above, with #109 PR 2. Nothing on any page
+depends on any of it; `consent.md` §14.8 says so in its own words.
 
 ## 13 · What this document does not fix
 
