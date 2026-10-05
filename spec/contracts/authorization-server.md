@@ -1664,8 +1664,9 @@ exists to catch. Written down here so the freeze does not have to rediscover it.
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
-two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page,
-which §12.1 rule 5's four-word `surface` vocabulary names but this section does not cover: its
+two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page or
+§9.2's `revoke` page, which §12.1 rule 5's five-word `surface` vocabulary names but this section
+does not cover (`revoke`'s entries are `token.revoke` and §9.2's refusal entry). For the tap, its
 endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10.5's `[LEAN]`
 paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
 carries); its own audit entries are a different pointer, §10.5's `[LEAN]` closing line's, which
@@ -1852,14 +1853,14 @@ naming decision:
 5. **The release appends whenever an engage did, `refused: 0` included.** (e) is the only entry that
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
-   `authorize` · `tap` (the step-up tap is the fourth surface, throttled unconditionally by
+   `authorize` · `tap` · `revoke` (`revoke` is §9.2's owner-path page, the fifth word, **[0.3 · 11]**;
+   the step-up tap is the fourth surface, throttled unconditionally by
    `consent.md`'s D-C6; if §10.5's `[LEAN]` is not taken the tap rides a channel of its own rather
    than these AS endpoints, but the word is still used there — D-C6's release entry is
    `consent.md` §14.8 (e), the same event this rule pins, and the tap spec §14.5 binds to it **by
    citing the decision, not by restating it in an entry of its own** — never unused, only ridden
-   elsewhere) — and `refused`, an integer. **These two are closed; §12.2 is the one place this
-   rule's entry may still grow a third `details` key** — the opaque throttle key pairing (e) with
-   the engage entries it summarises — and that key is `[OPEN→0.3]` there, not decided by this rule.
+   elsewhere) — `refused`, an integer, and `window_key`, the opaque per-window key pairing (e) with
+   the engage entry it summarises (**[0.3 · 35]**, §12.2). **These three are closed.**
 6. **The deciding session's replay is never throttled.** §11.4 binds a decided request to the
    interactive session that decided it, and *that* session's re-submission is the one this rule
    exempts: it is evaluated — **in §11.0's substep 1, ahead of the counter, which is where that
