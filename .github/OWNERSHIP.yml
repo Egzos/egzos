@@ -38,7 +38,10 @@ chief_only:
   - ".github/OWNERSHIP.yml"
   # Claude Code loads these at any depth, so a nested one is a control input too, whatever the
   # entry's type (Egzos/egzos-platform#46). `*/**/` needs at least one directory above, so the
-  # root CLAUDE.md and .claude/ stay a1p-planner's.
+  # root CLAUDE.md and .claude/ stay a1p-planner's; `**/.mcp.json` matches the root too, which no
+  # agent owned. Residual: a1p-planner can still change the type of the root .claude (a directory
+  # for a symlink); the reviewers' cleanup removes it whatever its type and the Chief's approval
+  # gates it. A test needing one of these shapes builds it in tmp_path at runtime, never commits it.
   - "*/**/.claude"
   - "*/**/.claude/**"
   - "*/**/CLAUDE.md"

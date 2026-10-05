@@ -13,12 +13,25 @@ from __future__ import annotations
 
 from typing import NotRequired, get_type_hints, is_typeddict
 
+import pytest
+
 import egzos._types as t
 
-# authorization-server.md §6's table, in order.
+# authorization-server.md §11.1's table: the AS-internal `client_type` literal, and the kind word
+# `consent.md` renders beside the client name (its `kind.*` copy keys). Transcribed from the two
+# documents, never read back from the module under test.
+CONSENT_KIND_ROWS = [
+    ("browser", "browser"),
+    ("cli", "device"),
+    ("mcp", "mcp"),
+]
+
+# authorization-server.md §6's table, in order. Ten rows, all unconditional: [0.3 · 10] removed
+# `registration_endpoint` from the document and [0.3 · 11] made `revocation_endpoint` a row like
+# any other.
 AS_METADATA_FIELDS = (
     "issuer", "authorization_endpoint", "token_endpoint", "device_authorization_endpoint",
-    "revocation_endpoint", "registration_endpoint", "response_types_supported",
+    "revocation_endpoint", "response_types_supported",
     "grant_types_supported", "code_challenge_methods_supported",
     "token_endpoint_auth_methods_supported", "scopes_supported",
 )
@@ -30,19 +43,20 @@ def test_metadata_surface_is_exactly_the_contracts():
     assert t.AS_METADATA_ENDPOINT == "/.well-known/oauth-authorization-server"
 
 
-def test_only_the_two_open_endpoints_are_conditional():
-    """§6: advertising an endpoint the container does not implement is non-conforming.
+def test_no_metadata_row_is_conditional_and_registration_is_absent():
+    """§6: the field set is closed in BOTH directions, and nothing in it is optional.
 
-    `revocation_endpoint` is conditional because §9 leaves the endpoint's existence `[OPEN->0.3]`
-    (§K answers revocation with `token rm`, an owner path); `registration_endpoint` because §5
-    leaves dynamic registration open. The other nine rows are unconditional.
+    [0.3 · 11] decided the RFC 7009 endpoint exists, so `revocation_endpoint` is unconditional;
+    [0.3 · 10] decided there is no open dynamic client registration, so `registration_endpoint` is
+    absent from the document — not present-and-null, which would tell a reader the container
+    considered the question. `AS_METADATA_CONDITIONAL_FIELDS` is gone rather than empty: an empty
+    constant is a place for a later field to be quietly added, which is what this test pins.
     """
-    assert t.AS_METADATA_CONDITIONAL_FIELDS == {"revocation_endpoint", "registration_endpoint"}
-    # Conditional means "a row of the table that may be omitted", never "a row not in the table".
-    assert t.AS_METADATA_CONDITIONAL_FIELDS <= set(AS_METADATA_FIELDS)
-    unconditional = [f for f in AS_METADATA_FIELDS if f not in t.AS_METADATA_CONDITIONAL_FIELDS]
-    assert len(unconditional) == 9
-    assert "issuer" in unconditional and "token_endpoint" in unconditional
+    assert not hasattr(t, "AS_METADATA_CONDITIONAL_FIELDS")
+    assert "AS_METADATA_CONDITIONAL_FIELDS" not in t.__all__
+    assert "registration_endpoint" not in AS_METADATA_FIELDS
+    assert "revocation_endpoint" in AS_METADATA_FIELDS
+    assert len(AS_METADATA_FIELDS) == 10
 
 
 def test_plain_is_never_advertised_and_code_is_the_only_response_type():
@@ -60,6 +74,41 @@ def test_plain_is_never_advertised_and_code_is_the_only_response_type():
     assert v["token_endpoint_auth_methods_supported"] == ("none",)
     assert t.AS_CLIENT_TYPES == ("browser", "cli", "mcp")
     assert "client_secret" not in t.ClientRegistration.__annotations__
+
+
+@pytest.mark.parametrize(("client_type", "kind"), CONSENT_KIND_ROWS)
+def test_each_client_type_renders_its_contracted_kind_word(client_type, kind):
+    """Forward, one row at a time: §11.1's table, with `cli` rendering as `device`."""
+    assert t.CONSENT_KIND_FROM_CLIENT_TYPE[client_type] == kind
+
+
+@pytest.mark.parametrize(("client_type", "kind"), CONSENT_KIND_ROWS)
+def test_each_kind_word_is_rendered_by_exactly_one_client_type(client_type, kind):
+    """Reverse, one row at a time: no kind word is unreachable, none has two sources."""
+    assert [c for c, k in t.CONSENT_KIND_FROM_CLIENT_TYPE.items() if k == kind] == [client_type]
+
+
+def test_the_kind_mapping_spans_both_vocabularies_exactly():
+    """§11.1 binds `AS_CLIENT_TYPES` to `consent.md`'s rendered kinds; neither side may grow alone.
+
+    A fourth client type with no kind word is a client the consent page cannot render, and a kind
+    word no client type produces is a copy key nothing emits.
+    """
+    assert set(t.CONSENT_KIND_FROM_CLIENT_TYPE) == set(t.AS_CLIENT_TYPES)
+    assert set(t.CONSENT_KIND_FROM_CLIENT_TYPE.values()) == set(t.CONSENT_KINDS)
+    assert t.CONSENT_KINDS == ("browser", "device", "mcp")
+
+
+def test_cli_is_the_one_row_where_the_two_vocabularies_differ():
+    """The reason the mapping is named rather than left to prose (#10 F25).
+
+    Two rows are identities, so a surface that re-derives the kind from the literal agrees on
+    `browser` and `mcp` and emits `kind.cli` — a copy key that does not exist — on the third.
+    """
+    differing = {c for c, k in t.CONSENT_KIND_FROM_CLIENT_TYPE.items() if c != k}
+    assert differing == {"cli"}
+    assert "cli" not in t.CONSENT_KINDS
+    assert "device" not in t.AS_CLIENT_TYPES
 
 
 def test_the_scope_vocabulary_is_the_six_names_plus_the_node_form():
@@ -101,7 +150,12 @@ def test_admin_is_the_one_word_the_two_vocabularies_collide_on():
 
 
 def test_the_registration_and_device_shapes():
-    """§5's four keys plus §11.1's `registered_at`, and §3's `[OPEN->0.3]` completion URI."""
+    """§5's four keys plus §11.1's `registered_at`, and §3's device response without the URI.
+
+    [0.3 · 21] does not issue `verification_uri_complete`: the key is absent from the response
+    entirely, so the shape must not carry it even as `NotRequired`. An optional key is a key an
+    implementation may populate, and the decision was that none may.
+    """
     assert is_typeddict(t.ClientRegistration)
     assert is_typeddict(t.DeviceAuthorization)
     assert set(t.ClientRegistration.__annotations__) == {
@@ -113,7 +167,29 @@ def test_the_registration_and_device_shapes():
     }
     # `__required_keys__` cannot see through PEP 563's string annotations, so read the hints.
     hints = get_type_hints(t.DeviceAuthorization, include_extras=True)
-    assert hints["verification_uri_complete"] == NotRequired[str]
+    assert "verification_uri_complete" not in hints
+    assert set(hints) == {
+        "device_code",
+        "user_code",
+        "verification_uri",
+        "expires_in",
+        "interval",
+    }
+    # Every key is required: RFC 8628 names all five, and none is conditional here.
+    assert not any(h == NotRequired[str] for h in hints.values())
+
+
+def test_the_two_decided_lifetimes():
+    """§2's 60 s code ([0.3 · 16]) and §9.3's 1 h access token ([0.3 · 17]).
+
+    Both are contract values rather than defaults a deployment may raise, so they are pinned as
+    literals here: a config key that moved either would have to change this test to land.
+    """
+    assert t.AS_CODE_LIFETIME_SECONDS == 60
+    assert t.AS_ACCESS_TOKEN_LIFETIME_SECONDS == 3600
+    # The code is far shorter-lived than the token it is exchanged for; a code outliving its token
+    # would invert the two risks §2 and §9.3 bound.
+    assert t.AS_CODE_LIFETIME_SECONDS < t.AS_ACCESS_TOKEN_LIFETIME_SECONDS
 
 
 def test_the_consent_screen_reads_one_client_entry_and_nothing_more():

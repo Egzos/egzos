@@ -19,7 +19,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_OPUS: claude-opus-5
+  MODEL_OPUS: claude-opus-5-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
 
@@ -83,6 +83,7 @@ jobs:
             complete. Commit and push again after each artifact section or acceptance-criterion group, not only
             once at the end: a run that is killed by the turn budget must leave a recoverable draft PR with
             partial progress, never nothing. Mark the PR ready for review only once everything is done.
+            Before `gh pr ready`, rewrite the PR body with `gh pr edit --body-file` so What, Risk, Contract impact and Checks describe what was pushed, not the draft's forecast (#99). Use `gh pr edit` for the body and title only: never `--base`, `--add-label` or `--remove-label`.
 
             Commit with imperative subject lines referencing the issue number. WIP cap: 1 open PR under agent/a1p-planner/ — an open draft for the same issue is not a second PR, it is yours to continue (an earlier run was killed); never open a second PR beside it. PR size cap: 600 lines or 30 files (lockfiles excluded). Comment the PR URL on the triggering issue, then stop.
           claude_args: >-

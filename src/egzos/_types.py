@@ -95,7 +95,7 @@ class ArtifactContent(TypedDict):
 
 
 class Provenance(TypedDict):
-    """All five keys present, null where unknown — never absent-vs-unset."""
+    """All six keys present, null where unknown — never absent-vs-unset."""
 
     actor: str | None
     principal: Principal | None
@@ -153,6 +153,34 @@ CONTEXT_ITEM_FIELDS: tuple[str, ...] = (
 )
 
 
+class ResolvedItem(TypedDict):
+    """One item as a resolution returns it (container.md §4).
+
+    `shadowed_by` is a property of THIS resolution, not of the item: the same item is shadowed in
+    one chain and the winner in another. It is the id of the item that beat this one on its
+    `(kind, key)` pair, or `None` for the winner and for every item without a `key`. `layer` and
+    `layer_type` are here for the same reason — where this copy was found is not the item's own
+    business. `layer_type` is a `ContainerType` or a `RootType`, as `Node.type` is, and is the key
+    `SERVING_POLICY` is read by. Nothing here is ever persisted onto the `ContextItem`.
+
+    The item's trust status is deliberately NOT a key here. It has one home,
+    `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
+    in two places with no rule for which wins when they differ — the copy a resolver snapshots
+    before serialisation, and serves a quarantined item under. Read it from the item. The walking
+    skeleton's resolver does emit a `trust` key here; container.md §4 states the removal as a1p's
+    reading, pending the freeze, with the Chief's confirmation as its TODO.
+
+    The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
+    here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is
+    `[OPEN->0.3]`, and typing the response would answer it by accident.
+    """
+
+    item: ContextItem
+    layer: str
+    layer_type: str
+    shadowed_by: str | None
+
+
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
@@ -182,6 +210,7 @@ Event = Literal[
     "approval.promote",
     "approval.execute",
     "approval.deny",
+    "approval.stale",
     "trust.quarantine",
     "step_up",
     "token.mint",
@@ -189,8 +218,11 @@ Event = Literal[
     "item.tombstone",
     "blob.grant",
 ]
-#: An append whose event name is not here MUST be rejected. `step_up` is reserved (Phase 2.2);
-#: `blob.grant` is decided, not running (F5).
+#: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
+#: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
+#: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
+#: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
+#: code that emits it. events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
@@ -343,6 +375,28 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "step_up_window_seconds": 300,
 }
 
+#: Wire key -> `ContainerConfig` field. **The dotted names are canonical** (container.md §8): they
+#: are what a config file and the wire carry, and no other spelling of them is a key.
+#: `ContainerConfig` underscores them only because a dotted name is not a Python identifier — the
+#: same situation as the wire's `from` against `Proposal.from_`, named by `PROPOSAL_WIRE_KEY_FROM`.
+#:
+#: A loader that does not consult this mapping does not read §8's keys at all: it silently ignores
+#: every one of them and serves `CONTAINER_CONFIG_DEFAULTS`. That is the failure this constant
+#: exists to prevent — an org that sets `step_up.window_seconds` to `0` gets `0`, not the 300 it
+#: refused.
+#:
+#: Loading rule, from the same clause: **absence is tested by absence, never by truthiness.** `0`,
+#: `""` and `False` are values. `cfg.get(wire_key) or default` is wrong for every row below and
+#: silently wrong for the one row where it matters most.
+CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
+    "chain.personal_root": "chain_personal_root",
+    "org.policy.sovereign_chain": "org_policy_sovereign_chain",
+    "node.policy.structure_floor": "node_policy_structure_floor",
+    "blobs.inline_max_bytes": "blobs_inline_max_bytes",
+    "blobs.staging_retention_days": "blobs_staging_retention_days",
+    "step_up.window_seconds": "step_up_window_seconds",
+}
+
 
 # --- the authorization server (spec/contracts/authorization-server.md) ----------------------
 #
@@ -355,6 +409,27 @@ ASClientType = Literal["browser", "cli", "mcp"]
 #: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
 #: confidential type, which is why no registration below carries a `client_secret`.
 AS_CLIENT_TYPES: tuple[ASClientType, ...] = get_args(ASClientType)
+
+ConsentKind = Literal["browser", "device", "mcp"]
+#: The kind words the consent page renders (`spec/design/consent.md` §14 item 1, R4's client block,
+#: the `kind.*` copy keys). Three words, and they are NOT `AS_CLIENT_TYPES`.
+CONSENT_KINDS: tuple[ConsentKind, ...] = get_args(ConsentKind)
+
+#: `ASClientType` -> the kind word rendered beside the client name (authorization-server.md §11.1).
+#: The AS literal and the rendered word differ for exactly ONE type: `cli` renders as `device`,
+#: because the design names that client by its flow (device-code) rather than by its category,
+#: while this document's type predates Part B. A page renders the copy key `kind.device`, never
+#: `kind.cli`, which does not exist.
+#:
+#: Named here for the same reason as `CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY`: the mapping was
+#: prose-only (#10 F25), and a mapping that lives only in prose is one each surface re-derives. The
+#: AS-internal literal does not change; only its display name does, at the one place a display name
+#: is rendered.
+CONSENT_KIND_FROM_CLIENT_TYPE: dict[ASClientType, ConsentKind] = {
+    "browser": "browser",
+    "cli": "device",
+    "mcp": "mcp",
+}
 
 
 class ClientRegistration(TypedDict):
@@ -464,7 +539,9 @@ AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS: frozenset[str] = frozenset(
 class DeviceAuthorization(TypedDict):
     """RFC 8628's device-authorization response (§3) — CLI and headless only; browsers are retired.
 
-    `verification_uri_complete` is `[OPEN->0.3]`, so it is optional here, not absent or mandatory.
+    `verification_uri_complete` is NOT issued ([0.3 · 21]) — the key is absent from the response
+    entirely, not optional and not null, and `/device` ignores a `user_code` query parameter. The
+    typing step IS the mitigation: a code in a URL is a code a user can be asked to forward.
     """
 
     device_code: str
@@ -472,7 +549,6 @@ class DeviceAuthorization(TypedDict):
     verification_uri: str
     expires_in: int
     interval: int
-    verification_uri_complete: NotRequired[str]
 
 
 #: RFC 8414's location, at the container's own origin, unauthenticated (§6).
@@ -480,14 +556,18 @@ AS_METADATA_ENDPOINT: str = "/.well-known/oauth-authorization-server"
 
 #: The metadata document IS the interoperability surface: a container MUST NOT advertise what it
 #: does not implement, or implement what it does not advertise. This is the whole field vocabulary
-#: of eleven; two of them are CONDITIONAL, see `AS_METADATA_CONDITIONAL_FIELDS` below.
+#: of TEN, and every row is unconditional: omitting one is non-conforming, and advertising a field
+#: that is not here is too. `registration_endpoint` is ABSENT, not present-and-null — [0.3 · 10]
+#: decided there is no open dynamic client registration, and RFC 8414 omits an unsupported optional
+#: field rather than nulling it. `revocation_endpoint` is here unconditionally — [0.3 · 11] decided
+#: the RFC 7009 endpoint exists. The predecessor `AS_METADATA_CONDITIONAL_FIELDS` is gone with them:
+#: an empty constant is a place for a later field to be quietly added.
 AS_METADATA_FIELDS: tuple[str, ...] = (
     "issuer",
     "authorization_endpoint",
     "token_endpoint",
     "device_authorization_endpoint",
     "revocation_endpoint",
-    "registration_endpoint",
     "response_types_supported",
     "grant_types_supported",
     "code_challenge_methods_supported",
@@ -495,16 +575,15 @@ AS_METADATA_FIELDS: tuple[str, ...] = (
     "scopes_supported",
 )
 
-#: The two rows whose endpoint's very existence is `[OPEN->0.3]`, so §6's "MUST NOT advertise what
-#: it does not implement" forbids advertising either until the freeze says yes:
-#:   - `revocation_endpoint` — §9. §K answers revocation with `token rm`, an OWNER path; whether an
-#:     RFC 7009 endpoint exists (and its silence rule, and whether a client may revoke another
-#:     client's token) is the §9 `[OPEN->0.3]`. A browser or MCP client cannot run `token rm`.
-#:   - `registration_endpoint` — §5. Advertised only if dynamic registration (RFC 7591) is enabled.
-#: The other nine are unconditional: omitting one of those is non-conforming.
-AS_METADATA_CONDITIONAL_FIELDS: frozenset[str] = frozenset(
-    {"revocation_endpoint", "registration_endpoint"}
-)
+#: §2 — an authorization code expires 60 seconds after issuance ([0.3 · 16]). A contract value, not
+#: a default: there is no config key that raises it and a deployment may not add one.
+AS_CODE_LIFETIME_SECONDS: int = 60
+
+#: §9.3 — an AS-issued access token ALWAYS carries a non-null `expires_at`, 1 hour by default
+#: ([0.3 · 17]). `capabilities.md` §5's `expires_at: null` stays reachable through `token mint`
+#: ONLY, where the owner chooses it deliberately; no AS path, parameter or config key yields a
+#: non-expiring token.
+AS_ACCESS_TOKEN_LIFETIME_SECONDS: int = 3600
 
 #: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
 #: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
@@ -522,7 +601,8 @@ AS_SCOPE_ALL_NODES: str = "node:*"
 
 #: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
 #: MUST be rejected; every client is public, so `none` is the only auth method. `scopes_supported`
-#: is absent: it is the six capability names, and whether `node:` joins them is `[OPEN->0.3]`.
+#: is absent from this map because its value is container-independent but not literal: it is the six
+#: capability names, i.e. `CAPABILITIES`, and the `node:` form is NOT advertised ([0.3 · 28]).
 AS_METADATA_CLOSED_VALUES: dict[str, tuple[str, ...]] = {
     "response_types_supported": ("code",),
     "grant_types_supported": (
@@ -634,16 +714,17 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 
 __all__ = [
+    "AS_ACCESS_TOKEN_LIFETIME_SECONDS",
     "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
     "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
     "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
+    "AS_CODE_LIFETIME_SECONDS",
     "AS_DEVICE_REDEMPTION_CAUSES",
     "AS_LOGIN_CAUSES",
     "AS_METADATA_CLOSED_VALUES",
-    "AS_METADATA_CONDITIONAL_FIELDS",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
     "AS_SCOPE_ALL_NODES",
@@ -658,11 +739,15 @@ __all__ = [
     "BlobGrant",
     "BlobStore",
     "CAPABILITIES",
+    "CONSENT_KINDS",
+    "CONSENT_KIND_FROM_CLIENT_TYPE",
     "CONTAINER_CONFIG_DEFAULTS",
+    "CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY",
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
     "ClientRegistration",
+    "ConsentKind",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
@@ -690,6 +775,7 @@ __all__ = [
     "RING_RANK",
     "ROLE_BUNDLES",
     "ROOT_TYPES",
+    "ResolvedItem",
     "Role",
     "RootType",
     "SERVING_POLICY",

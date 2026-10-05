@@ -20,7 +20,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_OPUS: claude-opus-5
+  MODEL_OPUS: claude-opus-5-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
 
@@ -183,7 +183,10 @@ jobs:
                PR already exists for this branch (an earlier run was killed), continue on it — do not open a
                second PR. Fill `.github/PULL_REQUEST_TEMPLATE.md` completely (What / Why / Risk / Contract
                impact / Checks).
-            7. Mark the PR ready for review only once everything is done, then comment the PR URL on issue
+            7. Mark the PR ready for review only once everything is done. Before `gh pr ready`, rewrite the PR body
+               with `gh pr edit --body-file` so What, Risk, Contract impact and Checks describe what was pushed,
+               not the draft's forecast (#99). Use `gh pr edit` for the body and title only: never
+               `--base`, `--add-label` or `--remove-label`. Then comment the PR URL on issue
                #${{ steps.resolve.outputs.issue }}.
             8. Stop.
           claude_args: >-

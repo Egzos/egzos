@@ -38,6 +38,17 @@ cap only when whoever last applied it is in OWNERSHIP.yml's `size_exception_appr
 label's presence proves only that someone with issues: write applied it, and egzos-forge holds
 issues: write (drift F18). Both values come from the environment the workflow sets, so a
 workflow that passes them runs against a checker that predates them without an argument error.
+
+RD-005's named backstop (Egzos/egzos-platform#45): on every a6 branch ($A6_BACKSTOP=true, set
+by the workflow from the branch prefix, never from anything the branch names), any change under a6's
+exclusive paths fails the check until `a6-cleared`, last applied by an approver, is on the PR. The
+check reads no file content: a rule over content the constrained branch writes is a denylist, and a
+denylist cannot be completed (Egzos/egzos-platform#50 review). What it guarantees is that nothing an
+a6 branch puts under its paths reaches the default branch without the Chief's explicit clearance. It
+does not keep a reproduction out of the PR's own diff or out of the PR's own test run. Both
+repositories carry this checker line-identical but for the docstring's first line; the backstop is
+wired only where a workflow sets $A6_BACKSTOP (egzos-platform), and is inert elsewhere rather than
+dead code.
 """
 
 import argparse
@@ -219,6 +230,17 @@ def size_exception_waives(labels_set, applier, approvers):
     """True only when `size-exception` is present AND its last applier is an approver."""
     return "size-exception" in labels_set and bool(applier) and applier in set(approvers)
 
+
+def a6_cleared_waives(labels_set, applier, approvers):
+    """True only when `a6-cleared` is present AND its last applier is an approver."""
+    return "a6-cleared" in labels_set and bool(applier) and applier in set(approvers)
+
+
+def a6_backstop_failures(changed, scope):
+    """(path, reason) for every changed path under a6's exclusive globs. Content is never read."""
+    return [(path, "an a6 change here lands only once the Chief applies a6-cleared")
+            for path in changed if matches_any(scope, path)]
+
 # ---------------------------------------------------------------------------
 # Size cap
 # ---------------------------------------------------------------------------
@@ -259,6 +281,18 @@ def main():
         dest="size_exception_applier",
         default=os.environ.get("SIZE_EXCEPTION_APPLIER", ""),
         help="Login that last applied size-exception (default: $SIZE_EXCEPTION_APPLIER)",
+    )
+    parser.add_argument(
+        "--a6-backstop",
+        dest="a6_backstop",
+        default=os.environ.get("A6_BACKSTOP", ""),
+        help="'true' when the RD-005 backstop applies to this branch (default: $A6_BACKSTOP)",
+    )
+    parser.add_argument(
+        "--a6-cleared-applier",
+        dest="a6_cleared_applier",
+        default=os.environ.get("A6_CLEARED_APPLIER", ""),
+        help="Login that last applied a6-cleared (default: $A6_CLEARED_APPLIER)",
     )
     parser.add_argument(
         "--pr-author",
@@ -442,6 +476,14 @@ def main():
     # ---- Emit governance ::notice:: annotations ------------------------------
     for gpath in notices:
         print(f"::notice::governance path touched: {gpath}")
+
+    # ---- RD-005 backstop on a6 branches (Egzos/egzos-platform#45) -------------
+    if agent_name == "a6-adversary" and args.a6_backstop == "true":
+        if a6_cleared_waives(labels_set, args.a6_cleared_applier, approvers):
+            print(f"a6-cleared applied by {args.a6_cleared_applier} — backstop lifted.")
+        else:
+            failures.extend(a6_backstop_failures(
+                changed, agents_cfg[agent_name].get("exclusive") or ["adversarial/**"]))
 
     # ---- Size cap -----------------------------------------------------------
     total_lines, file_count = compute_size(numstat_entries, cap_exclude)

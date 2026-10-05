@@ -15,7 +15,7 @@ on:
 permissions: {}
 
 env:
-  MODEL_OPUS: claude-opus-5
+  MODEL_OPUS: claude-opus-5-5
   MODEL_SONNET: claude-sonnet-5
   MODEL_HAIKU: claude-haiku-4-5-20251001
   # One number for the model's --max-turns and for diagnose-failure's ceiling check, so the
@@ -35,6 +35,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      issues: read          # scope reads the PR's label events, as ownership-check does
       # gh pr checks: the tests check's result, which the model reads instead of running the tree.
       # It resolves each check's workflow run, an Actions resource, so actions: read is needed too.
       checks: read
@@ -43,6 +44,21 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Every required check takes its controls from the base and diffs against it, so a run against
+      # any other base says nothing about a merge into the default branch. No pull_request workflow
+      # here subscribes to `edited`, so a PR retargeted with `gh pr edit --base` would carry that
+      # run's result back to the default branch (#99). Fail every run whose base is elsewhere.
+      - name: base-is-default-branch
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$BASE_REF" != "$DEFAULT_BRANCH" ]]; then
+            echo "::error::base is ${BASE_REF}, not ${DEFAULT_BRANCH}: required checks run only for PRs into the default branch."
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -56,16 +72,45 @@ jobs:
           # comma spell a second label (#44).
           HAS_SECURITY: ${{ contains(github.event.pull_request.labels.*.name, 'security') }}
           ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          # Who may take a PR out of a6's scope by removing `security`: the Chief directly, or
+          # chief-proxy registering the Chief's reply. Must equal OWNERSHIP.yml's
+          # size_exception_approvers (a governance test pins the two together).
+          SECURITY_LABEL_REMOVERS: '["Gond-ul","chief-proxy[bot]"]'
         run: |
+          set -euo pipefail
           if [[ "$ACTOR" == "dependabot[bot]" ]]; then
             echo "applicable=false" >> "$GITHUB_OUTPUT"
             echo "Dependabot pin bump — review checks pass early (Dependabot runs carry no secrets); the Chief reviews the diff directly."
             exit 0
           fi
           APPLICABLE=false
-          if [[ "$HAS_SECURITY" == "true" ]]; then APPLICABLE=true; fi
+          if [[ "$HAS_SECURITY" == "true" ]]; then
+            APPLICABLE=true
+          else
+            # Sticky label (drift F23, Egzos/egzos-platform#48): builders hold `gh pr edit`, which
+            # carries --remove-label, and the `unlabeled` run would otherwise pass early. Once
+            # `security` has been applied, the PR stays in scope unless the most recent removal
+            # was by an approver. A failed lookup fails this step, so the check fails closed.
+            LAST=$(gh api --paginate "repos/${REPO}/issues/${PR}/events?per_page=100" \
+              --jq '.[] | select((.event == "labeled" or .event == "unlabeled") and .label.name == "security") | "\(.event) \(.actor.login)"' \
+              | tail -n 1)
+            if [[ -n "$LAST" ]]; then
+              EVENT="${LAST%% *}"
+              WHO="${LAST#* }"
+              if [[ "$EVENT" == "unlabeled" ]] \
+                && jq -e --arg who "$WHO" 'any(.[]; . == $who)' <<<"$SECURITY_LABEL_REMOVERS" >/dev/null; then
+                echo "security was removed by approver ${WHO} — out of scope."
+              else
+                APPLICABLE=true
+                echo "::warning::the latest security label event is a ${EVENT} by ${WHO}, not an approver's removal — a6 still reviews this PR."
+              fi
+            fi
+          fi
           echo "applicable=${APPLICABLE}" >> "$GITHUB_OUTPUT"
-          echo "Scope check — security label present: ${APPLICABLE}"
+          echo "Scope check — security label in force: ${APPLICABLE}"
 
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
@@ -391,7 +436,7 @@ jobs:
   # ── Nightly / dispatch mode: full sweep, no verdict gate ──────────────────
   # The adversarial suite runs in a job of its own, holding no token: a process one step starts
   # outlives that step, so running code in the job that later mints the forge token is not
-  # separated by step order (RD-005). This job's result reaches the sweep as a job output.
+  # separated by step order (RD-005). This job's result reaches the sweep as a one-day artifact.
   a6-adversary-suite:
     name: a6-adversary-suite
     if: github.event_name != 'pull_request'
@@ -399,8 +444,6 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-    outputs:
-      result: ${{ steps.suite.outputs.result }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -417,7 +460,8 @@ jobs:
         id: suite
         run: |
           set -u
-          OUT="$(mktemp)"
+          mkdir -p /tmp/a6suite
+          OUT=/tmp/a6suite/adversarial-suite.txt
           {
             pip install -q -e ".[dev]" && pytest -q -rxX adversarial
             echo "exit status: $?"
@@ -429,13 +473,23 @@ jobs:
             | grep -E '^(=+ )?[0-9]+ (passed|failed|xfailed|xpassed|error|skipped)|^no tests ran' || true
           tail -n 1 "$OUT"
           STATUS="$(grep -oE '^exit status: [0-9]+' "$OUT" | tail -n 1 | grep -oE '[0-9]+$' || true)"
-          D="SUITE_$(openssl rand -hex 16)"
-          { echo "result<<$D"; tail -c 60000 "$OUT"; echo; echo "$D"; } >> "$GITHUB_OUTPUT"
           case "${STATUS:-none}" in
             0) ;;
             5) echo "::warning::the adversarial suite collected no tests" ;;
             *) echo "::error::the adversarial suite did not pass (exit status ${STATUS:-unknown})"; exit 1 ;;
           esac
+
+      # The detail travels as a one-day artifact, never through a job output or a step's env, both of
+      # which the run log prints. The artifact is as public as the log on this repository: the gain is
+      # retention and no plaintext in an indexed log, not confidentiality. What keeps the detail safe
+      # is that main holds no open reproduction (a security regression test lands with its fix).
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() }}
+        with:
+          name: adversarial-suite
+          path: /tmp/a6suite/adversarial-suite.txt
+          retention-days: 1
+          if-no-files-found: error
 
   a6-adversary-nightly:
     name: a6-adversary-nightly   # distinct from the required check name; only the PR job reports a6-adversary
@@ -454,17 +508,20 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # The suite's result, from the job above; the session cites it and executes nothing. Its env
-      # value is printed in this log: acceptable only because it is main's suite, and a security
-      # regression test enters adversarial/ only in its fix PR, so main holds no open reproduction.
-      # Moving it to an artifact needs a SHA-pinned upload/download action (follow-up).
+      # The suite's result, from the job above, as an artifact: the session cites it and executes
+      # nothing, and the detail never enters this log.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        id: download
+        continue-on-error: true
+        with:
+          name: adversarial-suite
+          path: /tmp
+
       - name: suite-result
         env:
-          SUITE_RESULT: ${{ needs.a6-adversary-suite.outputs.result }}
+          DOWNLOADED: ${{ steps.download.outcome }}
         run: |
-          if [[ -n "$SUITE_RESULT" ]]; then
-            printf '%s\n' "$SUITE_RESULT" > /tmp/adversarial-suite.txt
-          else
+          if [[ "$DOWNLOADED" != "success" || ! -s /tmp/adversarial-suite.txt ]]; then
             echo "The adversarial-suite job produced no result this run." > /tmp/adversarial-suite.txt
           fi
 

@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "check_ownership.py"
@@ -295,7 +296,9 @@ def _run_main(repo, branch, env_extra=None):
     own = repo.parent / "OWNERSHIP.yml"
     own.write_text(json.dumps(OWNERSHIP))  # JSON is YAML
     env = {k: v for k, v in os.environ.items() if k not in ("PR_LABELS_JSON", "PR_AUTHOR",
-                                                            "SIZE_EXCEPTION_APPLIER")}
+                                                            "SIZE_EXCEPTION_APPLIER",
+                                                            "A6_BACKSTOP",
+                                                            "A6_CLEARED_APPLIER")}
     env.update(env_extra or {})
     return subprocess.run(
         [sys.executable, str(SCRIPT), "--base", "main", "--head", "HEAD",
@@ -422,11 +425,74 @@ def test_main_fails_closed_on_unparseable_numstat_file(repo, tmp_path):
 def test_nested_claude_control_inputs_are_chief_only():
     # A builder must not be able to plant a .claude (symlink or not), CLAUDE.md or .mcp.json under
     # its own paths: reviewers' sessions would load it (Egzos/egzos-platform#46).
-    import yaml
-
     chief_only = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["chief_only"]
     for path in ("apps/ui-flagship/src/.claude", "adversarial/x/.claude/settings.json",
                  "src/egzos/web/CLAUDE.md", "tests/a/CLAUDE.local.md", "server/.mcp.json",
                  ".mcp.json"):
         assert co.matches_any(chief_only, path), path
+    # The root CLAUDE.md and .claude/ stay a1p-planner's: a widening to `**/` would break its PRs.
+    for path in ("CLAUDE.md", ".claude/agents/x.md", ".claude"):
+        assert not co.matches_any(chief_only, path), path
 
+
+# ---------------------------------------------------------------------------
+# RD-005 backstop on every a6 branch (Egzos/egzos-platform#45)
+# ---------------------------------------------------------------------------
+
+def test_a6_backstop_failures_cover_the_scope_and_read_nothing():
+    changed = ["adversarial/test_a.py", "adversarial/data.bin", "adversarial/x/conftest.py",
+               "docs/a.md"]
+    out = co.a6_backstop_failures(changed, ["adversarial/**"])
+    assert [p for p, _ in out] == changed[:3]
+    assert all("a6-cleared" in reason for _, reason in out)
+
+
+def _a6_change(repo, rel="adversarial/test_x.py"):
+    _write(repo, "adversarial/__init__.py", "")
+    _commit(repo, "base")
+    _branch_diff(repo, lambda r: _write(r, rel, "import pytest\n@pytest.mark.xfail\n"
+                                                "def test_x():\n    pass\n"))
+
+
+def test_main_backstop_refuses_any_a6_change_even_an_xfail_test(repo):
+    # Content is never read: an xfail test runs its body, and a denylist over what the branch
+    # writes cannot be completed (Egzos/egzos-platform#50 review).
+    _a6_change(repo)
+    res = _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"})
+    assert res.returncode == 1
+    assert "adversarial/test_x.py" in res.stdout and "a6-cleared" in res.stdout
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"A6_BACKSTOP": "false"},
+        {},
+        {"A6_BACKSTOP": "true", "PR_LABELS_JSON": '["a6-cleared"]',
+         "A6_CLEARED_APPLIER": "Gond-ul"},
+    ],
+)
+def test_main_backstop_passes_when_unset_or_cleared(repo, env):
+    _a6_change(repo)
+    res = _run_main(repo, "agent/a6-adversary/x", env)
+    assert res.returncode == 0, res.stdout
+
+
+def test_main_backstop_clearance_needs_an_approver(repo):
+    _a6_change(repo)
+    res = _run_main(repo, "agent/a6-adversary/x", {
+        "A6_BACKSTOP": "true", "PR_LABELS_JSON": '["a6-cleared"]',
+        "A6_CLEARED_APPLIER": "egzos-forge[bot]"})
+    assert res.returncode == 1
+
+
+def test_main_backstop_scope_follows_the_agents_exclusive_globs(repo):
+    # The scope is read from OWNERSHIP.yml, so a narrower exclusive list narrows the gate.
+    saved = OWNERSHIP["agents"]["a6-adversary"]
+    OWNERSHIP["agents"]["a6-adversary"] = {"paths": ["adversarial/**"],
+                                          "exclusive": ["adversarial/live/**"]}
+    try:
+        _a6_change(repo)
+        assert _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"}).returncode == 0
+    finally:
+        OWNERSHIP["agents"]["a6-adversary"] = saved

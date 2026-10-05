@@ -134,7 +134,7 @@ entry here settles it.
 1. the workflow's `--model` flag, through the `MODEL_*` env indirection — every call site that runs
    the agent (`a6-adversary.yml` has two; `a1r-reviewer` runs in `a1r-review.yml` and
    `nightly-integration.yml`);
-2. the definition's `model:` frontmatter **and** its prose tier line ("Opus 5, fixed.");
+2. the definition's `model:` frontmatter **and** its prose tier line ("Opus 5.5, fixed.");
 3. CLAUDE.md's model-pin table and the roster in `.claude/agents/README.md`;
 4. every dispatcher that special-cases the agent by name — here, the `case` arms in `core-queue.yml`.
 
@@ -201,7 +201,14 @@ reads its result (`gh pr checks`, with `checks`, `statuses` and `actions: read`)
 producing a second result in a job that holds the review token and the comment script. For the a6
 sweep, which holds the forge token and so runs no interpreter either, a separate job holding no
 token runs the adversarial suite against `main`. Step order inside one job would not separate it,
-for the reason above. The sweep cites `/tmp/adversarial-suite.txt`.
+for the reason above. The sweep cites `/tmp/adversarial-suite.txt`, which reaches it as a one-day
+artifact rather than a job output or step env, so the detail stays out of the run log.
+The artifact is as public as the log on this repository: the gain is retention and no plaintext
+in an indexed log, not confidentiality. What keeps the detail safe is unchanged: `main` holds no open
+reproduction, because a security regression test enters `adversarial/` only in its fix PR. The nightly
+integration check is the same shape (drift F22): `integration-suite` runs the suites holding
+`contents: read` only, over `tests/` and never `adversarial/` (a6's sweep owns that output), and the
+session that holds the drift issue's write token reads `/tmp/suite/suite.txt` and runs no interpreter.
 
 The same rule covers scripts (#71 review, round 3). A session that can write files never also
 holds a grant to run a file it could have rewritten, because that grant is an interpreter. The
@@ -235,7 +242,8 @@ required. If it ever stops doing either, the reviewer is left with no executed r
 half 2 has to be reopened.
 
 **Paths in scope.** `.github/workflows/a1r-review.yml`, `.github/workflows/a2-conformance.yml`,
-`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`, `.claude/agents/a1r-reviewer.md`,
+`.github/workflows/a6-adversary.yml`, `.github/workflows/tests.yml`,
+`.github/workflows/nightly-integration.yml`, `.claude/agents/a1r-reviewer.md`,
 `.claude/agents/a2-conformance.md`, `.claude/agents/a6-adversary.md`,
 `.github/scripts/file_advisory.sh`, `.github/scripts/post_review_comment.sh`.
 
