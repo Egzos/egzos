@@ -930,7 +930,8 @@ and a bearer credential in a cookie. The session:
 - is **not** a bearer credential: it is never accepted at the REST surface, at the token endpoint, or
   anywhere a `Token` is accepted, and it carries no `capabilities` or `scopes` of its own;
 - is scoped to the container's **own origin** — the pages of §11 and nothing else;
-- ends. Its lifetime is the browser session's, and it is not renewable by a refresh token.
+- ends — at **30 minutes idle or 8 hours absolute**, whichever comes first (§10.2, **[0.3 · 13]**) —
+  and it is not renewable by a refresh token.
 
 ### 10.2 · `/authorize` is an owner act, and no token can take it
 
@@ -981,15 +982,16 @@ holding all six capabilities could walk §2's flow and mint a second client a to
 capability reaches a human-only act, including `admin`* is the same rule; this states it at the one
 endpoint where the act is "hand out authority."
 
-`[OPEN→0.3]` **The session this endpoint decides on carries no stated maximum age, idle timeout or
-re-authentication point.** §10.1 bounds it only as far as *"ends. Its lifetime is the browser
-session's"* — `consent.md` §2.1 names no sign-out act either. §10.4's presence backstop requires
-re-proof within a live window for `HUMAN_ONLY_ACTS`, but `/authorize` is not among those three acts,
-so the endpoint this document itself calls "hand out authority" carries a weaker presence guarantee
-than `approve.pending` does. Not decided here — a maximum age, an idle timeout, and the stance that
-the browser session's own lifetime is the correct and only bound are all live options — but it
-belongs among this document's `[OPEN→0.3]` markers and was missing from them until now. §13's
-`TODO(a1p)` on §10.1's session storage is the durable-state half of this question, not this one.
+**The session this endpoint decides on has two clocks: 30 minutes idle, 8 hours absolute. [0.3 ·
+13]** It ends at whichever comes first — `AS_SESSION_IDLE_SECONDS` and `AS_SESSION_ABSOLUTE_SECONDS`
+in `_types.py`, **a1p**'s naming. The idle clock restarts on a request the session makes to §11's
+pages; the absolute clock runs from the login that established the session and nothing extends it.
+**a1p**, binding the two words: a session that a page load could keep alive forever would have no
+absolute bound at all. An ended session is no session: the next `/authorize` takes §11.0 substep 3's
+303 to `/login`. Both numbers are contract values with no config key, as §2's code lifetime is.
+`/authorize` is not among `HUMAN_ONLY_ACTS`, so these clocks, not §10.4's window, are what bound
+presence at the endpoint this document calls "hand out authority". §13's `TODO(a1p)` on session
+storage is the durable-state half of this question.
 
 ### 10.3 · The AS mints `interactive` only where presence can actually be composed
 
@@ -1018,14 +1020,13 @@ Two consequences:
    the same principal as the one presented, and a refresh that could change it would compose
    presence out of a value replay.
 
-`[OPEN→0.3]` **Whether an interactive-principal token outlives the session that authorized it.** As
-written it does: §9's rotation keeps it alive, and nothing ties it to the session's end. The two
-readings are a real fork — bind the token's life to the session (a browser "close" becomes a
-revocation, and the flagship's long-lived connection breaks) or leave it independent (a presence
-claim survives the presence). No source names it. What makes the fork survivable either way is the
-backstop below, which is why a1p does not pick here: the backstop, not the token's lifetime, is what
-stops a stale interactive claim from reaching a human-only act. §9's `[OPEN→0.3]` on a non-null
-`expires_at` for public-client tokens bounds the damage under the second reading.
+**An interactive-principal token is independent of the session that authorized it. [0.3 · 12]**
+The session ending (§10.2's clocks, or a browser close) revokes nothing, so the flagship's long-lived
+connection survives it. Two things bound the presence claim that survives the presence instead:
+**the token always expires** — §9.3's 1-hour access token, non-null on every AS path (**[0.3 ·
+17]**), under §11.5's grant expiry (**[0.3 · 18]**) — and **§10.4's backstop gates every human-only
+act** on presence proven at or near the act, whatever the token's principal says. The backstop, not
+the token's lifetime, stops a stale interactive claim from reaching a human-only act.
 
 ### 10.4 · The presence backstop — an interactive principal is necessary, never sufficient
 
@@ -1068,9 +1069,6 @@ Stated so it can be tested when 2.2 lands: an interactive-principal token, prese
 window where the configured window is nonzero, and with no proof-at-the-act where it is zero, MUST
 be refused a human-only act. A container that admits one is non-conforming.
 
-One clause of this backstop is **not** settled by the text above, and it is marked rather than
-written, because this document is at its narrowing round:
-
 **`yes.consume` is gated by the window of the ring pair the act crosses** — source → destination,
 the pair `container.md` §8's third column already scopes the key by. **There is no single global
 step-up window**, and a container that keeps one has collapsed R11's per-pair key into a setting
@@ -1079,21 +1077,16 @@ that lets a tap taken for an inbox-to-thread act satisfy a project-to-org one. D
 window up takes the act's *source and destination*, so a call site that has only the destination
 cannot evaluate this gate and must not approximate it.
 
-`[OPEN→0.3]` **Which window gates the other two acts.** `container.md` scopes
-`step_up.window_seconds` per source→destination ring pair **and manifest shape** (R11) — a window
-opened for one shape of act does not cover another. `gate.confirm` is plausibly ring-pair shaped;
-whether `approve.pending` is ring-pair-scoped, manifest-shape-bounded, or bound some other way is
-undecided here. The manifest-shape half of the bound is undecided for `yes.consume` too: the
-paragraph above settles *which pair*, not whether a pair's window is further narrowed by shape.
+**The other two acts use the same window, and all three are narrowed by manifest shape. [0.3 ·
+14]** `approve.pending` and `gate.confirm` are gated, as `yes.consume` is, by the window of the ring
+pair the act crosses; and for all three a window opened for one manifest shape does not cover an
+act of another (`container.md`'s R11 scoping). So the lookup for any of the three takes the act's
+source, destination and manifest shape, and a call site missing one of them cannot evaluate the gate.
 
-`[OPEN→0.3]` **This backstop adds a second, mandatory gate to `capabilities.md` §4's human-only-act
-rule, and `capabilities.md` §4 carries no pointer to it.** §4 is marked **running** and states only
-the principal gate; §13 routes "human-only acts" to `capabilities.md` by name, so a builder following
-this document's own pointer arrives at a clause that ships half the gate. §12 meets the identical
-situation for `events.md` §4 invariant 2 and routes an explicit amendment ask rather than settling the
-reconciliation locally; the fix here is the same shape, not a new one. Routed to the freeze review:
-`capabilities.md` §4 needs an explicit amendment naming this backstop, not only a second document that
-states it exists.
+**`capabilities.md` §4 is amended to name this backstop. [0.3 · 38]** — **decided-pending**: §4
+today states only the principal gate, and the amendment lands with #109 PR 2. Until it merges, a
+builder following §13's pointer to `capabilities.md` must read this section beside it: the principal
+gate there is the floor, and this backstop is the second, mandatory half.
 
 **Until Phase 2.2 the interactive owner token is the proof** (`capabilities.md` §3, **running**), and
 this document does not pretend otherwise: that is a **stated, dated gap**, not the posture. The
