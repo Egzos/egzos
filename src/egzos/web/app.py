@@ -23,8 +23,9 @@ passes an open window or redirects to `/tap/<token>`; the pending page embeds th
 (the tap spec §3.2). Every decision appends `step_up`.
 
 Not here yet, named: blob grants (`blob.grant` is decided, not running — F5), so artifacts offer a
-Download that pulls through `ItemStore.blob_pull` (audited `blob.pull`) and no inline image/PDF
-preview; search relevance order (the grammar returns recency only).
+Download that pulls through `ItemStore.blob_pull` (audited `blob.pull`) and R7's image, pdf, grant
+error and oversize rows do not render — tracked on contract-change #138; search relevance order
+(the grammar returns recency only).
 """
 
 from __future__ import annotations

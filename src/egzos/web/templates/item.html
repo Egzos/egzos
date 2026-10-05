@@ -39,10 +39,8 @@
   <section>
     <h2>{{ S["section.trust"] }}</h2>
     <dl>
-      <dt>{{ S["dl.status"] }}</dt><dd><span class="stamp stamp--{{ item.status }}">{{ item.status }}</span></dd>
-      {%- if promoted %}
-      <dt>{{ S["dl.promoted"] }}</dt><dd>{{ promoted }}</dd>
-      {%- endif %}
+      {#- §3.4: the status stamp, plus for verified the trust.promoted line itself, unlabelled #}
+      <dt>{{ S["dl.status"] }}</dt><dd><span class="stamp stamp--{{ item.status }}">{{ item.status }}</span>{% if promoted %} {{ promoted }}{% endif %}</dd>
     </dl>
   </section>
 

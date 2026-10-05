@@ -784,3 +784,15 @@ def test_the_launch_says_what_to_do_when_localhost_does_not_resolve(capsys):
     assert _launch("http://127.0.0.1:1/?k=x", False, terminal=True) is False
     out = capsys.readouterr().out
     assert out.count(LOCALHOST_HINT) == 2 and "egzos web --no-open" in LOCALHOST_HINT
+
+
+def test_the_promoted_line_sits_with_the_stamp_unlabelled(lb):
+    # §3.4: Trust is the status stamp plus, for verified, the trust.promoted line itself — no
+    # second `promoted` label in front of a value that already begins with the word.
+    boat, client, item = lb
+    owner = boat.c.auth.interactive_token()
+    boat.c.trust.promote(boat.c.backend.get(item.id), token=owner, actor=OWNER)
+    page = client.get(f"/items/{item.id}").text
+    assert "<dt>promoted</dt>" not in page
+    assert re.search(r'stamp--verified">verified</span> promoted \d\d:\d\d:\d\d · manifest sha256 ',
+                     page)

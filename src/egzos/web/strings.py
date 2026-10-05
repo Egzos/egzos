@@ -57,7 +57,6 @@ S: dict[str, str] = {
     "row.meta": "{actor} · v{version}",
     # R8's trust and tags <dt> labels: §13 names none (design-gap #129); one place until it does.
     "dl.status": "status",
-    "dl.promoted": "promoted",
     "dl.tags": "tags",
     "dl.key": "key",
     "item.scope": "in {scope} · ring {ring}",
