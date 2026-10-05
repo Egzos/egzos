@@ -225,7 +225,7 @@ def test_a_quarantine_after_parking_blocks_the_approval_but_not_the_deny(box: Co
     item = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
     pid = box.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
     box.trust.quarantine(box.backend.get(item.id), token=t, actor=OWNER, reason="poisoned")
-    act = build_act(box, pid)
+    act = build_act(box, pid, token=t)
     assert act["blocked"] == "Contains a quarantined item. It cannot move."
     page = Tap(act).page(armed=False)
     assert "Sign and approve" not in page and "Approve without a window" not in page
@@ -250,13 +250,14 @@ def test_a_proposal_into_an_exo_room_names_its_external_audience(box: Container)
     item = box.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
     to_exo = box.trust.move(item, exo, token=t, actor=OWNER)["proposal"]["id"]
     # §4 R6 / §13 `consequence.exo`: the room's named external parties, not a subtree.
-    assert build_act(box, to_exo)["consequence"] == (
+    assert build_act(box, to_exo, token=t)["consequence"] == (
         "Consequence. Everything in the exo room partners sees this — every named external "
         "party, now and in future.")
     _client(box, "watcher", "reader", [other.id])
     second = box.store.add(body="note", scope=proj, token=t, actor=OWNER, principal=t.principal)
     to_project = box.trust.move(second, other, token=t, actor=OWNER)["proposal"]["id"]
-    assert build_act(box, to_project)["consequence"].startswith("Consequence. Everything under ")
+    consequence = build_act(box, to_project, token=t)["consequence"]
+    assert consequence.startswith("Consequence. Everything under ")
 
 
 def test_a_failure_mid_execute_moves_nothing(box: Container, monkeypatch):
@@ -324,7 +325,7 @@ def test_a_failed_act_under_an_open_window_is_on_the_chain(tmp_path, monkeypatch
     c = Container(tmp_path)
     t = c.auth.interactive_token()
     item = c.store.add(body="note", token=t, actor=OWNER, principal=t.principal)
-    act = build_act(c, item.id)
+    act = build_act(c, item.id, token=t)
     Presence(c).record(act, via="tap", outcome="approved", windowed=True)
 
     def broken(*a, **kw):
@@ -347,10 +348,10 @@ def test_a_quarantined_manifest_is_never_covered_and_a_refusal_is_on_the_chain(
     item = box.store.add(body="n", scope=proj, token=t, actor=OWNER, principal=t.principal)
     pid = box.trust.move(item, other, token=t, actor=OWNER)["proposal"]["id"]
     p = Presence(box)
-    p.record(build_act(box, pid), via="tap", outcome="approved", windowed=True)
-    assert p.covers(build_act(box, pid))
+    p.record(build_act(box, pid, token=t), via="tap", outcome="approved", windowed=True)
+    assert p.covers(build_act(box, pid, token=t))
     box.trust.quarantine(box.backend.get(item.id), token=t, actor=OWNER, reason="poisoned")
-    act = build_act(box, pid)
+    act = build_act(box, pid, token=t)
     assert act["blocked"] and not p.covers(act)  # R5: no window stands in for a blocked manifest
     try:
         box.trust.execute(pid, token=t, actor=OWNER)

@@ -65,9 +65,6 @@ def _parked_proposal(c: Container):
     return result["proposal"]["id"], attacker
 
 
-@pytest.mark.xfail_finding
-@pytest.mark.xfail(strict=True,
-                    reason="see issue #131: promote checks only the principal, never the scope")
 def test_promote_refuses_a_token_that_does_not_cover_the_item(box):
     owner = box.auth.interactive_token()
     root = box.nodes.user_root()
@@ -83,27 +80,18 @@ def test_promote_refuses_a_token_that_does_not_cover_the_item(box):
         box.trust.promote(item, token=second, actor="second-device")
 
 
-@pytest.mark.xfail_finding
-@pytest.mark.xfail(strict=True,
-                    reason="see issue #131: execute checks only the principal, never the scope")
 def test_execute_refuses_a_token_that_covers_neither_end_of_the_proposal(box):
     pid, attacker = _parked_proposal(box)
     with pytest.raises(TrustError):
         box.trust.execute(pid, token=attacker, actor="attacker-device")
 
 
-@pytest.mark.xfail_finding
-@pytest.mark.xfail(strict=True,
-                    reason="see issue #131: deny checks only the principal, never the scope")
 def test_deny_refuses_a_token_that_covers_neither_end_of_the_proposal(box):
     pid, attacker = _parked_proposal(box)
     with pytest.raises(TrustError):
         box.trust.deny(pid, token=attacker, actor="attacker-device")
 
 
-@pytest.mark.xfail_finding
-@pytest.mark.xfail(strict=True,
-                    reason="see issue #131: build_act has no token param, cannot scope disclosure")
 def test_build_act_refuses_a_ref_the_deciding_token_does_not_cover(box):
     pid, attacker = _parked_proposal(box)
     assert presence.build_act(box, pid, token=attacker) is None

@@ -55,6 +55,7 @@ from urllib.parse import parse_qs
 from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_DEFAULTS
 from egzos.container import OWNER, Container
+from egzos.model import Token
 
 # The one default, from the typed contract (container.md §8, 300 s for a window bounded to the
 # manifest's shape): no second constant beside it. `EGZOS_STEP_UP_WINDOW_SECONDS=0` opts out.
@@ -141,11 +142,17 @@ def short_id(value: str) -> str:
     return f"{value[:8]} … {value[-4:]}" if len(value) > 12 else value
 
 
-def build_act(c: Container, ref: str) -> dict[str, Any] | None:
+def build_act(c: Container, ref: str, *, token: Token) -> dict[str, Any] | None:
     """The tap's content for an open proposal or an unverified item; None if there is nothing to
-    decide. Everything the page shows comes from here, for the CLI and the lifeboat alike."""
+    decide. Everything the page shows comes from here, for the CLI and the lifeboat alike.
+
+    `token` is the deciding token, and the content is scoped to it (#131): a proposal whose ends
+    it does not both cover, or an item it does not cover, is None, the answer for no ref at all.
+    The page shows paths, titles and the audience, so building it is a read."""
     prop = c.backend.get_proposal(ref)
     if prop and prop.get("status") == "open":
+        if not c.trust.decides_over(token, prop):
+            return None
         frm, to = c.backend.get_node(prop["from"]), c.backend.get_node(prop["to"])
         items = [i for i in (c.backend.get(x) for x in prop["items"]) if i]
         by = prop.get("proposed_by", {})
@@ -192,7 +199,7 @@ def build_act(c: Container, ref: str) -> dict[str, Any] | None:
         }
     item = c.backend.get(ref)
     node = c.backend.get_node(item.scope) if item else None
-    if item and node and item.status == "unverified":
+    if item and node and item.status == "unverified" and c.trust.covers(token, node):
         path = c.nodes.path(node)
         client = (item.provenance or {}).get("client")
         return {

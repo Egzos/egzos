@@ -641,12 +641,12 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         if not boat.armed("promote", item.id, version, form.get("arm")):
             # The first press — or a confirm whose 10 s lapsed — arms in place (R9 confirming).
             boat.read("item", subject=item.id, scope=item.scope, items=[item.id])
-            act = build_act(boat.c, item.id)
+            act = build_act(boat.c, item.id, token=boat.token())
             covered = act is not None and boat.presence.covers(act)
             ctx = item_context(request, item, node, full=False, message=None,
                                arm=boat.arm("promote", item.id, version, windowed=covered))
             return boat.render(request, "item.html", {**ctx, "refresh": ARM_SECONDS})
-        act = build_act(boat.c, item.id)
+        act = build_act(boat.c, item.id, token=boat.token())
         if act is None:
             return boat.not_found(request)
         if boat.presence.covers(act):
@@ -756,7 +756,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         open_id = pid or (rows[0]["id"] if rows else None)
         detail = None
         if open_id:
-            act = build_act(boat.c, open_id)
+            act = build_act(boat.c, open_id, token=boat.token())
             if act is None or act["kind"] != "proposal":
                 if pid and message is None:
                     return None
@@ -839,7 +839,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
         form = await form_of(request)
         if form is None:
             return HTMLResponse(_REFUSED, status_code=403)
-        act = build_act(boat.c, pid)
+        act = build_act(boat.c, pid, token=boat.token())
         if act is None or act["kind"] != "proposal":
             return boat.not_found(request)
         step = form.get("step", "")

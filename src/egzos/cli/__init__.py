@@ -459,7 +459,7 @@ def _decide(c: Container, token, ref: str, *, asked: str = "approve") -> None:
 
     prop = c.backend.get_proposal(ref)
     prop = prop if prop and prop.get("status") == "open" else None
-    act = build_act(c, prop["id"] if prop else _item_ref(c, ref).id)
+    act = build_act(c, prop["id"] if prop else _item_ref(c, ref).id, token=token)
     if act is None:
         _fail("nothing to decide: it is not pending")
     from egzos.authz.presence import TAP_COPY, outcome_text
