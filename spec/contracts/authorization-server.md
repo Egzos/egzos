@@ -23,10 +23,9 @@ Clauses carry one of six markings instead:
   line that decided it. Law on the same terms as a §K one: the wording may be improved, the decision
   may not be changed here. Where the record settled a question but left a detail unnamed — a config
   key's spelling, a constant's name, a section's number — a1p chose it, and marked it **a1p** too.
-- `[OPEN→0.3]` — the freeze review must settle it. Not decided here, deliberately. The 0.3 record
-  answered every one, but **this PR rewrote §§1–9 only**: **27 of these markers are still live
-  across §§10–13** and are to be read as genuinely open text until the Part B PR replaces each with
-  its decision, or with `[v1.1]` and the reason. That PR is tracked at **#113**.
+- **open→0.3** — the marking a clause carried while the freeze review had still to settle it. The 0.3
+  record answered every one, and **none remains**: each was replaced by its **[0.3 · N]** decision,
+  or by `[v1.1]` with the reason the record gave.
 - `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
   Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
   escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.
@@ -35,19 +34,6 @@ Clauses carry one of six markings instead:
   **not a decision**: no clause marked `[LEAN]` fixes a shape, and **a builder may not implement
   against one.** Part B carries exactly one (§10.5, the step-up tap riding these endpoints), and
   hardening it would be the one thing this marking exists to prevent.
-
-**Reading note — §§1–9 are revised, §§10–13 are not, and where they disagree §§1–9 govern.** Three questions §§1–9 now
-decide are still written as open in Part B: the owner-path revocation keyed on `Token.id` (§11.9, decided at §9.2),
-`verification_uri_complete` and the `user_code` alphabet (§11.8, decided at §3 and §9.1), and a non-null `expires_at`
-(§11.5, decided at §9.3). Those are **stale, not a second answer**, and the "three options" framing they argue from no
-longer exists. Likewise §§1–9's citations to §11.5, §11.7 and §11.8 name where that text **will** be written.
-
-**And the converse, because the override rule otherwise reads wider than it is: §9.3 makes no §12 text stale.** Its rows 3/4
-are bounded to an owner's decision, so §12's row (d), its row (f) and its three still-open markers — the invariant-2 read
-exception, the abandoned render, and the sub-threshold `/authorize` sweep that "leaves no trace at all" — are each **still
-live and still #86's**, not overridden by §§1–9. §9.3 settles #68 for the five AS effects **§9** names and **does not dispose
-of row (f)**, which stays raised to #68 and asked of #61 exactly as §12 says; nor does it close the sub-threshold-sweep gap.
-§9.3 states both in its exclusions (iii) and (iv); this line puts them where a reader checking the override rule will look.
 
 **Scope of this document.** §§1–9, **Part A** (#67, with #73 and #78): the AS core mechanics — the
 client types, the two flows, registration and the redirect allowlist, metadata discovery, the grant
@@ -70,7 +56,7 @@ requirement this PR adds, not a restatement of anything #67, #73 or #78 reviewed
 *modifies* ratified §9 text, which is a stronger reason to name it than an addition, not a weaker
 one:** §9 option 1's blast-radius argument is rewritten — RFC 7009 §2.1 is demoted from a premise
 to a corroborating, conditional SHOULD; rotation clause 2 is named as carrying the chain-reach
-argument on its own; and the `[OPEN→0.3]` on entropy that #67/#73/#78 left in option 1's own prose
+argument on its own; and the open-to-0.3 marker on entropy that #67/#73/#78 left in option 1's own prose
 was removed from there, relocated into §9.1 as the broader marker it became, and is now **[0.3 ·
 19]**. The relocation is not asked back — it is a defensible edit — but a freeze reader
 of §9 option 1 at this head is reading Part B's reasoning, not #67/#73/#78's, and nothing in this
@@ -108,16 +94,12 @@ every divergence this Part states, not only the ones already listed above it. A 
 of an unauthenticated caller's reach except for (d)'s `throttled` and `token_presented` causes, the
 direct negation of D-C6's premise that *the post-trust tier is as reachable as the pre-trust one*.
 Named at §11.0's own "Consequence recorded, not acted on here" clause; named here for the same
-reason as the other five. This document does not revise the premise — the revision is filed as
-**#98** (`design-gap`), which names the affected regions and states the options for the Chief's pick.
-A seventh, a **reopening** rather than a narrowing, an addition or a mapping: §11.8's `user_code`
-length and alphabet are not a rendering choice this Part merely restates — `consent.md`'s own
-**D-C4** already committed to a number, *"Device codes are 8 characters, shown `XXXX-XXXX`,"*
-rejecting shorter codes by name for the brute-force surface they would open. Taking ownership of the
-length and alphabet as this contract's to pin, rather than citing D-C4's eight directly, reopens a
-committed Decision. Named at §11.8 itself, and here for the same reason as the other six: this
-paragraph's standard reaches every divergence this Part states, reopenings included, not
-narrowings, the addition and the mapping alone.
+reason as the other five. This document does not revise the premise; **#98 took option (a) [0.3 ·
+45]**, so `consent.md` D-C6 is revised to this ordering, A2's edit after the freeze. **[0.3 · 45]**
+also records these divergences as authoritative (#100), with A2 adding back-pointers in `consent.md`.
+§11.8's `user_code` is **not** a seventh: **[0.3 · 20]** confirms `consent.md` D-C4's eight
+characters and adds the alphabet D-C4 left open, so the contract restates a committed Decision
+rather than reopening it.
 
 ## 1 · One AS, three client types
 
@@ -744,9 +726,8 @@ an endpoint bounded by a token's value alone is no path on which an owner should
   an authenticated interactive session — reaching tokens whose values the owner does not have. `Token.id` is safe to render
   for §9.1's closing reason: it is the identifier, not the value, so a page listing it hands a reader no credential.
 
-**The owner path adds `revoke` to the closed `surface` vocabulary** — **decided-pending**: §12.1 rule 5 and
-`AS_THROTTLE_SURFACES` in `_types.py` still pin four words (`login` · `device` · `authorize` · `tap`) and both land in **#113**,
-so the fifth word is decided but written nowhere a test can read. It also adds **an entry on its refusal path**: an attempt
+**The owner path adds `revoke` to the closed `surface` vocabulary**: §12.1 rule 5 and `AS_THROTTLE_SURFACES` in `_types.py`
+both carry it, beside `login` · `device` · `authorize` · `tap`, and §11.9 states the page. It also adds **an entry on its refusal path**: an attempt
 naming a `Token.id` that does not exist, or one the session may not reach, is refused uniformly — §7.1 applied to an identifier
 rather than a scope, since a page answering "no such token" differently from "not yours" would enumerate tokens. The throttle
 keyed on `revoke` bounds a walk of the id space.
@@ -869,11 +850,9 @@ to `/login` having read, validated and decided nothing, so no denial exists to r
 (§12.1 rule 3). **(iii) §12's row (f) is not covered and is not folded in:** a post-trust rejection — outcome `rejected`,
 closed causes `vocabulary` · `scope`, pinned as `AS_AUTHORIZE_POSTTRUST_CAUSES` — is refused against §7's vocabulary before
 the owner is asked, so it keeps its own row, its own outcome and **both causes**; `authz.grant`'s field set is deliberately
-**not** widened, having no field a cause fits. **Row (f)'s event name is therefore not settled here** — item 29 answers #68
-for the five effects **§9** names, (f) is not one of them, and it stays raised to #68 and asked of #61 exactly as §12 states.
-**(iv) §12's three still-open markers stay open:** the invariant-2 read exception, the abandoned render and the
-**sub-threshold `/authorize` sweep**, all #86's. A sub-threshold sweep is session-less, so (i) gives it no row 4 and §12's
-"leaves no trace at all" stands undiminished; #86's answer needs a row of §12's kind, keyed on the surface, not this table's.
+**not** widened, having no field a cause fits. Row (f)'s own event is `authz.reject` (§12, **[0.3 · 33]**). **(iv) §12's
+own rows are not this table's:** the invariant-2 read exception, the rendered screen (row (g), abandoned or not) and the
+session-less 303's throttle accounting are §12's (**[0.3 · 36, 37, 38]**). A session-less sweep gets no row 4 under (i).
 
 **Rotation emits no event. [0.3 · 30]** Clause 2 above revokes a reused chain and writes `token.revoke`; a successful rotation writes
 `token.mint` for the token it issues. What is added instead of a `token.rotate` row is that **both carry the refresh-family id**, so a
@@ -1692,8 +1671,8 @@ and threaded through §5.3 clause 1, §11.0 substep 3, §12.1 rule 3 and §12.2.
 §10.2's reasoning for refusing a presented credential at this endpoint is not in question — but it is
 the same kind of divergence the narrowings below are named for, and it carries a cost a narrowing
 does not: a builder working from §20's six-cause fixture list produces no `token_presented` fixture
-and has no signal that one is owed. §20 does not carry this cause; whether it owes one is for the
-freeze review, not decided here.
+and has no signal that one is owed. **[0.3 · 45]** records this divergence as authoritative (#100):
+§20 owes a `token_presented` fixture, added by A2 with the back-pointers after the freeze.
 
 **Row (f) has two closed causes, not three — a narrowing of a decision `consent.md` states in
 **six** places, named as the spec revision it is.** §14 item 8's own cause list for (f)
@@ -1899,8 +1878,8 @@ that boundary open. A consent screen may not promise a boundary the capability c
 drawn. That closes §14's list: every item is now cited by number somewhere in Part B — §11.2 above
 carries item 3's render half, §7 its vocabulary half — and Part B answers or routes each. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
-`events.md`, plus **#68** (the five effects around a token) and **#86** (§12's five before one
-exists) — two issues, one sitting, for the reason §12 gives. The MCP-specific surface → contract v1.1
+`events.md`; **#68** (§9.3's effects) and **#86** (§12's rows) were settled in the one 0.3
+sitting, and their `events.md` text is decided-pending with #109 PR 2. The MCP-specific surface → contract v1.1
 at the Phase 5 boundary (§4). The step-up tap's endpoints, token shape and window mechanics → Phase
 2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10.5's `[LEAN]` fixes none of them, and
 §10.4's backstop is written in terms of *a live presence window* so that it does not depend on how the
@@ -1909,8 +1888,8 @@ tap is reached. The *look* of §11's pages — regions, states, copy, every stri
 
 **The flagship's permissions dashboard is not this document's surface**, and §11.9 is the boundary:
 the dashboard reaches this AS as a browser client from a separate origin, so it holds no session on
-the container's pages. What revocation it can offer depends on §9's pick and §11.9's, and until both
-are taken `consent.md` §19's revoke sentence has no transport under it.
+the container's pages. Under **[0.3 · 11]** it can revoke the token it holds through §9.2's endpoint
+and nothing else, so `consent.md` §19's broader revoke sentence is a spec revision (§11.9).
 
 TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
 authorization codes, pending device authorizations, refresh-token chains, §11.4's decided-request
