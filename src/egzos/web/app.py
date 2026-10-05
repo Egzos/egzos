@@ -917,11 +917,11 @@ def _for_htmx(resp: Response) -> Response:
 
 
 def _harden(resp: Response, path: str) -> Response:
-    """lifeboat.md §18: no referrer leaves this origin; no-store, nosniff, framed by no one.
+    """lifeboat.md §18 (v1.23): no referrer leaves this origin; no-store, nosniff, framed by no one.
 
-    `same-origin`, not §18's `no-referrer`: under `no-referrer` a browser serialises a form POST's
+    `same-origin`, never `no-referrer`: under `no-referrer` a browser serialises a form POST's
     Origin as `null` (Fetch, "serializing a request origin"), and the guard refuses any POST whose
-    Origin is not this one, so every act would fail in Chromium and Firefox (design-gap #130)."""
+    Origin is not this one, so every act would fail in Chromium and Firefox (#130)."""
     resp.headers["Referrer-Policy"] = "same-origin"
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
