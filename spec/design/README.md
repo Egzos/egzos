@@ -90,6 +90,14 @@ trusted. That rule came from two real failures: a guard written so it could neve
 build of the width audit that returned 357 findings by measuring surfaces at widths no spec puts them at.
 A check that fires on questions nobody asked looks exactly like coverage.
 
+**Where they live.** `docs/build/instruments/` in this repository, since 2026-10-02 (decision (a), the
+Chief). The originals ran in A2's studio sandbox and were lost on 2026-09-24 with every state mock; the
+text audit is rebuilt there by specification — every expectation derived from this directory, no registry
+— together with the copy-key check, the sync check and a selftest that makes every check fail on purpose.
+Its README records what each check sees and what it has been blind to. The render audits and the state
+mocks follow in a second commit; until they re-measure, the figures above are records of the lost
+instruments, not claims of the rebuilt ones.
+
 ## How specs arrive
 
 A2 (studio mode on Hyperagent) runs direction sessions with the Chief → produces direction boards with tradeoffs → the Chief picks → A2 writes the binding spec, exhaustive → the Chief commits it to this directory. The commit IS the approval. Decisions A2 takes inside a spec are listed in its header with the rejected alternative and the cost, and the Chief may veto by editing before commit. Agents build from committed specs only.
