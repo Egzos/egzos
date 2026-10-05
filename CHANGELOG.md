@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0a1] — MVP preview (2026-10-03)
+
+### Added
+
+- The walking skeleton's modules land as the MVP's running core: nodes, items and blobs (store),
+  trust engine and the gate, hash-chained ledger, resolver, tokens, the CLI and the MCP stdio door.
+- `egzos connect [claude-code] [--apply]`: mints a client token (never admin) and registers the MCP
+  server with Claude Code at user scope.
+- The container home is owner-only (0700): it holds the chain, every item and the token hashes.
+- The presence tap (`egzos.authz.presence`): `egzos trust approve` / `trust deny` open a one-shot
+  loopback decision page — *Sign and approve* → *Confirm signature* within 10 s, *Approve without a
+  window*, or *Deny*. Every check appends `step_up` with its outcome. A signature opens a window
+  for that ring pair bounded to the signed shape, read back from the chain, for
+  `step_up.window_seconds` (the contract's default 300; `EGZOS_STEP_UP_WINDOW_SECONDS=0` makes
+  every act tap); `egzos trust close-window` ends it. An act lands whole or not at all.
+- Token values are 256 random bits, stored only as a hash; the id is public (freeze item 19).
+  `egzos token revoke <id>` takes a client token back, in a running `serve --mcp` too: the door
+  re-reads its token on every call. A token past its `expires_at` is not live.
+- The gate: `organize` for a silent move, `publish` to propose a widening one; a manifest drift is
+  `approval.stale` (freeze items 3, 39); an ambiguous path is refused with its matches named, never picked (item 1, as revised).
+
+### Security
+
+- Minting is the owner's act (`connect`, `token create`, `Auth.mint`); the owner's views (`trust
+  pending`, `token ls`, `audit`) refuse a client principal; `ls` checks coverage.
+- The MCP door answers identically for a scope that does not exist and one the token cannot see.
+- `egzos_fetch` fences each item with a fresh per-response nonce, so a body cannot forge the
+  delimiters that mark where its data ends.
+- An open presence window carries out what was asked: `trust deny` under a window denies.
+- Every MCP probe of a scope the token cannot see is on the chain, whichever tool asked.
+- `ls` and `trust pending` are audited reads; `blob_pull` checks coverage.
+- The tap's one-shot URL is printed only to a terminal, never to an agent's pipe.
+- Coverage is checked in the engine (`resolve_ref`, node creation, moves, quarantine, the resolver)
+  and on every CLI scope and item reference; a client's `ls` and the MCP inbox are served under the
+  serving policy; `%n` belongs to the token whose `find` made it; `connect` prints its secret only
+  to a terminal.
+- The audit chain cannot fork: one successor per entry, and a writer that loses the race re-chains.
+- A proposal goes stale if an item moved since it was filed; POSTs without an `Origin` are refused.
+
+### Changed
+
+- Opus-tier agents run on Opus 5.5 (`claude-opus-5-5`).
+
 ## [Unreleased] — Phase 0.0 scaffold
 
 ### Added
