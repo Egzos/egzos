@@ -239,19 +239,16 @@ def test_the_error_redirect_carries_exactly_two_fields_and_never_a_description()
     assert "error_description" not in t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS
 
 
-def test_the_throttle_surfaces_are_four_closed_words():
+def test_the_throttle_surfaces_are_five_closed_words():
     """§12.1 rule 5 and §12.2: the release entry's `surface`, and what `actor` carries.
 
     Written out rather than derived, because the point of the vocabulary is that it is closed: a
     fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
     `consent.md`'s D-C6 throttles the tap page unconditionally, as the fourth surface, independent
     of whether §10.5's `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not
-    whether the word is used. Rule 5's use of the tuple is
-    settled; §12.2's use of the same four words for `actor` is not — it is `[OPEN->0.3]`, a1p's
-    reading offered for #86 to take or reject, not a decision this test's green result should be
-    read as making. If #86 rejects it, this test still passes: it only pins the tuple itself.
+    whether the word is used. `revoke` is §11.9's page, [0.3 · 11]; `actor` is [0.3 · 34].
     """
-    assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap")
+    assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap", "revoke")
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
     # §12.2: the caller's network identifier is never the actor, so no surface is one.
     assert not any(s in {"ip", "remote_addr", "caller"} for s in t.AS_THROTTLE_SURFACES)
@@ -261,7 +258,7 @@ def test_the_pre_token_cause_vocabularies_are_closed_per_row():
     """§12's table, rows (a), (b), (d) and (f) — four closed `details.cause` vocabularies.
 
     Written out rather than derived, for the same reason
-    `test_the_throttle_surfaces_are_four_closed_words` is: a cause arriving at one of these rows
+    `test_the_throttle_surfaces_are_five_closed_words` is: a cause arriving at one of these rows
     that is not in its tuple should break a test, not append quietly. #61's own history has an
     instance: a seventh cause, `token_presented`, arrived at row (d) with nothing to catch it,
     caught only by hand on a later reading of the table. `throttled` recurs across (a), (b) and (d)
@@ -299,3 +296,20 @@ def test_the_pre_token_cause_vocabularies_are_closed_per_row():
         *t.AS_AUTHORIZE_POSTTRUST_CAUSES,
     }
     assert not any(c in {"token", "user_code", "code_verifier"} for c in all_causes)
+
+
+def test_the_part_b_numbers_are_the_freeze_records():
+    """§10.1, §11.5, §11.7 and §11.8's numbers, each transcribed from the #31 record's item."""
+    day = 24 * 3600
+    assert (t.AS_SESSION_IDLE_SECONDS, t.AS_SESSION_ABSOLUTE_SECONDS) == (1800, 28800)  # item 13
+    assert t.AS_GRANT_LIFETIME_DEFAULT_SECONDS == 30 * day  # item 18
+    assert t.AS_GRANT_LIFETIME_MAX_SECONDS == 90 * day  # item 18
+    assert t.AS_CONTINUE_MAX_BYTES == 2048  # item 25
+
+
+def test_the_user_code_is_eight_of_rfc_8628s_twenty_consonants():
+    """§11.8 ([0.3 · 20]): RFC 8628 §6.1's alphabet, written out, and D-C4's eight characters."""
+    assert t.AS_USER_CODE_ALPHABET == "BCDFGHJKLMNPQRSTVWXZ"
+    assert len(set(t.AS_USER_CODE_ALPHABET)) == len(t.AS_USER_CODE_ALPHABET) == 20
+    assert not set(t.AS_USER_CODE_ALPHABET) & set("AEIOUY0123456789")
+    assert t.AS_USER_CODE_LENGTH == 8

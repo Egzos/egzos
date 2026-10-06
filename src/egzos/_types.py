@@ -481,11 +481,12 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: own instead of these AS endpoints, but the word is still used there — D-C6's release entry is
 #: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
 #: by citing the decision rather than restating it in an entry of its own — never unused, only
-#: ridden elsewhere. The caller's network identifier is NEVER the actor: it would write
-#: surveillance into a chain the owner cannot prune.
-#: The event NAMES these entries append under are `[OPEN->0.3]`, batched as #86 with #68 — so there
-#: is no constant for the event name itself, deliberately.
-ThrottleSurface = Literal["login", "device", "authorize", "tap"]
+#: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
+#: ([0.3 · 11]). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
+#: identifier may key a throttle bucket (§11.0, [0.3 · 24]) and never enters the chain.
+#: The event NAMES these entries append under are decided (§12, [0.3 · 33]) and land in
+#: `events.md` §1 and `Event` with #109 PR 2 — so there is no constant for them here yet.
+ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
@@ -496,8 +497,8 @@ AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 #: `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not silently
 #: absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because §11.5
 #: clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s own
-#: paragraph). These four are never open — unlike the event *names* these causes travel under,
-#: which are `[OPEN->0.3]`, batched as #86 with #68, and so have no constant here.
+#: paragraph). These four are closed; the event *names* these causes travel under are decided at
+#: §12 ([0.3 · 33]) and reach `Event` with `events.md` in #109 PR 2.
 LoginCause = Literal["wrong", "unknown", "throttled"]
 AS_LOGIN_CAUSES: tuple[LoginCause, ...] = get_args(LoginCause)
 
@@ -584,6 +585,21 @@ AS_CODE_LIFETIME_SECONDS: int = 60
 #: ONLY, where the owner chooses it deliberately; no AS path, parameter or config key yields a
 #: non-expiring token.
 AS_ACCESS_TOKEN_LIFETIME_SECONDS: int = 3600
+
+#: §11.5 — grant expiry: 30 d default, 90 d max; longer is CLAMPED, never refused ([0.3 · 18]).
+AS_GRANT_LIFETIME_DEFAULT_SECONDS: int = 30 * 24 * 3600
+AS_GRANT_LIFETIME_MAX_SECONDS: int = 90 * 24 * 3600
+
+#: §10.2 — the interactive session ends at 30 min idle or 8 h absolute ([0.3 · 13]).
+AS_SESSION_IDLE_SECONDS: int = 30 * 60
+AS_SESSION_ABSOLUTE_SECONDS: int = 8 * 3600
+
+#: §11.8 — a `user_code` is 8 of RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX` ([0.3 · 20]).
+AS_USER_CODE_ALPHABET: str = "BCDFGHJKLMNPQRSTVWXZ"
+AS_USER_CODE_LENGTH: int = 8
+
+#: §11.7 — `continue` is at most 2048 bytes, still percent-encoded, as received ([0.3 · 25]).
+AS_CONTINUE_MAX_BYTES: int = 2048
 
 #: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
 #: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
@@ -722,14 +738,21 @@ __all__ = [
     "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
     "AS_CODE_LIFETIME_SECONDS",
+    "AS_CONTINUE_MAX_BYTES",
     "AS_DEVICE_REDEMPTION_CAUSES",
+    "AS_GRANT_LIFETIME_DEFAULT_SECONDS",
+    "AS_GRANT_LIFETIME_MAX_SECONDS",
     "AS_LOGIN_CAUSES",
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
+    "AS_SESSION_ABSOLUTE_SECONDS",
+    "AS_SESSION_IDLE_SECONDS",
     "AS_THROTTLE_SURFACES",
+    "AS_USER_CODE_ALPHABET",
+    "AS_USER_CODE_LENGTH",
     "ASClientType",
     "ArtifactContent",
     "AudienceMember",
