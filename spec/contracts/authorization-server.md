@@ -1283,8 +1283,8 @@ and §12.2's pairing key is derived from whatever this is. The floor every bucke
 container-global one bounding the ledger absolutely, and an inner one keyed on the transport source
 address so a single noisy source cannot spend the global budget. Each alone fails where the other
 holds. An attempt is refused when **either** holds, which is what "holds" means throughout §11.0 and
-§12.1, and **a network identifier may key a throttle and may never enter the chain.** TODO(chief):
-the buckets' rates and windows are not in the record; until named they are an implementation's.
+§12.1, and **a network identifier may key a throttle and may never enter the chain.** TODO(chief),
+#141: the record names no rates or windows; they bound every sweep, row (h)'s included (§12).
 
 ### 11.1 · The client-registry read (§14 item 1)
 
@@ -1390,7 +1390,8 @@ request is safe here and not in substep 1 because this read runs *after* the cou
 varying the key at no cost is still throttled. **This is §12's fourth read of container state.**
 **What identifies a request** is not in the record. **a1p**: the tuple `(client_id, redirect_uri,
 state, code_challenge)` the request carries, since `code_challenge` is client-generated per request
-and §2 already binds the code to it; for `consent.md` R3's device hand-off, the pending authorization
+and §2 binds the code to it; without the optional `state`, `code_challenge` (PKCE is mandatory) and
+the rest identify it. For `consent.md` R3's device hand-off, the pending authorization
 §3 mitigation 3 binds to the `device_code`.
 
 **A re-submission carrying no session at all is not one this section ever sees. a1p** — it is
@@ -1424,7 +1425,7 @@ redeemable — and §9.3's 1-hour access token (**[0.3 · 17]**) is the shorter 
 renders the grant's expiry, clamped. `AS_GRANT_LIFETIME_DEFAULT_SECONDS` and
 `AS_GRANT_LIFETIME_MAX_SECONDS` in `_types.py` carry them, **a1p**'s naming. No AS grant is
 non-expiring: `null` is `token mint`'s alone (§9.3). The record names the numbers and no config key.
-TODO(chief): whether a container's config may lower either number. Until decided, both are contract
+TODO(chief), #142: whether a container's config may lower either number. Until then both are contract
 values with no config key, the stricter reading.
 
 ### 11.6 · A standard error redirect carries no description, at all (§14 item 4)
@@ -1552,8 +1553,8 @@ container's secret at `/login`, and that is the whole of v1.0's login — `conse
   it, and §8's IdP collapse stays `[v1.1]` (**[0.3 · 8]**).
 - **The secret never enters the chain or a page.** §12.1 rule 7 already keeps it out of `details`.
 
-TODO(a1p): how the secret is provisioned at `init`, how it is stored, and how it is rotated are not in
-the record. They are a3-trust's at Phase 0.4, under §13's state-persistence TODO.
+TODO(a1p), #143: how the secret is provisioned at `init`, how it is stored, and how it is rotated are
+not in the record. They are a3-trust's at Phase 0.4, under §13's state-persistence TODO.
 
 ### 11.8 · The device-code entry (§14 item 5)
 
@@ -1606,9 +1607,9 @@ both answered: §9.2's client path keyed on the token *value*, and this owner pa
    with §11.0's two buckets, so a walk of the id space is bounded.
 3. **A refusal is uniform and appends.** An id that does not exist and one the session may not reach
    get the same response, §7.1's rule applied to an identifier; the attempt appends once with its
-   cause in `details`, so the refusal path leaves a trace as the success path does. TODO(a1p): the
-   record names no event for that entry; it is named with §12's six in #109 PR 2's `events.md`
-   amendment.
+   cause in `details`, so the refusal path leaves a trace as the success path does. It carries
+   `principal: interactive` (**a1p**): the page is reached only inside a session. TODO(a1p), #144:
+   its name, which with §12's seven makes **eight** new names for #109 PR 2's `events.md` amendment.
 
 **The flagship dashboard.** It is a separate origin reaching this AS as a browser client, so it holds
 no session on the container's pages and cannot use the owner path. It can revoke the token it holds
@@ -1619,9 +1620,9 @@ spec revision (A2's, after the freeze): the owner revokes other tokens on the co
 ## 12 · The pre-authorization audit surface
 
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
-two tiers, plus the throttle's own release entry — three pages and a timer, not the tap page or
-§9.2's `revoke` page, which §12.1 rule 5's five-word `surface` vocabulary names but this section
-does not cover (`revoke`'s entries are `token.revoke` and §9.2's refusal entry). For the tap, its
+two tiers, plus the throttle's release and tally entries — three pages and a timer, not the tap page
+or §11.9's page (decided at §9.2), which §12.1 rule 5's five-word `surface` vocabulary names but
+this section does not cover (its entries are `token.revoke` and §11.9's refusal entry). For the tap, its
 endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10.5's `[LEAN]`
 paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
 carries); its own audit entries are a different pointer, §10.5's `[LEAN]` closing line's, which
@@ -1634,13 +1635,13 @@ name. [0.3 · 33, 36]** `events.md` §4 invariant 2 (*"A surface that produces a
 corresponding event is non-conforming"*) and §1's closed vocabulary can both hold here once the names
 are in `events.md` §1.
 
-**Five `authz.*` events for the pre-authorization surfaces, and a sixth for the render. [0.3 · 33,
-36]** The rows are `spec/design/consent.md` §14.8's (a), (b), (d), (e) and (f); its (c), a consent
-denial, is `authz.grant` with `decision: denied` (§9.3, **[0.3 · 29]**). Row (g) is the record's
-sixth row: a rendered consent screen appends. The record fixes the five effects and leaves the names
-to a1p; **the names are a1p's**, in `events.md`'s `noun.verb` shape. **Decided-pending:** the six
-names enter `events.md` §1 and `_types.py`'s `Event` with #109 PR 2, and until it merges an append
-under any of them MUST be rejected, as §9.3 states for its own two.
+**Five `authz.*` events for the pre-authorization surfaces, a sixth for the render, a seventh for
+the tally. [0.3 · 33, 36], #140** The rows are `spec/design/consent.md` §14.8's (a), (b), (d), (e)
+and (f); its (c), a consent denial, is `authz.grant` with `decision: denied` (§9.3, **[0.3 · 29]**).
+Row (g) is the record's sixth row: a rendered consent screen appends. Row (h) is the Chief's #140.
+**The names are a1p's**, in `events.md`'s `noun.verb` shape. **Decided-pending:** the seven names
+enter `events.md` §1 and `_types.py`'s `Event` with #109 PR 2 (eight with §11.9's), and until it
+merges an append under any of them MUST be rejected, as §9.3 states for its own two.
 
 | | the effect | event | outcome | `details.cause`, a closed word |
 |---|---|---|---|---|
@@ -1650,12 +1651,14 @@ under any of them MUST be rejected, as §9.3 states for its own two.
 | **(e)** | a throttle releasing | `authz.release` | `released` | — (see below) |
 | **(f)** | a post-trust rejection at `/authorize` | `authz.reject` | `rejected` | `vocabulary` · `scope` |
 | **(g)** | a consent screen rendered at `/authorize` | `authz.render` | `rendered` | — |
+| **(h)** | session-less `/authorize` traffic the throttle admitted, per window | `authz.tally` | `counted` | — |
 
 **Row (f) is one of the five, which settles what §9.3's exclusion (iii) left raised to #68:** a
-post-trust rejection keeps its own row, outcome and both causes, under its own name, and
-`authz.grant`'s field set is not widened. **Row (g) carries `client_id`. a1p** — so the owner can
-see which client put a screen in front of them. It appends once per render, inside a session §10.1
-has authenticated, and §11.0's throttle bounds its volume.
+post-trust rejection keeps its own row, outcome and both causes, and `authz.grant` is not widened.
+**`refuse` is pre-trust, `reject` is post-trust. a1p:** `authz.refuse` is §5.3's uniform page, which
+never names the client; `authz.reject` follows a matched client and redirect (§11.6). **Row (g)
+carries `client_id`. a1p** — so the owner can see which client put a screen in front of them. It
+appends once per render, inside a session §10.1 has authenticated, and §11.0's throttle bounds it.
 
 **Row (d) has a seventh closed cause `consent.md` does not carry — named as the addition it is, not
 left for the freeze review to discover.** `consent.md` §14.8 (d) closes at six causes —
@@ -1699,34 +1702,32 @@ its row's tuple breaks a test rather than appending quietly, which is exactly th
 own row (d) addition sat in until this review caught it by hand.
 
 **The reads a decision rests on, and `events.md` §4 invariant 2's exception. [0.3 · 36, 38]** A
-rendered screen performs §11.1's registry read and §11.3's existing-tokens read, and row (g) is the
-entry that records them — so the **abandoned** render, where no decision follows and which a client
-can drive at will by initiating `/authorize` and never being answered, leaves a trace. **Invariant 2
+rendered screen performs §11.1's and §11.3's reads, and row (g) records them — so the **abandoned**
+render, which a client can drive at will by initiating `/authorize`, leaves a trace. **Invariant 2
 is amended** with one exception: a read the owner makes of their own container's state, inside a
 session §10.1 has authenticated, to decide an act they are performing, gets no read event of its
-own. Its three instances are named:
-
-1. §11.1's registry read — recorded by row (g);
-2. §11.3's existing-tokens read — recorded by row (g);
-3. §11.0 substep 1's match against §11.4's decided-request record — recorded by row (d) `replayed`
-   where it matches; where it falls through, the request goes on to an entry of its own (rule 1,
-   or rule 3's count while a throttle holds).
+own. Its three instances: (1) §11.1's registry read and (2) §11.3's existing-tokens read, both
+recorded by row (g); (3) §11.0 substep 1's match against §11.4's decided-request record, recorded by
+row (d) `replayed` where it matches, and otherwise by the entry the request goes on to (rule 1, or
+rule 3's count while a throttle holds).
 
 Each is bounded — one keyed entry, a count and a timestamp, one record — so none carries out
 anything an unrecorded read would hide. **§11.4's request-keyed read, §12's fourth (**[0.3 · 27]**),
-is not an instance**: every path through it appends — row (d) `replayed` on a match, otherwise the
-request goes on to (d), (f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in
-`events.md` §4 with #109 PR 2.
+is not an instance**: every path through it appends — row (d) `replayed` on a match, otherwise (d),
+(f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in `events.md` §4 with PR 2.
 
 **A session-less 303 to `/login` counts toward the throttle. [0.3 · 37]** Substep 3 runs after
 substep 2, so every session-less `/authorize` adds to both §11.0 buckets. A sweep that engages
 either appends row (d) `throttled` once and row (e) once at release, whose `refused` count carries its
-size. **What stays unrecorded, stated as it is. a1p:** a sweep that stays under both buckets for its
-whole life appends nothing, since a redirect that reads and decides nothing has no effect to record.
-This is what item 37 leaves of `consent.md` D-C6's rejected "no trace at all", named rather than
-hidden: the container-global bucket caps such a sweep's volume, and each redirect tells it nothing
-(§11.0). A sweep large enough to matter engages the throttle and is seen. If the Chief wants the
-residue closed, that is a `contract-change` at the next phase boundary, not a reading of item 37.
+size. **A sweep under both buckets is tallied, not traceless. #140; the shape is a1p's.** At the
+close of each window of `/authorize`'s container-global bucket in which the throttle admitted any
+session-less 303, the timer appends row (h) once: `principal: none`, `actor: authorize` (§12.2), and
+two closed `details` keys, `redirected` (the count of those 303s) and `window_key`, derived from that
+bucket as §12.2 states. No 303, no entry. The 303 appends nothing itself and the caller's response
+is unchanged. Not a sample: a sample leaves the unsampled traceless, which D-C6 rejected by name.
+Like (e), (h) is written on no request, at most once per window, so §12.1 rule 3's bound holds.
+**What remains:** (h) says how many, never who — no network identifier (§11.0), no `client_id`
+(substep 3 runs before either tier reads one) — and shows at its window's close; #141 names it.
 
 ### 12.1 · The rules, which are not open
 
@@ -1787,10 +1788,10 @@ naming decision:
    Rule 6's deciding-session replay is the one case this rule does not reach: it is read inside
    §11.0 substep 1, ahead of the counter this rule governs, which is the ordering rule 6 states and
    this rule's own wording does not point to.
-5. **The release appends whenever an engage did, `refused: 0` included.** (e) is the only entry that
+5. **The release appends whenever an engage did, `refused: 0` included.** Beside (h)'s admitted count, (e) is the only entry that
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
-   `authorize` · `tap` · `revoke` (`revoke` is §9.2's owner-path page, the fifth word, **[0.3 · 11]**;
+   `authorize` · `tap` · `revoke` (`revoke` is §11.9's page (decided at §9.2), the fifth word, **[0.3 · 11]**;
    the step-up tap is the fourth surface, throttled unconditionally by
    `consent.md`'s D-C6; if §10.5's `[LEAN]` is not taken the tap rides a channel of its own rather
    than these AS endpoints, but the word is still used there — D-C6's release entry is
@@ -1857,10 +1858,10 @@ request. The record closes the gap as follows; the text that carries it is `even
   time, which is the whole of what pairing needs.
 
 **Which rows carry `none`. a1p**, binding item 34, which names the value and not its rows: (a), (b),
-(e) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its session
-exists, (b) is not an owner act, and (e) has no caller. (d) is uniform across all seven causes,
-although five are reached only inside a session, so that a reader cannot infer from the principal
-which cause a uniform page had, or whether a throttled caller held a session. (f) and (g) are not
+(e), (h) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its
+session exists, (b) is not an owner act, and (e) and (h) have no caller. (d) is uniform across all
+seven causes, although five are reached only inside a session, so that a reader cannot infer from
+the principal which cause a uniform page had, or whether a throttled caller held a session. (f) and (g) are not
 uniform pages and are reached only inside a session, where `interactive` is available and true.
 
 **Decided-pending:** `none` enters `capabilities.md` §3 and `_types.py`'s `Principal`, and

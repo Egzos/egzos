@@ -246,7 +246,7 @@ def test_the_throttle_surfaces_are_five_closed_words():
     fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
     `consent.md`'s D-C6 throttles the tap page unconditionally, as the fourth surface, independent
     of whether §10.5's `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not
-    whether the word is used. `revoke` is §9.2's owner path ([0.3 · 11]); `actor` is [0.3 · 34].
+    whether the word is used. `revoke` is §11.9's page, [0.3 · 11]; `actor` is [0.3 · 34].
     """
     assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap", "revoke")
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
