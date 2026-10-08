@@ -149,14 +149,13 @@ JSON with:
 
 ### Why `seq` stays out of the hashed body
 
-**a1p, frozen with the set.** The Chief's note on #102 recorded the opposite recommendation (hash
-`seq`); this section goes the other way. The 45-item freeze record on #31 does not list the
-question, so this reading is not a `[0.3 · N]` decision: it is a1p's text, and **the Chief's merge
-of the freeze is what makes it law.** Four places agree on excluding `seq` — §3's bullet, §3's
-formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later change to the other reading is
-a `contract-change` that moves those four together. TODO(chief): the record is silent on this
-item; if the Chief takes the #102 reading instead, say so on #109 before the merge, not after. The
-reasoning below is why a1p chose as it did.
+**a1p's reading, adopted by the Chief's merge of the freeze; #31 is silent on it.** The Chief's
+note on #102 recorded the opposite recommendation (hash `seq`); this section goes the other way.
+The 45-item freeze record on #31 does not list the question, so this reading is not a `[0.3 · N]`
+decision: it is law because the merge that froze the set adopted it. Four places agree on excluding
+`seq` — §3's bullet, §3's formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later
+change to the other reading is a `contract-change` that moves those four together. The reasoning
+below is why a1p chose as it did.
 
 Stated as a decision rather than left as the absence of one, because the drift report found the
 formula and the prose disagreeing, and *including* `seq` was the first reading offered (#10 F7,

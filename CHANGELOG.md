@@ -13,7 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (#25–#30) — `context-item.md`, `capabilities.md`, `events.md`, `storage.md`, `container.md` and
   the prose-derived `authorization-server.md` — with typed stubs in `src/egzos/_types.py`.
 - The Chief's 45-item freeze record (#31, 2026-10-03) written into the text as `[0.3 · N]`
-  clauses (#109: #111, #139, #147, #152 and this pass). No open→0.3 marking remains.
+  clauses (#109: #111, #139, #147, #152 and this pass). No open→0.3 marking remains in
+  `spec/contracts/` or `src/`.
 - `spec/contracts/README.md` is the index of the set; each document's status line reads frozen at
   0.3. The Chief's merge declares the freeze. Contract v1.1 is planned at the Phase 5 boundary.
 
