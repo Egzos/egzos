@@ -256,59 +256,69 @@ class TrustEngine:
         p = self.backend.get_proposal(proposal_id)
         if not p or p["status"] != "open" or not self.decides_over(token, p):
             raise TrustError("no open proposal with that id")
-        to = self.backend.get_node(p["to"])
-        if not to:
-            raise TrustError("target scope no longer exists")
-        if any((i := self.backend.get(x)) and i.status == "quarantined" for x in p["items"]):
-            # Quarantined after it was parked: the manifest still matches, but a manifest holding a
-            # quarantined item cannot be approved (step-up spec §11, R5). The proposal stays open,
-            # because Deny still is. Which event the ENGINE writes for this refusal is #125
-            # (approval.stale means drift and a stale proposal); until then the presence layer
-            # records it (step_up `closed`, reason `refused`).
-            raise TrustError("Contains a quarantined item. It cannot move.")
-        # Manifest binding: execute only if items + target + audience still match what was approved.
-        current = self.manifest_hash(p["items"], p["to"], self.audience(to))
-        items = [self.backend.get(x) for x in p["items"]]
-        moved = [i for i in items if not i or i.scope != p["from"]]  # the source is bound too
-        if current != p["manifest"] or moved:
-            p["status"] = "stale"
-            self.backend.put_proposal(p)
-            # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
-            self.ledger.append(
-                "approval.stale",
-                actor=actor,
-                principal=token.principal,
-                subject=p["id"],
-                reason="an item moved since the proposal (TOCTOU)"
-                if moved
-                else "manifest changed since proposal (TOCTOU)",
-            )
-            raise TrustError("manifest changed since the proposal was made — re-propose")
-        proposer = (p.get("proposed_by") or {}).get("principal", "client")
-        reset = []
-        # Every move, the status and the chain entry land together: a failure on item k rolls back
-        # items 1…k-1 too, so a failed approval has moved nothing.
+        # Everything the decision rests on is read under the write lock that the move takes, so
+        # what is executed is exactly what was checked: the proposal still open (#118), the
+        # target, no quarantined item, and the manifest and source unchanged (approve-what-you-
+        # saw; a1r on #146). A racing decider waits on BEGIN IMMEDIATE and then reads the outcome.
+        stale_reason = None
         with self.backend.atomic():
-            for item_id in p["items"]:
-                item = self.backend.get(item_id)
-                if item:
-                    if self._reset_if_agent_run(item, proposer):
-                        reset.append(item.id)
-                    self._do_move(item, to, actor, token.principal)
-            p["status"] = "executed"
-            p["executed_at"] = now_iso()
-            p["approved_by"] = actor
-            self.backend.put_proposal(p)
-            self.ledger.append(
-                "approval.execute",
-                actor=actor,
-                principal=token.principal,
-                subject=p["id"],
-                scope=to.id,
-                items=p["items"],
-                manifest=p["manifest"],
-                reset=reset,
-            )
+            self._still_open(p["id"])
+            to = self.backend.get_node(p["to"])
+            if not to:
+                raise TrustError("target scope no longer exists")
+            items = [self.backend.get(x) for x in p["items"]]
+            if any(i and i.status == "quarantined" for i in items):
+                # Quarantined after it was parked: the manifest still matches, but a manifest
+                # holding a quarantined item cannot be approved (step-up spec §11, R5). The
+                # proposal stays open, because Deny still is. Which event the ENGINE writes for
+                # this refusal is #125 (approval.stale means drift and a stale proposal); until
+                # then the presence layer records it (step_up `closed`, reason `refused`).
+                raise TrustError("Contains a quarantined item. It cannot move.")
+            current = self.manifest_hash(p["items"], p["to"], self.audience(to))
+            moved = [i for i in items if not i or i.scope != p["from"]]  # the source is bound too
+            if current != p["manifest"] or moved:
+                p["status"] = "stale"
+                self.backend.put_proposal(p)
+                stale_reason = (
+                    "an item moved since the proposal (TOCTOU)"
+                    if moved
+                    else "manifest changed since proposal (TOCTOU)"
+                )
+                # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
+                self.ledger.append(
+                    "approval.stale",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=p["id"],
+                    reason=stale_reason,
+                )
+            else:
+                proposer = (p.get("proposed_by") or {}).get("principal", "client")
+                reset = []
+                # Every move, the status and the chain entry land together: a failure on item k
+                # rolls back items 1…k-1 too, so a failed approval has moved nothing.
+                for item in items:
+                    if item:
+                        if self._reset_if_agent_run(item, proposer):
+                            reset.append(item.id)
+                        self._do_move(item, to, actor, token.principal)
+                p["status"] = "executed"
+                p["executed_at"] = now_iso()
+                p["approved_by"] = actor
+                self.backend.put_proposal(p)
+                self.ledger.append(
+                    "approval.execute",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=p["id"],
+                    scope=to.id,
+                    items=p["items"],
+                    manifest=p["manifest"],
+                    reset=reset,
+                )
+        if stale_reason:
+            # Raised after the transaction commits, so the stale status and its event stay.
+            raise TrustError("manifest changed since the proposal was made — re-propose")
         return p
 
     def deny(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
@@ -318,11 +328,22 @@ class TrustEngine:
             raise TrustError("no open proposal with that id")
         p["status"] = "denied"
         with self.backend.atomic():
+            self._still_open(p["id"])
             self.backend.put_proposal(p)
             self.ledger.append(
                 "approval.deny", actor=actor, principal=token.principal, subject=p["id"]
             )
         return p
+
+    def _still_open(self, proposal_id: str) -> None:
+        """Re-read the proposal under the write lock and refuse unless it is still open (#118).
+        The checks above run before the lock, so two deciders (a lifeboat tab and a CLI `trust
+        approve`) could both see it open; `atomic()` takes BEGIN IMMEDIATE, so whichever decides
+        second waits here, then finds it decided and lands nothing. The answer is the one a
+        missing id gets."""
+        current = self.backend.get_proposal(proposal_id)
+        if not current or current["status"] != "open":
+            raise TrustError("no open proposal with that id")
 
     def decides_over(self, token: Token, proposal: dict[str, Any]) -> bool:
         """Whether `token` may decide (or see) this proposal: it covers both ends of the move,
