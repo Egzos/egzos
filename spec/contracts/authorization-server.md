@@ -25,8 +25,9 @@ Clauses carry one of six markings instead:
   may not be changed here. Where the record settled a question but left a detail unnamed — a config
   key's spelling, a constant's name, a section's number — a1p chose it, and marked it **a1p** too.
 - **open→0.3** — the marking a clause carried while the freeze review had still to settle it. The 0.3
-  record answered every one, and **none remains**: each was replaced by its **[0.3 · N]** decision,
-  or by `[v1.1]` with the reason the record gave.
+  record answered every one, and **none remains in `spec/contracts/` or `src/`**: each was replaced
+  by its **[0.3 · N]** decision, or by `[v1.1]` with the reason the record gave. The design specs
+  still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 - `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
   Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
   escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.

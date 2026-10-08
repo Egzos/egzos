@@ -149,13 +149,12 @@ JSON with:
 
 ### Why `seq` stays out of the hashed body
 
-**a1p's reading, adopted by the Chief's merge of the freeze; #31 is silent on it.** The Chief's
-note on #102 recorded the opposite recommendation (hash `seq`); this section goes the other way.
-The 45-item freeze record on #31 does not list the question, so this reading is not a `[0.3 · N]`
-decision: it is law because the merge that froze the set adopted it. Four places agree on excluding
-`seq` — §3's bullet, §3's formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later
-change to the other reading is a `contract-change` that moves those four together. The reasoning
-below is why a1p chose as it did.
+**The Chief's decision on #102 F7** (his correction comment of 2026-10-03, implemented by PR 104):
+`seq` is store-assigned, so hashing it would break verification on a re-import that renumbers, and
+the formula reads `canonical(entry minus hash and seq)`. Four places agree on excluding `seq` —
+§3's bullet, §3's formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later change to
+the other reading is a `contract-change` that moves those four together. The reasoning below is the
+case for that decision.
 
 Stated as a decision rather than left as the absence of one, because the drift report found the
 formula and the prose disagreeing, and *including* `seq` was the first reading offered (#10 F7,

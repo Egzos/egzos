@@ -24,8 +24,12 @@ The typed face of the set is `src/egzos/_types.py`. Every name there traces to a
 **Markings.** Clauses carry **running**, **decided, not running**, or `[0.3 · N]` — item `N` of the
 Chief's freeze record on #31 (2026-10-03, with the revision of item 1 the same day).
 `authorization-server.md` adds its own prose-derived markings (§K, a1p, `[LEAN]`). `[v1.1]` marks
-what the record deferred to the Phase 5 boundary, with the reason. **No open→0.3 marking remains:**
-the 45-item record answered all of them, so the collected list #30 asked for is the record itself.
+what the record deferred to the Phase 5 boundary, with the reason. **No open→0.3 marking remains in
+`spec/contracts/` or `src/`** (a grep for the retired upper-case marker over those two trees returns
+nothing): the 45-item record answered all of them, so the collected list #30 asked for is the record
+itself. The claim stops at those two trees. The design specs under `spec/design/` still carry the
+retired marker at sites the record has since settled; design-gap #157 tracks their revision by A2,
+committed by the Chief.
 
 ## Interface rules the freeze honours
 

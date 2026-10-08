@@ -17,7 +17,8 @@ review must read §1–§3 knowing it is reading a **decided split, not a runnin
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a Chief
 freeze decision F1–F5 or 0.3 decision the skeleton does not yet execute). A `[0.3 · N]` marking
 cites item `N` of the Chief's freeze record on #31 (2026-10-03). The open→0.3 marking the draft
-carried is gone: the record answered every one.
+carried is gone from `spec/contracts/` and `src/`: the record answered every one. The design specs
+still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 
 ## 1 · Three contracts, not one (F3)
 

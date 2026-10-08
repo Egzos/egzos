@@ -16,8 +16,9 @@ token.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a freeze
 decision the skeleton does not execute). A `[0.3 · N]` marking cites item `N` of the Chief's freeze
-record on #31 (2026-10-03). The open→0.3 marking the draft carried is gone: the record answered
-every one.
+record on #31 (2026-10-03). The open→0.3 marking the draft carried is gone from `spec/contracts/`
+and `src/`: the record answered every one. The design specs still carry the retired marker;
+design-gap #157 tracks their revision by A2 (`README.md`).
 
 ## 1 · Container types and ring rank
 
