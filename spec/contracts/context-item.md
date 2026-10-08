@@ -86,8 +86,11 @@ one to another item or token. The MAC algorithm and key rotation are not pinned 
 descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **decided, not
 running.**
 
-_Implementation note (a1p):_ the MAC covers every descriptor field other than `sig` itself, and verification compares
-`sig` in constant time.
+**The MAC MUST cover every descriptor field other than `sig`, and verification MUST compare `sig`
+in constant time.** A field outside the MAC can be altered by a redeemer without detection, and a
+comparison that exits at the first differing byte lets a redeemer recover a valid `sig` byte by
+byte from its timing. A field added to the descriptor later is covered by the same rule, with no
+edit here. **a1p**, the binding of [0.3 · 45].
 
 ## 4 · `provenance`
 

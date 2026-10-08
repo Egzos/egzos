@@ -61,14 +61,15 @@ update — zero bytes move (v0.4 §16). Each ancestor renders root-first as `typ
 `user:self/project:health`, or the bare `health`. A tail matches when each segment equals the full
 `type:name` label or the name alone, against the same number of trailing path segments. **running.**
 
-**Disambiguation when a tail matches more than one node is by most recent activity. [0.3 · 1]**
-Recency means the **latest write anywhere in the node's subtree**, not the node's `created_at`: a
-`project:health` the user touched this morning beats one created last week and left dormant. Ties
-break on the node's ULID. **The recency key is computed only over items the caller is served** under
-the serving policy (§4, `capabilities.md` §6 clause 2). A withheld write therefore never changes which
-node is picked: an unverified or quarantined item a client is not served is absent from that
-client's recency, so the pick tells it nothing about content it cannot see. The same key orders results at every layer (`storage.md` §2), so `%n` is
-identical across backends. **decided, not running**: the skeleton orders by `created_at`.
+**A tail that matches more than one node is refused, and nothing is picked. [0.3 · 1, as revised by
+the Chief on 2026-10-03]** The refusal names the matching paths, and the caller answers with a
+longer path or the node id. Any rule that picks — recency of creation or of activity — can be
+steered by whoever writes into one of the candidates, so **recency never disambiguates a path.**
+**The candidates are only the nodes the caller can see**: a node the caller's token does not cover
+answers exactly like an absent one, never makes a reference ambiguous, and is never named in the
+refusal (`capabilities.md` §6). The names are listed sorted by path. **running**:
+`NodeService.resolve_ref` raises `AmbiguousRef`, and the CLI and the MCP door answer with the
+matches (#115).
 
 **Auto-thread naming is fixed at creation. [0.3 · 2]** Pure capture names the thread from the
 **first item's auto-title**, and the name does not change on its own. A later title pass may only
@@ -362,6 +363,14 @@ structure path (`structure_floor`) and the blob path (`inline_max_bytes`), so it
 widen an audience without passing the gate.** `config.set`'s shape is `events.md` §1's.
 **decided, not running.** TODO(a1p): `storage.md` §3 lists only running methods, so the config
 method group's signatures arrive with the Phase 1 issue that builds the config surface.
+
+**A config key MUST NOT hold a secret value.** `config.set` writes the value after the change into
+the chain (`events.md` §1), and the chain is exported with the container and read by its audience,
+so a secret held as a key would be published by the act that set it. The container's own secrets —
+the browser-login secret (`authorization-server.md` §11, [0.3 · 7]) and the `BlobGrant` MAC key
+(`context-item.md` §3, [0.3 · 45]) — are therefore never config keys, and a key added to the table
+later is added only if its value is not a secret. **a1p**, the binding of [0.3 · 40] onto
+`events.md` §4 invariant 4.
 
 ## 9 · What this document does not fix
 
