@@ -79,8 +79,8 @@ decided-pending rows, not here.
   append-only chain is a surveillance record the owner cannot prune. An append with
   `principal: none` under any event other than `authz.login`, `authz.redeem`, `authz.refuse`,
   `authz.release` and `authz.tally` **MUST be rejected**: a read, a pull or an act is never
-  unattributed. `_types.py` pins the five as `PRINCIPAL_NONE_EVENTS`. **decided, not running**
-  (no AS in this tree emits one yet, and the ledger does not check it yet). [0.3 · 34, 35]
+  unattributed. `_types.py` pins the five as `PRINCIPAL_NONE_EVENTS`. **running**: the ledger
+  refuses such an append (#150), though no AS in this tree emits a `none` entry yet. [0.3 · 34, 35]
 - `subject` — the id the event is about (item, node, token, proposal, or a blob's `sha256`).
 - `scope` — the container the event happened in; nullable.
 - `details` — event-specific, open. A reader MUST tolerate unknown keys here.
