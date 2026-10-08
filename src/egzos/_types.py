@@ -191,8 +191,8 @@ class ResolvedItem(TypedDict):
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
-    *Decided, not running.* `sig` is `[OPEN->0.3]`: HMAC over the descriptor with a container key,
-    or the grant id as the bearer secret — A6's call on the enumeration surface.
+    *Decided, not running.* `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]);
+    the grant id is not the bearer secret.
     """
 
     sha256: str
@@ -770,7 +770,9 @@ class BlobStore(Protocol):
 
     def put(self, data: bytes) -> str: ...
     def stage(self, data: bytes) -> str: ...
-    def promote(self, sha: str) -> None: ...
+    def promote(self, sha: str) -> bool: ...
+    #: ^ True if staged bytes moved, False if nothing was staged there. Internal caller only
+    #:   ([0.3 · 43]): the result never crosses an external boundary.
     def get(self, sha: str) -> bytes | None: ...
     def exists(self, sha: str) -> bool: ...
     #: ^ an existence oracle over guessable addresses: never reachable from an external path.
