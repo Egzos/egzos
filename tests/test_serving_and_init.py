@@ -72,3 +72,56 @@ def test_racing_inits_mint_one_owner_and_one_set_of_roots(tmp_path: Path):
     assert len(owners) == 1 and set(tokens) == {owners[0].id}
     users = c.backend.db.execute("SELECT COUNT(*) FROM nodes WHERE type = 'user'").fetchone()[0]
     assert users == 1
+
+
+# --- #118: two deciders racing on one proposal land one decision -------------------------------
+def _parked(home: Path):
+    c = Container(home)
+    t = c.auth.interactive_token()
+    root = c.nodes.user_root()
+    org = c.nodes.create("org", "acme", root, token=t, actor=OWNER, principal=t.principal)
+    proj = c.nodes.create("project", "p", org, token=t, actor=OWNER, principal=t.principal)
+    other = c.nodes.create("project", "q", org, token=t, actor=OWNER, principal=t.principal)
+    c.auth.mint(principal="client", owner=OWNER, client="watcher", role="reader",
+                scopes=[other.id], actor=OWNER, by_principal="interactive")
+    item = c.store.add(body="draft", scope=proj, token=t, actor=OWNER, principal=t.principal)
+    result = c.trust.move(item, other, token=t, actor=OWNER)
+    assert result["gate"] == "pending"
+    return result["proposal"]["id"]
+
+
+def _race(box: Container, tmp_path: Path, monkeypatch, first: str):
+    """B passes execute's pre-lock checks; then, before B takes the lock (while B reads the
+    audience for the manifest), A decides (`first`)."""
+    from egzos.trust import TrustEngine, TrustError
+
+    home = tmp_path / "home"
+    pid = _parked(home)
+    a, b = Container(home), Container(home)
+    ta, tb = a.auth.interactive_token(), b.auth.interactive_token()
+    real = TrustEngine.audience
+
+    def a_decides_first(self, *args, **kw):
+        if self is b.trust and not getattr(self, "_raced", False):
+            self._raced = True
+            getattr(a.trust, first)(pid, token=ta, actor=OWNER)
+        return real(self, *args, **kw)
+
+    monkeypatch.setattr(TrustEngine, "audience", a_decides_first)
+    with pytest.raises(TrustError, match="no open proposal"):
+        b.trust.execute(pid, token=tb, actor=OWNER)
+    c = Container(home)
+    events = [e["event"] for e in c.ledger.tail(50) if e.get("subject") == pid]
+    return c.backend.get_proposal(pid)["status"], events
+
+
+def test_a_second_execute_that_lost_the_race_lands_nothing(box, tmp_path, monkeypatch):
+    status, events = _race(box, tmp_path, monkeypatch, "execute")
+    assert status == "executed"
+    assert events.count("approval.execute") == 1 and "approval.stale" not in events
+
+
+def test_an_execute_that_lost_to_a_deny_lands_nothing(box, tmp_path, monkeypatch):
+    status, events = _race(box, tmp_path, monkeypatch, "deny")
+    assert status == "denied"
+    assert events.count("approval.deny") == 1 and "approval.execute" not in events
