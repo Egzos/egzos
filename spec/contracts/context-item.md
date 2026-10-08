@@ -87,7 +87,8 @@ freeze review; it is not decided here. The descriptor's other fields are
 `{ actor, principal, client, derived_from, imported_from, approved_by }` — **all six present**, null
 where unknown, so a reader never has to distinguish "absent" from "unset". **running**
 
-- `principal` is `interactive | client` (see `capabilities.md` §3).
+- `principal` is `interactive | client` (see `capabilities.md` §3) — a token's principal, never the
+  audit-only `none`; `_types.py` types it `TokenPrincipal`.
 - `derived_from` is the item this one was derived from. **Quarantine propagates along it**: see
   `container.md`.
 - `approved_by` is stamped by promotion and is null until then.

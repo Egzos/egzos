@@ -56,14 +56,25 @@ the capabilities**, not the bundle name — a bundle's later redefinition cannot
 
 ## 3 · Principals
 
-`interactive | client`. A bearer token cannot prove a human, so the token carries the claim and the
-container enforces on it. **running**
+`interactive | client | none`. A bearer token cannot prove a human, so the token carries the claim
+and the container enforces on it. **running** for the first two; `none` is **decided, not running**
+([0.3 · 34]).
+
+**A token carries `interactive` or `client`, never `none`.** `none` is an *audit entry's* principal
+only: the value `events.md` §2 writes when an append has no caller to name —
+`authorization-server.md` §12.2's rows (a), (b), (d), (e) and (h), which fire before any session or
+token exists, or on no request at all. A third closed word rather than a nullable field, so that
+`principal` stays mandatory and every `audit` reader carries no null branch. `_types.py` types this
+split: `Principal` is the three words, `TokenPrincipal` the two a `Token`, an `AudienceMember` or an
+item's provenance may carry.
 
 - `principal: interactive` — established, for browser sessions, by the login PKCE performs against
   the container. The flow is `authorization-server.md` §2; **where in it the principal is established
   is issue #61** (Part B, presence composition), as `container.md` §9 already says. In the skeleton
   the interactive owner token *is* the proof; the step-up tap arrives at Phase 2.2.
 - `principal: client` — every machine client.
+- `principal: none` — no caller. It is never minted onto a token and never presented, so no
+  surface enforces on it; it exists only in the chain.
 - **`serve` refuses to run on an interactive token.** The door is not opened with the human's own
   credential. **running**
 
