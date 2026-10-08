@@ -448,7 +448,7 @@ under any cause.** Testable as written:
    credential, which it already knows. An implementation that pads it fully is conforming, one that
    does not is conforming too, and neither may widen the first two, which stay MUSTs.
    **Decided-pending: [0.3 · 42]'s rewrite of `capabilities.md` §6 into numbered binding clauses —
-   where a container-wide timing posture is to be stated — lands in #109 PR 2 and is not in this
+   where a container-wide timing posture is to be stated — lands in #109 PR 2b and is not in this
    tree**, so nothing outside this clause carries the SHOULD. **The first two differences' padding is a named
    spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
@@ -692,7 +692,7 @@ which is why §9.1's opening clause names the source and this one names the amou
 It is **not** the whole requirement, and the rest is **decided-pending**: `token mint` is the
 owner's own path, so a floor binding only the AS leaves the same forgeable value reachable through
 another verb, and `capabilities.md` §5 must carry the container-wide clause. **That text lands in
-#109 PR 2 and is not in this tree**; nothing below defers to it in the meantime.
+#109 PR 2b and is not in this tree**; nothing below defers to it in the meantime.
 
 Two readings the number does not have:
 
@@ -829,8 +829,8 @@ count them rather than trust the number, each now with its disposition:
 | 7 | a **device authorization is requested** (§3) | **none** — *partly* covered by 3/4 plus §12's redemption row; see below |
 
 **Three of this table's rows are decided-pending, and the pending half is `events.md`'s.** `authz.grant` (rows 3, 4) and
-`client.register` (row 6) are **not** among `events.md` §1's eighteen names, and §4 invariant 2's amendment that row 5
-needs is unwritten. **All three edits land in #109 PR 2 and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3
+`client.register` (row 6) are **not** among `events.md` §1's names, and §4 invariant 2's amendment that row 5
+needs is unwritten. **All three edits land in #109 PR 2b and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3
 · 38]**). Until it merges `events.md` governs as it stands — an append under either new name MUST be rejected, row 5's
 silence is a conformance failure — so **no implementation may be built against this table yet.**
 
@@ -1063,7 +1063,7 @@ act of another (`container.md`'s R11 scoping). So the lookup for any of the thre
 source, destination and manifest shape, and a call site missing one of them cannot evaluate the gate.
 
 **`capabilities.md` §4 is amended to name this backstop. [0.3 · 38]** — **decided-pending**: §4
-today states only the principal gate, and the amendment lands with #109 PR 2. Until it merges, a
+today states only the principal gate, and the amendment lands with #109 PR 2b. Until it merges, a
 builder following §13's pointer to `capabilities.md` must read this section beside it: the principal
 gate there is the floor, and this backstop is the second, mandatory half.
 
@@ -1236,14 +1236,18 @@ string the container has ever seen — so a caller comparing two redirects is co
 requests. **The invariant this ordering needs is that nothing the AS knows varies, not that the bytes
 do not**, and §5.3 and §10.2 now state it in those terms.
 
-**The redirect of substep 3 appends nothing, and stores nothing**, and both are deliberate rather
-than an omission from §12's table: it performs no read — not §11.1's keyed entry, not §11.3's —
-decides nothing about the request, and changes no container state, so there is no effect for
-`events.md` §4 invariant 2 to require an entry of. The pending request rides in `continue` (§11.7)
+**The redirect of substep 3 appends nothing, and stores nothing about the request**, and both are
+deliberate rather than an omission from §12's table: it performs no read — not §11.1's keyed entry,
+not §11.3's — and decides nothing about the request. **The container state it changes is two counts
+and nothing else:** the throttle counter's increment, and §12 row (h)'s per-window count of
+admitted session-less 303s (`redirected`), which the throttle's timer appends once at the window's
+close — so the effect invariant 2 requires an entry of has one, and the 303 itself owes none. The
+pending request rides in `continue` (§11.7)
 precisely so that no server-side record has to be written to hold it: a design that parked the
 request in container state would hand an unauthenticated sweep something to *grow*, which is the very
-thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. What the sweep does produce is
-the counter's increment, and the attempt that
+thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. A count does not grow with what
+the sweep sends, only with how often. What the sweep produces in the chain is row (h)'s one entry per
+window, and the attempt that
 engages the throttle appends once under §12.1 rule 3 as row (d) cause `throttled`. That entry, and
 one row (d) `token_presented` entry per evaluated attempt that presents a bearer credential (§10.2,
 bounded by the same counter), are the whole of an unauthenticated *caller's* reach into the chain at
@@ -1521,8 +1525,10 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
     targets consume none.
   - **Nothing is written to container state to make this work.** The request rides in the redirect,
     not in a server-side pending record. This is what keeps §11.0's substep 3 a step that appends
-    nothing and stores nothing, and it is why an unauthenticated sweep cannot make the container
-    retain anything (§12.1 rule 3). **The login form's carrier is not an exception to this.** The
+    nothing and stores nothing about the request, and it is why an unauthenticated sweep cannot make
+    the container retain anything of what it sent (§12.1 rule 3). The 303 does change two counts —
+    the throttle counter and §12 row (h)'s per-window `redirected` tally (§11.0) — and neither holds
+    a byte of the request. **The login form's carrier is not an exception to this.** The
     hidden field or `action` query named two bullets above lives in the response the AS renders and
     comes back on the POST the browser sends; the AS retains nothing between the two, and a caller
     that never posts leaves nothing behind. What this bullet forbids is a **server-side pending
@@ -1608,8 +1614,14 @@ both answered: §9.2's client path keyed on the token *value*, and this owner pa
 3. **A refusal is uniform and appends.** An id that does not exist and one the session may not reach
    get the same response, §7.1's rule applied to an identifier; the attempt appends once with its
    cause in `details`, so the refusal path leaves a trace as the success path does. It carries
-   `principal: interactive` (**a1p**): the page is reached only inside a session. TODO(a1p), #144:
-   its name, which with §12's seven makes **eight** new names for #109 PR 2's `events.md` amendment.
+   `principal: interactive` (**a1p**): the page is reached only inside a session. **Its event is
+   `authz.revoke_refuse`, outcome `refused`, and `details.cause` is one closed word: `unknown` (no
+   token has that id) · `unreachable` (one does, and the session may not reach it) · `throttled`
+   (the attempt that engages the `revoke` throttle, on §12.1 rule 3's terms: every further attempt
+   while it holds is counted, not appended, and rule 5's release closes the pair). a1p, #144** —
+   pinned as `AS_REVOKE_REFUSAL_CAUSES`. Not `authz.refuse` (row (d), pre-trust) or `authz.reject`
+   (row (f), post-trust): a revoke is neither tier of `/authorize`, and an `audit` query should not
+   have to read `details` to tell the three apart.
 
 **The flagship dashboard.** It is a separate origin reaching this AS as a browser client, so it holds
 no session on the container's pages and cannot use the owner path. It can revoke the token it holds
@@ -1632,16 +1644,15 @@ keeps them with #68's batch and `events.md` rather than here.
 `throttled` and `token_presented` causes before any session exists either, (e) on no request at all
 (§12.2), the rest inside a session §11.0's substep 3 has already required — **each now has an event
 name. [0.3 · 33, 36]** `events.md` §4 invariant 2 (*"A surface that produces an effect without a
-corresponding event is non-conforming"*) and §1's closed vocabulary can both hold here once the names
-are in `events.md` §1.
+corresponding event is non-conforming"*) and §1's closed vocabulary both hold here: the names are
+in `events.md` §1.
 
 **Five `authz.*` events for the pre-authorization surfaces, a sixth for the render, a seventh for
 the tally. [0.3 · 33, 36], #140** The rows are `spec/design/consent.md` §14.8's (a), (b), (d), (e)
 and (f); its (c), a consent denial, is `authz.grant` with `decision: denied` (§9.3, **[0.3 · 29]**).
 Row (g) is the record's sixth row: a rendered consent screen appends. Row (h) is the Chief's #140.
-**The names are a1p's**, in `events.md`'s `noun.verb` shape. **Decided-pending:** the seven names
-enter `events.md` §1 and `_types.py`'s `Event` with #109 PR 2 (eight with §11.9's), and until it
-merges an append under any of them MUST be rejected, as §9.3 states for its own two.
+**The names are a1p's**, in `events.md`'s `noun.verb` shape. The seven are in `events.md` §1 and
+`_types.py`'s `Event`, eight with §11.9's `authz.revoke_refuse`, all **decided, not running**.
 
 | | the effect | event | outcome | `details.cause`, a closed word |
 |---|---|---|---|---|
@@ -1714,7 +1725,8 @@ rule 3's count while a throttle holds).
 Each is bounded — one keyed entry, a count and a timestamp, one record — so none carries out
 anything an unrecorded read would hide. **§11.4's request-keyed read, §12's fourth (**[0.3 · 27]**),
 is not an instance**: every path through it appends — row (d) `replayed` on a match, otherwise (d),
-(f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in `events.md` §4 with PR 2.
+(f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in `events.md` §4 with #109
+PR 2b.
 
 **A session-less 303 to `/login` counts toward the throttle. [0.3 · 37]** Substep 3 runs after
 substep 2, so every session-less `/authorize` adds to both §11.0 buckets. A sweep that engages
@@ -1764,7 +1776,8 @@ naming decision:
    reaches a response that depends on the registry. **(d)'s other five causes and the whole of (f)
    are not reachable unauthenticated** — a
    session-less `/authorize` is a 303 to `/login` before either validation tier, and the redirect
-   appends nothing and stores nothing. Nothing here says a client id or a registered redirect URI may be learned: §11.1's
+   appends nothing and stores nothing about the request — it changes only the throttle counter and
+   row (h)'s per-window `redirected` count, which the timer appends once per window (§11.0). Nothing here says a client id or a registered redirect URI may be learned: §11.1's
    *"a caller must not learn that a client id exists"* and §5.3 clause 2's time budget hold
    undiminished, and this rule takes no position on what a caller knows — only on what an
    **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
@@ -1832,11 +1845,12 @@ naming decision:
 
 ### 12.2 · What `actor` and `principal` carry when there is no caller
 
-`events.md` §2 makes `actor` and `principal` **mandatory** on every entry, and `capabilities.md` §3
-closes `principal` to `interactive` · `client`. None of the five can satisfy that: (a) fires on
-`/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before any
-token exists; and (e) fires on **no attempt at all** — a timer releasing, with no caller in any
-request. The record closes the gap as follows; the text that carries it is `events.md`'s and
+`events.md` §2 makes `actor` and `principal` **mandatory** on every entry, and before 0.3
+`capabilities.md` §3 closed `principal` to `interactive` · `client`. None of the five, nor (h), could
+satisfy that: (a)
+fires on `/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before
+any token exists; and (e) and (h) fire on **no attempt at all** — a timer releasing or tallying, with
+no caller in any request. The record closes the gap as follows; the text that carries it is `events.md`'s and
 `capabilities.md`'s.
 
 **a1p's reading, taken by the record. [0.3 · 34, 35]**
@@ -1855,7 +1869,9 @@ request. The record closes the gap as follows; the text that carries it is `even
   `window_key` (**a1p**'s name) — a per-container, per-window value derived from the bucket that
   engaged (§11.0), never the key itself,
   rotating with the window. It correlates the entries of one sweep and correlates nothing across
-  time, which is the whole of what pairing needs.
+  time, which is the whole of what pairing needs. **Row (h) carries the same per-window key**,
+  derived the same way from `/authorize`'s container-global bucket (§12), so a tally joins the
+  engage and release pair of that bucket's window.
 
 **Which rows carry `none`. a1p**, binding item 34, which names the value and not its rows: (a), (b),
 (e), (h) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its
@@ -1864,9 +1880,9 @@ seven causes, although five are reached only inside a session, so that a reader 
 the principal which cause a uniform page had, or whether a throttled caller held a session. (f) and (g) are not
 uniform pages and are reached only inside a session, where `interactive` is available and true.
 
-**Decided-pending:** `none` enters `capabilities.md` §3 and `_types.py`'s `Principal`, and
-`events.md` §2's entry description states all of the above, with #109 PR 2. Nothing on any page
-depends on any of it; `consent.md` §14.8 says so in its own words.
+`none` is in `capabilities.md` §3 and `_types.py`'s `Principal` — an audit entry's principal only,
+never a token's (`TokenPrincipal`) — and `events.md` §2's entry description states the above.
+Nothing on any page depends on any of it; `consent.md` §14.8 says so in its own words.
 
 ## 13 · What this document does not fix
 
@@ -1879,7 +1895,7 @@ drawn. That closes §14's list: every item is now cited by number somewhere in P
 carries item 3's render half, §7 its vocabulary half — and Part B answers or routes each. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`; **#68** (§9.3's effects) and **#86** (§12's rows) were settled in the one 0.3
-sitting, and their `events.md` text is decided-pending with #109 PR 2. The MCP-specific surface → contract v1.1
+sitting; §12's names are in `events.md` §1, and §9.3's `events.md` text is decided-pending with #109 PR 2b. The MCP-specific surface → contract v1.1
 at the Phase 5 boundary (§4). The step-up tap's endpoints, token shape and window mechanics → Phase
 2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10.5's `[LEAN]` fixes none of them, and
 §10.4's backstop is written in terms of *a live presence window* so that it does not depend on how the

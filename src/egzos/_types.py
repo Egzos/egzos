@@ -41,8 +41,15 @@ ROLE_BUNDLES: dict[Role, frozenset[Capability]] = {
     "admin": frozenset(CAPABILITIES),
 }
 
-Principal = Literal["interactive", "client"]
+Principal = Literal["interactive", "client", "none"]
+#: `none` is an AUDIT ENTRY's principal, never a token's (capabilities.md §3, [0.3 · 34]): the
+#: pre-authorization appends that have no caller to name (authorization-server.md §12.2).
 PRINCIPALS: tuple[Principal, ...] = get_args(Principal)
+
+#: What a token, an audience member or an item's provenance can carry: `none` excluded by type, so
+#: a token minted for nobody is a type error rather than a value a check has to remember to refuse.
+TokenPrincipal = Literal["interactive", "client"]
+TOKEN_PRINCIPALS: tuple[TokenPrincipal, ...] = get_args(TokenPrincipal)
 
 #: Outside the capability vocabulary by construction: no token reaches these, `admin` included.
 #: A client principal can only propose. Not configurable, at any deployment.
@@ -53,7 +60,7 @@ class Token(TypedDict):
     """`scopes` are node ids; coverage is computed down the path AT CHECK TIME. `["*"]` = owner."""
 
     id: str
-    principal: Principal
+    principal: TokenPrincipal
     owner: str
     client: str
     capabilities: list[Capability]
@@ -98,7 +105,7 @@ class Provenance(TypedDict):
     """All six keys present, null where unknown — never absent-vs-unset."""
 
     actor: str | None
-    principal: Principal | None
+    principal: TokenPrincipal | None
     client: str | None
     derived_from: str | None
     imported_from: str | None
@@ -217,13 +224,34 @@ Event = Literal[
     "token.revoke",
     "item.tombstone",
     "blob.grant",
+    "authz.login",
+    "authz.redeem",
+    "authz.refuse",
+    "authz.release",
+    "authz.reject",
+    "authz.render",
+    "authz.tally",
+    "authz.revoke_refuse",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
 #: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
 #: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
-#: code that emits it. events.md §1 says the same thing from the contract's side.
+#: code that emits it. The eight `authz.*` names are the same case: decided at the 0.3 freeze
+#: (authorization-server.md §12 rows (a), (b), (d)–(h) and §11.9; [0.3 · 33, 36], #140, #144), with
+#: no AS in this tree to emit them. events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
+
+#: The only events an entry with `principal: none` may carry (events.md §2): the caller-less rows
+#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2. An append with `principal: none`
+#: under any other event MUST be rejected — a read or an act is never unattributed. [0.3 · 34]
+PRINCIPAL_NONE_EVENTS: tuple[Event, ...] = (
+    "authz.login",
+    "authz.redeem",
+    "authz.refuse",
+    "authz.release",
+    "authz.tally",
+)
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
 GENESIS_HASH: str = "0" * 64
@@ -240,7 +268,7 @@ class AuditEntry(TypedDict):
     ts: str
     event: Event
     actor: str
-    principal: Principal
+    principal: Principal  # `none` only under PRINCIPAL_NONE_EVENTS (events.md §2)
     subject: str | None
     scope: str | None
     details: dict[str, Any]
@@ -297,7 +325,7 @@ class AudienceMember(TypedDict):
     token: str
     owner: str
     client: str
-    principal: Principal
+    principal: TokenPrincipal
     role: Role
 
 
@@ -484,8 +512,7 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
 #: ([0.3 · 11]). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
 #: identifier may key a throttle bucket (§11.0, [0.3 · 24]) and never enters the chain.
-#: The event NAMES these entries append under are decided (§12, [0.3 · 33]) and land in
-#: `events.md` §1 and `Event` with #109 PR 2 — so there is no constant for them here yet.
+#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]).
 ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
@@ -497,8 +524,8 @@ AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 #: `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not silently
 #: absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because §11.5
 #: clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s own
-#: paragraph). These four are closed; the event *names* these causes travel under are decided at
-#: §12 ([0.3 · 33]) and reach `Event` with `events.md` in #109 PR 2.
+#: paragraph). These four are closed; the event *names* these causes travel under are §12's
+#: ([0.3 · 33]): `authz.login`, `authz.redeem`, `authz.refuse` and `authz.reject` in `Event`.
 LoginCause = Literal["wrong", "unknown", "throttled"]
 AS_LOGIN_CAUSES: tuple[LoginCause, ...] = get_args(LoginCause)
 
@@ -520,6 +547,14 @@ AuthorizePosttrustCause = Literal["vocabulary", "scope"]
 AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[AuthorizePosttrustCause, ...] = get_args(
     AuthorizePosttrustCause
 )
+
+#: §11.9 item 3 — the closed `details.cause` of `authz.revoke_refuse`, the owner-path revoke
+#: refusal (#144, a1p). `unknown`: no token has that id; `unreachable`: one exists and the session
+#: may not reach it; `throttled`: the attempt that engages the `revoke` throttle (§12.1 rule 3).
+#: Both of the first two get the same response (§7.1); the cause is the owner's ledger's, never
+#: the page's.
+RevokeRefusalCause = Literal["unknown", "unreachable", "throttled"]
+AS_REVOKE_REFUSAL_CAUSES: tuple[RevokeRefusalCause, ...] = get_args(RevokeRefusalCause)
 
 #: §11.6 — a standard error redirect from `/authorize` carries exactly these two keys and nothing
 #: else. `error_description` and `error_uri` are MUST NOT, with any value, under any cause — removed
@@ -746,6 +781,7 @@ __all__ = [
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
+    "AS_REVOKE_REFUSAL_CAUSES",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
     "AS_SESSION_ABSOLUTE_SECONDS",
@@ -788,6 +824,7 @@ __all__ = [
     "LoginCause",
     "Node",
     "PRINCIPALS",
+    "PRINCIPAL_NONE_EVENTS",
     "PROPOSAL_STATUSES",
     "PROPOSAL_WIRE_KEY_FROM",
     "PersonalRootMode",
@@ -799,6 +836,7 @@ __all__ = [
     "ROLE_BUNDLES",
     "ROOT_TYPES",
     "ResolvedItem",
+    "RevokeRefusalCause",
     "Role",
     "RootType",
     "SERVING_POLICY",
@@ -806,10 +844,12 @@ __all__ = [
     "STRUCTURE_FLOORS",
     "ServingPolicy",
     "StructureFloor",
+    "TOKEN_PRINCIPALS",
     "TRUST_STATUSES",
     "TextContent",
     "ThrottleSurface",
     "Token",
+    "TokenPrincipal",
     "Trust",
     "TrustStatus",
     "VERIFIED_ONLY_KINDS",
