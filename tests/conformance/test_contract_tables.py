@@ -35,11 +35,20 @@ import egzos._types as t
 
 CONTRACTS = Path(__file__).resolve().parents[2] / "spec" / "contracts"
 
-_WORDS = (
+_UNITS = (
     "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen "
-    "fifteen sixteen seventeen eighteen nineteen twenty"
+    "fifteen sixteen seventeen eighteen nineteen"
 ).split()
-NUMBER_WORDS = {word: value for value, word in enumerate(_WORDS)}
+_TENS = "twenty thirty forty fifty sixty seventy eighty ninety".split()
+NUMBER_WORDS = {word: value for value, word in enumerate(_UNITS)}
+for _tens, _ten in enumerate(_TENS, start=2):
+    NUMBER_WORDS[_ten] = _tens * 10
+    for _unit in range(1, 10):  # "twenty-seven": the hyphenated compounds up to ninety-nine (#148)
+        NUMBER_WORDS[f"{_ten}-{_UNITS[_unit]}"] = _tens * 10 + _unit
+
+#: A spelled-out count in a prose pattern, hyphenated compound included — `\w+` alone reads
+#: "Twenty-seven names" as "seven names" (#148).
+NUM = r"(\w+(?:-\w+)?)"
 
 _CODE = re.compile(r"`([^`\n]+)`")
 _BRACE = re.compile(r"\{([^{}]*)\}")
@@ -257,8 +266,8 @@ def check_container_config(md: str) -> None:
     assert set(documented) == set(mapping), f"{where}: table keys vs the wire-key mapping"
 
     # Both count sentences §8 carries, each against the thing it counts.
-    assert_counted(body, r"\b(\w+)\s+keys\b", len(mapping), where=where)
-    assert_counted(body, r"\b(\w+)\s+rows\b", len(rows), where=where)
+    assert_counted(body, r"\b" + NUM + r"\s+keys\b", len(mapping), where=where)
+    assert_counted(body, r"\b" + NUM + r"\s+rows\b", len(rows), where=where)
 
     for wire_key, field in mapping.items():
         typed = t.CONTAINER_CONFIG_DEFAULTS[field]
@@ -283,6 +292,38 @@ def test_container_config_table_matches_the_typed_defaults() -> None:
     check_container_config(doc("container.md"))
 
 
+def check_exceptions(
+    body: str, status_of: dict[str, str], counts: Counter[str], *, where: str
+) -> list[tuple[str, list[str], str]]:
+    """The count sentences of the form *word (`event`, …) is/are status*, each checked: every code
+    span is an event in `EVENTS` or a family glob matching one, the status agrees with the table,
+    and the count word equals the table's count of rows with that status."""
+    found = []
+    prose = body.replace("**", "")  # code ticks kept: the names are read from them
+    pattern = NUM + r"\s+\(([^()]*)\)\s+(?:is|are)\s+(reserved|decided)"
+    for word, inner, status in re.findall(pattern, prose, re.IGNORECASE):
+        named = []
+        for span in _CODE.findall(inner):
+            if span.endswith(".*"):
+                family = [e for e in t.EVENTS if e.startswith(span[:-1])]
+                assert family, f"{where}: the prose names `{span}`, which matches no event"
+                named += family
+            else:
+                assert span in t.EVENTS, f"{where}: the prose names `{span}`, not in `EVENTS`"
+                named.append(span)
+        assert named, f"{where}: the parenthetical after {word!r} names no event"
+        for event in named:
+            assert status_of[event].startswith(status), (
+                f"{where}: the prose calls `{event}` {status}, the table: {status_of[event]!r}"
+            )
+            assert NUMBER_WORDS.get(word.lower()) == counts[status_of[event]], (
+                f"{where}: the prose counts {word} {status_of[event]!r} events, the table has "
+                f"{counts[status_of[event]]}"
+            )
+        found.append((word, named, status))
+    return found
+
+
 # --- events.md §1–§2 · the taxonomy (F8) -------------------------------------------------------
 def test_event_table_matches_the_typed_vocabulary() -> None:
     where = "events.md §1"
@@ -292,7 +333,7 @@ def test_event_table_matches_the_typed_vocabulary() -> None:
     names = [one_code(row[0], where=where) for row in rows]
     assert len(names) == len(set(names)), f"{where}: the table lists an event twice: {names}"
     assert set(names) == set(t.EVENTS), f"{where}: the table and `EVENTS` list different events"
-    assert_counted(body, r"\b(\w+)\s+names\b", len(t.EVENTS), where=where)
+    assert_counted(body, r"\b" + NUM + r"\s+names\b", len(t.EVENTS), where=where)
 
 
 def test_event_status_counts_match_the_prose_sentence() -> None:
@@ -304,21 +345,14 @@ def test_event_status_counts_match_the_prose_sentence() -> None:
     status_of = {one_code(row[0], where=where): plain(row[-1]).strip().lower() for row in rows}
     counts = Counter(status_of.values())
 
-    assert_counted(body, r"\b(\w+)\s+run\b", counts["running"], where=where)
+    assert_counted(body, r"\b" + NUM + r"\s+run\b", counts["running"], where=where)
 
-    # The sentence names its own exceptions — "one (`step_up`) is **reserved**". Read the names
-    # out of it, so this test carries no event name of its own.
-    exceptions = re.findall(r"\b(\w+)\s+\(([\w.]+)\)\s+is\s+(reserved|decided)", plain(body))
+    # The sentence names its own exceptions — "one (`step_up`) is **reserved**", or "nine
+    # (`blob.grant` and the eight `authz.*` rows) are **decided, not running**". Read the names
+    # out of its code spans, so this test carries no event name of its own; a family glob such as
+    # `authz.*` stands for every event it matches and must match at least one (#148).
+    exceptions = check_exceptions(body, status_of, counts, where=where)
     assert exceptions, f"{where}: the sentence no longer names the non-running events"
-    for word, event, status in exceptions:
-        assert event in t.EVENTS, f"{where}: the prose names `{event}`, which is not in `EVENTS`"
-        assert status_of[event].startswith(status), (
-            f"{where}: the prose calls `{event}` {status}, the table calls it {status_of[event]!r}"
-        )
-        assert NUMBER_WORDS[word] == counts[status_of[event]], (
-            f"{where}: the prose counts {word} {status_of[event]!r} events, the table has "
-            f"{counts[status_of[event]]}"
-        )
 
 
 def test_audit_entry_fields_match_the_entry_block() -> None:
@@ -356,7 +390,7 @@ def test_provenance_keys_match_the_six_the_document_counts() -> None:
     body = section(doc("context-item.md"), "4", where=where)
     documented = brace_list(body, where=where)
     assert set(documented) == set(t.Provenance.__annotations__), f"{where}: vs `Provenance`"
-    assert_counted(body, r"all\s+(\w+)\s+present", len(documented), where=where)
+    assert_counted(body, r"all\s+" + NUM + r"\s+present", len(documented), where=where)
 
 
 def test_trust_statuses_and_their_additional_fields() -> None:
@@ -462,7 +496,7 @@ def test_authorize_pretrust_names_its_own_addition_over_the_design_spec() -> Non
     body = section(doc("authorization-server.md"), "12", where=where, nested=False)
 
     inherited = code_run(body, where=where, anchor="closes at")
-    assert_counted(body, r"closes\s+at\s+(\w+)\s+causes", len(inherited), where=where)
+    assert_counted(body, r"closes\s+at\s+" + NUM + r"\s+causes", len(inherited), where=where)
 
     named = re.search(r"`([\w.]+)`\s+is\s+this\s+Part's\s+own\s+addition", body)
     if named is None:
@@ -479,7 +513,10 @@ def test_authorize_posttrust_excludes_the_cause_it_narrows_away() -> None:
     where = "authorization-server.md §12, row (f)"
     body = section(doc("authorization-server.md"), "12", where=where, nested=False)
     assert_counted(
-        body, r"\b(\w+)\s+closed\s+causes\b", len(t.AS_AUTHORIZE_POSTTRUST_CAUSES), where=where
+        body,
+        r"\b" + NUM + r"\s+closed\s+causes\b",
+        len(t.AS_AUTHORIZE_POSTTRUST_CAUSES),
+        where=where,
     )
     narrowed = re.search(r"`([\w.]+)`\s+is\s+not\s+a\s+closed\s+cause", body)
     if narrowed is None:
@@ -533,7 +570,8 @@ def test_storage_method_sets_match_the_protocols(number: str, protocol: type) ->
 def test_container_state_method_count_sentence() -> None:
     where = "storage.md §3"
     body = section(doc("storage.md"), "3", where=where, nested=False)
-    assert_counted(body, r"\ball\s+(\w+)\b", len(protocol_methods(t.ContainerState)), where=where)
+    methods = len(protocol_methods(t.ContainerState))
+    assert_counted(body, r"\ball\s+" + NUM + r"\b", methods, where=where)
 
 
 def test_blob_grant_descriptor_agrees_across_both_documents() -> None:
@@ -589,3 +627,26 @@ def test_meta_a_changed_default_fails() -> None:
     assert broken != md
     with pytest.raises(AssertionError):
         check_container_config(broken)
+
+
+def test_meta_a_compound_count_that_disagrees_fails() -> None:
+    """#148: a hyphenated count is read whole, and a wrong one still fails."""
+    assert_counted("Twenty-seven names are listed", r"\b" + NUM + r"\s+names\b", 27, where="meta")
+    with pytest.raises(AssertionError):
+        assert_counted("Twenty-seven names", r"\b" + NUM + r"\s+names\b", 26, where="meta")
+    with pytest.raises(AssertionError):  # "seven names" inside the compound is not a second count
+        assert_counted("Twenty-seven names", r"\b" + NUM + r"\s+names\b", 7, where="meta")
+
+
+def test_meta_an_exception_sentence_that_miscounts_fails() -> None:
+    """#148: the plural form with a family glob is checked, not skipped."""
+    status_of = dict.fromkeys(t.EVENTS, "running")
+    status_of["blob.grant"] = "decided, not running"
+    counts = Counter(status_of.values())
+    ok = "one (`blob.grant`) is **decided, not running**"
+    assert check_exceptions(ok, status_of, counts, where="meta")
+    with pytest.raises(AssertionError):
+        check_exceptions(ok.replace("one", "two"), status_of, counts, where="meta")
+    with pytest.raises(AssertionError):
+        check_exceptions("two (`blob.grant` and `no.such.*`) are decided", status_of, counts,
+                         where="meta")
