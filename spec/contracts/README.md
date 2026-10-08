@@ -1,6 +1,6 @@
 # spec/contracts/
 
-**Status: frozen at 0.3 (Chief, date of merge).** The freeze is the Chief's merge of the commit that
+**Status: frozen at 0.3 (Chief, 2026-10-08).** The freeze is the Chief's merge of the commit that
 set this line, dated by that merge, after the Phase 0.3 review by A6 and the Chief personally.
 a1p-planner prepared the text and did not declare it. From that merge, every document below is law.
 
