@@ -1,7 +1,8 @@
 # Contract · Storage
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** The walking skeleton (`chief/walking-skeleton`, `docs/build/WALKING-SKELETON.md` §7)
 runs **one wide `Backend` Protocol** — `src/egzos/backends/base.py`, implemented by
@@ -14,8 +15,10 @@ verbatim from the running code — the *methods* are running, the *partition* is
 review must read §1–§3 knowing it is reading a **decided split, not a running one**.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a Chief
-freeze decision F1–F5 the skeleton does not yet execute), or `[OPEN→0.3]` (the freeze review must
-settle it — deliberately not decided here).
+freeze decision F1–F5 or 0.3 decision the skeleton does not yet execute). A `[0.3 · N]` marking
+cites item `N` of the Chief's freeze record on #31 (2026-10-03). The open→0.3 marking the draft
+carried is gone from `spec/contracts/` and `src/`: the record answered every one. The design specs
+still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 
 ## 1 · Three contracts, not one (F3)
 
@@ -43,11 +46,12 @@ reading a change to a previously decided sentence, and should review it as one. 
 effect the Chief named: a mem0 or zep backend is no longer "partial by construction", because the
 part it could not honestly implement is no longer in the contract it implements.
 
-`[OPEN→0.3]` **Whether `ContainerState` may be delegated to a *self-hosted* postgres** — Phase 5
-puts postgres behind both contracts, and a container's own postgres is not a "third-party store" in
-F3's sense. F3 says "postgres at Phase 5, never delegated to a third-party store" and does not draw
-the line between *operating* a substrate and *delegating* to one. The freeze review should draw it,
-because Phase 5 is where the distinction first has to hold.
+**`ContainerState` may run on the operator's own self-hosted postgres. [0.3 · 5]** Operating a
+substrate is not delegating to one: a container's own postgres, run by the operator who runs the
+container, is not a "third-party store" in F3's sense. **Delegation to a third-party store stays
+forbidden** — mem0, zep, a hosted vector database, or any service whose operator is not the
+container's. The line is who operates the substrate, not which engine it is. **decided, not
+running** (postgres is Phase 5).
 
 ## 2 · `ItemStore` — pluggable, delegable
 
@@ -81,18 +85,20 @@ trust decisions inside a substrate a third party may have written. **running.**
 `text` is a **substring** match in the skeleton (`doc LIKE`), deliberately degraded — embeddings are
 Phase 1 and Store's, not the backend's. **running.**
 
-`[OPEN→0.3]` **Whether `text` stays lexical at this boundary.** A delegated mem0/zep store does
-semantic retrieval natively, and pgvector does it in the same query; pushing `text` down would mean
-identical calls return different result *sets* per backend, which the resolver above cannot correct
-for. Either `text` is contractually lexical and semantic search is a separate Store-side surface, or
-the contract admits per-backend retrieval and says so. No source settles this and it is the
-pluggable contract's central question — not decided here.
+**`text` is lexical on every backend. [0.3 · 6]** A delegated mem0/zep store does semantic
+retrieval natively, and pgvector does it in the same query, but `ItemStore.text` stays a lexical
+match everywhere, so identical calls return identical result *sets* on every conforming backend and
+the resolver above never has to correct for a backend's retrieval. **Semantic search is a separate
+surface on the Store side**, above this boundary (Phase 1's embeddings), never a reinterpretation of
+`text`. **running** (substring match).
 
-`[OPEN→0.3]` **Whether result ordering is contractual.** The skeleton orders `created_at DESC`. If
-ordering is the backend's choice, the resolver's recency tie-break is non-deterministic across
-backends, and `%n` positional refs differ between two conforming containers. This is the same
-unsettled question as path disambiguation by recency (`WALKING-SKELETON.md` §"still open" item 1) at
-a different layer; the review should settle both together.
+**Result ordering is contractual. [0.3 · 1]** `query` returns candidates ordered by **most recent
+activity, then ULID**, newest first, where an item's activity is its own latest write, so `%n`
+positional refs are identical between two conforming containers. A backend that orders otherwise is
+non-conforming. This key orders **results** only. Since the Chief's revision of item 1 it
+disambiguates nothing: an ambiguous path is refused (`container.md` §2), so no ordering here can
+steer which node a reference names. **decided, not running**: the skeleton orders
+`created_at DESC`.
 
 ### `tombstone` and `get`
 
@@ -148,7 +154,7 @@ fixes only how those shapes are **persisted**.
 ```
 put(data)      -> sha256        # promoted store, dedup by construction
 stage(data)    -> sha256        # staging prefix, invisible to resolution
-promote(sha)   -> None          # staging -> promoted, on approval
+promote(sha)   -> bool          # staging -> promoted, on approval
 get(sha)       -> bytes | None
 exists(sha)    -> bool
 ```
@@ -156,6 +162,15 @@ exists(sha)    -> bool
 Two prefixes under the blob root: `sha256/<hash>` for promoted bytes and `staging/<hash>` for staged
 bytes. `put` is idempotent — an identical write of existing content is a no-op returning the same
 address. **running.**
+
+**Dedup is unobservable. [0.3 · 41]** `put` and `stage` are internal to the storage boundary: no
+external surface calls either or sees its result beyond the content address of the bytes the caller
+itself supplied. **`blob.put` is emitted on every `put`**, a deduplicated one included, so neither
+the response nor the ledger tells a caller whether the bytes were already stored. **`stage` does not
+dedup against the promoted store**: staging bytes that are already promoted writes them to
+`staging/` like any other, so staging never answers whether content exists. **running**: the skeleton's one
+`put` path (`Store.add` with a file, `store/items.py`) appends `blob.put` after every `put`, whether or not
+the bytes were already stored.
 
 ### Store/Vault never mints a URL on its own authority
 
@@ -170,8 +185,8 @@ descriptor, `blob.pull` when the bytes are actually served (`events.md`). One wi
 finding, not a shortcut. **decided, not running** — the skeleton serves `text/*` inline at or below
 64 KiB, records every pull, and has no grant.
 
-The descriptor is `{sha256, item, token, expires_at, sig}`; `sig`'s shape is `[OPEN→0.3]` and is
-A6's call on the enumeration surface (`context-item.md` §3).
+The descriptor is `{sha256, item, token, expires_at, sig}`; `sig` is an **HMAC over the descriptor
+with a container key** (`context-item.md` §3, [0.3 · 45]).
 
 ### The staging prefix is invisible to resolution
 
@@ -181,16 +196,17 @@ agent-proposed artifact awaiting approval is therefore not merely unserved but u
 staging is not a trust status applied to a reachable blob, it is a different location. `promote`
 moves the bytes into the promoted store; only then does the content address resolve. **running.**
 
-`[OPEN→0.3]` **`promote`'s behaviour on a missing or already-promoted address.** The skeleton is
-silent in both cases: `promote` of an unstaged sha does nothing and reports nothing. Silence is
-right at an external boundary (§5) but this caller is the approval path, and an approval that
-promoted nothing should not look like an approval that promoted something. Whether `promote` returns
-a result to its *internal* caller is not decided here.
+**`promote` returns its result to its internal caller only. [0.3 · 43]** It returns `True` when
+staged bytes moved to the promoted store and `False` when nothing was staged at that address,
+missing and already-promoted alike, so an approval that promoted nothing does not look like one
+that promoted something. The approval path is the only caller, and the result never crosses an
+external boundary (§5). **a1p**, the `bool`: the record fixes who sees the result, not its shape.
+**decided, not running**: the skeleton returns `None`.
 
-TODO(a1p): no source names a deletion or garbage-collection path for blobs. Tombstoning an artifact
-item leaves its bytes addressable forever, and abandoned staged bytes are never reclaimed. Whether
-that is intended (the audit chain keeps referring to the address) or an omission is the review's to
-say.
+**Deletion. [0.3 · 44]** v1.0 **never deletes promoted bytes** behind a tombstoned item: the audit
+chain keeps referring to the address. **Staged bytes are purged** after
+`blobs.staging_retention_days` (30 by default, `container.md` §8). An owner purge act for promoted
+bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
 
 ## 5 · Silence-not-errors at the storage boundary
 

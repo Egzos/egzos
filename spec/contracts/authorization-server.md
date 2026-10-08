@@ -1,7 +1,8 @@
 # Contract · the container's authorization server
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation — read this before any clause below.** Every other document in `spec/contracts/` was
 drafted from a running shape: the walking skeleton executes it and the clause records what it does.
@@ -24,8 +25,9 @@ Clauses carry one of six markings instead:
   may not be changed here. Where the record settled a question but left a detail unnamed — a config
   key's spelling, a constant's name, a section's number — a1p chose it, and marked it **a1p** too.
 - **open→0.3** — the marking a clause carried while the freeze review had still to settle it. The 0.3
-  record answered every one, and **none remains**: each was replaced by its **[0.3 · N]** decision,
-  or by `[v1.1]` with the reason the record gave.
+  record answered every one, and **none remains in `spec/contracts/` or `src/`**: each was replaced
+  by its **[0.3 · N]** decision, or by `[v1.1]` with the reason the record gave. The design specs
+  still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 - `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
   Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
   escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.
@@ -285,7 +287,7 @@ renders is a field the registry has to carry.
 `authz.*` family: this section's exact-match rule is only as strong as the allowlist it compares against, so a change to that
 allowlist is a change to the AS's security posture whether or not any token is involved. `redirect_uris` carries the entry's URIs
 **after** the change (empty on `remove`), so the log states the allowlist as it then stood rather than the delta that produced it.
-**`events.md` §1 does not yet carry the row — §9.3 records this name and `authz.grant` as decided-pending.**
+**`events.md` §1 carries the row, with `authz.grant` beside it** (#109 PR 2b).
 
 **No open dynamic client registration. [0.3 · 10]** RFC 7591's endpoint is what the MCP authorization spec expects (§4), and an open
 registration endpoint on a personal container lets any caller create a client entry — which is the direction that loses. Concretely:
@@ -447,9 +449,8 @@ under any cause.** Testable as written:
    only a fact about the **caller's own request**, that it was throttled or that it carried a
    credential, which it already knows. An implementation that pads it fully is conforming, one that
    does not is conforming too, and neither may widen the first two, which stay MUSTs.
-   **Decided-pending: [0.3 · 42]'s rewrite of `capabilities.md` §6 into numbered binding clauses —
-   where a container-wide timing posture is to be stated — lands in #109 PR 2b and is not in this
-   tree**, so nothing outside this clause carries the SHOULD. **The first two differences' padding is a named
+   **`capabilities.md` §6 clause 4 states the container-wide timing posture ([0.3 · 42]):** a
+   SHOULD everywhere, with this clause's two MUSTs governing this surface. **The first two differences' padding is a named
    spec revision, not a rule this document merely restates.** `consent.md` states the opposite in six places, deliberately and with a reason —
    D-C6's own *Cost* clause (a refused attempt "sits outside D-T8's uniform set" because "a refused
    attempt's timing class is the throttle's own, which is not a secret"), `consent.md`'s §10
@@ -689,10 +690,9 @@ endpoint, and §2's code binding, §3's device codes and every access token alre
 from the platform CSPRNG**. The number and the source are both normative: 128 bits of a weak generator is not 128 bits of entropy,
 which is why §9.1's opening clause names the source and this one names the amount. **This is the citable clause, here, today.**
 
-It is **not** the whole requirement, and the rest is **decided-pending**: `token mint` is the
-owner's own path, so a floor binding only the AS leaves the same forgeable value reachable through
-another verb, and `capabilities.md` §5 must carry the container-wide clause. **That text lands in
-#109 PR 2b and is not in this tree**; nothing below defers to it in the meantime.
+It is **not** the whole requirement: `token mint` is the owner's own path, so a floor binding only
+the AS leaves the same forgeable value reachable through another verb. **`capabilities.md` §5
+carries the container-wide clause** (#109 PR 2b), `token mint` included; nothing below defers to it.
 
 Two readings the number does not have:
 
@@ -828,11 +828,9 @@ count them rather than trust the number, each now with its disposition:
 | 6 | a client is **registered**, amended or removed (§5) | `client.register` |
 | 7 | a **device authorization is requested** (§3) | **none** — *partly* covered by 3/4 plus §12's redemption row; see below |
 
-**Three of this table's rows are decided-pending, and the pending half is `events.md`'s.** `authz.grant` (rows 3, 4) and
-`client.register` (row 6) are **not** among `events.md` §1's names, and §4 invariant 2's amendment that row 5
-needs is unwritten. **All three edits land in #109 PR 2b and are not in this tree** (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3
-· 38]**). Until it merges `events.md` governs as it stands — an append under either new name MUST be rejected, row 5's
-silence is a conformance failure — so **no implementation may be built against this table yet.**
+**`events.md` carries all three of this table's new dispositions** (#109 PR 2b): `authz.grant` (rows 3, 4) and
+`client.register` (row 6) are among §1's names, **decided, not running**, and §4 invariant 2 names row 5's rotation as an
+exception (**[0.3 · 29]**, **[0.3 · 31]**, **[0.3 · 30]**).
 
 **`authz.grant {client_id, decision, scopes, capabilities}`. [0.3 · 29]** One row with a closed `decision` of `granted` ·
 `denied`, not an `authz.grant`/`authz.deny` pair: the two halves carry identical fields and differ only in outcome, and
@@ -859,7 +857,7 @@ session-less 303's throttle accounting are §12's (**[0.3 · 36, 37, 38]**). A s
 reuse-detection cascade revokes a chain the log can name and a reader can follow a family from first mint to last revocation. A
 `token.rotate` row was rejected for what it would turn the chain into: a rotation fires on a schedule the client picks, so a log
 carrying one is a session log, and an audit chain that fills with routine machine traffic is one an owner stops reading. The silence
-is a decision; what will keep it from being a conformance failure is **[0.3 · 38]**, decided-pending above.
+is a decision, and `events.md` §4 invariant 2 names it as an exception, so it is not a conformance failure.
 
 **`client.register {client_id, op, redirect_uris}`. [0.3 · 31]** Specified at §5, named here so the count closes. Its own
 event rather than a member of the `authz.*` family: a registration produces no token and concerns no grant, and what it
@@ -1062,10 +1060,8 @@ pair the act crosses; and for all three a window opened for one manifest shape d
 act of another (`container.md`'s R11 scoping). So the lookup for any of the three takes the act's
 source, destination and manifest shape, and a call site missing one of them cannot evaluate the gate.
 
-**`capabilities.md` §4 is amended to name this backstop. [0.3 · 38]** — **decided-pending**: §4
-today states only the principal gate, and the amendment lands with #109 PR 2b. Until it merges, a
-builder following §13's pointer to `capabilities.md` must read this section beside it: the principal
-gate there is the floor, and this backstop is the second, mandatory half.
+**`capabilities.md` §4 is amended to name this backstop. [0.3 · 38]** §4 states the principal gate
+as the floor and this backstop as the second, mandatory half, and points here for the full text.
 
 **Until Phase 2.2 the interactive owner token is the proof** (`capabilities.md` §3, **running**), and
 this document does not pretend otherwise: that is a **stated, dated gap**, not the posture. The
@@ -1725,8 +1721,8 @@ rule 3's count while a throttle holds).
 Each is bounded — one keyed entry, a count and a timestamp, one record — so none carries out
 anything an unrecorded read would hide. **§11.4's request-keyed read, §12's fourth (**[0.3 · 27]**),
 is not an instance**: every path through it appends — row (d) `replayed` on a match, otherwise (d),
-(f), (g) or §9.3's decision. **Decided-pending:** the amendment lands in `events.md` §4 with #109
-PR 2b.
+(f), (g) or §9.3's decision. `events.md` §4 invariant 2 carries the amendment and names these three
+instances.
 
 **A session-less 303 to `/login` counts toward the throttle. [0.3 · 37]** Substep 3 runs after
 substep 2, so every session-less `/authorize` adds to both §11.0 buckets. A sweep that engages
@@ -1895,7 +1891,7 @@ drawn. That closes §14's list: every item is now cited by number somewhere in P
 carries item 3's render half, §7 its vocabulary half — and Part B answers or routes each. Containers,
 the chain, serving policy and the gate → `container.md`. The event list and the hash chain →
 `events.md`; **#68** (§9.3's effects) and **#86** (§12's rows) were settled in the one 0.3
-sitting; §12's names are in `events.md` §1, and §9.3's `events.md` text is decided-pending with #109 PR 2b. The MCP-specific surface → contract v1.1
+sitting; §12's and §9.3's names are in `events.md` §1. The MCP-specific surface → contract v1.1
 at the Phase 5 boundary (§4). The step-up tap's endpoints, token shape and window mechanics → Phase
 2.2 and `spec/design/step-up-tap-and-pending-approval.md`; §10.5's `[LEAN]` fixes none of them, and
 §10.4's backstop is written in terms of *a live presence window* so that it does not depend on how the
