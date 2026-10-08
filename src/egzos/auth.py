@@ -21,7 +21,7 @@ from pathlib import Path
 from egzos._ids import ulid
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
-from egzos.model import ROLE_BUNDLES, Token, now_iso
+from egzos.model import ROLE_BUNDLES, TOKEN_PRINCIPALS, Token, now_iso
 
 
 class AuthError(Exception):
@@ -73,6 +73,9 @@ class Auth:
             raise AuthError("minting a token is the owner's act")
         if role not in ROLE_BUNDLES:
             raise AuthError(f"unknown role {role!r}")
+        if principal not in TOKEN_PRINCIPALS:
+            # `none` is an audit-only principal (events.md §2): no token is ever minted for it.
+            raise AuthError(f"unknown token principal {principal!r}")
         token = Token(
             id=ulid(),
             principal=principal,
