@@ -174,8 +174,8 @@ class ResolvedItem(TypedDict):
     `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
     in two places with no rule for which wins when they differ — the copy a resolver snapshots
     before serialisation, and serves a quarantined item under. Read it from the item. The walking
-    skeleton's resolver does emit a `trust` key here; container.md §4 states the removal as a1p's
-    reading, pending the freeze, with the Chief's confirmation as its TODO.
+    skeleton's resolver does emit a `trust` key here; the 0.3 freeze removed it (container.md §4),
+    and Phase 1's resolver drops it.
 
     The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
     here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is
@@ -191,8 +191,8 @@ class ResolvedItem(TypedDict):
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
-    *Decided, not running.* `sig` is `[OPEN->0.3]`: HMAC over the descriptor with a container key,
-    or the grant id as the bearer secret — A6's call on the enumeration surface.
+    *Decided, not running.* `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]);
+    the grant id is not the bearer secret.
     """
 
     sha256: str
@@ -232,19 +232,26 @@ Event = Literal[
     "authz.render",
     "authz.tally",
     "authz.revoke_refuse",
+    "authz.grant",
+    "client.register",
+    "config.set",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
 #: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
 #: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
-#: code that emits it. The eight `authz.*` names are the same case: decided at the 0.3 freeze
-#: (authorization-server.md §12 rows (a), (b), (d)–(h) and §11.9; [0.3 · 33, 36], #140, #144), with
-#: no AS in this tree to emit them. events.md §1 says the same thing from the contract's side.
+#: code that emits it. The nine `authz.*` names and `client.register` are the same case: decided at
+#: the 0.3 freeze (authorization-server.md §12 rows (a), (b), (d)–(h), §11.9, §9.3 and §5;
+#: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
+#: (container.md §8, [0.3 · 40]), with no config surface. events.md §1 says the same thing from the
+#: contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: The only events an entry with `principal: none` may carry (events.md §2): the caller-less rows
 #: (a), (b), (d), (e) and (h) of authorization-server.md §12.2. An append with `principal: none`
-#: under any other event MUST be rejected — a read or an act is never unattributed. [0.3 · 34]
+#: under any other event MUST be rejected — a read or an act is never unattributed. The converse
+#: binds too: an append under one of these five MUST carry `principal: none` (events.md §2).
+#: [0.3 · 34]
 PRINCIPAL_NONE_EVENTS: tuple[Event, ...] = (
     "authz.login",
     "authz.redeem",
@@ -556,6 +563,16 @@ AS_AUTHORIZE_POSTTRUST_CAUSES: tuple[AuthorizePosttrustCause, ...] = get_args(
 RevokeRefusalCause = Literal["unknown", "unreachable", "throttled"]
 AS_REVOKE_REFUSAL_CAUSES: tuple[RevokeRefusalCause, ...] = get_args(RevokeRefusalCause)
 
+#: §9.3 — `authz.grant`'s closed `details.decision` ([0.3 · 29]). One event with two outcomes, not
+#: an `authz.grant`/`authz.deny` pair: the halves carry identical fields and differ only in outcome.
+GrantDecision = Literal["granted", "denied"]
+AS_GRANT_DECISIONS: tuple[GrantDecision, ...] = get_args(GrantDecision)
+
+#: §5 — `client.register`'s closed `details.op` ([0.3 · 31]). `redirect_uris` beside it is the
+#: allowlist AFTER the change, empty on `remove`.
+ClientRegisterOp = Literal["add", "amend", "remove"]
+AS_CLIENT_REGISTER_OPS: tuple[ClientRegisterOp, ...] = get_args(ClientRegisterOp)
+
 #: §11.6 — a standard error redirect from `/authorize` carries exactly these two keys and nothing
 #: else. `error_description` and `error_uri` are MUST NOT, with any value, under any cause — removed
 #: rather than constrained, because a uniform constant description would satisfy §7's convergence
@@ -753,7 +770,9 @@ class BlobStore(Protocol):
 
     def put(self, data: bytes) -> str: ...
     def stage(self, data: bytes) -> str: ...
-    def promote(self, sha: str) -> None: ...
+    def promote(self, sha: str) -> bool: ...
+    #: ^ True if staged bytes moved, False if nothing was staged there. Internal caller only
+    #:   ([0.3 · 43]): the result never crosses an external boundary.
     def get(self, sha: str) -> bytes | None: ...
     def exists(self, sha: str) -> bool: ...
     #: ^ an existence oracle over guessable addresses: never reachable from an external path.
@@ -770,11 +789,13 @@ __all__ = [
     "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
+    "AS_CLIENT_REGISTER_OPS",
     "AS_CLIENT_REGISTRY_READ_FIELDS",
     "AS_CLIENT_TYPES",
     "AS_CODE_LIFETIME_SECONDS",
     "AS_CONTINUE_MAX_BYTES",
     "AS_DEVICE_REDEMPTION_CAUSES",
+    "AS_GRANT_DECISIONS",
     "AS_GRANT_LIFETIME_DEFAULT_SECONDS",
     "AS_GRANT_LIFETIME_MAX_SECONDS",
     "AS_LOGIN_CAUSES",
@@ -805,6 +826,7 @@ __all__ = [
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
     "Capability",
+    "ClientRegisterOp",
     "ClientRegistration",
     "ConsentKind",
     "ContainerConfig",
@@ -816,6 +838,7 @@ __all__ = [
     "EVENTS",
     "Event",
     "GENESIS_HASH",
+    "GrantDecision",
     "HUMAN_ONLY_ACTS",
     "ItemStore",
     "KINDS",

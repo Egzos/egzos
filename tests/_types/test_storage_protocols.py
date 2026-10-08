@@ -16,6 +16,8 @@ a test that asks the code what it contains cannot notice the code changing.
 
 from __future__ import annotations
 
+import typing
+
 import egzos._types as t
 
 # The skeleton's `Backend` union, verbatim — the 18 methods F3 partitions.
@@ -87,6 +89,11 @@ def test_blob_store_exposes_no_read_path_into_staging():
     """
     readers = {name for name in _methods(t.BlobStore) if name not in {"put", "stage", "promote"}}
     assert readers == {"get", "exists"}
+
+
+def test_promote_reports_to_its_internal_caller():
+    """[0.3 · 43]: an approval that promoted nothing must not look like one that did."""
+    assert typing.get_type_hints(t.BlobStore.promote)["return"] is bool
 
 
 def test_storage_contracts_names_resolve_and_are_exported():
