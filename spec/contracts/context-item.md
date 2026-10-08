@@ -79,7 +79,10 @@ another (`blob.pull`) — see `events.md`. **decided, not running** (the skeleto
 
 **`BlobGrant.sig` is an HMAC over the descriptor with a container key. [0.3 · 45]** The grant id is
 not the bearer secret: a redeemer cannot forge or alter a descriptor without the key, and the key
-never leaves the container. a6 confirms the construction in its review of this text. The
+never leaves the container. a6's review of this text (#152) found the construction sound at the
+contract level: it binds the grant to its item, token and expiry, so a descriptor cannot be forged,
+altered or replayed against another item or token. The MAC algorithm and key rotation are
+implementation choices and are not pinned here. The
 descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **decided, not
 running.**
 

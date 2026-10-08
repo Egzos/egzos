@@ -163,8 +163,24 @@ every surface: CLI, both MCP transports, REST, the lifeboat and the authorizatio
    cover**, or a covered scope where the token **lacks the capability** gets one refusal, and that
    refusal MUST be **byte-identical to not-found**: the same status, the same body, the same
    headers, the same exit code. No surface may answer any of the three differently from the others
-   or from a scope that never existed. **running** (the skeleton's write path raises "scope not
-   found" when a token does not cover the target: the required behaviour, not a mislabelled error).
+   or from a scope that never existed. The third case is the Chief's decision, not an inference
+   from the other two: a capability refusal on a covered scope tells the caller what its token
+   cannot do there, and the record closes that too ([0.3 · 42]).
+   - **running** for the absent and uncovered cases (the skeleton's write path raises "scope not
+     found" when a token does not cover the target: the required behaviour, not a mislabelled
+     error).
+   - **decided, not running** for the lacking-capability case. These running surfaces still answer
+     it with their own text: `store/items.py`'s remember refusal in `Store.add` ("token lacks `remember`");
+     `trust.py`'s "quarantine needs `curate`" and its `_MOVE_REFUSED` floor text; and the CLI's
+     "needs `admin`" refusals on `token create`, `token revoke` and `connect`. The running not-found
+     texts also differ from each other ("not found", "scope not found", "scope not found: <ref>").
+     Bringing them into line is #155.
+   - **How this fits `container.md` §6's floor-before-delta refusal.** That clause fixes an
+     **order**: the gate checks `organize` before it computes the delta, and both gate refusals carry
+     one text, so no refusal depends on the branch the move would have taken. Clause 1 changes what
+     that one text **is**: the not-found refusal instead of `_MOVE_REFUSED`. The order stays binding
+     as it stands. A gate that computed the delta first would still leak through which check failed,
+     whatever text it sent.
 2. **No enumeration through error shapes, anywhere.** No error text, field, ordering, count or
    pagination cursor may reveal that something the caller cannot see exists. A partial result and
    a result with nothing in the hidden part are indistinguishable (`container.md` §4 invariant 3).

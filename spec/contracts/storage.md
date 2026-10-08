@@ -164,8 +164,9 @@ external surface calls either or sees its result beyond the content address of t
 itself supplied. **`blob.put` is emitted on every `put`**, a deduplicated one included, so neither
 the response nor the ledger tells a caller whether the bytes were already stored. **`stage` does not
 dedup against the promoted store**: staging bytes that are already promoted writes them to
-`staging/` like any other, so staging never answers whether content exists. **decided, not
-running** for the event on a deduplicated `put`.
+`staging/` like any other, so staging never answers whether content exists. **running**: the skeleton's one
+`put` path (`Store.add` with a file, `store/items.py`) appends `blob.put` after every `put`, whether or not
+the bytes were already stored.
 
 ### Store/Vault never mints a URL on its own authority
 

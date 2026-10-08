@@ -61,7 +61,10 @@ update — zero bytes move (v0.4 §16). Each ancestor renders root-first as `typ
 **Disambiguation when a tail matches more than one node is by most recent activity. [0.3 · 1]**
 Recency means the **latest write anywhere in the node's subtree**, not the node's `created_at`: a
 `project:health` the user touched this morning beats one created last week and left dormant. Ties
-break on the node's ULID. The same key orders results at every layer (`storage.md` §2), so `%n` is
+break on the node's ULID. **The recency key is computed only over items the caller is served** under
+the serving policy (§4, `capabilities.md` §6 clause 2). A withheld write therefore never changes which
+node is picked: an unverified or quarantined item a client is not served is absent from that
+client's recency, so the pick tells it nothing about content it cannot see. The same key orders results at every layer (`storage.md` §2), so `%n` is
 identical across backends. **decided, not running**: the skeleton orders by `created_at`.
 
 **Auto-thread naming is fixed at creation. [0.3 · 2]** Pure capture names the thread from the
