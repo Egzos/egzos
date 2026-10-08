@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Contracts v1.0 — frozen at 0.3 (Chief, date of merge)
+
+### Added
+
+- `spec/contracts/`: the Phase 0.2 draft set, drafted from the walking skeleton's running shapes
+  (#25–#30) — `context-item.md`, `capabilities.md`, `events.md`, `storage.md`, `container.md` and
+  the prose-derived `authorization-server.md` — with typed stubs in `src/egzos/_types.py`.
+- The Chief's 45-item freeze record (#31, 2026-10-03) written into the text as `[0.3 · N]`
+  clauses (#109: #111, #139, #147, #152 and this pass). No open→0.3 marking remains.
+- `spec/contracts/README.md` is the index of the set; each document's status line reads frozen at
+  0.3. The Chief's merge declares the freeze. Contract v1.1 is planned at the Phase 5 boundary.
+
+### Changed
+
+- `container.md` §2: an ambiguous path tail is refused with the caller-visible matches named,
+  never picked by recency (item 1, as revised by the Chief).
+- `_types.py`: `__all__` is isort-sorted, pinned by ruff RUF022 (#30).
+
 ## [0.1.0a1] — MVP preview (2026-10-03)
 
 ### Added
