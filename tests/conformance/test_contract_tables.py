@@ -312,6 +312,7 @@ def check_exceptions(
                 assert span in t.EVENTS, f"{where}: the prose names `{span}`, not in `EVENTS`"
                 named.append(span)
         assert named, f"{where}: the parenthetical after {word!r} names no event"
+        status = status.lower()  # the pattern ignores case; the comparison must too
         for event in named:
             assert status_of[event].startswith(status), (
                 f"{where}: the prose calls `{event}` {status}, the table: {status_of[event]!r}"
@@ -320,6 +321,13 @@ def check_exceptions(
                 f"{where}: the prose counts {word} {status_of[event]!r} events, the table has "
                 f"{counts[status_of[event]]}"
             )
+        # The parenthetical names exactly the table's events with that status (a1r on #149): a
+        # count that agrees while the list leaves one out would pass every check above.
+        want = {e for e, s in status_of.items() if s in {status_of[n] for n in named}}
+        assert set(named) == want, (
+            f"{where}: the parenthetical after {word!r} names {sorted(set(named))}; the table's "
+            f"{status} events are {sorted(want)}"
+        )
         found.append((word, named, status))
     return found
 
@@ -649,4 +657,16 @@ def test_meta_an_exception_sentence_that_miscounts_fails() -> None:
         check_exceptions(ok.replace("one", "two"), status_of, counts, where="meta")
     with pytest.raises(AssertionError):
         check_exceptions("two (`blob.grant` and `no.such.*`) are decided", status_of, counts,
+                         where="meta")
+
+
+def test_meta_an_exception_sentence_that_leaves_an_event_out_fails() -> None:
+    """a1r on #149: the count agrees with the table, but the parenthetical names one event short."""
+    status_of = dict.fromkeys(t.EVENTS, "running")
+    status_of["blob.grant"] = status_of["approval.stale"] = "decided, not running"
+    counts = Counter(status_of.values())
+    ok = "two (`blob.grant` and `approval.stale`) are Decided, not running"
+    assert check_exceptions(ok, status_of, counts, where="meta")
+    with pytest.raises(AssertionError, match="names"):
+        check_exceptions("two (`blob.grant`) are decided, not running", status_of, counts,
                          where="meta")

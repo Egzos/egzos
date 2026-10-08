@@ -5,7 +5,8 @@ Append-only, hash-chained audit (v0.4 §15; a3-ledger charter). Each entry carri
 previous one; verification fails loudly and specifically. Reads are logged, not just writes.
 
 The event taxonomy is `_types.EVENTS` (spec/contracts/events.md §1); an append outside it is
-refused.
+refused, and so is `principal: none` under any event outside `_types.PRINCIPAL_NONE_EVENTS`
+(events.md §2): a read, a pull or an act is never unattributed.
 """
 
 from __future__ import annotations
@@ -14,7 +15,7 @@ import hashlib
 from typing import Any
 
 from egzos._types import EVENTS as CONTRACT_EVENTS
-from egzos._types import GENESIS_HASH
+from egzos._types import GENESIS_HASH, PRINCIPAL_NONE_EVENTS
 from egzos.backends.base import Backend, ChainConflict
 from egzos.model import canonical, now_iso
 
@@ -44,6 +45,8 @@ class Ledger:
     ) -> dict[str, Any]:
         if event not in EVENTS:
             raise ValueError(f"unknown audit event {event!r}")
+        if principal == "none" and event not in PRINCIPAL_NONE_EVENTS:
+            raise ValueError(f"audit event {event!r} cannot be unattributed")
         # Read the head, chain onto it, append. Two processes (the CLI and `serve --mcp`) can read
         # the same head; the backend accepts one successor per entry, and the loser re-chains.
         for _ in range(64):
