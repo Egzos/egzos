@@ -174,8 +174,8 @@ class ResolvedItem(TypedDict):
     `item["trust"]["status"]`, and a `TrustStatus` restated on the envelope would be the same fact
     in two places with no rule for which wins when they differ — the copy a resolver snapshots
     before serialisation, and serves a quarantined item under. Read it from the item. The walking
-    skeleton's resolver does emit a `trust` key here; container.md §4 states the removal as a1p's
-    reading, pending the freeze, with the Chief's confirmation as its TODO.
+    skeleton's resolver does emit a `trust` key here; the 0.3 freeze removed it (container.md §4),
+    and Phase 1's resolver drops it.
 
     The envelope AROUND this list (`{scope, chain, items, withheld}`) is deliberately not typed
     here: `container.md` §4's `TODO(a1p)` on whether a silent refusal carries `withheld` is

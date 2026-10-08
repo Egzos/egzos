@@ -58,18 +58,17 @@ update — zero bytes move (v0.4 §16). Each ancestor renders root-first as `typ
 `user:self/project:health`, or the bare `health`. A tail matches when each segment equals the full
 `type:name` label or the name alone, against the same number of trailing path segments. **running.**
 
-`[OPEN→0.3]` **Disambiguation when a tail matches more than one node.** v0.3 §4 says recency decides;
-the skeleton uses **`created_at`**. Whether recency means creation or **last activity** is
-**question 1 for the freeze review and is not decided here.** The two differ exactly where it
-matters: a dormant `project:health` created last week beats one created last year that the user
-touched this morning. Settle it with `storage.md` §2's open question on contractual result ordering —
-the same question at two layers, and answers that disagree make `%n` non-deterministic.
+**Disambiguation when a tail matches more than one node is by most recent activity. [0.3 · 1]**
+Recency means the **latest write anywhere in the node's subtree**, not the node's `created_at`: a
+`project:health` the user touched this morning beats one created last week and left dormant. Ties
+break on the node's ULID. The same key orders results at every layer (`storage.md` §2), so `%n` is
+identical across backends. **decided, not running**: the skeleton orders by `created_at`.
 
-`[OPEN→0.3]` **Auto-thread naming.** Pure capture names the thread from the **first item's
-auto-title** (skeleton); whether it instead comes from a **thread-level title pass** once the thread
-has several items is **question 2 for the freeze review and is not decided here.** It bears on this
-document because a thread that renames itself changes its own path, and paths are the addressing
-surface.
+**Auto-thread naming is fixed at creation. [0.3 · 2]** Pure capture names the thread from the
+**first item's auto-title**, and the name does not change on its own. A later title pass may only
+**propose** a rename, as a proposal the owner decides; it never renames. A thread that renamed
+itself would change its own path, and paths are the addressing surface. **running** for the
+first-item name; the rename proposal is **decided, not running**.
 
 ## 3 · The chain
 
@@ -144,9 +143,10 @@ same reason: they say where this copy was found, which is also not the item's ow
 implementation that persisted `shadowed_by` onto the item would have to rewrite stored items on
 every resolution, and would serve one chain's answer to another chain. **running** for
 `shadowed_by`, `layer` and `layer_type` (F10 — the clause ran in the skeleton with no typed home; it
-has one now); the envelope's fourth key, `trust`, is addressed in the next paragraph.
+has one now); the skeleton's fourth key, `trust`, is removed by the next paragraph.
 
-**The item's trust status is not restated on the envelope — a1p's reading, pending the freeze.** It
+**The item's trust status is not restated on the envelope. `ResolvedItem.trust` is removed** (the
+Chief at the 0.3 freeze, taking a1p's reading in #104). It
 is the item's own fact and has one home, `item.trust.status`; a surface that branches on invariant 2
 above or on the serving policy reads it there and nowhere else. A second spelling of the same
 status, nested one level outside the first, is the one a resolver could snapshot before
@@ -157,8 +157,7 @@ copy wins. **decided, not running.** The walking skeleton's `Resolver.resolve` (
 not an unbuilt one. The skeleton shows no bug — `trust` and `item` are copied from the same
 `item.status` in one pass, so they cannot differ there — and the removal is for the resolver Phase 1
 builds, where the two reads need not be one. Phase 1 drops the key; a consumer of the envelope's
-`trust` moves to `item.trust.status`. TODO(chief): confirm the removal, or keep the key and say which
-copy wins on divergence — one field and this paragraph.
+`trust` moves to `item.trust.status`.
 
 **Clients may see the full chain, overridden values included** (v0.4 §7) — `shadowed_by` is the
 mechanism, and it is deliberate: a client that sees only the winner cannot explain *why* a preference
@@ -336,10 +335,9 @@ Four notes the table cannot carry:
 - **`chain.personal_root`** is per-deployment by F1 and "invertible **per user**" by R11 — the same
   key in a single-owner container, which is all v0.1 has. Recorded so the freeze reads a known
   equivalence rather than a contradiction.
-- **`org.policy.sovereign_chain`'s default `allow`** is a1p's reading, not a quoted source: F1 says
-  an org *may* forbid inversion, and a permission that must first be granted before it can be
-  withheld is not a permission to withhold. TODO(chief): confirm `allow`, or say `deny` and make org
-  branches sovereign-proof by default.
+- **`org.policy.sovereign_chain` defaults to `allow`** ([0.3 · 4]): F1 says an org *may* forbid
+  inversion, and a permission that must first be granted before it can be withheld is not a
+  permission to withhold.
 - **`step_up.window_seconds`** is per source→destination ring pair and **manifest-shape bounded**
   (R11) — a window opened for one shape of act does not cover another. **Zero is supported, and
   means no grace period** (above). Because the key is per pair, **the window that gates a human-only
@@ -347,17 +345,17 @@ Four notes the table cannot carry:
   global window; `authorization-server.md` §10 states this at `yes.consume`, where the window is
   read. `step_up` runs (`events.md` §1: the MVP tap, ahead of Phase 2.2); the *key* is frozen.
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
-  written before this key existed: R11 ratifies 30 days cold, then purge. TODO(a1p): #30 should
-  strike that TODO's "no source names" clause and point it here. It covers **staged** bytes only —
-  no source names a reclamation path for *promoted* bytes behind a tombstoned artifact.
+  written before this key existed: R11 ratifies 30 days cold, then purge. It covers **staged**
+  bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item; an owner purge act is
+  `[v1.1]` ([0.3 · 44]; `storage.md` §4).
 
-`[OPEN→0.3]` **Where the object lives and who may write it.** The config is read on the resolution
-path (`chain.personal_root`), the structure path (`structure_floor`) and the blob path
-(`inline_max_bytes`), so it is `ContainerState` by F3's rule — but `storage.md` §3 names four method
-groups and config is not among them, and no source says whether changing a key is an `admin` act, an
-audit event, or a restart-only file. Not decided here: the freeze should name the method group, the
-capability and the event, because **a config surface Trust does not gate is a way to widen an
-audience without passing the gate.**
+**The object lives in `ContainerState`, and changing a key is an `admin` act that emits
+`config.set`. [0.3 · 40]** The config is read on the resolution path (`chain.personal_root`), the
+structure path (`structure_floor`) and the blob path (`inline_max_bytes`), so it is never delegated
+(F3). Trust gates the change on `admin`, because **a config surface Trust does not gate is a way to
+widen an audience without passing the gate.** `config.set`'s shape is `events.md` §1's.
+**decided, not running.** TODO(a1p): `storage.md` §3 lists only running methods, so the config
+method group's signatures arrive with the Phase 1 issue that builds the config surface.
 
 ## 9 · What this document does not fix
 
