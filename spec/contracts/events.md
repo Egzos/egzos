@@ -1,6 +1,8 @@
 # Contract · event taxonomy and the audit chain
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** RUNNING shapes of the walking skeleton (`docs/build/WALKING-SKELETON.md` §8); code
 `src/egzos/ledger.py` (`EVENTS`, `Ledger.append`, `Ledger.verify`), `src/egzos/model.py`

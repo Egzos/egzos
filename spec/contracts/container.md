@@ -1,7 +1,8 @@
 # Contract · containers, the chain, serving policy and the gate
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** The walking skeleton (`chief/walking-skeleton`, `docs/build/WALKING-SKELETON.md`
 §2–§5, §9). Code: `model.py` (`CONTAINER_TYPES`, `RING_RANK`, `ROOT_TYPES`, `BASELINE_CREATE`,
@@ -14,7 +15,9 @@ trust statuses, the gate and the container-config object; nothing about how a cl
 token.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a freeze
-decision the skeleton does not execute), or `[OPEN→0.3]` (the freeze review must settle it).
+decision the skeleton does not execute). A `[0.3 · N]` marking cites item `N` of the Chief's freeze
+record on #31 (2026-10-03). The open→0.3 marking the draft carried is gone: the record answered
+every one.
 
 ## 1 · Container types and ring rank
 
