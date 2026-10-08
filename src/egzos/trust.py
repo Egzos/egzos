@@ -271,24 +271,29 @@ class TrustEngine:
         items = [self.backend.get(x) for x in p["items"]]
         moved = [i for i in items if not i or i.scope != p["from"]]  # the source is bound too
         if current != p["manifest"] or moved:
-            p["status"] = "stale"
-            self.backend.put_proposal(p)
-            # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
-            self.ledger.append(
-                "approval.stale",
-                actor=actor,
-                principal=token.principal,
-                subject=p["id"],
-                reason="an item moved since the proposal (TOCTOU)"
-                if moved
-                else "manifest changed since proposal (TOCTOU)",
-            )
+            with self.backend.atomic():
+                # A racing decider that already executed moved the items too: it won, and this
+                # call must not overwrite its outcome with `stale` (#118).
+                self._still_open(p["id"])
+                p["status"] = "stale"
+                self.backend.put_proposal(p)
+                # A TOCTOU refusal is not a human "no": its own event (freeze item 39).
+                self.ledger.append(
+                    "approval.stale",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=p["id"],
+                    reason="an item moved since the proposal (TOCTOU)"
+                    if moved
+                    else "manifest changed since proposal (TOCTOU)",
+                )
             raise TrustError("manifest changed since the proposal was made — re-propose")
         proposer = (p.get("proposed_by") or {}).get("principal", "client")
         reset = []
         # Every move, the status and the chain entry land together: a failure on item k rolls back
         # items 1…k-1 too, so a failed approval has moved nothing.
         with self.backend.atomic():
+            self._still_open(p["id"])  # #118: a racing execute or deny that won the lock first
             for item_id in p["items"]:
                 item = self.backend.get(item_id)
                 if item:
@@ -318,11 +323,22 @@ class TrustEngine:
             raise TrustError("no open proposal with that id")
         p["status"] = "denied"
         with self.backend.atomic():
+            self._still_open(p["id"])
             self.backend.put_proposal(p)
             self.ledger.append(
                 "approval.deny", actor=actor, principal=token.principal, subject=p["id"]
             )
         return p
+
+    def _still_open(self, proposal_id: str) -> None:
+        """Re-read the proposal under the write lock and refuse unless it is still open (#118).
+        The checks above run before the lock, so two deciders (a lifeboat tab and a CLI `trust
+        approve`) could both see it open; `atomic()` takes BEGIN IMMEDIATE, so whichever decides
+        second waits here, then finds it decided and lands nothing. The answer is the one a
+        missing id gets."""
+        current = self.backend.get_proposal(proposal_id)
+        if not current or current["status"] != "open":
+            raise TrustError("no open proposal with that id")
 
     def decides_over(self, token: Token, proposal: dict[str, Any]) -> bool:
         """Whether `token` may decide (or see) this proposal: it covers both ends of the move,
