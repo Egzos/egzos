@@ -77,7 +77,7 @@ def test_racing_inits_mint_one_owner_and_one_set_of_roots(tmp_path: Path):
 # --- #118: two deciders racing on one proposal land one decision -------------------------------
 def _parked(home: Path):
     c = Container(home)
-    t = c.auth.interactive_token()
+    t = c.init()
     root = c.nodes.user_root()
     org = c.nodes.create("org", "acme", root, token=t, actor=OWNER, principal=t.principal)
     proj = c.nodes.create("project", "p", org, token=t, actor=OWNER, principal=t.principal)
@@ -90,38 +90,84 @@ def _parked(home: Path):
     return result["proposal"]["id"]
 
 
-def _race(box: Container, tmp_path: Path, monkeypatch, first: str):
-    """B passes execute's pre-lock checks; then, before B takes the lock (while B reads the
-    audience for the manifest), A decides (`first`)."""
+def _race(tmp_path: Path, monkeypatch, first: str, second: str):
+    """B (`second`) passes its pre-lock checks; then, before B takes the write lock, A decides
+    (`first`). The hook is `decides_over`, the last pre-lock check of both execute and deny."""
     from egzos.trust import TrustEngine, TrustError
 
     home = tmp_path / "home"
     pid = _parked(home)
     a, b = Container(home), Container(home)
     ta, tb = a.auth.interactive_token(), b.auth.interactive_token()
-    real = TrustEngine.audience
+    real = TrustEngine.decides_over
 
     def a_decides_first(self, *args, **kw):
+        allowed = real(self, *args, **kw)
         if self is b.trust and not getattr(self, "_raced", False):
             self._raced = True
             getattr(a.trust, first)(pid, token=ta, actor=OWNER)
-        return real(self, *args, **kw)
+        return allowed
 
-    monkeypatch.setattr(TrustEngine, "audience", a_decides_first)
+    monkeypatch.setattr(TrustEngine, "decides_over", a_decides_first)
     with pytest.raises(TrustError, match="no open proposal"):
-        b.trust.execute(pid, token=tb, actor=OWNER)
+        getattr(b.trust, second)(pid, token=tb, actor=OWNER)
     c = Container(home)
     events = [e["event"] for e in c.ledger.tail(50) if e.get("subject") == pid]
     return c.backend.get_proposal(pid)["status"], events
 
 
-def test_a_second_execute_that_lost_the_race_lands_nothing(box, tmp_path, monkeypatch):
-    status, events = _race(box, tmp_path, monkeypatch, "execute")
+def test_a_second_execute_that_lost_the_race_lands_nothing(tmp_path, monkeypatch):
+    status, events = _race(tmp_path, monkeypatch, "execute", "execute")
     assert status == "executed"
     assert events.count("approval.execute") == 1 and "approval.stale" not in events
 
 
-def test_an_execute_that_lost_to_a_deny_lands_nothing(box, tmp_path, monkeypatch):
-    status, events = _race(box, tmp_path, monkeypatch, "deny")
+def test_an_execute_that_lost_to_a_deny_lands_nothing(tmp_path, monkeypatch):
+    status, events = _race(tmp_path, monkeypatch, "deny", "execute")
     assert status == "denied"
     assert events.count("approval.deny") == 1 and "approval.execute" not in events
+
+
+def test_a_deny_that_lost_to_an_execute_lands_nothing(tmp_path, monkeypatch):
+    # a1r on #146: the guard in deny is the one decider branch the two cases above leave untested.
+    status, events = _race(tmp_path, monkeypatch, "execute", "deny")
+    assert status == "executed"
+    assert events.count("approval.execute") == 1 and "approval.deny" not in events
+
+
+def test_no_audience_change_lands_between_the_manifest_check_and_the_move(tmp_path, monkeypatch):
+    # a1r on #146: approve-what-you-saw holds only if the manifest comparison runs under the lock
+    # the move takes. Right after execute hashes the manifest, a second connection tries to widen
+    # the destination's audience. Either that write is blocked until the move commits, or execute
+    # sees it and refuses; a widened audience and an executed move together is the bug.
+    import sqlite3
+
+    from egzos.trust import TrustEngine, TrustError
+
+    home = tmp_path / "home"
+    pid = _parked(home)
+    a, b = Container(home), Container(home)
+    other_id = b.backend.get_proposal(pid)["to"]
+    real_hash = TrustEngine.manifest_hash
+    widened: list[bool] = []
+
+    def hash_then_widen(*args, **kw):
+        h = real_hash(*args, **kw)
+        if not widened:
+            a.backend.db.execute("PRAGMA busy_timeout = 50")
+            try:
+                a.auth.mint(principal="client", owner=OWNER, client="late", role="reader",
+                            scopes=[other_id], actor=OWNER, by_principal="interactive")
+                widened.append(True)
+            except sqlite3.OperationalError:  # the write lock is held: execute is mid-decision
+                widened.append(False)
+        return h
+
+    monkeypatch.setattr(TrustEngine, "manifest_hash", staticmethod(hash_then_widen))
+    try:
+        b.trust.execute(pid, token=b.auth.interactive_token(), actor=OWNER)
+        executed = True
+    except TrustError:
+        executed = False
+    assert widened, "the hook never ran"
+    assert not (widened[0] and executed)
