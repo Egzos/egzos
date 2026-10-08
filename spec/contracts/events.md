@@ -9,15 +9,17 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Nineteen names are listed
-below**: eighteen **run**, and one (`blob.grant`) is **decided, not running** (F5). The typed
-vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it —
-carries **all nineteen**, `blob.grant` included: `AuditEntry.event` is typed `Event`, and F5's mint
-needs the member on the day it lands. So a validator written against `EVENTS` accepts a `blob.grant`
-append today, and **nothing in this tree rejects one** — what is not running is the *emitter*: no
-code path mints a `BlobGrant`, so no such entry is ever produced. `ledger.py` imports this tuple
-rather than restating it. Counted here because a count that disagrees with its own table, or with
-the constant beside it, is the kind of drift a reader resolves by guessing.
+An appended event whose name is not in this list MUST be rejected. **Twenty-seven names are listed
+below**: eighteen **run**, and nine (`blob.grant` and the eight `authz.*` rows) are **decided, not
+running** — `blob.grant` by F5, the eight by the 0.3 freeze for the container's authorization server
+(`authorization-server.md` §12 and §11.9; [0.3 · 33, 36], #140, #144). The typed vocabulary in this
+repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it — carries **all
+twenty-seven**, the nine included: `AuditEntry.event` is typed `Event`, and each emitter needs its
+member on the day it lands. So a validator written against `EVENTS` accepts an append under any of
+the nine today, and **nothing in this tree rejects one** — what is not running is the *emitter*: no
+code path mints a `BlobGrant` or serves an AS page, so no such entry is ever produced. `ledger.py`
+imports this tuple rather than restating it. Counted here because a count that disagrees with its
+own table, or with the constant beside it, is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|
@@ -40,9 +42,27 @@ the constant beside it, is the kind of drift a reader resolves by guessing.
 | `token.revoke` | a token is revoked | running |
 | `item.tombstone` | an item is tombstoned | running |
 | `blob.grant` | Trust mints a `BlobGrant` (**F5**) | decided, not running |
+| `authz.login` | a login attempt at `/login` is evaluated (AS §12 row (a)) | decided, not running |
+| `authz.redeem` | a device-code redemption at `/device` is evaluated (row (b)) | decided, not running |
+| `authz.refuse` | `/authorize` answers with the pre-trust uniform failure (AS §5.3; row (d)) | decided, not running |
+| `authz.release` | a throttle releases, `refused: 0` included (row (e)) | decided, not running |
+| `authz.reject` | `/authorize` rejects a matched client's request post-trust (row (f)) | decided, not running |
+| `authz.render` | a consent screen is rendered at `/authorize` (row (g)) | decided, not running |
+| `authz.tally` | a window closes in which the throttle admitted a session-less 303 (row (h)) | decided, not running |
+| `authz.revoke_refuse` | the owner path refuses a revoke by `Token.id` (AS §11.9) | decided, not running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
+
+**The `authz.*` rows are specified where their surfaces are.** Each row's outcome, its closed
+`details.cause` word and its `principal` are `authorization-server.md` §12's table and §12.2, and
+§11.9 item 3 for `authz.revoke_refuse`; the cause vocabularies are pinned in `_types.py`
+(`AS_LOGIN_CAUSES`, `AS_DEVICE_REDEMPTION_CAUSES`, `AS_AUTHORIZE_PRETRUST_CAUSES`,
+`AS_AUTHORIZE_POSTTRUST_CAUSES`, `AS_REVOKE_REFUSAL_CAUSES`). **`refuse` is pre-trust, `reject` is
+post-trust, and `revoke_refuse` is the owner's revoke page** — three refusals, each under its own
+event, so an `audit` query never has to tell them apart by `details`. A consent decision is not among them: it is
+`authorization-server.md` §9.3's `authz.grant`, which lands in this table with §9.3's other
+decided-pending rows, not here.
 
 ## 2 · The entry
 
@@ -51,7 +71,13 @@ unaudited move; it is an audited move that does not interrupt anyone.
 ```
 
 - `seq` — monotonic, assigned by the store on append.
-- `actor` / `principal` — who acted, and whether as `interactive` or `client`.
+- `actor` / `principal` — who acted, and as what: `interactive`, `client` or `none`
+  (`capabilities.md` §3). Both are mandatory on every entry; `principal` is never null. **`none`
+  is for an entry with no caller to name** — `authorization-server.md` §12.2: rows (a), (b), (d),
+  (e) and (h) — and on such an entry `actor` carries the **surface** the append is about, one of
+  `_types.py`'s `AS_THROTTLE_SURFACES`, **never the caller's network identifier**: an IP in an
+  append-only chain is a surveillance record the owner cannot prune. **decided, not running**
+  (no AS in this tree emits one yet). [0.3 · 34, 35]
 - `subject` — the id the event is about (item, node, token, proposal, or a blob's `sha256`).
 - `scope` — the container the event happened in; nullable.
 - `details` — event-specific, open. A reader MUST tolerate unknown keys here.
