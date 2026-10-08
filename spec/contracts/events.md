@@ -149,7 +149,7 @@ JSON with:
 
 ### Why `seq` stays out of the hashed body
 
-**The Chief's decision on #102 F7** (his correction comment of 2026-10-03, implemented by PR 104):
+**The Chief's decision on #102 F7** (the Chief's correction comment of 2026-10-03, https://github.com/Egzos/egzos/issues/102#issuecomment-5965659039, implemented by PR 104):
 `seq` is store-assigned, so hashing it would break verification on a re-import that renumbers, and
 the formula reads `canonical(entry minus hash and seq)`. Four places agree on excluding `seq` —
 §3's bullet, §3's formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later change to
