@@ -77,14 +77,15 @@ it at the REST door (Phase 2). The mint is one audit event (`blob.grant`) and th
 another (`blob.pull`) — see `events.md`. **decided, not running** (the skeleton serves inline
 `text/*` at or below 64 KiB and has no grant).
 
-**`BlobGrant.sig` is an HMAC over the descriptor with a container key. [0.3 · 45]** The grant id is
-not the bearer secret: a redeemer cannot forge or alter a descriptor without the key, and the key
-never leaves the container. a6's review of this text (#152) found the construction sound at the
-contract level: it binds the grant to its item, token and expiry, so a descriptor cannot be forged,
-altered or replayed against another item or token. The MAC algorithm and key rotation are
-implementation choices and are not pinned here. The
+**`BlobGrant.sig` is an HMAC over `sha256`, `item`, `token` and `expires_at` under a
+container-held key. [0.3 · 45]** The key never leaves the container, and the grant id is not the
+bearer secret. Without the key a redeemer therefore cannot forge a descriptor, alter one, or rebind
+one to another item or token. The MAC algorithm and key rotation are not pinned at this layer. The
 descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **decided, not
 running.**
+
+_Implementation note (a1p):_ the MAC covers every descriptor field other than `sig` itself, and verification compares
+`sig` in constant time.
 
 ## 4 · `provenance`
 
