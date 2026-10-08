@@ -76,8 +76,11 @@ decided-pending rows, not here.
   is for an entry with no caller to name** — `authorization-server.md` §12.2: rows (a), (b), (d),
   (e) and (h) — and on such an entry `actor` carries the **surface** the append is about, one of
   `_types.py`'s `AS_THROTTLE_SURFACES`, **never the caller's network identifier**: an IP in an
-  append-only chain is a surveillance record the owner cannot prune. **decided, not running**
-  (no AS in this tree emits one yet). [0.3 · 34, 35]
+  append-only chain is a surveillance record the owner cannot prune. An append with
+  `principal: none` under any event other than `authz.login`, `authz.redeem`, `authz.refuse`,
+  `authz.release` and `authz.tally` **MUST be rejected**: a read, a pull or an act is never
+  unattributed. `_types.py` pins the five as `PRINCIPAL_NONE_EVENTS`. **decided, not running**
+  (no AS in this tree emits one yet, and the ledger does not check it yet). [0.3 · 34, 35]
 - `subject` — the id the event is about (item, node, token, proposal, or a blob's `sha256`).
 - `scope` — the container the event happened in; nullable.
 - `details` — event-specific, open. A reader MUST tolerate unknown keys here.

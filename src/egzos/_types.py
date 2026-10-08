@@ -242,6 +242,17 @@ Event = Literal[
 #: no AS in this tree to emit them. events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
+#: The only events an entry with `principal: none` may carry (events.md §2): the caller-less rows
+#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2. An append with `principal: none`
+#: under any other event MUST be rejected — a read or an act is never unattributed. [0.3 · 34]
+PRINCIPAL_NONE_EVENTS: tuple[Event, ...] = (
+    "authz.login",
+    "authz.redeem",
+    "authz.refuse",
+    "authz.release",
+    "authz.tally",
+)
+
 #: Genesis `prev_hash`: 64 ASCII zeros.
 GENESIS_HASH: str = "0" * 64
 
@@ -257,7 +268,7 @@ class AuditEntry(TypedDict):
     ts: str
     event: Event
     actor: str
-    principal: Principal  # `none` only where no caller exists (authorization-server.md §12.2)
+    principal: Principal  # `none` only under PRINCIPAL_NONE_EVENTS (events.md §2)
     subject: str | None
     scope: str | None
     details: dict[str, Any]
@@ -813,6 +824,7 @@ __all__ = [
     "LoginCause",
     "Node",
     "PRINCIPALS",
+    "PRINCIPAL_NONE_EVENTS",
     "PROPOSAL_STATUSES",
     "PROPOSAL_WIRE_KEY_FROM",
     "PersonalRootMode",
