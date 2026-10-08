@@ -1236,14 +1236,18 @@ string the container has ever seen — so a caller comparing two redirects is co
 requests. **The invariant this ordering needs is that nothing the AS knows varies, not that the bytes
 do not**, and §5.3 and §10.2 now state it in those terms.
 
-**The redirect of substep 3 appends nothing, and stores nothing**, and both are deliberate rather
-than an omission from §12's table: it performs no read — not §11.1's keyed entry, not §11.3's —
-decides nothing about the request, and changes no container state, so there is no effect for
-`events.md` §4 invariant 2 to require an entry of. The pending request rides in `continue` (§11.7)
+**The redirect of substep 3 appends nothing, and stores nothing about the request**, and both are
+deliberate rather than an omission from §12's table: it performs no read — not §11.1's keyed entry,
+not §11.3's — and decides nothing about the request. **The container state it changes is two counts
+and nothing else:** the throttle counter's increment, and §12 row (h)'s per-window count of
+admitted session-less 303s (`redirected`), which the throttle's timer appends once at the window's
+close — so the effect invariant 2 requires an entry of has one, and the 303 itself owes none. The
+pending request rides in `continue` (§11.7)
 precisely so that no server-side record has to be written to hold it: a design that parked the
 request in container state would hand an unauthenticated sweep something to *grow*, which is the very
-thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. What the sweep does produce is
-the counter's increment, and the attempt that
+thing §12.1 rule 3 bounds, and would owe invariant 2 an event besides. A count does not grow with what
+the sweep sends, only with how often. What the sweep produces in the chain is row (h)'s one entry per
+window, and the attempt that
 engages the throttle appends once under §12.1 rule 3 as row (d) cause `throttled`. That entry, and
 one row (d) `token_presented` entry per evaluated attempt that presents a bearer credential (§10.2,
 bounded by the same counter), are the whole of an unauthenticated *caller's* reach into the chain at
@@ -1521,8 +1525,10 @@ What is fixed here, and it is the §10 boundary said as a requirement on the pag
     targets consume none.
   - **Nothing is written to container state to make this work.** The request rides in the redirect,
     not in a server-side pending record. This is what keeps §11.0's substep 3 a step that appends
-    nothing and stores nothing, and it is why an unauthenticated sweep cannot make the container
-    retain anything (§12.1 rule 3). **The login form's carrier is not an exception to this.** The
+    nothing and stores nothing about the request, and it is why an unauthenticated sweep cannot make
+    the container retain anything of what it sent (§12.1 rule 3). The 303 does change two counts —
+    the throttle counter and §12 row (h)'s per-window `redirected` tally (§11.0) — and neither holds
+    a byte of the request. **The login form's carrier is not an exception to this.** The
     hidden field or `action` query named two bullets above lives in the response the AS renders and
     comes back on the POST the browser sends; the AS retains nothing between the two, and a caller
     that never posts leaves nothing behind. What this bullet forbids is a **server-side pending
@@ -1770,7 +1776,8 @@ naming decision:
    reaches a response that depends on the registry. **(d)'s other five causes and the whole of (f)
    are not reachable unauthenticated** — a
    session-less `/authorize` is a 303 to `/login` before either validation tier, and the redirect
-   appends nothing and stores nothing. Nothing here says a client id or a registered redirect URI may be learned: §11.1's
+   appends nothing and stores nothing about the request — it changes only the throttle counter and
+   row (h)'s per-window `redirected` count, which the timer appends once per window (§11.0). Nothing here says a client id or a registered redirect URI may be learned: §11.1's
    *"a caller must not learn that a client id exists"* and §5.3 clause 2's time budget hold
    undiminished, and this rule takes no position on what a caller knows — only on what an
    **unauthenticated** caller can make the chain do. Without it a sweep at (a), (b) or a session-less
@@ -1838,11 +1845,12 @@ naming decision:
 
 ### 12.2 · What `actor` and `principal` carry when there is no caller
 
-`events.md` §2 makes `actor` and `principal` **mandatory** on every entry, and `capabilities.md` §3
-closes `principal` to `interactive` · `client`. None of the five can satisfy that: (a) fires on
-`/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before any
-token exists; and (e) fires on **no attempt at all** — a timer releasing, with no caller in any
-request. The record closes the gap as follows; the text that carries it is `events.md`'s and
+`events.md` §2 makes `actor` and `principal` **mandatory** on every entry, and before 0.3
+`capabilities.md` §3 closed `principal` to `interactive` · `client`. None of the five, nor (h), could
+satisfy that: (a)
+fires on `/login` *before* the login that would establish `interactive`; (b), (d) and (f) fire before
+any token exists; and (e) and (h) fire on **no attempt at all** — a timer releasing or tallying, with
+no caller in any request. The record closes the gap as follows; the text that carries it is `events.md`'s and
 `capabilities.md`'s.
 
 **a1p's reading, taken by the record. [0.3 · 34, 35]**
@@ -1861,7 +1869,9 @@ request. The record closes the gap as follows; the text that carries it is `even
   `window_key` (**a1p**'s name) — a per-container, per-window value derived from the bucket that
   engaged (§11.0), never the key itself,
   rotating with the window. It correlates the entries of one sweep and correlates nothing across
-  time, which is the whole of what pairing needs.
+  time, which is the whole of what pairing needs. **Row (h) carries the same per-window key**,
+  derived the same way from `/authorize`'s container-global bucket (§12), so a tally joins the
+  engage and release pair of that bucket's window.
 
 **Which rows carry `none`. a1p**, binding item 34, which names the value and not its rows: (a), (b),
 (e), (h) and **every** (d) carry `none`; (f) and (g) carry `interactive`. (a) fires before its
