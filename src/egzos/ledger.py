@@ -17,7 +17,7 @@ import hashlib
 from typing import Any
 
 from egzos._types import EVENTS as CONTRACT_EVENTS
-from egzos._types import GENESIS_HASH, PRINCIPAL_NONE_EVENTS
+from egzos._types import GENESIS_HASH, PRINCIPAL_NONE_EVENTS, PRINCIPALS
 from egzos.backends.base import Backend, ChainConflict
 from egzos.model import canonical, now_iso
 
@@ -47,6 +47,8 @@ class Ledger:
     ) -> dict[str, Any]:
         if event not in EVENTS:
             raise ValueError(f"unknown audit event {event!r}")
+        if principal not in PRINCIPALS:
+            raise ValueError(f"unknown audit principal {principal!r}")
         if principal == "none" and event not in PRINCIPAL_NONE_EVENTS:
             raise ValueError(f"audit event {event!r} cannot be unattributed")
         if event in PRINCIPAL_NONE_EVENTS and principal != "none":

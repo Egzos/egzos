@@ -3,6 +3,8 @@
 """
 events.md §2: `principal: none` is for an entry with no caller to name, and only the five
 `PRINCIPAL_NONE_EVENTS` may carry it — a read, a pull or an act is never unattributed (#150).
+The converse holds too: those five carry `none` and nothing else (#159). And `principal` is one
+of `interactive` · `client` · `none` on every entry.
 """
 
 from __future__ import annotations
@@ -72,4 +74,13 @@ def test_the_five_carry_none_and_nothing_else(box: Container, event: str, princi
     head = box.ledger.tail(1)
     with pytest.raises(ValueError, match="carries no caller"):
         box.ledger.append(event, actor="authorize", principal=principal)
+    assert box.ledger.tail(1) == head
+
+
+@pytest.mark.parametrize("principal", ["owner", "system", "", "Interactive", "NONE"])
+def test_a_principal_outside_the_vocabulary_is_refused(box: Container, principal: str):
+    # events.md §2 closes `principal` to interactive · client · none (a1r on #160).
+    head = box.ledger.tail(1)
+    with pytest.raises(ValueError, match="unknown audit principal"):
+        box.ledger.append("context.fetch", actor="owner", principal=principal)
     assert box.ledger.tail(1) == head
