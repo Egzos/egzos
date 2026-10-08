@@ -62,3 +62,14 @@ def test_model_reexports_the_token_principals():
     assert "TOKEN_PRINCIPALS" in model.__all__
     assert set(model.TOKEN_PRINCIPALS) == {"interactive", "client"}
     assert "none" not in model.TOKEN_PRINCIPALS
+
+
+@pytest.mark.parametrize("principal", ["interactive", "client"])
+@pytest.mark.parametrize("event", PRINCIPAL_NONE_EVENTS)
+def test_the_five_carry_none_and_nothing_else(box: Container, event: str, principal: str):
+    # events.md §2's converse, [0.3 · 34] (#159): a principal that varied within one of these
+    # events would tell a reader which cause a uniform page had.
+    head = box.ledger.tail(1)
+    with pytest.raises(ValueError, match="carries no caller"):
+        box.ledger.append(event, actor="authorize", principal=principal)
+    assert box.ledger.tail(1) == head
