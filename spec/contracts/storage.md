@@ -1,7 +1,8 @@
 # Contract · Storage
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** The walking skeleton (`chief/walking-skeleton`, `docs/build/WALKING-SKELETON.md` §7)
 runs **one wide `Backend` Protocol** — `src/egzos/backends/base.py`, implemented by
@@ -14,8 +15,10 @@ verbatim from the running code — the *methods* are running, the *partition* is
 review must read §1–§3 knowing it is reading a **decided split, not a running one**.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a Chief
-freeze decision F1–F5 the skeleton does not yet execute), or `[OPEN→0.3]` (the freeze review must
-settle it — deliberately not decided here).
+freeze decision F1–F5 or 0.3 decision the skeleton does not yet execute). A `[0.3 · N]` marking
+cites item `N` of the Chief's freeze record on #31 (2026-10-03). The open→0.3 marking the draft
+carried is gone from `spec/contracts/` and `src/`: the record answered every one. The design specs
+still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 
 ## 1 · Three contracts, not one (F3)
 
@@ -90,10 +93,11 @@ surface on the Store side**, above this boundary (Phase 1's embeddings), never a
 `text`. **running** (substring match).
 
 **Result ordering is contractual. [0.3 · 1]** `query` returns candidates ordered by **most recent
-activity, then ULID**, newest first, where an item's activity is its own latest write: the same key
-`container.md` §2 disambiguates paths by (for a node, the latest write in its subtree), so the two layers
-cannot disagree and `%n` positional refs are identical between two conforming containers. A backend
-that orders otherwise is non-conforming. **decided, not running**: the skeleton orders
+activity, then ULID**, newest first, where an item's activity is its own latest write, so `%n`
+positional refs are identical between two conforming containers. A backend that orders otherwise is
+non-conforming. This key orders **results** only. Since the Chief's revision of item 1 it
+disambiguates nothing: an ambiguous path is refused (`container.md` §2), so no ordering here can
+steer which node a reference names. **decided, not running**: the skeleton orders
 `created_at DESC`.
 
 ### `tombstone` and `get`

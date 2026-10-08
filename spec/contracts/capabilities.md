@@ -1,11 +1,16 @@
 # Contract · capability vocabulary, principals and tokens
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** RUNNING shapes of the walking skeleton (`docs/build/WALKING-SKELETON.md` §6); code
 `src/egzos/model.py` (`CAPABILITIES`, `ROLE_BUNDLES`, `PRINCIPALS`, `HUMAN_ONLY_ACTS`),
-`src/egzos/auth.py`, `src/egzos/trust.py`. Clauses are marked **running**, **decided, not running**,
-or `[OPEN→0.3]`.
+`src/egzos/auth.py`, `src/egzos/trust.py`. Clauses are marked **running** or **decided, not
+running**; a `[0.3 · N]` marking cites item `N` of the Chief's freeze record on #31 (2026-10-03).
+The open→0.3 marking the draft carried is gone from `spec/contracts/` and `src/`: the record
+answered every one. The design specs still carry the retired marker; design-gap #157 tracks their
+revision by A2 (`README.md`).
 
 ## 1 · Six capabilities, and only six
 

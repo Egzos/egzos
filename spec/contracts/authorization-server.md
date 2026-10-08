@@ -1,7 +1,8 @@
 # Contract · the container's authorization server
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation — read this before any clause below.** Every other document in `spec/contracts/` was
 drafted from a running shape: the walking skeleton executes it and the clause records what it does.
@@ -24,8 +25,9 @@ Clauses carry one of six markings instead:
   may not be changed here. Where the record settled a question but left a detail unnamed — a config
   key's spelling, a constant's name, a section's number — a1p chose it, and marked it **a1p** too.
 - **open→0.3** — the marking a clause carried while the freeze review had still to settle it. The 0.3
-  record answered every one, and **none remains**: each was replaced by its **[0.3 · N]** decision,
-  or by `[v1.1]` with the reason the record gave.
+  record answered every one, and **none remains in `spec/contracts/` or `src/`**: each was replaced
+  by its **[0.3 · N]** decision, or by `[v1.1]` with the reason the record gave. The design specs
+  still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 - `[v1.1]` — named by the 0.3 review as out of v1.0 and deferred to the contract v1.1 boundary at
   Phase 5 (`spec/contracts/README.md`), reviewed there by the Chief, a1p and A6. Planned, not an
   escalation. **A builder may not implement against one**, for the same reason as `[LEAN]`.

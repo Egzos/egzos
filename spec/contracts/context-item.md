@@ -1,7 +1,8 @@
 # Contract · ContextItem
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet. The freeze is declared by
-A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not declare.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** Frozen from the RUNNING shapes of the walking skeleton (`chief/walking-skeleton`,
 `docs/build/WALKING-SKELETON.md` §1), not from prose. Source code: `src/egzos/model.py`
@@ -9,8 +10,10 @@ A6 and the Chief personally (build plan 0.3); a1p-planner prepares, it does not 
 `tests/test_skeleton.py::test_unknown_fields_survive_round_trip`.
 
 Every clause below is marked **running** (observed in the skeleton), **decided, not running**
-(a Chief freeze decision F1–F5 the skeleton does not yet execute), or `[OPEN→0.3]` (the freeze
-review must settle it — deliberately not decided here).
+(a Chief freeze decision F1–F5 or 0.3 decision the skeleton does not yet execute). A `[0.3 · N]`
+marking cites item `N` of the Chief's freeze record on #31 (2026-10-03). The open→0.3 marking the
+draft carried is gone from `spec/contracts/` and `src/`: the record answered every one. The design
+specs still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
 
 ## 1 · The item
 
@@ -84,8 +87,11 @@ one to another item or token. The MAC algorithm and key rotation are not pinned 
 descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **decided, not
 running.**
 
-_Implementation note (a1p):_ the MAC covers every descriptor field other than `sig` itself, and verification compares
-`sig` in constant time.
+**The MAC MUST cover every descriptor field other than `sig`, and verification MUST compare `sig`
+in constant time.** A field outside the MAC can be altered by a redeemer without detection, and a
+comparison that exits at the first differing byte lets a redeemer recover a valid `sig` byte by
+byte from its timing. A field added to the descriptor later is covered by the same rule, with no
+edit here. **a1p**, the binding of [0.3 · 45].
 
 ## 4 · `provenance`
 

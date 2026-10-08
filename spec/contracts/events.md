@@ -1,6 +1,8 @@
 # Contract · event taxonomy and the audit chain
 
-**Status: drafted — awaiting the Phase 0.3 freeze review.** Not law yet.
+**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
+the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
 **Derivation.** RUNNING shapes of the walking skeleton (`docs/build/WALKING-SKELETON.md` §8); code
 `src/egzos/ledger.py` (`EVENTS`, `Ledger.append`, `Ledger.verify`), `src/egzos/model.py`
@@ -83,8 +85,9 @@ log states the setting as it then stood, the same rule `client.register` follows
 names: the record names the event and the capability and leaves the shape open. `subject` is the
 node the key applies at for a node-scoped key (`org.policy.sovereign_chain`,
 `node.policy.structure_floor`) and null for a container-wide one. A change that leaves the value
-as it was still appends: the act happened. No config value is a secret, so invariant 4 permits the
-value in `details`. [0.3 · 40]
+as it was still appends: the act happened. A config key MUST NOT hold a secret value
+(`container.md` §8), so `config.set` details never write one to the chain and invariant 4 permits
+the value in `details`. [0.3 · 40]
 
 ## 2 · The entry
 
@@ -146,12 +149,12 @@ JSON with:
 
 ### Why `seq` stays out of the hashed body
 
-**a1p's reading, pending the freeze — `[OPEN→0.3]`.** The Chief's note on #102 recorded the opposite
-recommendation (hash `seq`); this section goes the other way, and the freeze should read it as an
-agenda item, not as settled text. Four places already agree on excluding it — §3's bullet, §3's
-formula as amended here, `storage.md` §3 and `_types.py`'s `AuditEntry` — so **if the freeze takes
-the other reading, those four move together, and `a3-ledger` implements against a skeleton that
-does it the other way.** The reasoning below is why a1p chose as it did.
+**The Chief's decision on #102 F7** (the Chief's correction comment of 2026-10-03, https://github.com/Egzos/egzos/issues/102#issuecomment-5965659039, implemented by PR 104):
+`seq` is store-assigned, so hashing it would break verification on a re-import that renumbers, and
+the formula reads `canonical(entry minus hash and seq)`. Four places agree on excluding `seq` —
+§3's bullet, §3's formula, `storage.md` §3 and `_types.py`'s `AuditEntry` — so a later change to
+the other reading is a `contract-change` that moves those four together. The reasoning below is the
+case for that decision.
 
 Stated as a decision rather than left as the absence of one, because the drift report found the
 formula and the prose disagreeing, and *including* `seq` was the first reading offered (#10 F7,
