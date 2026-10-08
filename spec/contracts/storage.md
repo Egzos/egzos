@@ -90,7 +90,8 @@ surface on the Store side**, above this boundary (Phase 1's embeddings), never a
 `text`. **running** (substring match).
 
 **Result ordering is contractual. [0.3 · 1]** `query` returns candidates ordered by **most recent
-activity, then ULID**: the same key `container.md` §2 disambiguates paths by, so the two layers
+activity, then ULID**, newest first, where an item's activity is its own latest write: the same key
+`container.md` §2 disambiguates paths by (for a node, the latest write in its subtree), so the two layers
 cannot disagree and `%n` positional refs are identical between two conforming containers. A backend
 that orders otherwise is non-conforming. **decided, not running**: the skeleton orders
 `created_at DESC`.
