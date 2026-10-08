@@ -171,3 +171,30 @@ def test_no_audience_change_lands_between_the_manifest_check_and_the_move(tmp_pa
         executed = False
     assert widened, "the hook never ran"
     assert not (widened[0] and executed)
+
+
+def test_a_decider_revoked_after_the_pre_lock_check_lands_nothing(tmp_path, monkeypatch):
+    # a1r on #149: whether the token decides over the proposal is re-read under the lock, so a
+    # revoke between the pre-lock check and the move refuses the decision instead of landing it.
+    from egzos.trust import TrustEngine, TrustError
+
+    home = tmp_path / "home"
+    pid = _parked(home)
+    a, b = Container(home), Container(home)
+    tb = b.auth.interactive_token()
+    real = TrustEngine.decides_over
+
+    def revoke_after_check(self, *args, **kw):
+        allowed = real(self, *args, **kw)
+        if self is b.trust and not getattr(self, "_revoked", False):
+            self._revoked = True
+            a.auth.revoke(tb.id, actor=OWNER, principal="interactive")
+        return allowed
+
+    monkeypatch.setattr(TrustEngine, "decides_over", revoke_after_check)
+    with pytest.raises(TrustError, match="no open proposal"):
+        b.trust.execute(pid, token=tb, actor=OWNER)
+    c = Container(home)
+    assert c.backend.get_proposal(pid)["status"] == "open"
+    events = [e["event"] for e in c.ledger.tail(50) if e.get("subject") == pid]
+    assert "approval.execute" not in events

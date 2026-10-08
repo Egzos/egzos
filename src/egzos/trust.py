@@ -257,12 +257,13 @@ class TrustEngine:
         if not p or p["status"] != "open" or not self.decides_over(token, p):
             raise TrustError("no open proposal with that id")
         # Everything the decision rests on is read under the write lock that the move takes, so
-        # what is executed is exactly what was checked: the proposal still open (#118), the
-        # target, no quarantined item, and the manifest and source unchanged (approve-what-you-
-        # saw; a1r on #146). A racing decider waits on BEGIN IMMEDIATE and then reads the outcome.
+        # what is executed is exactly what was checked: the proposal still open (#118) and still
+        # the decider's to decide, the target, no quarantined item, and the manifest and source
+        # unchanged (approve-what-you-saw; a1r on #146 and #149). A racing decider waits on
+        # BEGIN IMMEDIATE and then reads the outcome.
         stale_reason = None
         with self.backend.atomic():
-            self._still_open(p["id"])
+            self._still_open(p["id"], token)
             to = self.backend.get_node(p["to"])
             if not to:
                 raise TrustError("target scope no longer exists")
@@ -328,21 +329,26 @@ class TrustEngine:
             raise TrustError("no open proposal with that id")
         p["status"] = "denied"
         with self.backend.atomic():
-            self._still_open(p["id"])
+            self._still_open(p["id"], token)
             self.backend.put_proposal(p)
             self.ledger.append(
                 "approval.deny", actor=actor, principal=token.principal, subject=p["id"]
             )
         return p
 
-    def _still_open(self, proposal_id: str) -> None:
-        """Re-read the proposal under the write lock and refuse unless it is still open (#118).
+    def _still_open(self, proposal_id: str, token: Token) -> None:
+        """Re-read the proposal under the write lock and refuse unless it is still open (#118)
+        and still the decider's: the token re-read (a revoke since the pre-lock check counts) and
+        its coverage of both ends re-checked against the tree as it now stands (a1r on #149).
         The checks above run before the lock, so two deciders (a lifeboat tab and a CLI `trust
         approve`) could both see it open; `atomic()` takes BEGIN IMMEDIATE, so whichever decides
         second waits here, then finds it decided and lands nothing. The answer is the one a
         missing id gets."""
         current = self.backend.get_proposal(proposal_id)
-        if not current or current["status"] != "open":
+        fresh = self.backend.get_token(token.id)
+        if not current or current["status"] != "open" or not fresh:
+            raise TrustError("no open proposal with that id")
+        if not self.decides_over(fresh, current):
             raise TrustError("no open proposal with that id")
 
     def decides_over(self, token: Token, proposal: dict[str, Any]) -> bool:

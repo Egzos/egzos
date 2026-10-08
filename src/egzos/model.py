@@ -27,6 +27,7 @@ from egzos._types import (
     ROLE_BUNDLES,
     ROOT_TYPES,
     SERVING_POLICY,
+    TOKEN_PRINCIPALS,
     TRUST_STATUSES,
     VERIFIED_ONLY_KINDS,
 )
@@ -43,6 +44,7 @@ __all__ = [
     "ROLE_BUNDLES",
     "ROOT_TYPES",
     "SERVING_POLICY",
+    "TOKEN_PRINCIPALS",
     "TRUST_STATUSES",
     "VERIFIED_ONLY_KINDS",
     "ContextItem",
@@ -164,7 +166,7 @@ class Token:
     """Capability lives in the TOKEN, not the surface (v0.3 §5). Owner identity on every token."""
 
     id: str
-    principal: str  # interactive | client
+    principal: str  # one of TOKEN_PRINCIPALS: a token is never minted for `none`
     owner: str
     client: str
     capabilities: list[str]

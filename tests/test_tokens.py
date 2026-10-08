@@ -58,3 +58,17 @@ def test_keychain_holds_the_owner_value_owner_only(box):
     assert stat.S_IMODE(kc.stat().st_mode) == 0o600
     value = json.loads(kc.read_text())["token"]
     assert box.auth.use(value).principal == "interactive"
+
+
+@pytest.mark.parametrize("principal", ["none", "owner", "", "Interactive"])
+def test_mint_refuses_a_principal_no_token_can_hold(tmp_path, principal):
+    # a6 on #151: `none` is audit-only (events.md §2), and the token vocabulary is closed.
+    from egzos.auth import AuthError
+
+    c = Container(tmp_path / "home")
+    c.init()
+    before = len(c.backend.list_tokens())
+    with pytest.raises(AuthError, match="unknown token principal"):
+        c.auth.mint(principal=principal, owner=OWNER, client="bot", role="reader", scopes=["*"],
+                    actor=OWNER, by_principal="interactive")
+    assert len(c.backend.list_tokens()) == before
