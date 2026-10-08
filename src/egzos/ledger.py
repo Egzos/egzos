@@ -6,7 +6,9 @@ previous one; verification fails loudly and specifically. Reads are logged, not 
 
 The event taxonomy is `_types.EVENTS` (spec/contracts/events.md §1); an append outside it is
 refused, and so is `principal: none` under any event outside `_types.PRINCIPAL_NONE_EVENTS`
-(events.md §2): a read, a pull or an act is never unattributed.
+(events.md §2): a read, a pull or an act is never unattributed. The converse holds too (#159):
+those five carry `none` and nothing else, so the principal never tells a reader which cause a
+uniform page had.
 """
 
 from __future__ import annotations
@@ -47,6 +49,8 @@ class Ledger:
             raise ValueError(f"unknown audit event {event!r}")
         if principal == "none" and event not in PRINCIPAL_NONE_EVENTS:
             raise ValueError(f"audit event {event!r} cannot be unattributed")
+        if event in PRINCIPAL_NONE_EVENTS and principal != "none":
+            raise ValueError(f"audit event {event!r} carries no caller")
         # Read the head, chain onto it, append. Two processes (the CLI and `serve --mcp`) can read
         # the same head; the backend accepts one successor per entry, and the loser re-chains.
         for _ in range(64):
