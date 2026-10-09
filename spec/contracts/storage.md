@@ -266,15 +266,17 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    name, in one step on one substrate, and returns the revoked `Token.id`s to its internal caller for
    `token.revoke` ([0.3 · 30]). A family half-revoked by a crash is the failure rotation exists to
    prevent. This couples the two Protocols: **the `ASState` implementer MUST be the `ContainerState`
-   implementer, on one substrate**. No backend may split them, because
-   `revoke_family` writes `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its family is not decided here;
-   `family_of_token` only makes the family id available to the entry.
+   implementer, on one substrate**. No backend may split them, because `revoke_family` writes
+   `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its
+   family is not decided here; `family_of_token` only makes the family id available to the entry.
 5. `claim_resubmission` returns `True` exactly once per `(session_hash, request_key)` that
    `put_decided` recorded, and `False` otherwise — §11.0 substep 1's "first re-submission on the
    deciding session". `get_decided` is the request-keyed read after the counter (§11.4).
 6. `throttle_incr` increments and returns the new count. It names no rate and no window length:
-   those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust derives, and so is `bucket_key` — the constant
-   container-global bucket or a digest of the transport source address (§11.0, [0.3 · 24]). A network
+   those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust
+   derives, and so is `bucket_key` — the constant container-global bucket, a digest of the transport
+   source address (§11.0, [0.3 · 24]), or, on the `rest` surface only, the `Token.id` a verified
+   descriptor names (`rest.md` §2 item 7). A network
    identifier reaches the store only as Trust chooses to key it and never enters the chain.
 
 **Silence-not-errors (§5) applies unchanged, to the plain getters and to what reaches an external
@@ -305,8 +307,8 @@ field a3-trust finds missing is an escalation on #173's thread, not a field adde
 
 **Implementations.** The sqlite implementation of `ASState` and of `ASGateState` is in
 `backends/sqlite.py`, on the file that holds `ContainerState` (the partition, below). The sqlite
-implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest of the backends. a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173
-question 5.
+implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest of the backends.
+a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173 question 5.
 
 **The partition: all of the authorization server's state is `ContainerState`-class. decided**
 (the Chief on #173, option (A), 2026-10-09). Under F3 it is durable and never delegated to a

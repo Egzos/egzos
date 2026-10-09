@@ -1285,34 +1285,37 @@ address so a single noisy source cannot spend the global budget. Each alone fail
 holds. An attempt is refused when **either** holds, which is what "holds" means throughout §11.0 and
 §12.1, and **a network identifier may key a throttle and may never enter the chain.**
 
-**Rates. #141; the structure is decided, the five AS surfaces' numbers are a1p-proposed.** The
-Chief on #141 (2026-10-09) fixed the shape for every surface: two buckets per surface, counted over
-a fixed 300-second window, a bucket that engages holding until its window closes. The `rest`
-surface's numbers are decided there (`rest.md` §2 item 7). **a1p proposes** the other five, for the
-Chief to confirm on the PR that lands this text; until then they are not decided, and #141 stays
-open on them:
+**Rates. decided** (the Chief on #141 and on #184, 2026-10-09). The Chief on #141 fixed the shape
+for every surface: two buckets per surface, counted over a fixed 300-second window, a bucket that
+engages holding until its window closes. The `rest` surface's numbers are decided there (`rest.md`
+§2 item 7), and the door adds a third, per-token bucket of its own there (#184). The other five
+were a1p's proposal, confirmed as proposed by the Chief on #184:
 
 | surface | container-global / 300 s | per source address / 300 s | status |
 |---|---|---|---|
-| `login` | 30 | 5 | **a1p-proposed** |
-| `device` | 30 | 5 | **a1p-proposed** |
-| `tap` | 60 | 10 | **a1p-proposed** |
-| `revoke` | 120 | 20 | **a1p-proposed** |
-| `authorize` | 300 | 30 | **a1p-proposed** |
+| `login` | 30 | 5 | **decided** (#184) |
+| `device` | 30 | 5 | **decided** (#184) |
+| `tap` | 60 | 10 | **decided** (#184) |
+| `revoke` | 120 | 20 | **decided** (#184) |
+| `authorize` | 300 | 30 | **decided** (#184) |
 | `rest` | 300 | 30 | **decided** (#141) |
 
-`AS_THROTTLE_WINDOW_SECONDS` and `AS_THROTTLE_RATES` in `_types.py` carry them. **Why these. a1p.**
-`login` and `device` are tightest: they guard password-like and low-entropy input (§11.7; the
-`user_code`'s 34.6 bits, §11.8), and `device`'s buckets are §3 mitigation 1's attempt bound. At
-30 per window the whole container meets at most 8,640 `user_code` guesses a day against a space of
-about 2.6 × 10¹⁰. Five per source still lets the owner mistype a few times. `tap` is an owner-only
-presence proof with no secret typed, so it sits above those two. `revoke` is owner pages plus RFC
-7009 calls a client makes on sign-out, so it is looser again. `authorize` takes `rest`'s numbers:
-consent round trips, back buttons and session-less 303s are its ordinary traffic. **The cost,
-carried from #141:** under §12.1 rule 4's fail-closed rule, a sweep that exhausts a surface's
-container-global bucket refuses the owner at that surface until the window closes; a smaller number
-is a cheaper lockout. Every window is 300 seconds, so row (h) reaches the chain at most once per
-window, 288 entries a day, and a release appends at most once per engaged bucket per window.
+`AS_THROTTLE_WINDOW_SECONDS` and `AS_THROTTLE_RATES` in `_types.py` carry them. **Why these**, a1p's
+reasoning as proposed: `login` and `device` are tightest, since they guard password-like and
+low-entropy input (§11.7; the `user_code`'s 34.6 bits, §11.8), and `device`'s buckets are §3
+mitigation 1's attempt bound. At 30 per window the whole container meets at most 8,640 `user_code`
+guesses a day against a space of about 2.6 × 10¹⁰. Five per source still lets the owner mistype a
+few times. `tap` is an owner-only presence proof with no secret typed, so it sits above those two.
+`revoke` is owner pages plus RFC 7009 calls a client makes on sign-out, so it is looser again.
+`authorize` takes `rest`'s numbers: consent round trips, back buttons and session-less 303s are its
+ordinary traffic. **The cost, carried from #141:** under §12.1 rule 4's fail-closed rule, a sweep
+that exhausts a surface's container-global bucket refuses the owner at that surface until the window
+closes; a smaller number is a cheaper lockout. The lockout is renewable, not a single-window event:
+a sender who refills the bucket in each new window holds it for as long as it keeps sending, about
+30 requests per 300 s on `login` or `device` (a6 on #184). TODO(a1p), #141: whether `login` and
+`device` need an owner path past a held bucket is open, named by the Chief on #184 and not blocking.
+Every window is 300 seconds, so row (h) reaches the chain at most once per window, 288 entries a
+day, and a release appends at most once per engaged bucket per window.
 
 ### 11.1 · The client-registry read (§14 item 1)
 

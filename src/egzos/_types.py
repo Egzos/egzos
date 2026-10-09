@@ -552,9 +552,10 @@ class ThrottleRate(NamedTuple):
     per_source: int  # keyed on the transport source address, never on a caller-supplied value
 
 
-#: §11.0's rate table. `rest` is decided (the Chief on #141, 2026-10-09). The five AS surfaces are
-#: a1p-proposed, tightest on `login` and `device`, for the Chief to confirm on the PR that lands
-#: them; #141 stays open until then. Read-only, so no caller can loosen a bound at runtime.
+#: §11.0's rate table, all six decided: `rest` by the Chief on #141, the five AS surfaces as a1p
+#: proposed them, confirmed by the Chief on #184 (2026-10-09), tightest on `login` and `device`.
+#: rest.md §2 item 7's per-token bucket is not here: its rate is open on #141. Read-only, so no
+#: caller can loosen a bound at runtime.
 AS_THROTTLE_RATES: Mapping[ThrottleSurface, ThrottleRate] = MappingProxyType(
     {
         "login": ThrottleRate(container_global=30, per_source=5),

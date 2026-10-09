@@ -1,14 +1,16 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The throttle rates, pinned: `authorization-server.md` §11.0's table and `rest.md` §2 item 7 (#141).
 
-`rest` is the Chief's decision; the five AS surfaces are a1p-proposed until the Chief confirms them.
+All six are the Chief's: `rest` on #141, the five AS surfaces confirmed as proposed on #184.
 Literals transcribed here on purpose, the way the rest of `tests/_types/**` does: a number that
 moves has to move in the contract and here together.
 """
 
 from __future__ import annotations
+
+import re
 
 import pytest
 
@@ -40,8 +42,8 @@ def test_rest_rates_are_the_chiefs():
         ("authorize", 300, 30),
     ],
 )
-def test_as_surface_rates_are_a1ps_proposal(surface, container_global, per_source):
-    # §11.0's table, a1p-proposed for the Chief to confirm (#141 stays open until then).
+def test_as_surface_rates_are_decided(surface, container_global, per_source):
+    # §11.0's table, confirmed by the Chief on #184, 2026-10-09.
     assert t.AS_THROTTLE_RATES[surface] == t.ThrottleRate(container_global, per_source)
 
 
@@ -70,4 +72,6 @@ def test_no_rate_is_a_config_key():
     fields = set(t.ContainerConfig.__annotations__)
     wire_keys = set(t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY)
     for name in fields | wire_keys:
-        assert "throttle" not in name and "rate" not in name, name
+        # Whole words only: `generate_*` or `moderate_*` is not a rate.
+        words = set(re.split(r"[^a-z0-9]+", name.lower()))
+        assert not words & {"throttle", "throttles", "rate", "rates"}, name
