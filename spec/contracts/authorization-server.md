@@ -1903,15 +1903,9 @@ the dashboard reaches this AS as a browser client from a separate origin, so it 
 the container's pages. Under **[0.3 · 11]** it can revoke the token it holds through §9.2's endpoint
 and nothing else, so `consent.md` §19's broader revoke sentence is a spec revision (§11.9).
 
-TODO(a1p): **nothing says where the AS's own state is persisted.** Client registrations,
-authorization codes, pending device authorizations, refresh-token chains, §11.4's decided-request
-records, §12's throttle counters and §10.1's interactive sessions are all durable state this document
-requires and `storage.md` §3 does not name a method group for — the same shape as `container.md`
-§8's open question about the config object, and the same reason it matters: state that Trust does
-not own is state that can be edited around Trust. The last three are Part B's additions to the list
-and the sharpest cases, because a session store editable around Trust forges presence, a throttle
-counter editable around Trust removes §12's only bound on the chain, and a decided-request record
-editable around Trust un-decides an authorization. a1p's reading is that all of it is
-`ContainerState` by F3's rule (it is never delegated to a pluggable backend), but F3 was written
-before this surface existed and should be asked, not assumed. The 0.3 review or the #30
-consolidation pass should settle it.
+**Where the AS's own state is persisted → `storage.md` §3.1** (draft binding, **a1p**, #173; not
+frozen). Client registrations, authorization codes, pending device authorizations, refresh-token
+chains, §11.4's decided-request records, §12's throttle counters and §10.1's interactive sessions are
+named there as `ASState` and `ASGateState`, never delegated, keyed on credential hashes, with single
+use enforced by the store atomically. Whether sessions and throttle counters are container state or
+process memory is the Chief's TODO there.
