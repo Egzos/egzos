@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **v0.1.1.** The core's first source-available release (PolyForm Strict 1.0.0): the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from the release tag below.
+> **v0.1.2.** The source-available core (PolyForm Strict 1.0.0): the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from PyPI below.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -26,7 +26,7 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 ## Quickstart
 
 ```bash
-pipx install "git+https://github.com/Egzos/egzos@v0.1.1"
+pipx install egzos                           # or: pip install egzos
 
 egzos init                                   # your container at ~/.egzos, and your owner token
 egzos add "Prefer imperative commit messages" --kind preference --key commit.style

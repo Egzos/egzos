@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — the CLI works from the home directory (2026-10-09)
+
+### Fixed
+
+- **`egzos add`, `ls` and every verb that reads the sticky scope crashed when run from `~`.** The
+  sticky scope is a `.egzos` *file* in the working directory, and in the home directory `.egzos` is
+  the container itself, a *directory* (`EGZOS_HOME`'s default), so the read raised
+  `IsADirectoryError`. Only a file is a sticky scope now, and `egzos cd` refuses to write one where
+  `.egzos` is a directory.
+- **Usage errors printed a Python traceback.** An unknown command or option (`egzos --version`), a
+  missing argument or a bare group (`egzos token`) now prints one `Error:` line and a `--help`
+  hint on stderr and exits 2. What was typed is echoed through the terminal sanitizer.
+
+### Changed
+
+- The README installs from PyPI: `pipx install egzos`.
+
 ## [0.1.1] — source-available under PolyForm Strict 1.0.0 (2026-10-09)
 
 ### Changed

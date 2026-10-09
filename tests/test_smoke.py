@@ -8,7 +8,7 @@ import egzos.cli
 
 
 def test_version():
-    assert egzos.__version__ == "0.1.1"
+    assert egzos.__version__ == "0.1.2"
 
 
 def test_cli_main_returns_zero():
