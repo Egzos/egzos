@@ -47,7 +47,7 @@ Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your 
   hash chain that verifies end to end.
 - **Structure as you go.** `egzos mk project health`, `egzos mv %1 project:health`, `egzos fetch project:health`.
 
-## Open core
+## The core and the flagship
 
 What is in this repository (public, source-available under the PolyForm Strict License 1.0.0):
 
@@ -64,7 +64,7 @@ What is in `Egzos/egzos-platform` (proprietary; private from its first product-c
 - Server-side intelligence (scheduling, continuous baselining, nightly suggest)
 - Billing and sessions
 
-**Capabilities are never paywalled. Only experiences and infrastructure are, over there.**
+**The core is free for noncommercial use under its licence (PolyForm Strict 1.0.0); commercial use needs a separate licence from the copyright holder. The flagship's hosted experiences and infrastructure are the paid product, over there.**
 
 ## How the build works
 
