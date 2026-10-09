@@ -544,6 +544,11 @@ jobs:
           permission-contents: read
           permission-issues: write
           permission-pull-requests: read
+          # permission-repository-advisories is not declared in this action's action.yml, so the
+          # runner warns "Unexpected input". The runner still exports it as an INPUT_PERMISSION-*
+          # variable, and the action reads every one of those generically
+          # (lib/get-permissions-from-inputs.js at this pin) into the App permission
+          # `repository_advisories`. Without it, the minted token could not file an advisory.
           permission-repository-advisories: write
 
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
@@ -601,7 +606,7 @@ jobs:
   # no issue verb (no label could dispatch a builder from here) and no write tool.
   a6-adversary-pr-advisory:
     name: a6-adversary-pr-advisory   # distinct from the required check name
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.pr != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.pr }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -636,6 +641,11 @@ jobs:
           # "can file an advisory and nothing else", not the tool list alone.
           permission-contents: read
           permission-pull-requests: read
+          # permission-repository-advisories is not declared in this action's action.yml, so the
+          # runner warns "Unexpected input". The runner still exports it as an INPUT_PERMISSION-*
+          # variable, and the action reads every one of those generically
+          # (lib/get-permissions-from-inputs.js at this pin) into the App permission
+          # `repository_advisories`. Without it, the minted token could not file an advisory.
           permission-repository-advisories: write
 
       - name: charter-a6-adversary

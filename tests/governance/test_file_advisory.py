@@ -212,6 +212,7 @@ def test_create_sends_only_the_advisory_fields(stub):
         "summary": "s",
         "description": "REPRO",
         "severity": "high",
+        "cvss_vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N",
         "cwe_ids": ["CWE-601"],
         "vulnerabilities": [{
             "package": {"ecosystem": "other", "name": "egzos", "purl": "x"},
@@ -227,7 +228,9 @@ def test_create_sends_only_the_advisory_fields(stub):
     r = _run(env, "create", "-", stdin=json.dumps(body))
     assert r.returncode == 0, r.stderr
     sent = json.loads((d / "sent.json").read_text())
-    assert set(sent) == {"summary", "description", "severity", "cwe_ids", "vulnerabilities"}
+    assert set(sent) == {
+        "summary", "description", "severity", "cvss_vector_string", "cwe_ids", "vulnerabilities",
+    }
     assert sent["vulnerabilities"] == [{
         "package": {"ecosystem": "other", "name": "egzos"},
         "vulnerable_version_range": "< 0.2",

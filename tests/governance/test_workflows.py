@@ -625,7 +625,7 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
     on = wf.get("on", wf.get(True))
     assert on["workflow_dispatch"]["inputs"]["pr"]["required"] is False
     job = wf["jobs"]["a6-adversary-pr-advisory"]
-    assert "workflow_dispatch" in job["if"] and "inputs.pr != ''" in job["if"]
+    assert job["if"] == "${{ github.event_name == 'workflow_dispatch' && inputs.pr }}"
     assert job["permissions"] == {"contents": "read", "pull-requests": "read"}
     steps = job["steps"]
     names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]

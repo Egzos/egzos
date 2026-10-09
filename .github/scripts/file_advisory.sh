@@ -13,10 +13,11 @@
 # write tool: a session that could write files and also run a script it could have rewritten would
 # hold an interpreter with the forge token behind it (Egzos/egzos#71 review, round 3).
 #
-# create sends only summary, description, severity, cwe_ids and vulnerabilities, each vulnerability
-# cut by the same WRITABLE filter update uses. Anything else the body carries is dropped: the endpoint
-# also takes credits, collaborating users and teams and a private fork, and a session that read
-# attacker-written text must not be able to add an outside account to a private advisory (#177).
+# create sends only summary, description, severity, cvss_vector_string, cwe_ids and vulnerabilities,
+# each vulnerability cut by the same WRITABLE filter update uses. Anything else the body carries is
+# dropped: the endpoint also takes credits, collaborating users and teams and a private fork, and a
+# session that read attacker-written text must not be able to add an outside account to a private
+# advisory (#177).
 #
 # update is append-only. The advisory body is the only copy of an unfixed reproduction, and the API's
 # PATCH replaces each field it is given, so the script reads the filed advisory itself: the new
@@ -73,6 +74,7 @@ case "${1:-}" in
     jq "$WRITABLE"'
         {summary, description}
         + (if .severity then {severity} else {} end)
+        + (if (.cvss_vector_string | type) == "string" then {cvss_vector_string} else {} end)
         + (if (.cwe_ids | type) == "array" then {cwe_ids} else {} end)
         + (if (.vulnerabilities | type) == "array"
              then {vulnerabilities: (.vulnerabilities | map(writable))}
