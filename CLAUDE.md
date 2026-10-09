@@ -8,7 +8,8 @@ This file binds every agent that runs in this repository. Read it first, then yo
 ## What this repository is
 
 `egzos` is the open core of egzos — an MCP-first, CLI-first personal context layer where the user's
-container is the home and platforms are clients. Apache-2.0, **public from commit one**. The closed,
+container is the home and platforms are clients. **Public from commit one**, source-available under the
+PolyForm Strict License 1.0.0 from v0.1.1 (the Chief, 2026-10-09; v0.1.0 and earlier were Apache-2.0). The closed,
 paid flagship (`egzos.io` UI, hosting, relay, server-side intelligence) lives in the sibling
 `Egzos/egzos-platform` (proprietary; public only while it holds nothing but scaffolding, private from
 its first product-code commit — D10), split from this repo on the container contract. Capabilities are
@@ -91,7 +92,7 @@ Need something outside your paths? File the issue and take the next item:
   Checks — because Herald distills those fields to the Chief's phone. Link the issue.
 - Tests accompany code. Own module ≥ 90% unit coverage is the standard for core teams.
 - License header on every source file:
-  `# Copyright 2026 Ali Sasanian` / `# SPDX-License-Identifier: Apache-2.0`.
+  `# Copyright 2026 Ali Sasanian` / `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Commit subjects imperative and specific; reference the issue in the body.
 - Never `git push --force`, never rewrite history on a shared branch, never push to `main`.
 - Builders checkpoint: open a draft PR on the first commit, push after each section, and mark it ready only

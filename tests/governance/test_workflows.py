@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Control-plane invariants over .github/workflows/*.yml (#44 item 2).
 
 Each of these was established by a fix and, until now, held only as long as the next reviewer

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 #
 # egzos path-ownership map — read by .github/scripts/check_ownership.py
 # Schema version 1. Do not edit on an agent branch: chief_only is hard-enforced — the checker and

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Stands in for a person at a browser, for the demo and tests only: given a /tap/<token> URL it
 opens the page, presses *Sign and approve*, then *Confirm signature* — the same two deliberate
 presses the page asks of a human, over the same HTTP.

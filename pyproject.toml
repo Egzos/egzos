@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "egzos"
-version = "0.1.0"
+version = "0.1.1"
 description = "MCP-first, CLI-first personal context layer"
 readme = "README.md"
-license = { text = "Apache-2.0" }
+license = { text = "LicenseRef-PolyForm-Strict-1.0.0" }
 requires-python = ">=3.11"
 authors = [
     { name = "Ali Sasanian" },

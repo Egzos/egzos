@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 # The only route to issue writes for the model sessions that hold no interpreter: a6's nightly sweep
 # and a1r's nightly drift report. It replaces raw `gh issue create|edit|comment:*` grants. A prefix
 # grant approves any flag, and `--body-file` (`-F`) makes gh read and post whatever path it names,

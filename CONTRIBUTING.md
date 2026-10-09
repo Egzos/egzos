@@ -19,7 +19,7 @@ Before opening a PR:
 3. Add the two header lines to every Python file you create:
    ```
    # Copyright 2026 Ali Sasanian
-   # SPDX-License-Identifier: Apache-2.0
+   # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
    ```
 4. Touch only the paths your change logically owns. Governance-sensitive paths (`CLAUDE.md`, `.github/**`, `.claude/**`, `spec/contracts/**`) require a strong justification.
 5. Keep the PR within the size cap: 600 changed lines or 30 files (lockfiles and `tests/fixtures/**` excluded).
@@ -38,7 +38,7 @@ Ruff is enforced; the CI `tests` check runs both. Add tests for any code you add
 
 `TODO(chief): choose DCO vs CLA before accepting outside PRs.` This has not been decided. Until then, outside PRs are reviewed case by case; the Chief will communicate what sign-off is required.
 
-All code in this repository is Apache-2.0 unless otherwise noted. By submitting a PR you confirm your contribution is yours to offer under that license (or whatever sign-off mechanism the Chief adopts). The egzos name and mark (`spec/design/brand/`) are not covered by that grant — see `TRADEMARKS.md`.
+This repository is source-available under the PolyForm Strict License 1.0.0, which grants no right to change the software or build new works on it. Changes therefore come from the copyright holder and the project's own build agents; an outside contribution needs a written agreement with the Chief first. Versions up to and including 0.1.0 were released under Apache-2.0. The egzos name and mark (`spec/design/brand/`) are not covered by any licence grant — see `TRADEMARKS.md`.
 
 ## Design and contract questions
 

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """gh_issue.sh against a stub `gh`: bodies come from the scoped directory only, never carry a
 credential, and each verb reaches one endpoint with fixed fields."""
 

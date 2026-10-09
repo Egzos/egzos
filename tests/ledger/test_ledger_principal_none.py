@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 events.md §2: `principal: none` is for an entry with no caller to name, and only the five
 `PRINCIPAL_NONE_EVENTS` may carry it — a read, a pull or an act is never unattributed (#150).

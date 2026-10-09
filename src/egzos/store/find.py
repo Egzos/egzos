@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The find grammar, one implementation for the CLI's `find` and the lifeboat's search (lifeboat.md
 §2.2, D-L2: "the UI renders whatever the CLI accepts").

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The REST door's answers from the Chief on #165, pinned: `rest.md` §6's grant lifetime, and §2's
 throttle surface and per-window tally.
