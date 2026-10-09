@@ -73,10 +73,45 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
    `authorization-server.md` §9.2's silence rule: an answer that varied would test a token value
    without holding one. RFC 9728's `resource_metadata` parameter is the MCP surface, `[v1.1]` by
    `authorization-server.md` §4, and is not sent.
-6. **An unauthenticated request appends nothing.** It read nothing, and it has no caller to name:
-   `events.md` §2 closes `principal: none` to the five AS events. **a1p.** `TODO(chief)`, #165
-   item 3: nothing bounds a sweep of token values here except `capabilities.md` §5's 128 bits. Until
-   the Chief answers, the door has no throttle, and no `surface` word is added.
+6. **An unauthenticated request appends no entry of its own.** It read nothing, and it has no caller
+   to name. **a1p.** Item 7's throttle counts it, and the window's `rest.tally` records it.
+7. **The door is throttled on its own `surface` word, `rest`. decided** (the Chief on #165 item 3,
+   2026-10-09, https://github.com/Egzos/egzos/issues/165#issuecomment-6073462009). One word covers
+   both sweeps the door is open to: token values at its `401` (item 5) and descriptors at its
+   redemption route (§6). **a1p** for the rest of this item, reading `authorization-server.md`
+   §11.0 and §12.1 onto this door:
+   - **What counts:** every `401` answer and every refused redemption, whichever §6 check refused
+     it. A request the door serves, or answers with §3's refusal on a live token, does not count.
+   - **Two buckets, both enforced** ([0.3 · 24]): one container-global, one keyed on the transport
+     source address, never on a value the caller supplies. A network identifier keys a bucket and
+     never enters the chain. The `rest` counters are the door's own, so exhausting them never
+     locks the owner out of `/login`, and the reverse holds too.
+   - **A throttle that holds does not evaluate, and fails closed** (§12.1 rule 4). While either
+     bucket holds, every request at the door gets its route's uniform failure, counted and not
+     evaluated: `401` on a bearer route, a live token included; §3's refusal at redemption, a
+     valid descriptor included, which is therefore not spent.
+   - **The chain.** No attempt at the door appends an engage entry: the door has no per-attempt
+     event a caller-less attempt could carry. The release appends `authz.release` with `surface:
+     rest`, `refused` and `window_key` whenever the throttle engaged, `refused: 0` included (§12.1
+     rule 5). At the close of each container-global window in which the throttle admitted any
+     `401`, or any redemption refused at §6's check 1 or 2, the timer appends **`rest.tally`**
+     once, as `authorization-server.md` §12 row (h) does: `principal: none`, `actor: rest`, and
+     three closed `details` keys, `unauthorized` (the count of those `401`s), `forged` (the count
+     of those redemptions) and `window_key`, derived from that bucket as §12.2 states. No such
+     admission, no entry. The response is unchanged by any of it.
+   - **What the chain bounds.** An unauthenticated sweep reaches the chain at one `rest.tally` per
+     window plus one release per engagement, never once per attempt. A redemption refused at check
+     3 or later names its token and appends its own `context.fetch` (§6), so a replayed grant
+     appends at the throttle's admitted rate and no faster.
+   - **Rates.** `TODO(chief)`, #141: the rates and windows join #141's batch. **a1p proposes**, for
+     the Chief's pick: container-global, 300 counted attempts per 300-second window; per source
+     address, 30 per 300-second window; a bucket that engages holds until its window closes. A
+     well-behaved client meets a `401` only on an expired or revoked token, a handful per window.
+     A 300-second window shows a sweep on the chain within five minutes, the grant's own lifetime
+     (§6), and caps `rest.tally` at 288 entries a day under a sustained sweep. **The cost, for the
+     Chief:** under the fail-closed rule above, a sweep that exhausts the container-global bucket
+     refuses the owner's own live tokens at this door until its window closes. Until the Chief
+     names the rates, the build issues carry them as open.
 
 ## 3 · The one refusal
 
@@ -185,7 +220,8 @@ running door uploads over HTTP to derive the shape from.
 
 `events.md` §4 invariant 2 binds this door without exception: every read, grant mint and blob pull
 is an event, and a door that produces an effect without one is non-conforming. **decided.** The
-table in §4 is the whole list of what the door appends. A test per row asserts the event.
+table in §4, with §2 item 7's `rest.tally` and `authz.release`, is the whole list of what the door
+appends. A test per row asserts the event.
 
 The two invariant-2 exceptions (the owner's read inside an AS session; refresh rotation) are the
 AS's, and neither reaches this door: §2 accepts no session. **decided.**
@@ -271,12 +307,16 @@ Referrer-Policy: no-referrer
 - Where the descriptor verifies (check 2 passed), the refusal appends `context.fetch` with
   `items: []` and the failed check in `details`, attributed to the named token. The lifeboat records
   a refused download this way. **a1p.**
-- Where it does not verify, the container has no caller it can name. `TODO(chief)`, #165 item 2:
-  `principal: none` is closed to the five AS events, so the two rules cannot both hold for a forged
-  descriptor. Until answered, such a refusal appends nothing, the same as §2's unauthenticated
-  request.
+  A replayed or expired grant is refused this way, and each such refusal counts toward §2 item 7's
+  throttle.
+- Where it does not verify (check 1 or 2 failed), the container has no caller it can name, and no
+  entry is attributed to one. The refusal is counted by the `rest` throttle and tallied under
+  `forged` in the window's `rest.tally` (§2 item 7), so a flood of forged descriptors leaves a
+  trace. **decided** (the Chief on #165 item 2, option (b), 2026-10-09); **a1p**, the shape.
 
 **The key.** `TODO(a1p)`, #165 item 4: where the HMAC key is provisioned, stored and rotated.
+Rotation voids every outstanding grant. It is drafted in the #143 batch, with the login secret and
+the device-code key `storage.md` §3.1 names.
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit

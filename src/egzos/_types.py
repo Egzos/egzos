@@ -244,6 +244,7 @@ Event = Literal[
     "authz.grant",
     "client.register",
     "config.set",
+    "rest.tally",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -252,21 +253,23 @@ Event = Literal[
 #: code that emits it. The nine `authz.*` names and `client.register` are the same case: decided at
 #: the 0.3 freeze (authorization-server.md §12 rows (a), (b), (d)–(h), §11.9, §9.3 and §5;
 #: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
-#: (container.md §8, [0.3 · 40]), with no config surface. events.md §1 says the same thing from the
-#: contract's side.
+#: (container.md §8, [0.3 · 40]), with no config surface; and so is `rest.tally`, the REST door's
+#: per-window tally (rest.md §2, the Chief on #165 items 2 and 3), with no REST door in this tree.
+#: events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: The only events an entry with `principal: none` may carry (events.md §2): the caller-less rows
-#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2. An append with `principal: none`
-#: under any other event MUST be rejected — a read or an act is never unattributed. The converse
-#: binds too: an append under one of these five MUST carry `principal: none` (events.md §2).
-#: [0.3 · 34]
+#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2, and the REST door's tally (rest.md
+#: §2, #165). An append with `principal: none` under any other event MUST be rejected — a read or an
+#: act is never unattributed. The converse binds too: an append under one of these six MUST carry
+#: `principal: none` (events.md §2). [0.3 · 34]
 PRINCIPAL_NONE_EVENTS: tuple[Event, ...] = (
     "authz.login",
     "authz.redeem",
     "authz.refuse",
     "authz.release",
     "authz.tally",
+    "rest.tally",
 )
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
@@ -527,10 +530,12 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
 #: by citing the decision rather than restating it in an entry of its own — never unused, only
 #: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
-#: ([0.3 · 11]). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
+#: ([0.3 · 11]). `rest` is the REST door's, the sixth: one surface covering the sweep at its 401 and
+#: descriptor redemption (rest.md §2, the Chief on #165 item 3). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
 #: identifier may key a throttle bucket (§11.0, [0.3 · 24]) and never enters the chain.
-#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]).
-ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke"]
+#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]),
+#: and `rest.tally` for the REST door's per-window tally.
+ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke", "rest"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token

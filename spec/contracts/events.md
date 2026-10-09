@@ -11,18 +11,19 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Thirty names are listed
-below**: eighteen **run**, and twelve (`blob.grant`, `client.register`, `config.set` and the nine
-`authz.*` rows) are **decided, not running** — `blob.grant` by F5, the other eleven by the 0.3
-freeze: the nine `authz.*` and `client.register` for the container's authorization server
+An appended event whose name is not in this list MUST be rejected. **Thirty-one names are listed
+below**: eighteen **run**, and thirteen (`blob.grant`, `client.register`, `config.set`,
+`rest.tally` and the nine `authz.*` rows) are **decided, not running** — `blob.grant` by F5,
+`rest.tally` by the Chief on #165 (2026-10-09), the other eleven by the 0.3 freeze: the nine
+`authz.*` and `client.register` for the container's authorization server
 (`authorization-server.md` §5, §9.3, §11.9 and §12; [0.3 · 29, 31, 33, 36], #140, #144), and
 `config.set` for the config object (`container.md` §8; [0.3 · 40]). The typed vocabulary in this
 repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it — carries **all
-thirty**, the twelve included: `AuditEntry.event` is typed `Event`, and each emitter needs its
+thirty-one**, the thirteen included: `AuditEntry.event` is typed `Event`, and each emitter needs its
 member on the day it lands. So a validator written against `EVENTS` accepts an append under any of
-the twelve today, and **nothing in this tree rejects one** — what is not running is the *emitter*:
-no code path mints a `BlobGrant`, serves an AS page, registers a client or changes a config key, so
-no such entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted
+the thirteen today, and **nothing in this tree rejects one** — what is not running is the *emitter*:
+no code path mints a `BlobGrant`, serves an AS page or the REST door, registers a client or changes
+a config key, so no such entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted
 here because a count that disagrees with its own table, or with the constant beside it, is the kind
 of drift a reader resolves by guessing.
 
@@ -58,6 +59,7 @@ of drift a reader resolves by guessing.
 | `authz.grant` | the owner decides a consent request, `decision: granted` or `denied` (AS §9.3) | decided, not running |
 | `client.register` | the owner registers, amends or removes a client, `op: add · amend · remove` (AS §5) | decided, not running |
 | `config.set` | a container-config key is changed — an `admin` act (`container.md` §8) | decided, not running |
+| `rest.tally` | a window closes in which the REST door's throttle admitted a 401 or a refused redemption that names no caller (`rest.md` §2) | decided, not running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
@@ -75,6 +77,14 @@ event, so an `audit` query never has to tell them apart by `details`.
 closed to `granted` · `denied` (`_types.py`'s `AS_GRANT_DECISIONS`) and `scopes`/`capabilities`
 recording what was *requested*, a denial included. It fires on an owner's decision inside an
 authenticated session and on nothing else, so it carries `principal: interactive` and no `cause`.
+
+**`rest.tally` is the REST door's row (h).** The Chief on #165 items 2 and 3 (2026-10-09): a
+redemption whose descriptor does not verify, and the 401 sweep, are throttled and tallied on the
+pattern of `authorization-server.md` §12 row (h), not left traceless. `details` are three closed
+keys, `unauthorized`, `forged` and `window_key`; `principal` is `none` and `actor` is the surface
+word `rest`. The shape and the rule are `rest.md` §2's. **a1p**, the name and the keys: its own
+event rather than a widened `authz.tally`, because the door is not the AS and row (h)'s keys are
+closed.
 
 **`client.register` and `config.set` are owner acts on container state, not `authz.*` rows.**
 `client.register`'s `details` are `{client_id, op, redirect_uris}`, `op` closed to `add` · `amend` ·
@@ -99,24 +109,25 @@ the value in `details`. [0.3 · 40]
 - `actor` / `principal` — who acted, and as what: `interactive`, `client` or `none`
   (`capabilities.md` §3). Both are mandatory on every entry; `principal` is never null. **`none`
   is for an entry with no caller to name** — `authorization-server.md` §12.2: rows (a), (b), (d),
-  (e) and (h) — and on such an entry `actor` carries the **surface** the append is about, one of
-  `_types.py`'s `AS_THROTTLE_SURFACES`, **never the caller's network identifier**: an IP in an
-  append-only chain is a surveillance record the owner cannot prune. An append with
-  `principal: none` under any event other than `authz.login`, `authz.redeem`, `authz.refuse`,
-  `authz.release` and `authz.tally` **MUST be rejected**: a read, a pull or an act is never
-  unattributed. `_types.py` pins the five as `PRINCIPAL_NONE_EVENTS`. **running**: the ledger
+  (e) and (h), and `rest.md` §2's `rest.tally` (#165) — and on such an entry `actor` carries the
+  **surface** the append is about, one of `_types.py`'s `AS_THROTTLE_SURFACES`, **never the
+  caller's network identifier**: an IP in an append-only chain is a surveillance record the owner
+  cannot prune. An append with `principal: none` under any event other than `authz.login`,
+  `authz.redeem`, `authz.refuse`, `authz.release`, `authz.tally` and `rest.tally` **MUST be
+  rejected**: a read, a pull or an act is never unattributed. `_types.py` pins the six as
+  `PRINCIPAL_NONE_EVENTS`. **running**: the ledger
   refuses such an append (#150), though no AS in this tree emits a `none` entry yet. [0.3 · 34, 35]
 - `subject` — the id the event is about (item, node, token, proposal, or a blob's `sha256`).
 - `scope` — the container the event happened in; nullable.
 - `details` — event-specific, open. A reader MUST tolerate unknown keys here.
-- **The converse binds too: an append under one of the five `PRINCIPAL_NONE_EVENTS` MUST carry
+- **The converse binds too: an append under one of the six `PRINCIPAL_NONE_EVENTS` MUST carry
   `principal: none`**, and an append under one of them with `interactive` or `client` MUST be
   rejected. `authorization-server.md` §12.2 puts `none` on **every** row (a), (b), (d), (e) and
   (h), (d) included although five of its seven causes are reached only inside a session, so that
   the principal never tells a reader which cause a uniform page had or whether a throttled caller
   held a session. A `principal` that varied within one of these events would be that signal.
-  So `none` and the five are one set seen from both sides: `none` appears under these events
-  and nowhere else, and these events carry `none` and nothing else. **a1p**, reading §12.2's row
+  `rest.tally` has no caller either, so it carries `none` like (h). So `none` and the six are one
+  set seen from both sides: `none` appears under these events and nowhere else, and these events carry `none` and nothing else. **a1p**, reading §12.2's row
   binding as the converse of the rule above (a1r on #147). [0.3 · 34] **running**: the ledger
   refuses such an append (#160).
 
