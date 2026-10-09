@@ -64,6 +64,12 @@ Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened throu
 
 ### Changed
 
+- `storage.md` §3.1, `rest.md` §2 item 7, `authorization-server.md` §11.0 and `_types.py`: all AS
+  state is `ContainerState` (#173, option (A)); all six surfaces' throttle rates are decided
+  (`AS_THROTTLE_RATES`, #141, #184), and the REST door counts verified-descriptor refusals in a
+  per-token bucket keyed on the descriptor's token (rate open on #141). The REST door's accepted
+  owner lockout is stated as renewable, as §11.0 states it for the AS surfaces, and Trust prefixes
+  each `bucket_key` with its kind.
 - `rest.md` §2, §6, `events.md`, `authorization-server.md` §12 and `_types.py`: the Chief's #165
   answers — a `BlobGrant` is single use with a fixed 300-second lifetime, and the REST door gets
   the `rest` throttle surface and the caller-less `rest.tally` event (rates open on #141).
