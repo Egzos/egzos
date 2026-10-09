@@ -32,11 +32,14 @@ Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened throu
   `interactive`, `client` and `none`, and the five caller-less events carry `none` and only `none`
   (#151, #160, #162).
 - Minting refuses a principal outside the token vocabulary (#154).
-- Consent pages send same-origin only (#146).
+- Consent pages send `Referrer-Policy: same-origin` (#146).
 
 ### Changed
 
-- Install from the release tag: `pipx install "git+https://github.com/Egzos/egzos@v0.1.0"`.
+- Releases publish to PyPI by trusted publishing (OIDC) when the Chief publishes a GitHub release,
+  with no stored token and a hash-locked build toolchain (`.github/workflows/release.yml`). The README
+  names `pipx install egzos` once the first upload is live. Until then, install from the release tag:
+  `pipx install "git+https://github.com/Egzos/egzos@v0.1.0"`.
 
 ## Contracts v1.0 — post-freeze status changes
 
