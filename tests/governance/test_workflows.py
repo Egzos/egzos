@@ -614,3 +614,20 @@ def test_core_queue_wip_cap_cannot_read_zero_while_a_pr_is_open():
     # gh pr list under the default token: a private repository refuses it without this scope, and
     # a refused list fails the step, so no builder dispatches at all.
     assert job["permissions"].get("pull-requests") == "read"
+
+
+def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
+    # #123: a PR-mode security finding sits in code that is not on main, so the sweep must be able
+    # to read that PR, and the number it is given must be digits before any model sees it.
+    wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
+    on = wf.get("on", wf.get(True))
+    assert on["workflow_dispatch"]["inputs"]["pr"]["required"] is False
+    steps = wf["jobs"]["a6-adversary-nightly"]["steps"]
+    names = [s.get("name") or s.get("uses", "") for s in steps]
+    gate = names.index("pr-input")
+    model = next(i for i, s in enumerate(steps) if "claude-code-action" in s.get("uses", ""))
+    assert gate < model
+    assert "^[0-9]+$" in steps[gate]["run"]
+    assert steps[gate]["env"]["PR"] == "${{ inputs.pr }}"
+    prompt = steps[model]["with"]["prompt"]
+    assert "inputs.pr" in prompt and "gh pr diff {0}" in prompt
