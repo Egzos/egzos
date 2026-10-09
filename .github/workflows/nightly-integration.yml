@@ -171,7 +171,7 @@ jobs:
           EXEC_FILE: ${{ steps.review.outputs.execution_file }}
         run: |
           python3 -I - <<'PYEOF'
-          import collections, json, os
+          import collections, json, os, re
           try:
               data = json.load(open(os.environ["EXEC_FILE"]))
           except (OSError, ValueError):
@@ -179,8 +179,21 @@ jobs:
           items = data if isinstance(data, list) else [data]
           res = next((d for d in reversed(items) if isinstance(d, dict) and d.get("type") == "result"), {})
           denials = [d for d in res.get("permission_denials") or [] if isinstance(d, dict)]
-          names = collections.Counter(str(d.get("tool_name", "?"))[:40] for d in denials)
+          def label(d):
+              # A refused Bash call is named by its first words when they are a plain command
+              # name or script path; never its arguments, which can carry a finding's detail.
+              name = str(d.get("tool_name", "?"))[:40]
+              cmd = str((d.get("tool_input") or {}).get("command", "")) if name == "Bash" else ""
+              words = re.findall(r"^\s*([a-z][a-z0-9_.-]*)(?:\s+([a-z0-9_./-]+\.sh|[a-z][a-z-]*))?", cmd)
+              head = " ".join(w for w in (words[0] if words else ()) if w)[:60]
+              return f"{name}({head})" if head else name
+          names = collections.Counter(label(d) for d in denials)
           print("denied tools: " + (", ".join(f"{n} x{c}" for n, c in sorted(names.items())) or "none"))
+          # The session's last line is ids only by its prompt (`filed <id>`, `none`, ...); print it
+          # only when it is exactly that shape, so no other text of the session reaches the log.
+          last = (str(res.get("result") or "").strip().splitlines() or [""])[-1].strip().strip("`")
+          ok = r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none)"
+          print("outcome: " + (last if re.fullmatch(ok, last) else "(not in the ids-only shape)"))
           PYEOF
 
       # The same diagnosis the PR reviewers carry (drift F21): without it a drift report that never
