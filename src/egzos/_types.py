@@ -531,8 +531,9 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: by citing the decision rather than restating it in an entry of its own — never unused, only
 #: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
 #: ([0.3 · 11]). `rest` is the REST door's, the sixth: one surface covering the sweep at its 401 and
-#: descriptor redemption (rest.md §2, the Chief on #165 item 3). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
-#: identifier may key a throttle bucket (§11.0, [0.3 · 24]) and never enters the chain.
+#: descriptor redemption (rest.md §2, the Chief on #165 item 3). The caller's network identifier
+#: is NEVER the actor ([0.3 · 34]): a network identifier may key a throttle bucket (§11.0,
+#: [0.3 · 24]) and never enters the chain.
 #: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]),
 #: and `rest.tally` for the REST door's per-window tally.
 ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke", "rest"]
