@@ -205,6 +205,12 @@ class BlobGrant(TypedDict):
     sig: str
 
 
+#: rest.md §6 — a `BlobGrant`'s `expires_at` is its mint time plus this, and the first verified
+#: redemption spends it. A fixed contract value, never a config key: the Chief on #165 item 1,
+#: option (a), 2026-10-09. A leaked grant URL is dead after one pull or five minutes at most.
+BLOB_GRANT_LIFETIME_SECONDS: int = 300
+
+
 # --- the audit chain (spec/contracts/events.md) ---------------------------------------------
 
 Event = Literal[
@@ -977,6 +983,7 @@ __all__ = [
     "AS_THROTTLE_SURFACES",
     "AS_USER_CODE_ALPHABET",
     "AS_USER_CODE_LENGTH",
+    "BLOB_GRANT_LIFETIME_SECONDS",
     "CAPABILITIES",
     "CONSENT_KINDS",
     "CONSENT_KIND_FROM_CLIENT_TYPE",

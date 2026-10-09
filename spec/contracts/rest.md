@@ -214,9 +214,24 @@ AS's, and neither reaches this door: §2 accepts no session. **decided.**
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token
 value, so redemption takes no `Authorization` header and consults none. **The cost, stated for the
-review:** until it expires, a grant URL is redeemable by whoever holds it. `TODO(chief)`, #165
-item 1: the grant's lifetime and whether it is single-use. The build issues carry it as open:
-neither the mint's `expires_at` nor redemption is built until the Chief answers.
+review:** a grant URL is redeemable by whoever holds it, so the grant is bounded twice.
+
+**A grant is single use and lives 300 seconds. decided** (the Chief on #165 item 1, option (a),
+2026-10-09, https://github.com/Egzos/egzos/issues/165#issuecomment-6073462009):
+
+- **Single use.** The first verified redemption spends the grant. **a1p**, reading "verified" as
+  checks 2 and 3 below: a redemption whose `sig` verifies and whose `expires_at` has not passed
+  spends the grant at check 4, **whatever checks 5–8 then decide**. A grant refused at check 5 is
+  still spent.
+  The spend is atomic: of two concurrent redemptions of one grant, at most one passes check 4.
+- **A fixed contract lifetime of 300 seconds from the mint.** Trust sets `expires_at` to the mint
+  time plus 300 seconds (`_types.py`'s `BLOB_GRANT_LIFETIME_SECONDS`). **It is not configurable**:
+  no config key, no flag and no client parameter lengthens or shortens it.
+- A leaked `grant_url` is therefore dead after one pull, or after five minutes at most.
+- The spent record is kept until the grant's `expires_at`, keyed on the sha256 of the descriptor's
+  `sig` and never on the `sig` itself: with the other four fields, the `sig` is the credential, as
+  `storage.md` §3.1 keys the AS's single-use state on credential hashes. **a1p.** Where it is
+  persisted joins #165 item 4's batch, beside the grant key.
 
 **The redemption checks, in this order. decided** for each check, **a1p** for the order:
 
@@ -224,12 +239,13 @@ neither the mint's `expires_at` nor redemption is built until the Chief answers.
 2. `sig` verifies under the container key, over every descriptor field other than `sig`, compared in
    constant time (`context-item.md` §3).
 3. `expires_at` has not passed.
-4. The named token is live (revocation first) and still holds `fetch` over the item's scope, checked
+4. The grant has not been spent, and this redemption spends it (single use, above).
+5. The named token is live (revocation first) and still holds `fetch` over the item's scope, checked
    now, not at mint.
-5. The item is still served to that token: not tombstoned, not quarantined, within the serving
+6. The item is still served to that token: not tombstoned, not quarantined, within the serving
    policy.
-6. `<sha256>` in the path equals the descriptor's `sha256` and the item's `content.sha256`.
-7. `BlobStore.get(sha256)` returns bytes.
+7. `<sha256>` in the path equals the descriptor's `sha256` and the item's `content.sha256`.
+8. `BlobStore.get(sha256)` returns bytes.
 
 Any failure is §3's refusal, byte-identical, whichever check failed. **decided**
 (`capabilities.md` §6 clause 1, `storage.md` §5).
