@@ -75,9 +75,10 @@ def _resolve(c: Container, ref: str, token) -> Node | None:
 
 
 def _sticky_scope(c: Container) -> Node | None:
-    """Sticky scope per shell/project: the `.egzos` file in the working directory (v0.3 §4)."""
+    """Sticky scope per shell/project: the `.egzos` file in the working directory (v0.3 §4).
+    Only a file is one: in the home directory `.egzos` is the container itself, a directory."""
     f = _scope_file()
-    if f.exists():
+    if f.is_file():
         return _resolve(c, f.read_text().strip(), c.require_token())
     return None
 
@@ -351,6 +352,11 @@ def cd(
     """Sticky scope: writes `.egzos` in the working directory (alias for `scope use`)."""
     c = _container()
     node = _scope_or(c, scope, None)
+    if _scope_file().is_dir():
+        _fail(
+            "`.egzos` here is a directory (the container lives here); "
+            "set a sticky scope in a project directory"
+        )
     _scope_file().write_text(node.id)
     _out({"scope": node.id, "path": c.nodes.path(node)}, c.nodes.path(node))
 
@@ -821,6 +827,14 @@ def main(argv: list[str] | None = None) -> int:
         return int(rv) if isinstance(rv, int) else 0
     except typer.Exit as e:
         return int(e.exit_code)
+    except typer.TyperException as e:
+        # A usage error (unknown command or option, missing argument): one line and a hint on
+        # stderr, never a traceback. The message can echo what was typed, so it goes through safe.
+        msg = e.format_message() if hasattr(e, "format_message") else str(e)
+        ctx = getattr(e, "ctx", None)
+        path = safe(ctx.command_path if ctx else "egzos")
+        typer.echo(f"Error: {safe(msg)}\nTry '{path} --help'.", err=True)
+        return int(getattr(e, "exit_code", 2))
     except SystemExit as e:
         return int(e.code or 0)
     except PermissionError as e:
