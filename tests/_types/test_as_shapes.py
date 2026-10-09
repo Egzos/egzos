@@ -239,16 +239,17 @@ def test_the_error_redirect_carries_exactly_two_fields_and_never_a_description()
     assert "error_description" not in t.AS_AUTHORIZE_ERROR_REDIRECT_FIELDS
 
 
-def test_the_throttle_surfaces_are_five_closed_words():
+def test_the_throttle_surfaces_are_six_closed_words():
     """§12.1 rule 5 and §12.2: the release entry's `surface`, and what `actor` carries.
 
     Written out rather than derived, because the point of the vocabulary is that it is closed: a
     fifth surface reaching the chain should break a test, not append quietly. `tap` is here because
     `consent.md`'s D-C6 throttles the tap page unconditionally, as the fourth surface, independent
     of whether §10.5's `[LEAN]` is taken — `[LEAN]` picks which channel the tap rides, not
-    whether the word is used. `revoke` is §11.9's page, [0.3 · 11]; `actor` is [0.3 · 34].
+    whether the word is used. `revoke` is §11.9's page, [0.3 · 11]; `actor` is [0.3 · 34]. `rest`
+    is the REST door's, `rest.md` §2 (#165 item 3).
     """
-    assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap", "revoke")
+    assert t.AS_THROTTLE_SURFACES == ("login", "device", "authorize", "tap", "revoke", "rest")
     assert len(set(t.AS_THROTTLE_SURFACES)) == len(t.AS_THROTTLE_SURFACES)
     # §12.2: the caller's network identifier is never the actor, so no surface is one.
     assert not any(s in {"ip", "remote_addr", "caller"} for s in t.AS_THROTTLE_SURFACES)

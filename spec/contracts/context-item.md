@@ -76,7 +76,8 @@ embedding-backed one later. **running**
 **Above the threshold a fetch carries a `BlobGrant` descriptor — never the bytes, and never a URL
 the client cannot use.** The grant is minted by Trust, never by Store/Vault (**F5**); Store/Vault
 renders a grant into a URL and decides nothing. A stdio client receives the descriptor and redeems
-it at the REST door (Phase 2). The mint is one audit event (`blob.grant`) and the redemption
+it at the REST door (Phase 2); how long a grant lives and how often it is redeemed is `rest.md`
+§6's (#165). The mint is one audit event (`blob.grant`) and the redemption
 another (`blob.pull`) — see `events.md`. **decided, not running** (the skeleton serves inline
 `text/*` at or below 64 KiB and has no grant).
 
