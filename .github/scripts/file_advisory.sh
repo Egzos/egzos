@@ -7,6 +7,11 @@
 #
 #   file_advisory.sh list                                  GHSA id, state, summary per advisory
 #   file_advisory.sh create <json-file | ->                file one; prints its GHSA id
+#
+# create sends only summary, description, severity, cwe_ids and vulnerabilities (cut to the fields
+# PATCH accepts too). Anything else the body carries is dropped: the endpoint also takes credits,
+# collaborating users and teams and a private fork, and a session that read attacker-written text
+# must not be able to add an outside account to a private advisory (#177 review).
 #   file_advisory.sh update <GHSA-id> <json-file | ->      append to one already filed; prints its id
 #
 # `-` reads the body from standard input. The sweep passes it that way because its session holds no
@@ -55,7 +60,22 @@ case "${1:-}" in
   create)
     [[ $# -eq 2 ]] || usage
     spool "$2"
-    gh api -X POST "repos/${REPO}/security-advisories" --input "$BODY" --jq '.ghsa_id'
+    jq -e '[.summary, .description] | all(type == "string" and length > 0)' "$BODY" >/dev/null \
+      || { echo "file_advisory.sh: create needs a non-empty summary and description" >&2; exit 2; }
+    jq '
+        def writable: (if .package.ecosystem
+                       then {package: ({ecosystem: .package.ecosystem, name: .package.name}
+                                       | with_entries(select(.value != null)))}
+                       else {} end)
+          + ({vulnerable_version_range, patched_versions, vulnerable_functions}
+             | with_entries(select(.value != null)));
+        {summary, description}
+        + (if .severity then {severity} else {} end)
+        + (if (.cwe_ids | type) == "array" then {cwe_ids} else {} end)
+        + (if (.vulnerabilities | type) == "array"
+             then {vulnerabilities: (.vulnerabilities | map(writable))}
+             else {} end)' "$BODY" \
+      | gh api -X POST "repos/${REPO}/security-advisories" --input - --jq '.ghsa_id'
     ;;
   update)
     [[ $# -eq 3 ]] || usage

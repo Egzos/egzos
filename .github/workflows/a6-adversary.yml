@@ -446,7 +446,8 @@ jobs:
   # separated by step order (RD-005). This job's result reaches the sweep as a one-day artifact.
   a6-adversary-suite:
     name: a6-adversary-suite
-    if: github.event_name != 'pull_request'
+    # A dispatch naming a PR files that PR's advisory and nothing else: no second, full sweep.
+    if: ${{ github.event_name != 'pull_request' && inputs.pr == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -502,7 +503,7 @@ jobs:
     name: a6-adversary-nightly   # distinct from the required check name; only the PR job reports a6-adversary
     needs: a6-adversary-suite
     # Runs whether the suite passed or not: a failing suite is exactly what the sweep should read.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+    if: ${{ !cancelled() && github.event_name != 'pull_request' && inputs.pr == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60   # 120 turns at the observed ~11 s/turn, with headroom (#70 review)
     permissions:
@@ -538,6 +539,11 @@ jobs:
         with:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
+          # Narrowed to the sweep's tools: issues and advisories written, the rest read.
+          permission-contents: read
+          permission-issues: write
+          permission-pull-requests: read
+          permission-repository-advisories: write
 
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
@@ -625,6 +631,11 @@ jobs:
         with:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
+          # The App's whole grant narrowed to what this session's tools reach, so GitHub enforces
+          # "can file an advisory and nothing else", not the tool list alone.
+          permission-contents: read
+          permission-pull-requests: read
+          permission-repository-advisories: write
 
       - name: charter-a6-adversary
         env:

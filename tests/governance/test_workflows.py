@@ -642,6 +642,29 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
         "Bash(bash .github/scripts/file_advisory.sh:*)",
     }
     assert "inputs.pr" in steps[model]["with"]["prompt"]
-    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs.
+    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs. A
+    # dispatch naming a PR runs neither the suite nor the sweep (#177 review).
     sweep = wf["jobs"]["a6-adversary-nightly"]["steps"]
     assert "inputs.pr" not in str(sweep)
+    for name in ("a6-adversary-suite", "a6-adversary-nightly"):
+        assert "inputs.pr == ''" in wf["jobs"][name]["if"], name
+
+
+def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():
+    # The App's grant is wider than either a6 session needs; the token each one holds is narrowed
+    # at mint, so GitHub enforces the boundary and not the tool list alone (#177 review).
+    wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
+    want = {
+        "a6-adversary-nightly": {
+            "permission-contents": "read", "permission-issues": "write",
+            "permission-pull-requests": "read", "permission-repository-advisories": "write",
+        },
+        "a6-adversary-pr-advisory": {
+            "permission-contents": "read", "permission-pull-requests": "read",
+            "permission-repository-advisories": "write",
+        },
+    }
+    for job_id, perms in want.items():
+        (mint,) = [s for s in wf["jobs"][job_id]["steps"] if s.get("id") == "forge"]
+        got = {k: v for k, v in mint["with"].items() if k.startswith("permission-")}
+        assert got == perms, job_id

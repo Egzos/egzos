@@ -201,3 +201,41 @@ def test_stdin_body_must_be_a_json_object(stub, stdin):
 def test_unknown_verb_is_refused(stub):
     _, env = stub
     assert _run(env, "delete", GHSA).returncode == 2
+
+
+def test_create_sends_only_the_advisory_fields(stub):
+    # #177 review: create is reachable from a session that read an unmerged diff. The endpoint also
+    # takes credits, collaborating users and teams and a private fork; none of them may pass, or an
+    # injected body could add an outside account to a private advisory.
+    d, env = stub
+    body = {
+        "summary": "s",
+        "description": "REPRO",
+        "severity": "high",
+        "cwe_ids": ["CWE-601"],
+        "vulnerabilities": [{
+            "package": {"ecosystem": "other", "name": "egzos", "purl": "x"},
+            "vulnerable_version_range": "< 0.2",
+            "cvss": None,
+        }],
+        "credits": [{"login": "outsider", "type": "reporter"}],
+        "collaborating_users": ["outsider"],
+        "collaborating_teams": ["outsiders"],
+        "start_private_fork": True,
+        "cve_id": "CVE-0000-0000",
+    }
+    r = _run(env, "create", "-", stdin=json.dumps(body))
+    assert r.returncode == 0, r.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    assert set(sent) == {"summary", "description", "severity", "cwe_ids", "vulnerabilities"}
+    assert sent["vulnerabilities"] == [{
+        "package": {"ecosystem": "other", "name": "egzos"},
+        "vulnerable_version_range": "< 0.2",
+    }]
+
+
+def test_create_refuses_a_body_without_summary_and_description(stub):
+    _, env = stub
+    r = _run(env, "create", "-", stdin=json.dumps({"summary": "s"}))
+    assert r.returncode == 2
+    assert "summary and description" in r.stderr
