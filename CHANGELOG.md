@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `storage.md` §3.1, `rest.md` §2 item 7, `authorization-server.md` §11.0 and `_types.py`: all AS
+  state is `ContainerState` (#173, option (A)); the `rest` rates and counting rule are decided, and
+  the five AS surfaces' rates are a1p-proposed (`AS_THROTTLE_RATES`, #141).
 - `rest.md` §2, §6, `events.md`, `authorization-server.md` §12 and `_types.py`: the Chief's #165
   answers — a `BlobGrant` is single use with a fixed 300-second lifetime, and the REST door gets
   the `rest` throttle surface and the caller-less `rest.tally` event (rates open on #141).
