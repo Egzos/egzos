@@ -248,15 +248,18 @@ def test_forge_token_sessions_run_no_interpreter():
             writes = [t for t in tools if t.split("(")[0] in edits]
             # The one write such a session holds reaches the scoped body directory only, which the
             # runner creates before the model and the scripts read from; never the scripts.
-            assert writes in ([], [AGENT_OUT_GRANT]), (wf, job_id)
+            assert not writes or set(writes) == set(AGENT_OUT_GRANTS), (wf, job_id)
             if writes:
                 names = [s.get("name") for _, j, _, s in _steps() if j == job_id]
-                assert "agent-out" in names, (wf, job_id)
+                assert "agent-out" in names and "denied-tools" in names, (wf, job_id)
+                assert "--add-dir /tmp/agent-out" in args, (wf, job_id)
     # Never vacuous: a renamed token step or a token moved to the job still reaches the sweep.
     assert "a6-adversary-nightly" in inspected
 
 
-AGENT_OUT_GRANT = "Edit(//tmp/agent-out/**)"
+# Write creates the body file; Edit alone did not (the #184 dispatch after #188: one refusal,
+# nothing filed). --add-dir puts the directory inside the session's reach as well.
+AGENT_OUT_GRANTS = ("Write(//tmp/agent-out/**)", "Edit(//tmp/agent-out/**)")
 # gh verbs that read a file the caller names (--body-file, -F, --input, @file) and post it.
 FILE_READING_GH = re.compile(
     r"Bash\(gh (?:issue (?:create|comment|edit)|pr (?:create|comment|edit|review)"
@@ -682,9 +685,10 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
     args = steps[model]["with"]["claude_args"]
     tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
     assert set(tools) == {
-        "Read", "Grep", "Glob", "Edit(//tmp/agent-out/**)", "Bash(gh pr view:*)",
+        "Read", "Grep", "Glob", *AGENT_OUT_GRANTS, "Bash(gh pr view:*)",
         "Bash(gh pr diff:*)", "Bash(bash .github/scripts/file_advisory.sh:*)",
     }
+    assert "--add-dir /tmp/agent-out" in args
     assert "inputs.pr" in steps[model]["with"]["prompt"]
     # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs. A
     # dispatch naming a PR runs neither the suite nor the sweep (#177 review).

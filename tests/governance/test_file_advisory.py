@@ -60,7 +60,7 @@ def stub(tmp_path):
         "STUB_DIR": str(tmp_path),
         "GHSA": GHSA,
         "GITHUB_REPOSITORY": "Egzos/x",
-        "GH_TOKEN": "t",
+        "GH_TOKEN": "ghs_stub_token_in_no_body",
         # The one directory a body file may come from; the sessions write nowhere else.
         "AGENT_OUT_DIR": str(tmp_path),
     }
@@ -298,4 +298,13 @@ def test_a_body_file_outside_the_scoped_directory_is_refused(stub, tmp_path_fact
         r = _run(env, verb, *args, path)
         assert r.returncode == 2, path
         assert "must be in" in r.stderr
+    assert not (tmp / "sent.json").exists()
+
+
+def test_a_body_carrying_a_credential_is_refused(stub):
+    tmp, env = stub
+    body = tmp / "b.json"
+    body.write_text(json.dumps({"summary": "s", "description": f"repro {env['GH_TOKEN']}"}))
+    r = _run(env, "create", str(body))
+    assert r.returncode == 2 and "credential" in r.stderr
     assert not (tmp / "sent.json").exists()

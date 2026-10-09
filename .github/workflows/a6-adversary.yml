@@ -582,6 +582,7 @@ jobs:
           test -s /tmp/charter-a6-adversary.md
 
       - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+        id: sweep
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:
@@ -609,8 +610,34 @@ jobs:
             --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_SONNET }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(bash .github/scripts/gh_issue.sh:*),Bash(bash .github/scripts/file_advisory.sh:*)"
+            --add-dir /tmp/agent-out
+            --allowedTools "Read,Grep,Glob,Write(//tmp/agent-out/**),Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(bash .github/scripts/gh_issue.sh:*),Bash(bash .github/scripts/file_advisory.sh:*)"
             --disallowedTools "Read(//proc/**)"
+      # Which tools the session was refused, by name and count only. A filing route that fails
+      # quietly shows here (#188's dispatches: 17 refusals, then one), and no input, path or
+      # text of the session reaches this public log.
+      - name: denied-tools
+        if: ${{ !cancelled() && steps.sweep.outputs.execution_file != '' }}
+        env:
+          PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          EXEC_FILE: ${{ steps.sweep.outputs.execution_file }}
+        run: |
+          python3 -I - <<'PYEOF'
+          import collections, json, os
+          try:
+              data = json.load(open(os.environ["EXEC_FILE"]))
+          except (OSError, ValueError):
+              raise SystemExit
+          items = data if isinstance(data, list) else [data]
+          res = next((d for d in reversed(items) if isinstance(d, dict) and d.get("type") == "result"), {})
+          denials = [d for d in res.get("permission_denials") or [] if isinstance(d, dict)]
+          names = collections.Counter(str(d.get("tool_name", "?"))[:40] for d in denials)
+          print("denied tools: " + (", ".join(f"{n} x{c}" for n, c in sorted(names.items())) or "none"))
+          PYEOF
 
   # ── Dispatch naming a PR: file its awaiting advisory (#123) ─────────────────────────────────
   # A PR-mode security finding sits in code that is not on main, so the sweep above cannot find it.
@@ -684,6 +711,7 @@ jobs:
           test -s /tmp/charter-a6-adversary.md
 
       - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+        id: file
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:
@@ -705,5 +733,31 @@ jobs:
             --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_SONNET }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(bash .github/scripts/file_advisory.sh:*)"
+            --add-dir /tmp/agent-out
+            --allowedTools "Read,Grep,Glob,Write(//tmp/agent-out/**),Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(bash .github/scripts/file_advisory.sh:*)"
             --disallowedTools "Read(//proc/**)"
+      # Which tools the session was refused, by name and count only. A filing route that fails
+      # quietly shows here (#188's dispatches: 17 refusals, then one), and no input, path or
+      # text of the session reaches this public log.
+      - name: denied-tools
+        if: ${{ !cancelled() && steps.file.outputs.execution_file != '' }}
+        env:
+          PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          EXEC_FILE: ${{ steps.file.outputs.execution_file }}
+        run: |
+          python3 -I - <<'PYEOF'
+          import collections, json, os
+          try:
+              data = json.load(open(os.environ["EXEC_FILE"]))
+          except (OSError, ValueError):
+              raise SystemExit
+          items = data if isinstance(data, list) else [data]
+          res = next((d for d in reversed(items) if isinstance(d, dict) and d.get("type") == "result"), {})
+          denials = [d for d in res.get("permission_denials") or [] if isinstance(d, dict)]
+          names = collections.Counter(str(d.get("tool_name", "?"))[:40] for d in denials)
+          print("denied tools: " + (", ".join(f"{n} x{c}" for n, c in sorted(names.items())) or "none"))
+          PYEOF

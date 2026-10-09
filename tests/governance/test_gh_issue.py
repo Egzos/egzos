@@ -13,7 +13,12 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / ".github" / "scripts" / "gh_issue.sh"
 
 STUB = """#!/usr/bin/env bash
-# Records each call's arguments one per line, and the body file gh would have read.
+# A read (no -X) answers with the target issue's kind and labels, as the script's --jq shapes them;
+# a write records its arguments one per line, and the body file gh would have read.
+if [[ "$*" != *"-X "* ]]; then
+  echo "${STUB_TARGET:-issue ,drift,}"
+  exit 0
+fi
 printf '%s\\n' "$@" > "$STUB_DIR/args"
 for a in "$@"; do
   [[ "$a" == body=@* ]] && cp "${a#body=@}" "$STUB_DIR/sent"
@@ -111,4 +116,20 @@ def test_malformed_calls_are_refused_before_gh(stub, args):
     resolved = [str(out / a) if a == "b.md" else a for a in args]
     r = _run(env, *resolved)
     assert r.returncode == 2
+    assert not (tmp / "args").exists()
+
+
+@pytest.mark.parametrize(("verb", "target", "refusal"), [
+    ("comment", "pr ,drift,", "is not an issue"),
+    ("edit", "pr ,drift,", "is not an issue"),
+    ("edit", "issue ,agent:a6-adversary,", "does not carry the drift label"),
+    ("edit", "issue ,drifting,", "does not carry the drift label"),
+])
+def test_comment_and_edit_reach_issues_only_and_edit_the_drift_report_only(
+    stub, verb, target, refusal,
+):
+    tmp, out, env = stub
+    (out / "b.md").write_text("body")
+    r = _run({**env, "STUB_TARGET": target}, verb, "12", str(out / "b.md"))
+    assert r.returncode == 2 and refusal in r.stderr
     assert not (tmp / "args").exists()
