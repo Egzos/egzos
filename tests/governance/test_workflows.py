@@ -680,3 +680,23 @@ def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():
         assert names.index("forge") < probe < model, job_id
         assert steps[probe]["run"] == "bash .github/scripts/file_advisory.sh list > /dev/null"
         assert steps[probe]["env"]["GH_TOKEN"] == "${{ steps.forge.outputs.token }}"
+
+
+def test_release_publishes_to_pypi_only_from_a_published_release_with_no_stored_token():
+    # The release is the Chief's act; the workflow only carries it out. Trusted publishing: the
+    # upload job holds an OIDC token and nothing else, in the environment PyPI trusts, and a tag
+    # that disagrees with the package version stops the build before anything is uploaded.
+    wf = _load(ROOT / ".github" / "workflows" / "release.yml")
+    on = wf.get("on", wf.get(True))
+    assert on == {"release": {"types": ["published"]}}
+    assert wf["permissions"] == {}
+    build, publish = wf["jobs"]["build"], wf["jobs"]["publish"]
+    assert build["permissions"] == {"contents": "read"}
+    names = [s.get("name") or s.get("uses", "") for s in build["steps"]]
+    assert names.index("version-matches-tag") < names.index("build")
+    assert publish["needs"] == "build"
+    assert publish["environment"] == "pypi"
+    assert publish["permissions"] == {"id-token": "write"}
+    assert "secrets." not in str(wf)
+    (up,) = [s for s in publish["steps"] if "gh-action-pypi-publish" in s.get("uses", "")]
+    assert "with" not in up  # no password, no token: OIDC only

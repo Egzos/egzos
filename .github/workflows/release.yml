@@ -1,0 +1,67 @@
+name: release
+# Third-party actions are SHA-pinned (Chief decision, 2026-09-06); Dependabot proposes bumps, the Chief commits them.
+# Publishes the open core to PyPI when the Chief publishes a GitHub release. Cutting the release is
+# the human act; this workflow only carries it out. Trusted publishing (OIDC): no PyPI token exists
+# anywhere. PyPI trusts this workflow, in the `pypi` environment, to upload the project `egzos`.
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      # The tag is the release's name: a tag that disagrees with the package's version is refused
+      # before anything is built, so PyPI never gets a version the tag did not promise.
+      - name: version-matches-tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          [[ "$TAG" == "v$VERSION" ]] || { echo "tag $TAG is not v$VERSION"; exit 1; }
+
+      - name: build
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check "build>=1.2"
+          python -m build
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          retention-days: 1
+
+  publish:
+    name: publish
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The environment PyPI's trusted publisher names. A required reviewer on it (the Chief) makes
+    # the upload wait for one more human yes after the release is published.
+    environment: pypi
+    permissions:
+      id-token: write   # the OIDC token PyPI exchanges for a short-lived upload credential
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

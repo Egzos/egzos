@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **v0.1.0.** The open core's first release: the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from the release tag below.
+> **v0.1.0.** The open core's first release: the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from PyPI.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -26,7 +26,8 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 ## Quickstart
 
 ```bash
-pipx install "git+https://github.com/Egzos/egzos@v0.1.0"
+pipx install egzos                           # its own isolated environment, `egzos` on your PATH
+# or: uv tool install egzos  ·  or, inside a virtualenv: pip install egzos
 
 egzos init                                   # your container at ~/.egzos, and your owner token
 egzos add "Prefer imperative commit messages" --kind preference --key commit.style
