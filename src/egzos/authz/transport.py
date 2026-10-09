@@ -9,6 +9,10 @@ header (`X-Forwarded-For`, `Forwarded`, `X-Forwarded-Proto`), all attacker-suppl
 construction. `0.0.0.0`, `::` and every LAN address require TLS, and so does a loopback listener
 behind a tunnel or proxy — which this function cannot see, so a caller fronting one must not ask
 it. Enforcing the refusal at `serve` is a3-doorman's; this is the rule it enforces.
+
+`serve` passes the host from the bound socket's `getsockname()`, after `bind()` — never the
+configured `--host` string (§2 clause 2): what the listener holds is the fact, the configuration is
+a request for it.
 """
 
 from __future__ import annotations
