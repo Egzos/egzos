@@ -475,7 +475,8 @@ class ClientRegistration(TypedDict):
 
     `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
     with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
-    ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
+    ignored. A `localhost` host is refused at registration in any case spelling, with or without a
+    port ([0.3 · 22], §5.2); a dev client registers `http://127.0.0.1/...` or `http://[::1]/...`.
 
     `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
     timestamp. It is the seventh `*_at: str` timestamp in this module, and the first naming a
@@ -786,6 +787,167 @@ class BlobStore(Protocol):
 STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore")
 
 
+# --- the authorization server's state (storage.md §3.1) — DRAFT binding (a1p), #173 ----------
+#
+# Not frozen. Two Protocols beside `ContainerState`, which is untouched: `ASState` is durable under
+# any answer, and `ASGateState` (sessions, throttle counters) is the half whose partition is the
+# Chief's TODO on #173 — container state, or process memory. Either answer implements the same
+# signatures. No method takes a credential value: every credential key is the lowercase hex sha256
+# of the whole value (`auth.py`'s `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256
+# because the `user_code` is low-entropy. No record carries the value itself.
+
+
+class ASGrant(TypedDict):
+    """What a decided authorization will mint (§7: six capabilities and node ids, nothing else)."""
+
+    capabilities: list[Capability]
+    scopes: list[str]
+    principal: TokenPrincipal  # §10.3: `interactive` only where presence was composed
+    grant_expires_at: str  # §11.5: after the clamp
+
+
+class AuthorizationCodeRecord(TypedDict):
+    """§2: single-use, 60 s, bound to client, redirect and challenge, and the initiating session."""
+
+    code_hash: str
+    client_id: str
+    redirect_uri: str
+    code_challenge: str  # S256 only (§2); the method is not stored because there is one
+    session_hash: str
+    grant: ASGrant
+    expires_at: str  # issued + `AS_CODE_LIFETIME_SECONDS`
+
+
+DeviceDecision = Literal["pending", "granted", "denied"]
+
+#: §11.8 — the requester hint is bounded. Trust truncates a longer one before `put_device` and never
+#: refuses for it: refusing would branch on the hint. Draft (a1p, storage.md §3.1), not frozen.
+AS_REQUESTER_HINT_MAX_CHARS: int = 64
+
+
+class DeviceRequest(TypedDict):
+    """§3 mitigations 2–3: what the device client asked for, as §7 expands its `scope`. An
+    unparseable `scope` is refused at the endpoint (§11.2 consequence 2), so it never lands here.
+    Principal (§10.3) and the clamped expiry (§11.5) are Trust's at `/device`, not requested."""
+
+    capabilities: list[Capability]
+    scopes: list[str]
+
+
+class DeviceAuthorizationRecord(TypedDict):
+    """§3 / §11.8: the pending authorization, bound to its `device_code` (mitigation 3)."""
+
+    device_code_hash: str
+    user_code_hash: str  # HMAC-SHA256 under the device-code key, not a bare sha256 (§3.1)
+    client_id: str
+    requested: DeviceRequest  # written by `put_device` only; what `/device` renders (mitigation 2)
+    requester_hint: str | None  # UNVERIFIED client-supplied text (§11.8); `put_device` only
+    decision: DeviceDecision
+    grant: ASGrant | None  # set by `decide_device`; None while pending or when denied
+    expires_at: str
+    last_polled_at: str | None  # §3 mitigation 1's `slow_down`; written only by `poll_device`
+
+
+class RefreshRecord(TypedDict):
+    """§9.2: one link of a rotating chain. Kept after redemption, so reuse is detectable."""
+
+    refresh_hash: str
+    family_id: str  # `token.revoke` carries it ([0.3 · 30])
+    client_id: str
+    access_token_id: str  # the `Token.id` minted beside it; `revoke_family` revokes it too
+    grant: ASGrant  # rotation does not widen a grant (§9.2 clause 3)
+    redeemed_at: str | None
+    revoked: bool
+
+
+class DecidedRequestRecord(TypedDict):
+    """§11.4: a request reaches a decision once. `request_key` is Trust's digest of the request's
+    `(client_id, redirect_uri, state, code_challenge)`; opaque to the store."""
+
+    request_key: str
+    session_hash: str  # the deciding session (§11.0 substep 1)
+    decision: GrantDecision
+    decided_at: str
+    resubmission_seen: bool
+
+
+class SessionRecord(TypedDict):
+    """§10.1: not a `Token`, not a bearer credential, never in `token ls`. Ends at
+    `AS_SESSION_IDLE_SECONDS` idle or `AS_SESSION_ABSOLUTE_SECONDS` absolute — judged by Trust."""
+
+    session_hash: str
+    created_at: str
+    last_seen_at: str
+
+
+class ASState(Protocol):
+    """The AS's durable state (storage.md §3.1). `ContainerState`-class: never delegated (F3).
+
+    The plain getters return `None` for absent, expired, spent and revoked alike. The consumers do
+    not judge: `consume_code` ignores expiry, and `redeem_refresh` and `poll_device` return the
+    record as it stood before the call, so reuse stays detectable. All of it, every `bool` and
+    `revoke_family`'s list stay inside Trust (storage.md §5). No client listing. The implementer
+    MUST be the `ContainerState` implementer: `revoke_family` revokes its `Token`s.
+    """
+
+    # clients (§5) — the registry, not a `ContainerConfig` key
+    def put_client(self, registration: ClientRegistration) -> None: ...
+    def get_client(self, client_id: str) -> ClientRegistration | None: ...
+    def remove_client(self, client_id: str) -> bool: ...
+
+    # codes (§2) — consume is the only read, and spends the code whatever Trust then decides
+    def put_code(self, record: AuthorizationCodeRecord) -> None: ...
+    def consume_code(self, code_hash: str) -> AuthorizationCodeRecord | None: ...
+
+    # device authorizations (§3, §11.8)
+    def put_device(self, record: DeviceAuthorizationRecord) -> None: ...
+    #: ^ insert-only: a put on an existing `device_code_hash` changes nothing
+    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None: ...
+    #: ^ sets `last_polled_at` alone, atomically; returns the record as it stood before the call
+    def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None: ...
+    def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool: ...
+    #: ^ pending -> granted/denied exactly once; False if it was not pending. Trust builds `grant`
+    #:   from the record's `requested`, capabilities and scopes unchanged (§11.2 consequence 1)
+    def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None: ...
+    #: ^ None while pending: a poll before the decision spends nothing
+
+    # refresh chains (§9.2)
+    def put_refresh(self, record: RefreshRecord) -> None: ...
+    def redeem_refresh(self, refresh_hash: str) -> RefreshRecord | None: ...
+    #: ^ returns the record AS IT STOOD before the call; a non-null `redeemed_at` is reuse
+    def family_of_token(self, token_id: str) -> str | None: ...
+    def revoke_family(self, family_id: str) -> list[str]: ...
+    #: ^ every refresh record AND every `Token` they name, in one step; returns the `Token.id`s
+
+    # decided requests (§11.4)
+    def put_decided(self, record: DecidedRequestRecord) -> None: ...
+    def get_decided(self, request_key: str) -> DecidedRequestRecord | None: ...
+    def claim_resubmission(self, session_hash: str, request_key: str) -> bool: ...
+    #: ^ True exactly once per recorded (session, request): §11.0 substep 1
+
+
+class ASGateState(Protocol):
+    """What gates a request before evaluation (§11.0): sessions and throttle counters.
+
+    TODO(chief) #173: container state like `ASState`, or process memory a restart lifts. The
+    signatures are the same either way (storage.md §3.1).
+    """
+
+    # interactive sessions (§10.1)
+    def put_session(self, record: SessionRecord) -> None: ...
+    def get_session(self, session_hash: str) -> SessionRecord | None: ...
+    def touch_session(self, session_hash: str, at: str) -> bool: ...
+    def end_session(self, session_hash: str) -> bool: ...
+
+    # throttle counters (§11.0, §12) — no rate, no window length (#141); keys are Trust's
+    def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
+    def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
+
+
+#: storage.md §3.1, draft. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+AS_STATE_CONTRACTS: tuple[str, ...] = ("ASState", "ASGateState")
+
+
 __all__ = [
     "AS_ACCESS_TOKEN_LIFETIME_SECONDS",
     "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
@@ -805,11 +967,13 @@ __all__ = [
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
+    "AS_REQUESTER_HINT_MAX_CHARS",
     "AS_REVOKE_REFUSAL_CAUSES",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
     "AS_SESSION_ABSOLUTE_SECONDS",
     "AS_SESSION_IDLE_SECONDS",
+    "AS_STATE_CONTRACTS",
     "AS_THROTTLE_SURFACES",
     "AS_USER_CODE_ALPHABET",
     "AS_USER_CODE_LENGTH",
@@ -838,9 +1002,13 @@ __all__ = [
     "TRUST_STATUSES",
     "VERIFIED_ONLY_KINDS",
     "ASClientType",
+    "ASGateState",
+    "ASGrant",
+    "ASState",
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
+    "AuthorizationCodeRecord",
     "AuthorizePosttrustCause",
     "AuthorizePretrustCause",
     "BlobGrant",
@@ -853,8 +1021,12 @@ __all__ = [
     "ContainerState",
     "ContainerType",
     "ContextItem",
+    "DecidedRequestRecord",
     "DeviceAuthorization",
+    "DeviceAuthorizationRecord",
+    "DeviceDecision",
     "DeviceRedemptionCause",
+    "DeviceRequest",
     "Event",
     "GrantDecision",
     "ItemStore",
@@ -867,11 +1039,13 @@ __all__ = [
     "Proposal",
     "ProposalStatus",
     "Provenance",
+    "RefreshRecord",
     "ResolvedItem",
     "RevokeRefusalCause",
     "Role",
     "RootType",
     "ServingPolicy",
+    "SessionRecord",
     "StructureFloor",
     "TextContent",
     "ThrottleSurface",

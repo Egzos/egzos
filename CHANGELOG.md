@@ -7,10 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Contracts v1.0 — post-freeze status changes
 
+### Added
+
+- `spec/contracts/rest.md`: the REST door contract, **draft** at the Phase 2 boundary (#42), for
+  the Chief's and a6's review before any builder implements against it.
+- `storage.md` §3.1: the authorization server's state as `ASState` and `ASGateState`, **draft**
+  binding beside the frozen `ContainerState`, with the partition as a TODO(chief) (#173).
+
 ### Changed
 
 - `events.md` §2: the converse principal rule (the five `PRINCIPAL_NONE_EVENTS` carry `none` and
   nothing else) moves from decided, not running to running, citing the ledger check (#160, #159).
+
+### Fixed
+
+- `_types.ClientRegistration` docstring: states the frozen rule that registration refuses a
+  `localhost` redirect host in any spelling, with or without a port ([0.3 · 22]), replacing the
+  overruled draft sentence (#174).
 
 ## Contracts v1.0 — frozen at 0.3 (Chief, 2026-10-08)
 
