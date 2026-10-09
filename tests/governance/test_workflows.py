@@ -700,3 +700,12 @@ def test_release_publishes_to_pypi_only_from_a_published_release_with_no_stored_
     assert "secrets." not in str(wf)
     (up,) = [s for s in publish["steps"] if "gh-action-pypi-publish" in s.get("uses", "")]
     assert "with" not in up  # no password, no token: OIDC only
+    # The toolchain that produces the published files is hash-locked; the backend is the locked one.
+    (step,) = [s for s in build["steps"] if s.get("name") == "build"]
+    assert "--require-hashes" in step["run"] and ".github/release-requirements.txt" in step["run"]
+    assert "python -m build --no-isolation" in step["run"]
+    lock = (ROOT / ".github" / "release-requirements.txt").read_text()
+    pins = [line for line in lock.splitlines() if line and not line.startswith((" ", "#"))]
+    assert pins and all("==" in p for p in pins)
+    assert {p.split("==")[0] for p in pins} >= {"build", "hatchling"}
+    assert lock.count("--hash=sha256:") >= len(pins)

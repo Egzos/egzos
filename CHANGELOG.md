@@ -36,9 +36,9 @@ Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened throu
 
 ### Changed
 
-- Published to PyPI: `pipx install egzos` (or `uv tool install egzos`, or `pip install egzos` in a
-  virtualenv). Publishing is trusted (OIDC), with no stored token, and runs when the Chief publishes a
-  GitHub release (`.github/workflows/release.yml`). Or install from the release tag:
+- Releases publish to PyPI by trusted publishing (OIDC) when the Chief publishes a GitHub release,
+  with no stored token and a hash-locked build toolchain (`.github/workflows/release.yml`). The README
+  names `pipx install egzos` once the first upload is live. Until then, install from the release tag:
   `pipx install "git+https://github.com/Egzos/egzos@v0.1.0"`.
 
 ## Contracts v1.0 — post-freeze status changes

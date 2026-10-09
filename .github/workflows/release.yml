@@ -36,11 +36,14 @@ jobs:
           VERSION="$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
           [[ "$TAG" == "v$VERSION" ]] || { echo "tag $TAG is not v$VERSION"; exit 1; }
 
+      # The toolchain is hash-locked and the build is not isolated, so the backend that builds
+      # the published files is the locked one, not whatever an isolated env resolves that day.
       - name: build
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check "build>=1.2"
-          python -m build
+          python -m pip install --disable-pip-version-check --require-hashes --only-binary :all: \
+            -r .github/release-requirements.txt
+          python -m build --no-isolation
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
