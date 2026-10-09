@@ -611,3 +611,6 @@ def test_core_queue_wip_cap_cannot_read_zero_while_a_pr_is_open():
     (wip,) = [s["run"] for s in job["steps"] if s.get("name") == "wip-check"]
     assert "--limit" in wip
     assert "isDraft" in wip  # a killed run's own draft resumes rather than blocks (RD-004)
+    # gh pr list under the default token: a private repository refuses it without this scope, and
+    # a refused list fails the step, so no builder dispatches at all.
+    assert job["permissions"].get("pull-requests") == "read"
