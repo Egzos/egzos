@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `spec/contracts/rest.md`: the REST door contract, **draft** at the Phase 2 boundary (#42), for
   the Chief's and a6's review before any builder implements against it.
+- `storage.md` §3.1: the authorization server's state as `ASState` and `ASGateState`, **draft**
+  binding beside the frozen `ContainerState`, with the partition as a TODO(chief) (#173).
 
 ### Changed
 
