@@ -17,6 +17,11 @@ An allowlist, never a validator. In D-C5's order:
 
 The same function runs on the GET and again on the POST (§11.7, [0.3 · 26]): a form field is
 caller-controlled whatever put it there.
+
+`value` is measured at one layer: the `continue` query parameter (or form field) as the framework
+hands it over after its single decode of that parameter — so `%2F` in the raw request arrives here
+as `/`, and anything still percent-encoded inside it (`%252F` arriving as `%2F`) stays encoded. The
+caller neither decodes it again nor passes the raw, undecoded request string.
 """
 
 from __future__ import annotations
