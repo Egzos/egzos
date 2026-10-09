@@ -92,7 +92,10 @@ Requires `GH_TOKEN` (the forge token) and `GITHUB_REPOSITORY`. The body must be 
 file inside `AGENT_OUT_DIR` (default `/tmp/agent-out`, resolved, symlinks included) or on standard
 input (`-`). The sessions write their bodies there with an `Edit` grant scoped to that directory,
 which never reaches this script, so the script they run is always the one their checkout holds; no
-other file on the runner can become a body. (They used to pass the body as a multi-line heredoc on
+other file on the runner can become a body, and a body carrying a credential is refused. The
+sessions hold `Write(//tmp/agent-out/**)` and `Edit(//tmp/agent-out/**)` with `--add-dir
+/tmp/agent-out`: the Edit rule alone did not let them create the file. A `denied-tools` step after
+each session prints the names of refused tools, never their inputs. (They used to pass the body as a multi-line heredoc on
 stdin; the two dispatched advisory runs of 2026-10-09 each ended in permission denials and filed
 nothing.) The body goes to the API from that file and is never echoed, so a run log carries ids and
 summaries only, never a reproduction. `update` is append-only: it reads the filed advisory and
@@ -112,11 +115,13 @@ Read tool, not gh.
 ```bash
 bash .github/scripts/gh_issue.sh create "<one-line title>" /tmp/agent-out/body.md [label ...]
 bash .github/scripts/gh_issue.sh comment <number> /tmp/agent-out/body.md
-bash .github/scripts/gh_issue.sh edit <number> /tmp/agent-out/body.md      # replaces the body
+bash .github/scripts/gh_issue.sh edit <number> /tmp/agent-out/body.md      # a drift issue's body
 ```
 
 The body file comes from `AGENT_OUT_DIR` only, and a body carrying a credential this process can see
 is refused, never posted. Numbers are digits, labels a closed character set, the title one line.
+`comment` and `edit` reach an issue, never a pull request (the issues API answers for both), and
+`edit` only an issue labelled `drift`.
 a2-conformance's design-gap job holds no gh write verb at all: it writes `/tmp/options.md` and a
 later step posts it, as the PR reviewers do.
 

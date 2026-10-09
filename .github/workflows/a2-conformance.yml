@@ -467,6 +467,7 @@ jobs:
           BASH_ENV: ""
           ENV: ""
           LD_PRELOAD: ""
+          TMPDIR: /tmp
           ISSUE: ${{ github.event.issue.number }}
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -486,6 +487,7 @@ jobs:
             fi
           done
           unset BODY CRED PROVIDER_KEY PROVIDER_OAUTH
+          export TMPDIR=/tmp   # mktemp's parent comes from here, never from a TMPDIR the session set
           env -i PATH=/usr/bin:/bin HOME="$(mktemp -d)" TMPDIR=/tmp GH_HOST=github.com \
             GH_TOKEN="$GH_TOKEN" gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${ISSUE}/comments" \
             -F body=@/tmp/options.md --jq '.id' > /dev/null

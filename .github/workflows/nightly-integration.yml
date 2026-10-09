@@ -154,8 +154,34 @@ jobs:
             --append-system-prompt-file /tmp/charter-a1r-reviewer.md
             --model ${{ env.MODEL_OPUS }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(bash .github/scripts/gh_issue.sh:*)"
+            --add-dir /tmp/agent-out
+            --allowedTools "Read,Grep,Glob,Write(//tmp/agent-out/**),Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(bash .github/scripts/gh_issue.sh:*)"
             --disallowedTools "Read(//proc/**)"
+
+      # Which tools the session was refused, by name and count only: a drift report that never
+      # appears because its route was refused shows here, and nothing of the session's text does.
+      - name: denied-tools
+        if: ${{ !cancelled() && steps.review.outputs.execution_file != '' }}
+        env:
+          PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          EXEC_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          python3 -I - <<'PYEOF'
+          import collections, json, os
+          try:
+              data = json.load(open(os.environ["EXEC_FILE"]))
+          except (OSError, ValueError):
+              raise SystemExit
+          items = data if isinstance(data, list) else [data]
+          res = next((d for d in reversed(items) if isinstance(d, dict) and d.get("type") == "result"), {})
+          denials = [d for d in res.get("permission_denials") or [] if isinstance(d, dict)]
+          names = collections.Counter(str(d.get("tool_name", "?"))[:40] for d in denials)
+          print("denied tools: " + (", ".join(f"{n} x{c}" for n, c in sorted(names.items())) or "none"))
+          PYEOF
 
       # The same diagnosis the PR reviewers carry (drift F21): without it a drift report that never
       # appears is indistinguishable from a quiet night. Copied from a1r-review.yml.
