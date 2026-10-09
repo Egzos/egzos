@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzos`,
+  which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
+  answers only "Ignored the following versions that require a different python version").
+
 ## [0.1.2] — the CLI works from the home directory (2026-10-09)
 
 ### Fixed
