@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The audit vocabulary #109 PRs 2 and 2b land, pinned: `events.md` §1's nine `authz.*` names,
 `client.register` and `config.set`, their closed `details` words, and `capabilities.md` §3's third

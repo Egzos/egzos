@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 # The a6-adversary nightly sweep's only route to the repository-advisory API. It replaces a raw
 # `gh api:*` grant, which handed the forge token's whole reach to the one session built to read
 # attacker-shaped text (drift F17). Three verbs, one endpoint family, this repository only.

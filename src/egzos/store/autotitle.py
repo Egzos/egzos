@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Auto-titling runs at write time for every item (v0.3 §3, v0.4 §16). Engines: BYO key, local
 model, or DEGRADED — no model, metadata only, nothing breaks. The skeleton ships degraded;

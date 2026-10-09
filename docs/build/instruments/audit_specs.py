@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """A2's pre-push audit of spec/design, read as text. Every expectation is derived from the tree.
 
 There is no registry of versions in this file. The index table in ``spec/design/README.md`` is

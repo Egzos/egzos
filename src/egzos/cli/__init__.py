@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The CLI — first surface, doubles as the test harness (v0.3 §10). Daily one-worders: login, fetch,
 add, ls, serve, find; noun-verb for the rest; --json everywhere; sticky scope (v0.4 §9).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """egzos identity · fixtures and conformance check (BRAND.md §16 and §20).
 
     python3 pipeline/check.py                 # check the committed masters under spec/design/brand/

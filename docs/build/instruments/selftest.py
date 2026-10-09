@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """A check that cannot fail is not a check. This makes every audit check fail on purpose.
 
 For each check id in ``audit_specs.py`` it copies ``spec/design`` to a temporary directory,

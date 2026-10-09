@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 #
 # The walking skeleton, end to end, in a throwaway container: add → inbox → resolve → serve --mcp → audit.
 # The Chief is the acceptance test (build plan 2.5, pulled forward). Run from the repo root:

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Freeze decisions read off the running code: `publish` gates widening and `organize` gates the
 silent move (item 3), a TOCTOU refusal is `approval.stale` not `approval.deny` (item 39), and an
