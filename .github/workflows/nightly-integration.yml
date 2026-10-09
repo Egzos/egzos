@@ -112,6 +112,11 @@ jobs:
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      # The one directory the session may write (its Edit grant is scoped to it): the drift report's
+      # body, which gh_issue.sh reads and refuses from anywhere else. Created by the runner, mode 700.
+      - name: agent-out
+        run: install -d -m 700 /tmp/agent-out
+
       - name: charter-a1r-reviewer
         env:
           # Refs via the environment, never ${{ }} into a run: line.
@@ -140,16 +145,16 @@ jobs:
 
             1. The suites already ran, in a job of their own that held no token. Their full output is `/tmp/suite/suite.txt`: install, `pytest -q -rfExX tests` (the integration, conformance and governance suites; `adversarial/` is a6's sweep and not in this run), per-file collection counts, and `ruff check .`, each with its exit status. Read it; execute nothing — this session holds no interpreter, by design (drift F22). If the file says the suite job produced no result, report that as the night's first finding.
             2. Check for drift: compare the code on main against spec/contracts/** (if it exists) and CLAUDE.md invariants, by reading.
-            3. Write or update ONE GitHub issue titled "drift report $(date +%F)" labelled `drift`:
+            3. Write or update ONE GitHub issue titled "drift report YYYY-MM-DD" (today's UTC date, written out) labelled `drift`. Write the body with the Write tool to /tmp/agent-out/drift.md, the one place this session can write; the script below reads bodies from there only.
                - First search: `gh issue list --label drift --search "drift report" --state open --json number,title`
-               - If a matching issue exists, read it with `gh issue view <number>` and update it with `gh issue edit <number> --body "..."`.
-               - If no match, create it: `gh issue create --title "drift report $(date +%F)" --label drift --body "..."`.
+               - If a matching issue exists, read it with `gh issue view <number>` and replace its body: `bash .github/scripts/gh_issue.sh edit <number> /tmp/agent-out/drift.md`.
+               - If no match, create it: `bash .github/scripts/gh_issue.sh create "drift report YYYY-MM-DD" /tmp/agent-out/drift.md drift`.
             4. The body must summarise: suites run, pass/fail counts, any drift findings, and the date.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1r-reviewer.md
             --model ${{ env.MODEL_OPUS }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"
+            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(bash .github/scripts/gh_issue.sh:*)"
             --disallowedTools "Read(//proc/**)"
 
       # The same diagnosis the PR reviewers carry (drift F21): without it a drift report that never

@@ -61,6 +61,8 @@ def stub(tmp_path):
         "GHSA": GHSA,
         "GITHUB_REPOSITORY": "Egzos/x",
         "GH_TOKEN": "t",
+        # The one directory a body file may come from; the sessions write nowhere else.
+        "AGENT_OUT_DIR": str(tmp_path),
     }
     return tmp_path, env
 
@@ -280,3 +282,20 @@ def test_create_sends_one_well_typed_severity_field(stub, given, kept):
     assert _run(env, "create", "-", stdin=json.dumps(body)).returncode == 0
     sent = json.loads((d / "sent.json").read_text())
     assert {k: v for k, v in sent.items() if k in ("severity", "cvss_vector_string")} == kept
+
+
+@pytest.mark.parametrize("verb", ["create", "update"])
+def test_a_body_file_outside_the_scoped_directory_is_refused(stub, tmp_path_factory, verb):
+    # Any other path on the runner, /proc/self/environ included, never becomes an advisory body.
+    tmp, env = stub
+    outside = tmp_path_factory.mktemp("elsewhere") / "body.json"
+    outside.write_text(json.dumps({"summary": "s", "description": "d"}))
+    link = tmp / "link.json"
+    link.symlink_to(outside)
+    args = [GHSA] if verb == "update" else []
+    dotdot = f"{tmp}/../{outside.parent.name}/body.json"
+    for path in (str(outside), str(link), "/proc/self/environ", dotdot):
+        r = _run(env, verb, *args, path)
+        assert r.returncode == 2, path
+        assert "must be in" in r.stderr
+    assert not (tmp / "sent.json").exists()
