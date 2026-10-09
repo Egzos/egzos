@@ -133,3 +133,11 @@ def test_comment_and_edit_reach_issues_only_and_edit_the_drift_report_only(
     r = _run({**env, "STUB_TARGET": target}, verb, "12", str(out / "b.md"))
     assert r.returncode == 2 and refusal in r.stderr
     assert not (tmp / "args").exists()
+
+
+def test_a_title_carrying_a_credential_is_refused(stub):
+    tmp, out, env = stub
+    (out / "b.md").write_text("body")
+    r = _run(env, "create", f"leak {env['GH_TOKEN']}", str(out / "b.md"))
+    assert r.returncode == 2 and "title carries a credential" in r.stderr
+    assert not (tmp / "args").exists()

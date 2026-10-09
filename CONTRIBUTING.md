@@ -12,7 +12,9 @@ Issues are welcome from anyone. Use the issue templates. For security concerns, 
 
 ## Submitting a pull request
 
-Before opening a PR:
+An outside change needs a written agreement with the Chief **before** you open a PR: this
+repository's license (PolyForm Strict 1.0.0) grants no right to make changes. See "License and DCO /
+CLA" below. With that agreement in place, or as one of the project's own agents:
 
 1. Read `CLAUDE.md` and `spec/` to understand the contracts and trust posture.
 2. Read `.github/PULL_REQUEST_TEMPLATE.md` — fill every field.

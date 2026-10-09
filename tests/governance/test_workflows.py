@@ -291,7 +291,14 @@ def test_a2_design_gap_posts_its_options_from_a_later_step():
     assert "gh issue comment" not in steps[model]["with"]["claude_args"]
     (post,) = [s for s in steps[model + 1:] if s.get("name") == "post-options"]
     run = post["run"]
-    assert "env -i" in run and "-F body=@/tmp/options.md" in run and "-L /tmp/options.md" in run
+    assert "env -i" in run and "-F body=@/tmp/agent-out/options.md" in run
+    assert "-L /tmp/agent-out/options.md" in run
+    # Its one write reaches the options directory only, created before the model.
+    tools = re.search(r'--allowedTools "([^"]*)"', steps[model]["with"]["claude_args"]).group(1)
+    writes = [t for t in tools.split(",") if t.split("(")[0] in {"Write", "Edit", "MultiEdit"}]
+    assert set(writes) == set(AGENT_OUT_GRANTS)
+    assert "--add-dir /tmp/agent-out" in steps[model]["with"]["claude_args"]
+    assert [s.get("name") for s in steps].index("agent-out") < model
     assert {"PROVIDER_KEY", "PROVIDER_OAUTH", "GH_TOKEN"} <= set(post["env"])
     assert post["env"]["PATH"] == "/usr/bin:/bin" and post["env"]["BASH_ENV"] == ""
 

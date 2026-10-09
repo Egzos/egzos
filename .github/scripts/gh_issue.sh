@@ -22,6 +22,18 @@ usage() {
   exit 2
 }
 
+# Refuses text carrying a credential this process can see: a body, and a title as well, which is
+# more visible than the body it heads (notifications, lists, search; Egzos/egzos-platform#88 review).
+no_credential() {
+  local cred
+  for cred in "${GH_TOKEN:-}" "${GITHUB_TOKEN:-}" "${ANTHROPIC_API_KEY:-}" "${CLAUDE_CODE_OAUTH_TOKEN:-}"; do
+    if [[ -n "$cred" && "$1" == *"$cred"* ]]; then
+      echo "gh_issue.sh: the $2 carries a credential; nothing posted" >&2
+      exit 2
+    fi
+  done
+}
+
 # Sets BODY to the resolved body file, refusing anything outside the directory or carrying a credential.
 body() {
   local dir
@@ -29,14 +41,7 @@ body() {
   BODY="$(realpath -e -- "${1:-}" 2>/dev/null)" || BODY=""
   [[ -n "$BODY" && "$BODY" == "$dir"/* && -f "$BODY" && -s "$BODY" ]] \
     || { echo "gh_issue.sh: a body file must be a non-empty file in $dir" >&2; exit 2; }
-  local text cred
-  text="$(cat -- "$BODY")"
-  for cred in "${GH_TOKEN:-}" "${GITHUB_TOKEN:-}" "${ANTHROPIC_API_KEY:-}" "${CLAUDE_CODE_OAUTH_TOKEN:-}"; do
-    if [[ -n "$cred" && "$text" == *"$cred"* ]]; then
-      echo "gh_issue.sh: the body carries a credential; nothing posted" >&2
-      exit 2
-    fi
-  done
+  no_credential "$(cat -- "$BODY")" body
 }
 
 number() {
@@ -63,6 +68,7 @@ case "${1:-}" in
     title="$2"
     [[ -n "$title" && "$title" != *$'\n'* && ${#title} -le 256 ]] \
       || { echo "gh_issue.sh: a title is one non-empty line of at most 256 characters" >&2; exit 2; }
+    no_credential "$title" title
     body "$3"
     labels=()
     for label in "${@:4}"; do
