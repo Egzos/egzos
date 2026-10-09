@@ -99,6 +99,15 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
      three closed `details` keys, `unauthorized` (the count of those `401`s), `forged` (the count
      of those redemptions) and `window_key`, derived from that bucket as §12.2 states. No such
      admission, no entry. The response is unchanged by any of it.
+   - **What pairs, and what stands alone.** Each release's `window_key` is derived from the
+     bucket that engaged, as §12.2 states. A release of the container-global bucket pairs with
+     that window's `rest.tally`, when one appended, by `window_key`. A release of a per-source
+     bucket carries that bucket's key, which joins no other entry: the door appends no engage
+     entry, and no tally carries a per-source key. That release is the engagement's whole trace.
+     `rest.tally`'s two counts are a subset of what the buckets count, since a redemption refused
+     at check 3 or later counts but is attributed in its own `context.fetch`. A window can engage
+     with no `rest.tally` at all, so `authz.release`'s `refused` is the complete engagement signal.
+     **a1p**, all of this bullet.
    - **What the chain bounds.** An unauthenticated sweep reaches the chain at one `rest.tally` per
      window plus one release per engagement, never once per attempt. A redemption refused at check
      3 or later names its token and appends its own `context.fetch` (§6), so a replayed grant
@@ -110,8 +119,11 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
      A 300-second window shows a sweep on the chain within five minutes, the grant's own lifetime
      (§6), and caps `rest.tally` at 288 entries a day under a sustained sweep. **The cost, for the
      Chief:** under the fail-closed rule above, a sweep that exhausts the container-global bucket
-     refuses the owner's own live tokens at this door until its window closes. Until the Chief
-     names the rates, the build issues carry them as open.
+     refuses the owner's own live tokens at this door until its window closes. A replayed grant's
+     refusal counts too, so a client retrying after a lost response spends budget. Whether the
+     door takes this cost or not is an explicit decision for the Chief on #141, not inherited from
+     `/login`'s posture. Until the Chief names the rates and that decision, the build issues carry
+     them as open.
 
 ## 3 · The one refusal
 

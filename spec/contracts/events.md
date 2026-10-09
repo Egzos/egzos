@@ -23,8 +23,8 @@ thirty-one**, the thirteen included: `AuditEntry.event` is typed `Event`, and ea
 member on the day it lands. So a validator written against `EVENTS` accepts an append under any of
 the thirteen today, and **nothing in this tree rejects one** — what is not running is the *emitter*:
 no code path mints a `BlobGrant`, serves an AS page or the REST door, registers a client or changes
-a config key, so no such entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted
-here because a count that disagrees with its own table, or with the constant beside it, is the kind
+a config key, so no such entry is ever produced. `ledger.py` imports this tuple rather than
+restating it. Counted here because a count that disagrees with its own table, or with the constant beside it, is the kind
 of drift a reader resolves by guessing.
 
 | event | emitted when | status |
@@ -127,9 +127,9 @@ the value in `details`. [0.3 · 40]
   the principal never tells a reader which cause a uniform page had or whether a throttled caller
   held a session. A `principal` that varied within one of these events would be that signal.
   `rest.tally` has no caller either, so it carries `none` like (h). So `none` and the six are one
-  set seen from both sides: `none` appears under these events and nowhere else, and these events carry `none` and nothing else. **a1p**, reading §12.2's row
-  binding as the converse of the rule above (a1r on #147). [0.3 · 34] **running**: the ledger
-  refuses such an append (#160).
+  set seen from both sides: `none` appears under these events and nowhere else, and these events
+  carry `none` and nothing else. **a1p**, reading §12.2's row binding as the converse of the rule
+  above (a1r on #147). [0.3 · 34] **running**: the ledger refuses such an append (#160).
 
 **running.**
 
