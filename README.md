@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **MVP preview (0.1.0a1).** Installable today — see the quickstart. The CLI, the MCP server, the browser approval tap and the audit chain run end to end.
+> **v0.1.0.** The open core's first release: the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from the release tag below.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -23,10 +23,10 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 
 **Signed `.xmb` export.** Leaving is easy. One command exports your container as a signed, portable archive you can import anywhere.
 
-## Quickstart (MVP preview)
+## Quickstart
 
 ```bash
-pipx install "git+https://github.com/Egzos/egzos@main"
+pipx install "git+https://github.com/Egzos/egzos@v0.1.0"
 
 egzos init                                   # your container at ~/.egzos, and your owner token
 egzos add "Prefer imperative commit messages" --kind preference --key commit.style
