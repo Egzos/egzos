@@ -1629,8 +1629,9 @@ spec revision (A2's, after the freeze): the owner revokes other tokens on the co
 
 §9 covers the chain entry a *token* produces. This covers `/login`, `/device` and `/authorize`'s
 two tiers, plus the throttle's release and tally entries — three pages and a timer, not the tap page
-or §11.9's page (decided at §9.2), which §12.1 rule 5's five-word `surface` vocabulary names but
-this section does not cover (its entries are `token.revoke` and §11.9's refusal entry). For the tap, its
+or §11.9's page (decided at §9.2), which §12.1 rule 5's six-word `surface` vocabulary names but
+this section does not cover (that page's entries are `token.revoke` and §11.9's refusal entry).
+Nor does it cover `rest`, the REST door's word, whose entries are `rest.md` §2's. For the tap, its
 endpoint, token shape and window mechanics are §13's to route to Phase 2.2 (§10.5's `[LEAN]`
 paragraph withholds binding on the same timeline, a fourth thing neither this section nor §13
 carries); its own audit entries are a different pointer, §10.5's `[LEAN]` closing line's, which
@@ -1800,7 +1801,9 @@ naming decision:
 5. **The release appends whenever an engage did, `refused: 0` included.** Beside (h)'s admitted count, (e) is the only entry that
    carries a sweep's size, so a release that appended only on a non-zero count would let the size be
    inferred from a *missing* entry. `details` carry `surface` — a closed word, `login` · `device` ·
-   `authorize` · `tap` · `revoke` (`revoke` is §11.9's page (decided at §9.2), the fifth word, **[0.3 · 11]**;
+   `authorize` · `tap` · `revoke` · `rest` (`rest` is the REST door's, the sixth word, added by
+   the Chief on #165 item 3; how the door's chain uses it is `rest.md` §2's, not this rule's;
+   `revoke` is §11.9's page (decided at §9.2), the fifth word, **[0.3 · 11]**;
    the step-up tap is the fourth surface, throttled unconditionally by
    `consent.md`'s D-C6; if §10.5's `[LEAN]` is not taken the tap rides a channel of its own rather
    than these AS endpoints, but the word is still used there — D-C6's release entry is
@@ -1855,9 +1858,9 @@ no caller in any request. The record closes the gap as follows; the text that ca
   mandatory is what makes the chain readable in one pass, and a nullable one is a branch every reader
   and every `audit` query must carry forever. A third word costs one row in `capabilities.md` §3 and
   says exactly what is true.
-- **`actor` carries the *surface*, not the caller** — the same closed five as (e)'s `surface`. It is
-  the only honest thing known about the append, and it is what pairs (e) with the entries it
-  summarises. **The caller's network identifier MUST NOT be the actor.** An IP or a client hint in
+- **`actor` carries the *surface*, not the caller** — the same closed words as (e)'s `surface`, six
+  since #165 added `rest`. It is the only honest thing known about the append, and it is what
+  pairs (e) with the entries it summarises. **The caller's network identifier MUST NOT be the actor.** An IP or a client hint in
   `actor` writes network identity into an append-only chain the owner cannot prune, which turns the
   audit log into a surveillance record of everyone who ever touched the container's front door — a
   cost the owner never agreed to and cannot undo.
