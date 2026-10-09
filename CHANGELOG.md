@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Contracts v1.0 — post-freeze status changes
 
+### Added
+
+- `spec/contracts/rest.md`: the REST door contract, **draft** at the Phase 2 boundary (#42), for
+  the Chief's and a6's review before any builder implements against it.
+
 ### Changed
 
 - `events.md` §2: the converse principal rule (the five `PRINCIPAL_NONE_EVENTS` carry `none` and

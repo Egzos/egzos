@@ -17,6 +17,12 @@ decisions written in at 0.3 (#109). Each document's own status line reads the sa
 | [`storage.md`](storage.md) | the backend contract, split by F3 into `ItemStore`, `ContainerState` and `BlobStore` | frozen at 0.3 |
 | [`container.md`](container.md) | containers, addressing, the chain, serving policy, trust statuses, the gate, the config object | frozen at 0.3 |
 | [`authorization-server.md`](authorization-server.md) | the container's OAuth 2.1 AS: auth-code + PKCE, device-code, MCP clients, client registration and the redirect allowlist (`egzos.io`, loopback), AS metadata | frozen at 0.3 |
+| [`rest.md`](rest.md) | the REST door: bearer authentication against the AS's tokens, the one not-found refusal, the v1.0 resource endpoints, `BlobGrant` redemption (F5) | **draft** (Phase 2 boundary, #42); not frozen, not law |
+
+**`rest.md` is the one exception to the status line above.** It is a Phase 2 draft, opened as a
+`contract-change` at the Phase 2 boundary (#42), and no builder implements against it until the
+Chief and a6-adversary have reviewed it. Where it and a frozen document disagree, the frozen
+document governs and the disagreement is a finding against `rest.md`.
 
 The typed face of the set is `src/egzos/_types.py`. Every name there traces to a clause here, and
 `tests/conformance/test_contract_tables.py` pins the vocabularies against these tables.
