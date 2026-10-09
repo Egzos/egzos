@@ -475,7 +475,8 @@ class ClientRegistration(TypedDict):
 
     `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
     with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
-    ignored. `http://localhost:<port>/...` is registrable only as the exact string, port included.
+    ignored. A `localhost` host is refused at registration in any case spelling, with or without a
+    port ([0.3 · 22], §5.2); a dev client registers `http://127.0.0.1/...` or `http://[::1]/...`.
 
     `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
     timestamp. It is the seventh `*_at: str` timestamp in this module, and the first naming a

@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `events.md` §2: the converse principal rule (the five `PRINCIPAL_NONE_EVENTS` carry `none` and
   nothing else) moves from decided, not running to running, citing the ledger check (#160, #159).
 
+### Fixed
+
+- `_types.ClientRegistration` docstring: states the frozen rule that registration refuses a
+  `localhost` redirect host in any spelling, with or without a port ([0.3 · 22]), replacing the
+  overruled draft sentence (#174).
+
 ## Contracts v1.0 — frozen at 0.3 (Chief, 2026-10-08)
 
 ### Added
