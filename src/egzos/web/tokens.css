@@ -236,7 +236,7 @@ html[data-scheme="dark"][data-canvas="violet"] {
 
   /* sidebar family — the flagship app shell's primary pick
    * (Egzos/egzos-platform · spec/design/search-list.md §17 — a proprietary sibling repository,
-   * qualified because this file ships to every consumer of this Apache-2.0 repository, a fork
+   * qualified because this file ships to every consumer of this public repository, a 0.1.0 fork
    * included, where an unqualified pointer resolves to nothing with no indication why). */
   --sidebar:                    var(--egz-paper);
   --sidebar-foreground:         var(--egz-ink);
