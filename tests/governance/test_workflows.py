@@ -617,17 +617,31 @@ def test_core_queue_wip_cap_cannot_read_zero_while_a_pr_is_open():
 
 
 def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
-    # #123: a PR-mode security finding sits in code that is not on main, so the sweep must be able
-    # to read that PR, and the number it is given must be digits before any model sees it.
+    # #123: a PR-mode security finding sits in code that is not on main, so a dispatch may name the
+    # PR. Its unmerged diff is attacker-written text on a public repository, so it is read in a job
+    # of its own whose session can file an advisory and nothing else, and only after a gate has
+    # checked the number is digits and the PR carries the `security` label.
     wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
     on = wf.get("on", wf.get(True))
     assert on["workflow_dispatch"]["inputs"]["pr"]["required"] is False
-    steps = wf["jobs"]["a6-adversary-nightly"]["steps"]
-    names = [s.get("name") or s.get("uses", "") for s in steps]
+    job = wf["jobs"]["a6-adversary-pr-advisory"]
+    assert "workflow_dispatch" in job["if"] and "inputs.pr != ''" in job["if"]
+    assert job["permissions"] == {"contents": "read", "pull-requests": "read"}
+    steps = job["steps"]
+    names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
     gate = names.index("pr-input")
-    model = next(i for i, s in enumerate(steps) if "claude-code-action" in s.get("uses", ""))
-    assert gate < model
-    assert "^[0-9]+$" in steps[gate]["run"]
+    model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+    assert gate < names.index("forge") < model
+    run = steps[gate]["run"]
+    assert "^[0-9]+$" in run and 'index("security")' in run
     assert steps[gate]["env"]["PR"] == "${{ inputs.pr }}"
-    prompt = steps[model]["with"]["prompt"]
-    assert "inputs.pr" in prompt and "gh pr diff {0}" in prompt
+    args = steps[model]["with"]["claude_args"]
+    tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+    assert set(tools) == {
+        "Read", "Grep", "Glob", "Bash(gh pr view:*)", "Bash(gh pr diff:*)",
+        "Bash(bash .github/scripts/file_advisory.sh:*)",
+    }
+    assert "inputs.pr" in steps[model]["with"]["prompt"]
+    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs.
+    sweep = wf["jobs"]["a6-adversary-nightly"]["steps"]
+    assert "inputs.pr" not in str(sweep)
