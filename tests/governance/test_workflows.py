@@ -625,7 +625,7 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
     on = wf.get("on", wf.get(True))
     assert on["workflow_dispatch"]["inputs"]["pr"]["required"] is False
     job = wf["jobs"]["a6-adversary-pr-advisory"]
-    assert "workflow_dispatch" in job["if"] and "inputs.pr != ''" in job["if"]
+    assert job["if"] == "${{ github.event_name == 'workflow_dispatch' && inputs.pr }}"
     assert job["permissions"] == {"contents": "read", "pull-requests": "read"}
     steps = job["steps"]
     names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
@@ -642,6 +642,41 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
         "Bash(bash .github/scripts/file_advisory.sh:*)",
     }
     assert "inputs.pr" in steps[model]["with"]["prompt"]
-    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs.
+    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs. A
+    # dispatch naming a PR runs neither the suite nor the sweep (#177 review).
     sweep = wf["jobs"]["a6-adversary-nightly"]["steps"]
     assert "inputs.pr" not in str(sweep)
+    # Spelled per event, so the cron never rests on how a null input compares (#181 review).
+    for name in ("a6-adversary-suite", "a6-adversary-nightly"):
+        cond = wf["jobs"][name]["if"]
+        assert "github.event_name == 'schedule' ||" in cond, name
+        assert "github.event_name == 'workflow_dispatch' && !inputs.pr" in cond, name
+
+
+def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():
+    # The App's grant is wider than either a6 session needs; the token each one holds is narrowed
+    # at mint, so GitHub enforces the boundary and not the tool list alone (#177 review).
+    wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
+    want = {
+        "a6-adversary-nightly": {
+            "permission-contents": "read", "permission-issues": "write",
+            "permission-pull-requests": "read", "permission-repository-advisories": "write",
+        },
+        "a6-adversary-pr-advisory": {
+            "permission-contents": "read", "permission-pull-requests": "read",
+            "permission-repository-advisories": "write",
+        },
+    }
+    for job_id, perms in want.items():
+        steps = wf["jobs"][job_id]["steps"]
+        (mint,) = [s for s in steps if s.get("id") == "forge"]
+        got = {k: v for k, v in mint["with"].items() if k.startswith("permission-")}
+        assert got == perms, job_id
+        # The advisory scope rides an input the action does not declare, so the job proves it
+        # reaches the API right after the mint and before any model runs (#181 review).
+        names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
+        probe = names.index("forge-reaches-advisories")
+        model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+        assert names.index("forge") < probe < model, job_id
+        assert steps[probe]["run"] == "bash .github/scripts/file_advisory.sh list > /dev/null"
+        assert steps[probe]["env"]["GH_TOKEN"] == "${{ steps.forge.outputs.token }}"

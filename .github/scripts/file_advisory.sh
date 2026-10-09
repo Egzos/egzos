@@ -13,6 +13,13 @@
 # write tool: a session that could write files and also run a script it could have rewritten would
 # hold an interpreter with the forge token behind it (Egzos/egzos#71 review, round 3).
 #
+# create sends only summary, description, severity or else cvss_vector_string (the API takes one,
+# never both), cwe_ids and vulnerabilities, each vulnerability cut by the same WRITABLE filter
+# update uses. Anything else the body carries is
+# dropped: the endpoint also takes credits, collaborating users and teams and a private fork, and a
+# session that read attacker-written text must not be able to add an outside account to a private
+# advisory (#177).
+#
 # update is append-only. The advisory body is the only copy of an unfixed reproduction, and the API's
 # PATCH replaces each field it is given, so the script reads the filed advisory itself: the new
 # file's `description` (required) is appended under a dated heading, its `vulnerabilities` are
@@ -26,6 +33,14 @@
 # tests/governance/test_workflows.py).
 set -euo pipefail
 REPO="${GITHUB_REPOSITORY:?GITHUB_REPOSITORY is not set}"
+
+# The vulnerability fields a write may carry, defined once so create and update cannot drift apart.
+WRITABLE='def writable: (if .package.ecosystem
+                       then {package: ({ecosystem: .package.ecosystem, name: .package.name}
+                                       | with_entries(select(.value != null)))}
+                       else {} end)
+          + ({vulnerable_version_range, patched_versions, vulnerable_functions}
+             | with_entries(select(.value != null)));'
 
 usage() {
   echo "usage: file_advisory.sh list | create <json-file|-> | update <GHSA-id> <json-file|->" >&2
@@ -55,7 +70,18 @@ case "${1:-}" in
   create)
     [[ $# -eq 2 ]] || usage
     spool "$2"
-    gh api -X POST "repos/${REPO}/security-advisories" --input "$BODY" --jq '.ghsa_id'
+    jq -e '[.summary, .description] | all(type == "string" and length > 0)' "$BODY" >/dev/null \
+      || { echo "file_advisory.sh: create needs a non-empty summary and description" >&2; exit 2; }
+    jq "$WRITABLE"'
+        {summary, description}
+        + (if (.severity | type) == "string" then {severity}
+           elif (.cvss_vector_string | type) == "string" then {cvss_vector_string}
+           else {} end)
+        + (if (.cwe_ids | type) == "array" then {cwe_ids} else {} end)
+        + (if (.vulnerabilities | type) == "array"
+             then {vulnerabilities: (.vulnerabilities | map(writable))}
+             else {} end)' "$BODY" \
+      | gh api -X POST "repos/${REPO}/security-advisories" --input - --jq '.ghsa_id'
     ;;
   update)
     [[ $# -eq 3 ]] || usage
@@ -64,13 +90,7 @@ case "${1:-}" in
     jq -e '(.description | type) == "string" and (.description | length) > 0' "$BODY" >/dev/null \
       || { echo "file_advisory.sh: update needs a non-empty description to append" >&2; exit 2; }
     CURRENT="$(gh api "repos/${REPO}/security-advisories/$2")"
-    jq -n --argjson cur "$CURRENT" --slurpfile new "$BODY" --arg day "$(date -u +%F)" '
-        def writable: (if .package.ecosystem
-                       then {package: ({ecosystem: .package.ecosystem, name: .package.name}
-                                       | with_entries(select(.value != null)))}
-                       else {} end)
-          + ({vulnerable_version_range, patched_versions, vulnerable_functions}
-             | with_entries(select(.value != null)));
+    jq -n --argjson cur "$CURRENT" --slurpfile new "$BODY" --arg day "$(date -u +%F)" "$WRITABLE"'
         $new[0] as $n
         | {description: (($cur.description // "") + "\n\n### Update " + $day + "\n\n" + $n.description)}
         + (if $n.severity then {severity: $n.severity} else {} end)
