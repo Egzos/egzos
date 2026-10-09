@@ -179,8 +179,8 @@ remove_client(client_id)                  -> bool    # internal
 put_code(record)                          -> None
 consume_code(code_hash)                   -> AuthorizationCodeRecord | None
 # device authorizations (§3, §11.8)
-put_device(record)                        -> None
-get_device(device_code_hash)              -> DeviceAuthorizationRecord | None
+put_device(record)                        -> None    # insert-only
+poll_device(device_code_hash, at)         -> DeviceAuthorizationRecord | None
 get_device_by_user_code(user_code_hash)   -> DeviceAuthorizationRecord | None
 decide_device(device_code_hash, grant)    -> bool    # internal; grant None = denied
 consume_device(device_code_hash)          -> DeviceAuthorizationRecord | None
@@ -211,13 +211,23 @@ client entry). No method here is offered to an `ItemStore` backend. Operating th
 not delegating it ([0.3 · 5], §1).
 
 **Credential values are stored as hashes, never the value.** The authorization code, the
-`device_code`, the `user_code`, the refresh-token value and the session identifier each reach the
-store only as the lowercase hex sha256 of the whole value, as `auth.py` already does for
-`Token.secret_hash`. **No method takes a credential value** — every key parameter that names one is a
-`*_hash`, and no record carries a field that holds one — so a backend cannot store a code or a refresh
-token in the clear, because it is never handed one. The `user_code`'s small alphabet (§11.8) makes
-its hash guessable offline; hashing it keeps the value out of a casual read of the store, and the
-`/device` throttle, not the hash, is what bounds guessing it.
+`device_code`, the refresh-token value and the session identifier each reach the store only as the
+lowercase hex sha256 of the whole value, as `auth.py` already does for `Token.secret_hash`. Each
+carries §9.1's entropy floor, so an unkeyed hash of it is not reversible.
+
+The `user_code` is the exception. It has 20⁸ ≈ 2³⁴·⁶ values (§11.8, [0.3 · 20]), so an unkeyed
+sha256 of it can be inverted by enumeration from a store leak, a backup or a replica. The `/device`
+throttle bounds only online guessing. So **`user_code_hash` is the lowercase hex HMAC-SHA256 of the
+normalized `user_code` under a container-held key** (the *device-code key*), never a bare sha256. A
+store read alone then yields no live `user_code`. The key MUST NOT be held in the store beside the
+hashes it keys, since a key that leaks with the store protects nothing. TODO(a1p) #143 / #165 item 4: how the device-code key is provisioned at `init`,
+where it is held and how it rotates is not decided here. It joins the login secret (#143) and the
+grant key (#165 item 4) in the same batch. Rotating it orphans every pending device authorization,
+which expires within §3's lifetime anyway.
+
+**No method takes a credential value.** Every key parameter that names one is a `*_hash`, and no
+record carries a field that holds one. A backend cannot store a code or a refresh token in the clear,
+because it is never handed one.
 
 **Single use is the store's, atomically.** Each of these is one indivisible step against concurrent
 callers on the same key — of two concurrent calls, exactly one observes the state before the change:
@@ -228,15 +238,25 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    first redemption attempt, successful or not (§2).
 2. `consume_device` is the same step for a decided device authorization at the token endpoint. It
    returns `None` while the authorization is still pending, so a poll before the decision spends
-   nothing; `get_device` is the poll's read. `decide_device` moves a record from pending exactly
-   once and returns `False` if it was not pending (§3 mitigation 3: one approval, one request).
+   nothing. `decide_device` moves a record from pending exactly once and returns `False` if it was
+   not pending (§3 mitigation 3: one approval, one request).
+   **The record is never rewritten whole.** `put_device` is insert-only: a put on a
+   `device_code_hash` that already exists changes nothing. After the insert, the record changes only
+   through three atomic methods, and each touches only its own fields. `poll_device` sets
+   `last_polled_at` to `at`. `decide_device` sets `decision` and `grant`. `consume_device` spends the
+   record. `poll_device` is the poll's read, and it returns the record **as it stood before the
+   call**, so Trust compares the prior `last_polled_at` with `at` for §3 mitigation 1's
+   `slow_down`. A poll can therefore never write back a stale `pending` copy over a concurrent
+   `decide_device`, so one authorization cannot be decided twice.
 3. `redeem_refresh` marks the record redeemed and returns it **as it stood before the call**. A
    returned record with a non-null `redeemed_at` is reuse, and Trust then calls `revoke_family`
    (§9.2 rotation clause 2). The store detects nothing; it reports the prior state truthfully.
 4. `revoke_family` revokes every refresh record in the family **and** every `Token` those records
    name, in one step on one substrate, and returns the revoked `Token.id`s to its internal caller for
    `token.revoke` ([0.3 · 30]). A family half-revoked by a crash is the failure rotation exists to
-   prevent. Whether revoking one access token by `Token.id` revokes its family is not decided here;
+   prevent. This couples the two Protocols: **the `ASState` implementer MUST be the `ContainerState`
+   implementer, on one substrate**, under either partition answer. No backend may split them, because
+   `revoke_family` writes `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its family is not decided here;
    `family_of_token` only makes the family id available to the entry.
 5. `claim_resubmission` returns `True` exactly once per `(session_hash, request_key)` that
    `put_decided` recorded, and `False` otherwise — §11.0 substep 1's "first re-submission on the
@@ -246,9 +266,17 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    container-global bucket or a digest of the transport source address (§11.0, [0.3 · 24]). A network
    identifier reaches the store only as Trust chooses to key it and never enters the chain.
 
-**Silence-not-errors (§5) applies unchanged.** Every getter and consumer returns `None` for absent,
-expired, spent and revoked alike; every `bool` and `revoke_family`'s list are internal to this
-boundary and MUST NOT be reflected to an external caller. `get_client` is §11.1's one keyed read, and
+**Silence-not-errors (§5) applies unchanged, to the plain getters and to what reaches an external
+caller.** The plain getters (`get_client`, `get_device_by_user_code`, `get_decided`, `get_session`,
+`family_of_token`) return `None` for absent, expired, spent and revoked alike. The consumers do not
+judge, so they return more than that, and all of it stays inside Trust. `consume_code` returns the
+record without judging its expiry or its §2 bindings (rule 1). `redeem_refresh` and `poll_device`
+return the record as it stood before the call (rules 2 and 3), so a non-null `redeemed_at` stays
+visible and reuse stays detectable. An implementation that collapses an already-redeemed refresh
+record to `None` silences §9.2's reuse detection, and that is a finding. What Trust then sends an
+external caller is §5's single shape for absent, expired, spent and revoked. Every `bool` and
+`revoke_family`'s list are internal to this boundary as well, and MUST NOT be reflected to an
+external caller. `get_client` is §11.1's one keyed read, and
 there is **no client listing method** (§11.1, §7.1). TODO(a1p): an owner's `client ls` at the CLI is
 not in any contract; if a3-doorman needs one, it is a `contract-change`, not a method added here.
 
@@ -263,9 +291,12 @@ land without `client.register`, which [0.3 · 31] makes an audit event. `Contain
 field cited there to the clause that requires it. They are **a1p**'s, drafted from those clauses; a
 field a3-trust finds missing is an escalation on #173's thread, not a field added in a builder's PR.
 
-**Implementations.** The sqlite implementation of both Protocols is in `backends/sqlite.py` and is
-therefore a3-store's (§6), moving to Vault at Phase 5 with the rest of the backends; a3-trust consumes
-the Protocols and adds no table itself. **a1p**, answering #173 question 5.
+**Implementations.** The sqlite implementation of `ASState` is in `backends/sqlite.py`, and so is
+`ASGateState`'s **only if** the partition below is answered (A). Under (B), `ASGateState` is an
+in-process class and gets no table. Until the Chief answers, a3-store builds no `ASGateState` table.
+Either way the sqlite implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest
+of the backends. a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173
+question 5.
 
 TODO(chief) #173 — **the partition: is `ASGateState` `ContainerState`-class too, or process memory?**
 `ASState` is durable under either answer; only the sessions and the throttle counters are in question.
@@ -285,6 +316,13 @@ TODO(chief) #173 — **the partition: is `ASGateState` `ContainerState`-class to
 The interface fits either answer: under (A) the backend that implements `ContainerState` implements
 both Protocols; under (B) it implements `ASState` and an in-process class implements `ASGateState`.
 No signature changes between the two.
+
+Open note beside the partition, not a method: `ASGateState` has no bulk form. `end_session` and the
+throttle counters are per key. Nothing ends every session, or clears every throttle bucket, tied to
+one principal or one client in a single step, as `revoke_family` does for a refresh chain. A
+principal or client found compromised therefore has no sweep on this half of the state. Whether one
+is needed, and its shape, depends on the partition: under (B) a restart is a crude sweep. It is
+raised on #173 with the partition and is not added here.
 
 ## 4 · `BlobStore` — content-addressed, staged
 
