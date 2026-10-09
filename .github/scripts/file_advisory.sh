@@ -67,6 +67,16 @@ spool() {
       || { echo "file_advisory.sh: a body file must be in $dir" >&2; exit 2; }
   fi
   [[ -f "$BODY" && -s "$BODY" ]] || { echo "file_advisory.sh: no non-empty body: ${1:-}" >&2; exit 2; }
+  # A body carrying a credential this process can see is refused, as gh_issue.sh refuses one: an
+  # advisory is private, but a token is never part of a reproduction (#188 review).
+  local text cred
+  text="$(cat -- "$BODY")"
+  for cred in "${GH_TOKEN:-}" "${GITHUB_TOKEN:-}" "${ANTHROPIC_API_KEY:-}" "${CLAUDE_CODE_OAUTH_TOKEN:-}"; do
+    if [[ -n "$cred" && "$text" == *"$cred"* ]]; then
+      echo "file_advisory.sh: the body carries a credential; nothing sent" >&2
+      exit 2
+    fi
+  done
   jq -e 'type == "object"' "$BODY" >/dev/null || { echo "file_advisory.sh: body is not a JSON object" >&2; exit 2; }
 }
 

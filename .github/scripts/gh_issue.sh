@@ -8,7 +8,7 @@
 #
 #   gh_issue.sh create <title> <body-file> [label ...]   open one issue; prints its number
 #   gh_issue.sh comment <number> <body-file>              comment on one issue
-#   gh_issue.sh edit <number> <body-file>                 replace one issue's body
+#   gh_issue.sh edit <number> <body-file>                 replace a drift issue's body
 #
 # A body file must sit in AGENT_OUT_DIR (default /tmp/agent-out), resolved, symlinks included. The
 # sessions write there with a Write grant scoped to that one directory, which never reaches this
@@ -43,6 +43,20 @@ number() {
   [[ "${1:-}" =~ ^[0-9]+$ ]] || { echo "gh_issue.sh: not an issue number: ${1:-}" >&2; exit 2; }
 }
 
+# The issues API answers for pull requests too: comment and edit reach an issue, never a PR, and
+# edit reaches only an issue carrying the drift label, the drift report's (#188 review).
+target() {
+  local got
+  got="$(gh api "repos/${REPO}/issues/$1" \
+    --jq '(if .pull_request then "pr" else "issue" end) + " ," + ([.labels[].name] | join(",")) + ","')" \
+    || { echo "gh_issue.sh: no such issue: $1" >&2; exit 2; }
+  [[ "${got%% *}" == "issue" ]] || { echo "gh_issue.sh: #$1 is not an issue" >&2; exit 2; }
+  if [[ -n "${2:-}" && "${got#* }" != *",$2,"* ]]; then
+    echo "gh_issue.sh: #$1 does not carry the $2 label" >&2
+    exit 2
+  fi
+}
+
 case "${1:-}" in
   create)
     [[ $# -ge 3 ]] || usage
@@ -61,6 +75,7 @@ case "${1:-}" in
     [[ $# -eq 3 ]] || usage
     number "$2"
     body "$3"
+    target "$2"
     gh api -X POST "repos/${REPO}/issues/$2/comments" -F "body=@$BODY" --jq '.id' > /dev/null
     echo "$2"
     ;;
@@ -68,6 +83,7 @@ case "${1:-}" in
     [[ $# -eq 3 ]] || usage
     number "$2"
     body "$3"
+    target "$2" drift
     gh api -X PATCH "repos/${REPO}/issues/$2" -F "body=@$BODY" --jq '.number'
     ;;
   *)
