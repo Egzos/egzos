@@ -4,18 +4,28 @@
 
 The step-up tap's own denial copy (`egzos.authz.presence.TAP_COPY["outcome.denied"]`) promises an
 owner: "Logged. Staged bytes kept 30 days cold." `BlobStore.stage()` already keeps a staged blob
-out of `get()`/`exists()`, which is the half of that promise this file confirms still holds. The
-other half does not: `egzos.store.items.Store.add()` — the only path that writes blob content —
-calls `BlobStore.put()` directly, so every attachment lands permanently under `sha256/` and never
-passes through `staging/` at all, and nothing in `src/` reads `blobs_staging_retention_days` to
-purge anything. See issue #196.
+out of `get()`/`exists()`, which is the half of that promise this file confirms still holds.
+
+Issue #196 originally also flagged `egzos.store.items.Store.add()` calling `BlobStore.put()`
+directly (never `stage()`) as a bypass. Per a1r's review of the first cut of this file
+(storage.md §4 [0.3 · 41]: "the skeleton's one `put` path (`Store.add` with a file,
+`store/items.py`)"), that is the contracted `put` path, not a defect — staging is for
+agent-proposed artifacts awaiting approval, a path still `TODO(a1p)` (#42) and not yet reachable
+to attack. That xfail is withdrawn here rather than carried as a finding against intended
+behavior.
+
+The real gap stands: nothing in `src/` reads `blobs_staging_retention_days` to purge anything
+under `staging/`, and `storage.md` [0.3 · 44] names a purge "after `blobs.staging_retention_days`"
+without naming its shape — no method, trigger, clock or audit event to call. That question is
+#198 (a1p, `contract-change`). The purge xfail lands here once #198 settles the shape; #196 stays
+open until then.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from egzos.container import OWNER, Container
+from egzos.container import Container
 
 pytestmark = pytest.mark.adversarial
 
@@ -35,24 +45,3 @@ def test_a_staged_blob_stays_unreachable_until_promoted(box):
     box.blobs.promote(sha)
     assert box.blobs.get(sha) == b"cold until promoted"
     assert not (box.blobs.root / "staging" / sha).exists()
-
-
-@pytest.mark.xfail_finding
-@pytest.mark.xfail(
-    strict=True,
-    reason="#196: store.add() with file content bypasses staging entirely, so the "
-    "30-day-cold purge promised by blobs_staging_retention_days has nothing to apply to",
-)
-def test_store_add_never_stages_a_file_attachment(box, tmp_path):
-    f = tmp_path / "attachment.txt"
-    f.write_text("unverified attachment content")
-    owner = box.auth.interactive_token()
-
-    item = box.store.add(file=f, token=owner, actor=OWNER, principal="interactive")
-    sha = item.content["sha256"]
-
-    # The product's own copy promises staged bytes stay cold and invisible to resolution until
-    # promoted. add()'s only blob-writing call is BlobStore.put(), so the bytes land straight in
-    # the permanent sha256/ prefix and staging/ is never touched for this write at all.
-    assert (box.blobs.root / "staging" / sha).exists()
-    assert not (box.blobs.root / "sha256" / sha).exists()
