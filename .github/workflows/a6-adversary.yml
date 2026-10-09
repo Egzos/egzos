@@ -640,7 +640,9 @@ jobs:
           # The session's last line is ids only by its prompt (`filed <id>`, `none`, ...); print it
           # only when it is exactly that shape, so no other text of the session reaches the log.
           last = (str(res.get("result") or "").strip().splitlines() or [""])[-1].strip().strip("`")
-          ok = r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none)"
+          # Plus the one fixed sentence the sweep's security instruction prescribes (platform#88 review).
+          ok = (r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none"
+                r"|security-class finding filed as advisory GHSA(?:-[a-z0-9]{4}){3})")
           print("outcome: " + (last if re.fullmatch(ok, last) else "(not in the ids-only shape)"))
           PYEOF
 
@@ -768,6 +770,8 @@ jobs:
           # The session's last line is ids only by its prompt (`filed <id>`, `none`, ...); print it
           # only when it is exactly that shape, so no other text of the session reaches the log.
           last = (str(res.get("result") or "").strip().splitlines() or [""])[-1].strip().strip("`")
-          ok = r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none)"
+          # Plus the one fixed sentence the sweep's security instruction prescribes (platform#88 review).
+          ok = (r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none"
+                r"|security-class finding filed as advisory GHSA(?:-[a-z0-9]{4}){3})")
           print("outcome: " + (last if re.fullmatch(ok, last) else "(not in the ids-only shape)"))
           PYEOF

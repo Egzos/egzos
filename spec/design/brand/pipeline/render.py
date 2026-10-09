@@ -39,7 +39,7 @@ CANVAS = {"light": "#FFFFFF", "dark": "#0B0B0B", "violet": "#0B0716"}  # --egz-c
 # --egz-shadow-ink equals --egz-ink in both schemes; the badge offset uses INK.
 LABEL = "personal context layer · mcp-first · cli-first · your container is the home"   # copy key brand.tagline
 URL_LINE = "github.com/Egzos/egzos"                                                      # copy key brand.social.url
-LICENCE_LINE = "polyform strict 1.0"                                                  # copy key brand.social.licence
+LICENCE_LINE = "polyform strict 1.0"                                                     # copy key brand.social.licence
 
 # ── fonts · pinned IBM Plex releases (OFL-1.1) ────────────────────────────────────────────────────
 FONTS_DIR = os.path.join(HERE, "fonts")
