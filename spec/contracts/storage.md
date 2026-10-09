@@ -160,7 +160,7 @@ no authorization server.
 
 `authorization-server.md` requires seven kinds of durable state that §3 named no method group for.
 They are declared as **two Protocols beside `ContainerState`**, in `src/egzos/_types.py` like the
-other three, so that the partition question below can be answered without reshaping either:
+other three. The partition between them is decided (below); the two Protocols stay separate:
 
 | Protocol | groups | source clause in `authorization-server.md` |
 |---|---|---|
@@ -168,7 +168,7 @@ other three, so that the partition question below can be answered without reshap
 | `ASGateState` | interactive sessions · throttle counters | §10.1, §11.0 / §12 |
 
 `ASGateState` is the two objects that gate a request **before** evaluation (§11.0's substeps); that is
-the line the partition question falls on, and the only reason for the second Protocol.
+the line the partition question fell on, and the only reason for the second Protocol.
 
 ```
 # ASState — clients (§5; registration is an owner act and writes client.register)
@@ -266,16 +266,21 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    name, in one step on one substrate, and returns the revoked `Token.id`s to its internal caller for
    `token.revoke` ([0.3 · 30]). A family half-revoked by a crash is the failure rotation exists to
    prevent. This couples the two Protocols: **the `ASState` implementer MUST be the `ContainerState`
-   implementer, on one substrate**, under either partition answer. No backend may split them, because
-   `revoke_family` writes `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its family is not decided here;
-   `family_of_token` only makes the family id available to the entry.
+   implementer, on one substrate**. No backend may split them, because `revoke_family` writes
+   `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its
+   family is not decided here; `family_of_token` only makes the family id available to the entry.
 5. `claim_resubmission` returns `True` exactly once per `(session_hash, request_key)` that
    `put_decided` recorded, and `False` otherwise — §11.0 substep 1's "first re-submission on the
    deciding session". `get_decided` is the request-keyed read after the counter (§11.4).
-6. `throttle_incr` increments and returns the new count. It names no rate and no window length
-   (#141): `window_key` is an opaque value Trust derives, and so is `bucket_key` — the constant
-   container-global bucket or a digest of the transport source address (§11.0, [0.3 · 24]). A network
-   identifier reaches the store only as Trust chooses to key it and never enters the chain.
+6. `throttle_incr` increments and returns the new count. It names no rate and no window length:
+   those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust
+   derives, and so is `bucket_key` — the constant container-global bucket, a digest of the transport
+   source address (§11.0, [0.3 · 24]), or, on the `rest` surface only, the `Token.id` a verified
+   descriptor names (`rest.md` §2 item 7). Trust prefixes each `bucket_key` with its kind
+   (global, source, token), so no `Token.id` can share a counter with the container-global
+   constant or a source digest; the store compares keys as opaque values. **a1p** (a6 on #184).
+   A network identifier reaches the store only as Trust chooses to key it and never enters the
+   chain.
 
 **Silence-not-errors (§5) applies unchanged, to the plain getters and to what reaches an external
 caller.** The plain getters (`get_client`, `get_device_by_user_code`, `get_decided`, `get_session`,
@@ -303,38 +308,33 @@ record carries) are typed in `_types.py`, each
 field cited there to the clause that requires it. They are **a1p**'s, drafted from those clauses; a
 field a3-trust finds missing is an escalation on #173's thread, not a field added in a builder's PR.
 
-**Implementations.** The sqlite implementation of `ASState` is in `backends/sqlite.py`, and so is
-`ASGateState`'s **only if** the partition below is answered (A). Under (B), `ASGateState` is an
-in-process class and gets no table. Until the Chief answers, a3-store builds no `ASGateState` table.
-Either way the sqlite implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest
-of the backends. a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173
-question 5.
+**Implementations.** The sqlite implementation of `ASState` and of `ASGateState` is in
+`backends/sqlite.py`, on the file that holds `ContainerState` (the partition, below). The sqlite
+implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest of the backends.
+a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173 question 5.
 
-TODO(chief) #173 — **the partition: is `ASGateState` `ContainerState`-class too, or process memory?**
-`ASState` is durable under either answer; only the sessions and the throttle counters are in question.
+**The partition: all of the authorization server's state is `ContainerState`-class. decided**
+(the Chief on #173, option (A), 2026-10-09). Under F3 it is durable and never delegated to a
+pluggable backend: client registrations, codes, device authorizations, refresh chains,
+decided-request records, interactive sessions and throttle counters alike. **`ASGateState` is
+implemented on the same substrate as `ASState`**, the sqlite backend, and never in process memory.
+The backend that implements `ContainerState` implements both Protocols.
 
-- **(A) All seven are container state, persisted with `ContainerState` on the same substrate.** A
-  restart lifts nothing: throttles hold and sessions survive. Costs: a store write on every throttled
-  request and on every page view that extends a session (`touch_session`), on the same sqlite file as
-  the chain; transport-address digests and session hashes persisted on disk; and a session survives a
-  restart the owner may have expected to sign them out.
-- **(B) Sessions and throttle counters are process memory**, implemented by an in-process
-  `ASGateState`. Nothing extra on disk, no write amplification. Costs: **every restart lifts every
-  throttle**, so anyone who can cause or wait for a restart resets §12's only bound on the chain's
-  growth and the `user_code` attempt bound; §12's engage/release pairs lose the release of any window
-  open at the restart; every restart signs the owner out; and a container served by more than one
-  process holds one counter per process, multiplying every bound by the process count.
+- **A restart lifts nothing.** A throttle that holds still holds after a restart, its window's
+  release entry still appends (§12.1 rule 5), and a container served by more than one process keeps
+  one counter, not one per process. A live session survives a restart; the owner signs out by
+  ending it, not by restarting.
+- **The costs, accepted with the decision:** a store write on every throttled request and on every
+  page view that extends a session (`touch_session`), on the same sqlite file as the chain; and the
+  transport-address digests that key the per-source buckets, and the session hashes, persisted on
+  disk. Neither is a credential value (the hash rule above), and neither enters the chain.
 
-The interface fits either answer: under (A) the backend that implements `ContainerState` implements
-both Protocols; under (B) it implements `ASState` and an in-process class implements `ASGateState`.
-No signature changes between the two.
-
-Open note beside the partition, not a method: `ASGateState` has no bulk form. `end_session` and the
-throttle counters are per key. Nothing ends every session, or clears every throttle bucket, tied to
-one principal or one client in a single step, as `revoke_family` does for a refresh chain. A
-principal or client found compromised therefore has no sweep on this half of the state. Whether one
-is needed, and its shape, depends on the partition: under (B) a restart is a crude sweep. It is
-raised on #173 with the partition and is not added here.
+TODO(a1p), #173: **no bulk sweep on `ASGateState`.** `end_session` and the throttle counters are per
+key. Nothing ends every session, or clears every throttle bucket, tied to one principal or one client
+in a single step, as `revoke_family` does for a refresh chain, so a principal or client found
+compromised has no sweep on this half of the state. With the partition decided, a restart is no
+longer a crude sweep either. Whether a sweep primitive is needed, and its shape, is for a later
+contract batch; it is not added here.
 
 ## 4 · `BlobStore` — content-addressed, staged
 
@@ -466,7 +466,7 @@ The postgres+pgvector and mem0/zep backends themselves are Phase 5. This documen
 contract they must satisfy.
 
 §3.1's `ASState` and `ASGateState` are a draft binding on #173, not part of the 0.3 freeze; their
-partition is the Chief's TODO there.
+partition is decided there (option (A), both on the `ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases
