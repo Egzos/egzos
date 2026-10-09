@@ -480,24 +480,35 @@ the device-code key `storage.md` §3.1 names.
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
 #138 asks for is `container.md`'s, open on #138.
 
-## 7 · Browser clients: the questions open on #153
+## 7 · Browser clients (#153)
 
-A browser client reaches this door with a token from `authorization-server.md` §2. #153 records five
-questions such a client meets. **All five are the Chief's. This document decides none of them**, and
-carries each so the review reads them in one place:
+A browser client reaches this door with a token from `authorization-server.md` §2. #153's five
+questions are decided, and `authorization-server.md` §2.1 records the answers. Four of them are the
+AS's, and no clause here depends on them: where the code is returned (q1), the flagship's
+`client_id` (q3), the request's `scope` (q4, since this door enforces whatever grant the minted
+token carries), and RFC 9207's `iss` (q5).
 
-- **`[open · #153 q1]`, where the authorization code is returned.** An AS question. No clause here
-  depends on it.
-- **`[open · #153 q2]`, CORS.** #153 asks it of the token and revocation endpoints. The flagship
-  calls this door cross-origin too, so the answer reaches here. **Until the Chief answers, this door
-  sends no `Access-Control-*` header and answers no preflight.** That is the absence of a decision,
-  not one. A builder may not implement CORS on this door against this draft.
-- **`[open · #153 q3]`, the flagship's `client_id`.** An AS question. No clause here depends on it.
-- **`[open · #153 q4]`, what the flagship's request carries as `scope`.** An AS question. This door
-  enforces whatever grant the minted token carries (`authorization-server.md` §7), so it depends on
-  no answer.
-- **`[open · #153 q5]`, RFC 9207's `iss` on the authorization response.** An AS question, and §6's
-  ten-field document. No clause here depends on it.
+**CORS at this door (q2). a1p proposes**, `TODO(chief)`, #153. The Chief's answer names the token
+and revocation endpoints. The flagship calls this door cross-origin too, so the proposal carries the
+same derivation here:
+
+- Every `/v1/` route except `GET /v1/blobs/{sha256}` answers a cross-origin request for exactly the
+  origins `authorization-server.md` §2.1 item 2 derives from the registry, with the same headers,
+  `Vary: Origin` included. A preflight from an allowed origin also gets
+  `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Allow-Headers: Authorization,
+  Content-Type`. `Access-Control-Allow-Credentials` is never sent: a session is not a credential
+  here (§2 item 3).
+- **The headers are identical on a success, a `401`, a `400`, a `409` and §3's refusal**, for one
+  `Origin`. They depend on the `Origin` and the registry only, never on the token, the route's
+  match or what exists. Otherwise a cross-origin caller could tell §3's refusal from a success by
+  whether it could read the response at all.
+- A preflight is answered before authentication and appends nothing. It names no resource, and the
+  throttle (§2 item 7) does not count it: a preflight is not an attempt.
+- The redemption route sends no `Access-Control-*` header. A grant URL is opened as an attachment
+  (§6), never read by a page's script.
+
+Until the Chief confirms it, a builder may not implement CORS at this door, and the door sends no
+`Access-Control-*` header.
 
 ## 8 · What this document does not fix
 

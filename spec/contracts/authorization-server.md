@@ -210,6 +210,59 @@ The exemption is a property of the **bind address**, not of a request, a header 
 `serve --tls` (a3-doorman, build plan 5.3) is therefore optional for a loopback bind and mandatory
 for every other one; enforcing the refusal is Doorman's, requiring it is this document's.
 
+### 2.1 · What a browser client meets (#153)
+
+**Five decisions, the Chief's, as recorded on #153 on 2026-10-09** by the operator at the Chief's
+instruction. All five were taken as a1p recommended. They are marked **decided** below and **a1p**
+where this text binds one onto the clauses above. `TODO(chief)`, #153: the record is an operator's
+comment, so the Chief's merge of this text is what confirms it.
+
+1. **The code is returned in the query. decided.** The redirect is `redirect_uri?code=…&state=…`,
+   as §11.6's error redirect is a query. The AS supports no `response_mode=fragment`, and it ignores
+   a `response_mode` parameter rather than refusing it, as §3 ignores `/device`'s `user_code`.
+   **a1p**, the ignoring. The code therefore reaches the client origin's request line and its
+   server, edge and CDN logs. **Why that is safe, carried so it is not re-litigated:** the code is
+   single-use and invalidated on the first redemption attempt (§2), it expires in 60 seconds
+   ([0.3 · 16]), and it is bound to a `code_challenge` whose verifier never leaves the tab. A logged
+   code is spent or expired by the time a log is read, and it is useless without the verifier in
+   either case. What a client does with its own request line afterwards, such as removing the code
+   from the address bar, belongs to its design spec.
+2. **CORS on the token and revocation endpoints, derived from the registry. decided.** These two
+   endpoints, and no other AS endpoint, answer a cross-origin request for exactly the origins of the
+   registered clients' `redirect_uris`, with no wildcard and no other origin. This is the same
+   derivation the tap spec's D-T9 (b) uses for the tap's return origin. **a1p**, the binding:
+   - An origin is `scheme://host[:port]` of a registered redirect URI, compared exactly. §5.2's
+     ignored port does not carry over: a loopback entry yields no origin, because a native client
+     that redirects to loopback does not call these endpoints from a page. A browser dev client
+     registers its exact `http://127.0.0.1:<port>/…` origin.
+   - An allowed origin gets `Access-Control-Allow-Origin` echoing it, plus `Vary: Origin`. A
+     preflight from an allowed origin gets `Access-Control-Allow-Methods: POST` and
+     `Access-Control-Allow-Headers: Content-Type`. `Access-Control-Allow-Credentials` is never
+     sent: no cookie is a credential at either endpoint.
+   - Any other origin gets no `Access-Control-*` header, and the endpoint's answer is otherwise
+     unchanged. The headers depend on the request's `Origin` and the registry only, never on the
+     code, token or client the request names.
+   - **The cost, stated for the review:** whether a CORS header comes back tells a prober whether
+     an origin it guessed is a registered client's, which is a narrow registry read that §5.3 and
+     §7.1 close everywhere else. The prober has to guess the origin, and the flagship's origin is
+     public anyway. `TODO(chief)`, #153: accept this disclosure as the price of q2, or have a6
+     weigh it at the next review.
+3. **The flagship's `client_id` is the literal `egzos.io`. decided.** §5's registration helper writes
+   it. The id identifies nothing about the container, and an unregistered id already takes §5.3's
+   uniform failure. The literal is not reserved and buys no privilege (§5).
+4. **The flagship's request carries no `scope`, and the consent screen decides. decided.** egzos.io
+   never asks for more than the owner picks, and a flagship screen whose capability was not granted
+   is absent, never disabled (the flagship's design spec carries that). **a1p**, the binding: a
+   request without `scope` is valid, and the minted grant is the owner's pick on §11's screen,
+   still six capabilities and node ids (§7). **Interim:** `consent.md` D-C2 forbids narrowing on
+   the page, so the page has no control to pick with. Design-gap #200 asks A2 for one. Until it is
+   committed, the AS answers a request without `scope` with `invalid_scope`, which states a fact
+   identical for every container (§7.1), and a builder may not implement the pick.
+5. **RFC 9207's `iss` is not returned at v1.0. decided.** The authorization response carries `code`
+   and `state` only, the error redirect stays `{error, state}` (§11.6), and §6 stays at ten fields.
+   **The reason:** one issuer per pending authorization record, and `state` bound to the initiating
+   tab, leave the mix-up attack `iss` defends against no client to mix up. Reconsidered at v1.1.
+
 ## 3 · CLI and headless — device code
 
 **Device-code is the CLI's native habitat, unchanged. §K.** A CLI has no redirect URI and no browser
@@ -281,6 +334,16 @@ redirect_uris, registered_at}` enters container config through an owner-authenti
 `registered_at` is **§11.1's addition to the four §K names**, recorded here because §5 is where a
 reader looks for the entry's shape: the consent screen renders the timestamp, and a field the screen
 renders is a field the registry has to carry.
+
+**The flagship's registration helper. decided** (the Chief on #153 q3, 2026-10-09; §2.1 item 3).
+The owner-authenticated CLI path carries a helper that registers the flagship under the well-known
+`client_id` `egzos.io`, with `client_type` `browser` and the flagship's published redirect URIs. It
+is the same owner act, writing the same `client.register` (`op: add`), and the entry is matched by
+§5.1 like any other. **a1p**: the helper writes a literal and no privilege, so a fork's UI may ship
+its own helper under its own literal, and an owner may register `egzos.io` by hand with the same
+result. The verb is a3-doorman's. `TODO(chief)`, #153: the flagship's redirect URIs are
+`egzos-platform`'s to publish; the helper carries them once they are, and until then it does not
+ship.
 
 **Registering, amending or removing a client writes `client.register`. [0.3 · 31]** The event carries
 `{client_id, op, redirect_uris}`, where `op` is one of `add` · `amend` · `remove`, and it is its own event rather than a member of the
