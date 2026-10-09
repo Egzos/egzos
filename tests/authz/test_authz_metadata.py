@@ -30,4 +30,4 @@ def test_metadata_endpoints_live_at_the_issuer_and_outside_the_door_prefix():
     for url in endpoints:
         assert url.startswith(ISSUER + "/") and not url.startswith(ISSUER + "/v1/")
     assert doc["authorization_endpoint"] == ISSUER + "/authorize"
-    assert metadata.DEVICE_ENTRY_PATH not in {u[len(ISSUER):] for u in endpoints}
+    assert metadata.DEVICE_ENTRY_PATH not in {u[len(ISSUER) :] for u in endpoints}

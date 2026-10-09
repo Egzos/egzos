@@ -35,7 +35,7 @@ def check_challenge(challenge: str | None, method: str | None) -> str:
     """Admit an authorization request's PKCE pair, returning the challenge to bind the code to.
 
     The method is compared exactly: `s256` is not `S256`, and an absent method is not a default."""
-    if not challenge or method != S256:
+    if not isinstance(challenge, str) or not challenge or method != S256:
         raise MissingPKCE("missing_pkce")
     if not _CHALLENGE.fullmatch(challenge):
         raise MalformedPKCE("malformed")

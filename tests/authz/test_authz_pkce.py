@@ -21,7 +21,9 @@ def test_rfc_7636_example_verifies():
 
 @pytest.mark.parametrize(
     ("challenge", "method"),
-    [(None, None), ("", "S256"), (CHALLENGE, None), (CHALLENGE, "plain"), (CHALLENGE, "s256")],
+    # `[CHALLENGE]` is a repeated parameter, which is not a challenge.
+    [(None, None), ("", "S256"), ([CHALLENGE], "S256"), (CHALLENGE, None), (CHALLENGE, "plain")]
+    + [(CHALLENGE, "s256")],
 )
 def test_missing_challenge_and_plain_are_missing_pkce_never_malformed(challenge, method):
     with pytest.raises(pkce.MissingPKCE):

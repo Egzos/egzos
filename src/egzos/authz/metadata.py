@@ -24,6 +24,9 @@ DEVICE_AUTHORIZATION_PATH = "/device_authorization"
 REVOCATION_PATH = "/revoke"
 #: The device-code entry page (§11.8), RFC 8628's `verification_uri`. Not a metadata field.
 DEVICE_ENTRY_PATH = "/device"
+#: The login page (§11.7; consent.md §2.1 names the path). Not a metadata field either: it sits
+#: here so every path the AS serves is fixed in one module, which the router and §11.7's
+#: `continue` allowlist both read.
 LOGIN_PATH = "/login"
 
 

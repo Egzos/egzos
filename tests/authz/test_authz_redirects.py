@@ -58,6 +58,9 @@ def test_loopback_ignores_the_port_only(registered, requested):
         ("http://127.0.0.1/cb", "http://127.0.0.1:/cb"),
         ("http://127.0.0.1/cb", "http://127.0.0.1:8x/cb"),
         ("http://127.0.0.1/cb", "http://127.0.0.2:8731/cb"),
+        ("http://127.0.0.1/cb", "http://127.0.0.1:0/cb"),  # not a port
+        ("http://127.0.0.1/cb", "http://127.0.0.1:65536/cb"),
+        ("http://127.0.0.1/cb", "http://127.0.0.1:000080/cb"),
         ("http://localhost/cb", "http://localhost:8731/cb"),  # the name gets no exception
         ("https://egzos.io/cb", "http://127.0.0.1/cb"),
     ],
@@ -78,39 +81,35 @@ def test_match_any_compares_against_the_whole_allowlist():
     assert not match_any(CB, [])
 
 
-@pytest.mark.parametrize(
-    "uri",
-    [CB, "https://egzos.io/cb?client=web", "http://127.0.0.1/cb", "http://[::1]:5173/cb",
-     "http://127.0.0.1"],
-)
+REGISTRABLE = [CB, "https://egzos.io/cb?client=web", "https://app-1.egzos.io:8443/cb"]
+REGISTRABLE += ["https://egzos.io./cb"]  # a fully-qualified ordinary host stays registrable
+REGISTRABLE += ["https://127.0.0.1/cb", "https://[::1]:8443/cb", "http://[::1]:5173/cb"]
+REGISTRABLE += ["http://127.0.0.1/cb", "http://127.0.0.1"]
+
+REFUSED = ["http://localhost/cb", "http://LOCALHOST:5173/cb", "https://localhost/cb"]
+REFUSED += ["https://app.localhost/cb", "http://egzos.io/cb", "http://127.0.0.2/cb"]
+# Every spelling a resolver or a URL parser turns into `localhost` (§5.2 clause 1): the
+# fully-qualified form, percent-encoding, full-width letters, ideographic and full-width stops,
+# and the punycode spelling (its label ends in -).
+REFUSED += ["http://localhost./cb", "https://localhost./cb", "https://LocalHost.:8443/cb"]
+REFUSED += ["https://app.localhost./cb", "https://%6Cocalhost/cb", "https://local%68ost/cb"]
+REFUSED += ["https://\uff4cocalhost/cb", "https://LOCAL\uff28OST/cb", "https://xn--localhost-/cb"]
+REFUSED += ["https://app\u3002localhost/cb", "https://app\uff0elocalhost/cb"]
+# Hosts that are not an ASCII LDH name at all.
+REFUSED += ["https://\u00e9gzos.io/cb", "https://egzos..io/cb", "https://-egzos.io/cb"]
+REFUSED += ["https://egzos-.io/cb", "https://egzos_io/cb", "https://[fe80::1]/cb"]
+REFUSED += ["https://egzos.io../cb", "https://egzos.io/cb#frag", "https://user:pw@egzos.io/cb"]
+REFUSED += ["https://egzos.io@evil.com/cb", "https:///cb", "/cb", "egzos.io/cb"]
+REFUSED += ["javascript:alert(1)", "https://egzos.io/c b", "https://egzos.io\\cb"]
+REFUSED += ["https://egzos.io:99999/cb", "https://egzos.io/\x00", "", None]
+
+
+@pytest.mark.parametrize("uri", REGISTRABLE)
 def test_registrable(uri):
     assert check_registrable(uri) == uri
 
 
-@pytest.mark.parametrize(
-    "uri",
-    [
-        "http://localhost/cb",
-        "http://LOCALHOST:5173/cb",
-        "https://localhost/cb",
-        "https://app.localhost/cb",
-        "http://egzos.io/cb",  # http off loopback
-        "http://127.0.0.2/cb",
-        "https://egzos.io/cb#frag",
-        "https://user:pw@egzos.io/cb",
-        "https://egzos.io@evil.com/cb",
-        "https:///cb",
-        "/cb",
-        "egzos.io/cb",
-        "javascript:alert(1)",
-        "https://egzos.io/c b",
-        "https://egzos.io\\cb",
-        "https://egzos.io:99999/cb",
-        "https://egzos.io/\x00",
-        "",
-        None,
-    ],
-)
+@pytest.mark.parametrize("uri", REFUSED)
 def test_refused_at_registration(uri):
     with pytest.raises(RedirectURIRefused):
         check_registrable(uri)

@@ -43,7 +43,9 @@ def _split_loopback(uri: str) -> tuple[str, str, str] | None:
                         end = i
                         break
                 port, tail = tail[1:end], tail[end:]
-                if not port.isascii() or not port.isdigit():
+                if not (port.isascii() and port.isdigit() and len(port) <= 5):
+                    return None
+                if not 0 < int(port) <= 65535:
                     return None
             if tail and tail[0] not in "/?":
                 return None
@@ -66,12 +68,28 @@ def matches(requested: str, registered: str) -> bool:
 
 
 def match_any(requested: str, registered: list[str]) -> bool:
-    """Exact-match against a client's allowlist. Every entry is compared, so the time taken does
-    not depend on which entry (if any) matched."""
+    """Whether a request's `redirect_uri` matches any allowlist entry (§5.1). Every entry is
+    compared, but no timing claim is made: §5.3 clause 2's budget is owed by the response."""
     found = False
     for entry in registered:
         found = matches(requested, entry) or found
     return found
+
+
+def _ldh_host(host: str) -> str | None:
+    """The host lowercased with one trailing dot stripped, if it is an ASCII LDH name (RFC 1123
+    §2.1); else None. Admitting only this form refuses every spelling a resolver or a URL parser
+    could turn into another name — percent-encoding, IDNA-mapped full-width letters, ideographic
+    full stops — so the `localhost` test below sees the one spelling there is."""
+    name = host.removesuffix(".")
+    if not name or len(name) > 253 or not name.isascii():
+        return None
+    for label in name.split("."):
+        if not 0 < len(label) <= 63 or "-" in (label[0], label[-1]):
+            return None
+        if not label.replace("-", "a").isalnum():  # ASCII already: letters, digits, hyphens
+            return None
+    return name.lower()
 
 
 def check_registrable(uri: str) -> str:
@@ -85,13 +103,15 @@ def check_registrable(uri: str) -> str:
         raise RedirectURIRefused("a redirect URI is one absolute URI") from exc
     if "#" in uri:
         raise RedirectURIRefused("a registered redirect URI carries no fragment")
-    host = (parts.hostname or "").lower()
-    if host == "localhost" or host.endswith(".localhost"):
-        raise RedirectURIRefused("register http://127.0.0.1/… or http://[::1]/…, not localhost")
-    if parts.username is not None or parts.password is not None or "@" in parts.netloc:
+    if "@" in parts.netloc:
         raise RedirectURIRefused("a redirect URI carries no userinfo")
-    if parts.scheme == "https" and parts.hostname:
-        return uri
+    # The host as written: `parts.hostname` lowercases and unbrackets, so read it off the netloc.
+    raw_host = parts.netloc if parts.netloc.endswith("]") else parts.netloc.rsplit(":", 1)[0]
+    name = _ldh_host(raw_host)
+    if name is not None and (name == "localhost" or name.endswith(".localhost")):
+        raise RedirectURIRefused("register http://127.0.0.1/… or http://[::1]/…, not localhost")
     if parts.scheme == "http" and _split_loopback(uri) is not None:
         return uri
-    raise RedirectURIRefused("a redirect URI is https, or http on 127.0.0.1 or [::1]")
+    if parts.scheme == "https" and (raw_host in LOOPBACK_HOSTS or name is not None):
+        return uri
+    raise RedirectURIRefused("a redirect URI is https on an ASCII name, or http on a loopback IP")
