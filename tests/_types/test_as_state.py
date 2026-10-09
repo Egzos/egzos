@@ -150,7 +150,7 @@ def test_grant_is_capabilities_and_node_ids():
 
 
 def test_throttle_names_no_rate_or_window_length():
-    """#141 is the Chief's: the store counts; it is never told a rate or a window length."""
+    """#141's rates are Trust's constants: the store counts and is never told a rate or a window."""
     for name in ("throttle_incr", "throttle_count"):
         params = list(inspect.signature(getattr(t.ASGateState, name)).parameters)
         assert params == ["self", "surface", "bucket_key", "window_key"]

@@ -80,8 +80,12 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
    both sweeps the door is open to: token values at its `401` (item 5) and descriptors at its
    redemption route (§6). **a1p** for the rest of this item, reading `authorization-server.md`
    §11.0 and §12.1 onto this door:
-   - **What counts:** every `401` answer and every refused redemption, whichever §6 check refused
-     it. A request the door serves, or answers with §3's refusal on a live token, does not count.
+   - **What counts:** what a sweep looks like, and nothing else: every `401` answer, and every
+     redemption whose descriptor fails §6's check 1 or 2. **decided** (the Chief on #141,
+     2026-10-09). A redemption refused at check 3 or later is a refusal of a *verified* descriptor,
+     a replay or a retry after a lost response and not a sweep, so it does not count; it still
+     appends its `context.fetch` under the verified caller (§6). A request the door serves, or
+     answers with §3's refusal on a live token, does not count either.
    - **Two buckets, both enforced** ([0.3 · 24]): one container-global, one keyed on the transport
      source address, never on a value the caller supplies. A network identifier keys a bucket and
      never enters the chain. The `rest` counters are the door's own, so exhausting them never
@@ -89,7 +93,11 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
    - **A throttle that holds does not evaluate, and fails closed** (§12.1 rule 4). While either
      bucket holds, every request at the door gets its route's uniform failure, counted and not
      evaluated: `401` on a bearer route, a live token included; §3's refusal at redemption, a
-     valid descriptor included, which is therefore not spent.
+     valid descriptor included, which is therefore not spent. An attempt refused while a bucket
+     holds is counted whatever it carries, since the door has not evaluated it. **Owner lockout
+     is accepted. decided** (the Chief on #141, 2026-10-09): live tokens are not exempt from the
+     container-global hold, since exempting them would validate a token before the throttle runs.
+     The cost is capped at one window, and it is revisited only if it bites in practice.
    - **The chain.** No attempt at the door appends an engage entry: the door has no per-attempt
      event a caller-less attempt could carry. The release appends `authz.release` with `surface:
      rest`, `refused` and `window_key` whenever the throttle engaged, `refused: 0` included (§12.1
@@ -104,26 +112,24 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
      that window's `rest.tally`, when one appended, by `window_key`. A release of a per-source
      bucket carries that bucket's key, which joins no other entry: the door appends no engage
      entry, and no tally carries a per-source key. That release is the engagement's whole trace.
-     `rest.tally`'s two counts are a subset of what the buckets count, since a redemption refused
-     at check 3 or later counts but is attributed in its own `context.fetch`. A window can engage
-     with no `rest.tally` at all, so `authz.release`'s `refused` is the complete engagement signal.
-     **a1p**, all of this bullet.
+     `rest.tally`'s two counts are what the container-global bucket admitted and counted; a
+     redemption refused at check 3 or later is in neither, and is attributed in its own
+     `context.fetch`. A window can engage with no `rest.tally` at all, so `authz.release`'s
+     `refused` is the complete engagement signal. **a1p**, all of this bullet.
    - **What the chain bounds.** An unauthenticated sweep reaches the chain at one `rest.tally` per
      window plus one release per engagement, never once per attempt. A redemption refused at check
-     3 or later names its token and appends its own `context.fetch` (§6), so a replayed grant
-     appends at the throttle's admitted rate and no faster.
-   - **Rates.** `TODO(chief)`, #141: the rates and windows join #141's batch. **a1p proposes**, for
-     the Chief's pick: container-global, 300 counted attempts per 300-second window; per source
-     address, 30 per 300-second window; a bucket that engages holds until its window closes. A
-     well-behaved client meets a `401` only on an expired or revoked token, a handful per window.
-     A 300-second window shows a sweep on the chain within five minutes, the grant's own lifetime
-     (§6), and caps `rest.tally` at 288 entries a day under a sustained sweep. **The cost, for the
-     Chief:** under the fail-closed rule above, a sweep that exhausts the container-global bucket
-     refuses the owner's own live tokens at this door until its window closes. A replayed grant's
-     refusal counts too, so a client retrying after a lost response spends budget. Whether the
-     door takes this cost or not is an explicit decision for the Chief on #141, not inherited from
-     `/login`'s posture. Until the Chief names the rates and that decision, the build issues carry
-     them as open.
+     3 or later names its token and appends its own `context.fetch` (§6). It does not count, so the
+     throttle does not bound it: a replayed descriptor appends once per attempt, attributed to the
+     token it names, at whatever rate the throttle's other traffic leaves open. TODO(a1p), #141:
+     whether attributed replay refusals need a bound of their own (per descriptor or per token)
+     is for a later batch; nothing here adds one.
+   - **Rates. decided** (the Chief on #141, 2026-10-09): container-global, 300 counted attempts
+     per 300-second window; per source address, 30 per 300-second window. A bucket that engages
+     holds until its window closes. `AS_THROTTLE_WINDOW_SECONDS` and `AS_THROTTLE_RATES["rest"]` in
+     `_types.py` carry them. A well-behaved client meets a `401` only on an expired or revoked
+     token, a handful per window. A 300-second window shows a sweep on the chain within five
+     minutes, the grant's own lifetime (§6), and caps `rest.tally` at 288 entries a day under a
+     sustained sweep.
 
 ## 3 · The one refusal
 
@@ -319,8 +325,8 @@ Referrer-Policy: no-referrer
 - Where the descriptor verifies (check 2 passed), the refusal appends `context.fetch` with
   `items: []` and the failed check in `details`, attributed to the named token. The lifeboat records
   a refused download this way. **a1p.**
-  A replayed or expired grant is refused this way, and each such refusal counts toward §2 item 7's
-  throttle.
+  A replayed or expired grant is refused this way, and such a refusal does not count toward §2
+  item 7's buckets (the Chief on #141).
 - Where it does not verify (check 1 or 2 failed), the container has no caller it can name, and no
   entry is attributed to one. The refusal is counted by the `rest` throttle and tallied under
   `forged` in the window's `rest.tally` (§2 item 7), so a flood of forged descriptors leaves a

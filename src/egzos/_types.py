@@ -21,8 +21,9 @@ twice, and ``__all__`` complete (``tests/_types/test_exports.py``) and isort-sor
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
-from typing import Any, Literal, NotRequired, Protocol, TypedDict, get_args
+from collections.abc import Iterable, Iterator, Mapping
+from types import MappingProxyType
+from typing import Any, Literal, NamedTuple, NotRequired, Protocol, TypedDict, get_args
 
 # The runtime tuples below are DERIVED from their Literal unions, never written out twice: a
 # vocabulary that can drift from its own type is a vocabulary that will.
@@ -539,6 +540,32 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke", "rest"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
+#: §11.0 and rest.md §2 item 7 (#141): every surface counts over one fixed window, and a bucket that
+#: engages holds until its window closes. Decided by the Chief on #141, 2026-10-09.
+AS_THROTTLE_WINDOW_SECONDS: int = 300
+
+
+class ThrottleRate(NamedTuple):
+    """§11.0's two buckets, both enforced: counted attempts admitted per window."""
+
+    container_global: int
+    per_source: int  # keyed on the transport source address, never on a caller-supplied value
+
+
+#: §11.0's rate table. `rest` is decided (the Chief on #141, 2026-10-09). The five AS surfaces are
+#: a1p-proposed, tightest on `login` and `device`, for the Chief to confirm on the PR that lands
+#: them; #141 stays open until then. Read-only, so no caller can loosen a bound at runtime.
+AS_THROTTLE_RATES: Mapping[ThrottleSurface, ThrottleRate] = MappingProxyType(
+    {
+        "login": ThrottleRate(container_global=30, per_source=5),
+        "device": ThrottleRate(container_global=30, per_source=5),
+        "authorize": ThrottleRate(container_global=300, per_source=30),
+        "tap": ThrottleRate(container_global=60, per_source=10),
+        "revoke": ThrottleRate(container_global=120, per_source=20),
+        "rest": ThrottleRate(container_global=300, per_source=30),
+    }
+)
+
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
 #: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
 #: `Capability`/`CAPABILITIES`, `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES`
@@ -951,7 +978,7 @@ class ASGateState(Protocol):
     def touch_session(self, session_hash: str, at: str) -> bool: ...
     def end_session(self, session_hash: str) -> bool: ...
 
-    # throttle counters (§11.0, §12) — no rate, no window length (#141); keys are Trust's
+    # throttle counters (§11.0, §12) — no rate, no window length (Trust's, #141); keys are Trust's
     def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
 
@@ -986,7 +1013,9 @@ __all__ = [
     "AS_SESSION_ABSOLUTE_SECONDS",
     "AS_SESSION_IDLE_SECONDS",
     "AS_STATE_CONTRACTS",
+    "AS_THROTTLE_RATES",
     "AS_THROTTLE_SURFACES",
+    "AS_THROTTLE_WINDOW_SECONDS",
     "AS_USER_CODE_ALPHABET",
     "AS_USER_CODE_LENGTH",
     "BLOB_GRANT_LIFETIME_SECONDS",
@@ -1061,6 +1090,7 @@ __all__ = [
     "SessionRecord",
     "StructureFloor",
     "TextContent",
+    "ThrottleRate",
     "ThrottleSurface",
     "Token",
     "TokenPrincipal",

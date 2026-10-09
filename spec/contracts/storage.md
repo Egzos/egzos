@@ -272,8 +272,8 @@ callers on the same key — of two concurrent calls, exactly one observes the st
 5. `claim_resubmission` returns `True` exactly once per `(session_hash, request_key)` that
    `put_decided` recorded, and `False` otherwise — §11.0 substep 1's "first re-submission on the
    deciding session". `get_decided` is the request-keyed read after the counter (§11.4).
-6. `throttle_incr` increments and returns the new count. It names no rate and no window length
-   (#141): `window_key` is an opaque value Trust derives, and so is `bucket_key` — the constant
+6. `throttle_incr` increments and returns the new count. It names no rate and no window length:
+   those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust derives, and so is `bucket_key` — the constant
    container-global bucket or a digest of the transport source address (§11.0, [0.3 · 24]). A network
    identifier reaches the store only as Trust chooses to key it and never enters the chain.
 
