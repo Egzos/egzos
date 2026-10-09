@@ -1,6 +1,6 @@
 # Contract · ContextItem
 
-**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+**Status: frozen at 0.3 (Chief, 2026-10-08).** Law: a change is a `contract-change` escalation to
 a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
 the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 

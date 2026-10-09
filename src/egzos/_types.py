@@ -8,7 +8,7 @@ the running walking skeleton (``chief/walking-skeleton``) and carries the contra
 belongs to. Shapes marked in the contracts as *decided, not running* are typed here too, so that
 Phase 1 builds against the frozen surface rather than the skeleton's.
 
-**Frozen at 0.3 with the contracts it types** (Chief, date of merge; ``spec/contracts/README.md``).
+**Frozen at 0.3 with the contracts it types** (Chief, 2026-10-08; ``spec/contracts/README.md``).
 A change to a vocabulary here is a change to a frozen contract: a ``contract-change`` escalation,
 never a drive-by.
 
@@ -406,7 +406,7 @@ class ContainerConfig(TypedDict):
 
 CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "chain_personal_root": "between",
-    "org_policy_sovereign_chain": "allow",  # a1p's reading — TODO(chief), container.md §8
+    "org_policy_sovereign_chain": "allow",  # Chief decision [0.3 · 4], container.md §8
     "node_policy_structure_floor": "project",
     "blobs_inline_max_bytes": 64 * 1024,
     "blobs_staging_retention_days": 30,

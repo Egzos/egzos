@@ -1,6 +1,6 @@
 # Contract · event taxonomy and the audit chain
 
-**Status: frozen at 0.3 (Chief, date of merge).** Law: a change is a `contract-change` escalation to
+**Status: frozen at 0.3 (Chief, 2026-10-08).** Law: a change is a `contract-change` escalation to
 a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
 the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
 
@@ -117,8 +117,8 @@ the value in `details`. [0.3 · 40]
   held a session. A `principal` that varied within one of these events would be that signal.
   So `none` and the five are one set seen from both sides: `none` appears under these events
   and nowhere else, and these events carry `none` and nothing else. **a1p**, reading §12.2's row
-  binding as the converse of the rule above (a1r on #147). [0.3 · 34] **decided, not running.**
-  TODO(chief): the ledger check for this direction belongs beside #150's, in a file no agent owns.
+  binding as the converse of the rule above (a1r on #147). [0.3 · 34] **running**: the ledger
+  refuses such an append (#160).
 
 **running.**
 
