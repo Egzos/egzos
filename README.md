@@ -28,6 +28,7 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 ```bash
 pipx install egzos                           # its own isolated environment, `egzos` on your PATH
 # or: uv tool install egzos  ·  or, inside a virtualenv: pip install egzos
+# or straight from the release tag: pipx install "git+https://github.com/Egzos/egzos@v0.1.0"
 
 egzos init                                   # your container at ~/.egzos, and your owner token
 egzos add "Prefer imperative commit messages" --kind preference --key commit.style
