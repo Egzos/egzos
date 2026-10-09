@@ -395,6 +395,44 @@ chain keeps referring to the address. **Staged bytes are purged** after
 `blobs.staging_retention_days` (30 by default, `container.md` §8). An owner purge act for promoted
 bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
 
+### The staged-bytes purge (#198)
+
+**a1p proposes** every clause of this subsection, `TODO(chief)`, #198. [0.3 · 44] and R11 decide
+*that* staged bytes are purged after `blobs.staging_retention_days`. No source names the method, the
+trigger, the clock or the trace. Until the Chief confirms them, nothing here is in `_types.py` and
+no build issue carries it.
+
+1. **The primitive: `purge_staged(before) -> int`, a sixth `BlobStore` method.** It removes every
+   staged blob whose staging time is earlier than `before`, a UTC ISO-8601 instant
+   (`context-item.md` §6's format), and returns how many it removed. It never touches
+   `sha256/<hash>`. The caller computes `before` as now minus `blobs.staging_retention_days`. The
+   blob store reads no config and decides no policy, as it decides no grant. Addressing stays by
+   `sha256` alone, with no item, node or proposal consulted, so the method moves to Vault whole
+   (§6). The count is internal to this boundary, like `promote`'s `bool` ([0.3 · 43]).
+2. **The clock is a staging time the blob store records, never a file's mtime.** `stage` records
+   `staged_at`, the UTC time of the call, with the staged bytes, inside the blob store, so that it
+   moves to Vault with them. Restaging bytes already staged refreshes `staged_at`, so a newer
+   proposal of the same bytes gets the full retention. `promote` removes the record with the staged
+   bytes. Mtime is rejected because a copy, a restore or a backup tool moves it, and a restore
+   would then either purge everything at once or nothing for a month. The record's representation
+   (a sidecar, a row) is the implementation's.
+3. **The trigger: the container sweeps, and Trust and Store do not.** The container runs one sweep
+   when it opens, and every long-running process it serves (`serve`, `web`) sweeps again every 24
+   hours of uptime. A box that is never restarted is therefore swept daily, and a CLI-only container
+   is swept whenever it is used. There is no owner verb in v1.0: the sweep is the decided
+   behaviour, not an act, and an owner purge of promoted bytes is `[v1.1]`.
+4. **The trace: one `blob.purge` per sweep that removed anything** (`events.md` §1, proposed
+   there), with the count and the cutoff and **no addresses**. The chain is append-only and the
+   owner cannot prune it, so a content address on the purge entry would outlive the bytes it
+   records discarding, and keep, for a guessable known document, the existence record the purge
+   was meant to end (#49). A sweep that removed nothing appends nothing, since it had no effect.
+   The entry is appended after the deletions, with their count. A crash between the two loses that
+   sweep's entry, which is the same exposure `put` followed by `blob.put` carries today; it is named
+   rather than closed.
+
+`TODO(a1p)`, #42: an approval whose `promote` returns `False` because the bytes were purged must not
+promote the item. That rule belongs with the artifact proposal path, which is itself #42's.
+
 ## 5 · Silence-not-errors at the storage boundary
 
 **A miss and a not-permitted are indistinguishable to the caller.** The contract defines **no error

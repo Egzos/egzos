@@ -86,6 +86,18 @@ word `rest`. The shape and the rule are `rest.md` §2's. **a1p**, the name and t
 event rather than a widened `authz.tally`, because the door is not the AS and row (h)'s keys are
 closed.
 
+**Proposed, not in the vocabulary: `blob.purge`. a1p proposes**, `TODO(chief)`, #198. It is
+emitted when a sweep removes staged bytes past `blobs.staging_retention_days` (`storage.md` §4, the
+staged-bytes purge). It is **not a row of the table above, and not in `EVENTS`**, until the Chief
+confirms it, so the ledger still rejects it. The proposed shape is `subject` and `scope` null, and
+`details` three closed keys: `count` (the blobs removed), `before` (the cutoff instant) and
+`retention_days` (the key's value at the sweep). It carries no `sha256`, for the reason
+`storage.md` gives. A sweep has no caller, so the entry carries `principal: none` and `actor:
+container`. **That widens two closed sets, and the Chief decides both:** `PRINCIPAL_NONE_EVENTS`
+grows to seven, and §2's rule that `actor` on a `none` entry is a throttle surface gains one word
+that is not a surface. The alternative, attributing the sweep to the owner, would record an
+automatic deletion as a human act, which is the misattribution §2's `none` exists to prevent.
+
 **`client.register` and `config.set` are owner acts on container state, not `authz.*` rows.**
 `client.register`'s `details` are `{client_id, op, redirect_uris}`, `op` closed to `add` · `amend` ·
 `remove` (`AS_CLIENT_REGISTER_OPS`), and `redirect_uris` is the allowlist **after** the change, empty
