@@ -668,6 +668,15 @@ def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():
         },
     }
     for job_id, perms in want.items():
-        (mint,) = [s for s in wf["jobs"][job_id]["steps"] if s.get("id") == "forge"]
+        steps = wf["jobs"][job_id]["steps"]
+        (mint,) = [s for s in steps if s.get("id") == "forge"]
         got = {k: v for k, v in mint["with"].items() if k.startswith("permission-")}
         assert got == perms, job_id
+        # The advisory scope rides an input the action does not declare, so the job proves it
+        # reaches the API right after the mint and before any model runs (#181 review).
+        names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
+        probe = names.index("forge-reaches-advisories")
+        model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+        assert names.index("forge") < probe < model, job_id
+        assert steps[probe]["run"] == "bash .github/scripts/file_advisory.sh list > /dev/null"
+        assert steps[probe]["env"]["GH_TOKEN"] == "${{ steps.forge.outputs.token }}"

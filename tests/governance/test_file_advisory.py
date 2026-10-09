@@ -228,9 +228,8 @@ def test_create_sends_only_the_advisory_fields(stub):
     r = _run(env, "create", "-", stdin=json.dumps(body))
     assert r.returncode == 0, r.stderr
     sent = json.loads((d / "sent.json").read_text())
-    assert set(sent) == {
-        "summary", "description", "severity", "cvss_vector_string", "cwe_ids", "vulnerabilities",
-    }
+    # severity wins over cvss_vector_string: the API takes one, never both.
+    assert set(sent) == {"summary", "description", "severity", "cwe_ids", "vulnerabilities"}
     assert sent["vulnerabilities"] == [{
         "package": {"ecosystem": "other", "name": "egzos"},
         "vulnerable_version_range": "< 0.2",
@@ -265,3 +264,19 @@ def test_create_and_update_cut_a_vulnerability_to_the_same_fields(stub):
         "package": {"ecosystem": "other", "name": "egzos"},
         "vulnerable_version_range": "< 0.3",
     }]
+
+
+@pytest.mark.parametrize(
+    ("given", "kept"),
+    [
+        ({"cvss_vector_string": "CVSS:3.1/AV:N"}, {"cvss_vector_string": "CVSS:3.1/AV:N"}),
+        ({"severity": "low", "cvss_vector_string": "CVSS:3.1/AV:N"}, {"severity": "low"}),
+        ({"severity": {"not": "a string"}}, {}),
+    ],
+)
+def test_create_sends_one_well_typed_severity_field(stub, given, kept):
+    d, env = stub
+    body = {"summary": "s", "description": "d", **given}
+    assert _run(env, "create", "-", stdin=json.dumps(body)).returncode == 0
+    sent = json.loads((d / "sent.json").read_text())
+    assert {k: v for k, v in sent.items() if k in ("severity", "cvss_vector_string")} == kept

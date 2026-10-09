@@ -13,8 +13,9 @@
 # write tool: a session that could write files and also run a script it could have rewritten would
 # hold an interpreter with the forge token behind it (Egzos/egzos#71 review, round 3).
 #
-# create sends only summary, description, severity, cvss_vector_string, cwe_ids and vulnerabilities,
-# each vulnerability cut by the same WRITABLE filter update uses. Anything else the body carries is
+# create sends only summary, description, severity or else cvss_vector_string (the API takes one,
+# never both), cwe_ids and vulnerabilities, each vulnerability cut by the same WRITABLE filter
+# update uses. Anything else the body carries is
 # dropped: the endpoint also takes credits, collaborating users and teams and a private fork, and a
 # session that read attacker-written text must not be able to add an outside account to a private
 # advisory (#177).
@@ -73,8 +74,9 @@ case "${1:-}" in
       || { echo "file_advisory.sh: create needs a non-empty summary and description" >&2; exit 2; }
     jq "$WRITABLE"'
         {summary, description}
-        + (if .severity then {severity} else {} end)
-        + (if (.cvss_vector_string | type) == "string" then {cvss_vector_string} else {} end)
+        + (if (.severity | type) == "string" then {severity}
+           elif (.cvss_vector_string | type) == "string" then {cvss_vector_string}
+           else {} end)
         + (if (.cwe_ids | type) == "array" then {cwe_ids} else {} end)
         + (if (.vulnerabilities | type) == "array"
              then {vulnerabilities: (.vulnerabilities | map(writable))}

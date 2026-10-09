@@ -551,6 +551,14 @@ jobs:
           # `repository_advisories`. Without it, the minted token could not file an advisory.
           permission-repository-advisories: write
 
+      # The token above is narrowed with an input this action does not declare; prove at run time,
+      # before any model, that it still reaches the advisory API. The listing is discarded: only an
+      # HTTP failure reaches the log (#181 review).
+      - name: forge-reaches-advisories
+        env:
+          GH_TOKEN: ${{ steps.forge.outputs.token }}
+        run: bash .github/scripts/file_advisory.sh list > /dev/null
+
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
@@ -647,6 +655,14 @@ jobs:
           # (lib/get-permissions-from-inputs.js at this pin) into the App permission
           # `repository_advisories`. Without it, the minted token could not file an advisory.
           permission-repository-advisories: write
+
+      # The token above is narrowed with an input this action does not declare; prove at run time,
+      # before any model, that it still reaches the advisory API. The listing is discarded: only an
+      # HTTP failure reaches the log (#181 review).
+      - name: forge-reaches-advisories
+        env:
+          GH_TOKEN: ${{ steps.forge.outputs.token }}
+        run: bash .github/scripts/file_advisory.sh list > /dev/null
 
       - name: charter-a6-adversary
         env:
