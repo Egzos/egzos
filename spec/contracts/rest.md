@@ -110,7 +110,12 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
      holds is counted whatever it carries, since the door has not evaluated it. **Owner lockout
      is accepted. decided** (the Chief on #141, 2026-10-09): live tokens are not exempt from the
      container-global hold, since exempting them would validate a token before the throttle runs.
-     The cost is capped at one window, and it is revisited only if it bites in practice.
+     The cost is one window per engagement, and it is renewable, not a single-window event: a
+     sender who refills the container-global bucket in each new window holds it for as long as it
+     keeps sending, about 300 requests per 300 s, and the owner's whole door, blob pulls included,
+     stays refused while it does (as `authorization-server.md` §11.0 states for the AS surfaces;
+     a6 on #184). The decision stands as written, and it is revisited only if it bites in
+     practice. TODO(chief), #141: confirm the decision holds for a renewable, not a capped, cost.
    - **The chain.** No attempt at the door appends an engage entry: the door has no per-attempt
      event a caller-less attempt could carry. The release appends `authz.release` with `surface:
      rest`, `refused` and `window_key` whenever the throttle engaged, `refused: 0` included (§12.1
@@ -135,7 +140,13 @@ door accepts the AS's tokens, so it sits where the AS's issuer is.
      rate per window per token, plus one release when that bucket engaged. A per-token release
      carries `surface: rest`, `refused` and a `window_key` derived from that bucket (§12.2), and
      no token id: §12.1 rule 5's three keys are closed. It is attributed by the `context.fetch`
-     entries of the same window that name the token, which is all the pairing it needs.
+     entries of the same window that name the token. That join is exact only when one per-token
+     bucket engages in the window. When two or more do, the chain shows which tokens drew
+     refusals and each release's `refused`, but not which count belongs to which token: the
+     window's per-token releases are attributable to that set of tokens as a whole. **a1p**: the
+     limit is accepted rather than closed, since closing it puts a token-derived key in rule 5's
+     closed set, a contract change for a phase boundary. TODO(a1p), #141: raise it there if an
+     owner needs the per-token split.
    - **Rates. decided** (the Chief on #141, 2026-10-09): container-global, 300 counted attempts
      per 300-second window; per source address, 30 per 300-second window. A bucket that engages
      holds until its window closes. `AS_THROTTLE_WINDOW_SECONDS` and `AS_THROTTLE_RATES["rest"]` in

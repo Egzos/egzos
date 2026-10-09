@@ -276,8 +276,11 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust
    derives, and so is `bucket_key` — the constant container-global bucket, a digest of the transport
    source address (§11.0, [0.3 · 24]), or, on the `rest` surface only, the `Token.id` a verified
-   descriptor names (`rest.md` §2 item 7). A network
-   identifier reaches the store only as Trust chooses to key it and never enters the chain.
+   descriptor names (`rest.md` §2 item 7). Trust prefixes each `bucket_key` with its kind
+   (global, source, token), so no `Token.id` can share a counter with the container-global
+   constant or a source digest; the store compares keys as opaque values. **a1p** (a6 on #184).
+   A network identifier reaches the store only as Trust chooses to key it and never enters the
+   chain.
 
 **Silence-not-errors (§5) applies unchanged, to the plain getters and to what reaches an external
 caller.** The plain getters (`get_client`, `get_device_by_user_code`, `get_decided`, `get_session`,
