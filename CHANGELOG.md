@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0] — the open core's first release (2026-10-09)
+
+Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened through review, plus:
+
+### Added
+
+- The lifeboat, `egzos web`, on its specified stack: FastAPI + Jinja + htmx, in-process, tokens as
+  CSS variables. It renders list, search and the pending queue (#127).
+- The authorization server's first mechanics in `egzos.authz` (#166 slices 1–2). These are
+  storage-free and not yet served:
+  - the scope grammar and grant lifetime;
+  - PKCE (S256 only, constant-time);
+  - the redirect allowlist, with `localhost` refused in every spelling;
+  - the metadata document;
+  - the `continue` allowlist and the loopback-only plain-HTTP rule;
+  - issued values.
+- Contracts v1.0, frozen at 0.3 (below), with the REST door and the authorization server's state as
+  drafts for Phase 5.
+
+### Security
+
+- A proposal is decided once under racing deciders, and the decider is re-checked under the lock
+  (#146, #149, #151).
+- The audit chain refuses an unattributed append. Its principal vocabulary is closed to
+  `interactive`, `client` and `none`, and the five caller-less events carry `none` and only `none`
+  (#151, #160, #162).
+- Minting refuses a principal outside the token vocabulary (#154).
+- Consent pages send same-origin only (#146).
+
+### Changed
+
+- Install from the release tag: `pipx install "git+https://github.com/Egzos/egzos@v0.1.0"`.
+
 ## Contracts v1.0 — post-freeze status changes
 
 ### Added
