@@ -446,8 +446,9 @@ jobs:
   # separated by step order (RD-005). This job's result reaches the sweep as a one-day artifact.
   a6-adversary-suite:
     name: a6-adversary-suite
-    # A dispatch naming a PR files that PR's advisory and nothing else: no second, full sweep.
-    if: ${{ github.event_name != 'pull_request' && inputs.pr == '' }}
+    # A dispatch naming a PR files that PR's advisory and nothing else: no second, full sweep. Spelled
+    # per event, so the nightly cron never depends on how a null input compares (#181 review).
+    if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.pr) }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -503,7 +504,7 @@ jobs:
     name: a6-adversary-nightly   # distinct from the required check name; only the PR job reports a6-adversary
     needs: a6-adversary-suite
     # Runs whether the suite passed or not: a failing suite is exactly what the sweep should read.
-    if: ${{ !cancelled() && github.event_name != 'pull_request' && inputs.pr == '' }}
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !inputs.pr)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 60   # 120 turns at the observed ~11 s/turn, with headroom (#70 review)
     permissions:

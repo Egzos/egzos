@@ -646,8 +646,11 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
     # dispatch naming a PR runs neither the suite nor the sweep (#177 review).
     sweep = wf["jobs"]["a6-adversary-nightly"]["steps"]
     assert "inputs.pr" not in str(sweep)
+    # Spelled per event, so the cron never rests on how a null input compares (#181 review).
     for name in ("a6-adversary-suite", "a6-adversary-nightly"):
-        assert "inputs.pr == ''" in wf["jobs"][name]["if"], name
+        cond = wf["jobs"][name]["if"]
+        assert "github.event_name == 'schedule' ||" in cond, name
+        assert "github.event_name == 'workflow_dispatch' && !inputs.pr" in cond, name
 
 
 def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():

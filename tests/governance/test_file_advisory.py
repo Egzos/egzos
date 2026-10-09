@@ -235,7 +235,30 @@ def test_create_sends_only_the_advisory_fields(stub):
 
 
 def test_create_refuses_a_body_without_summary_and_description(stub):
-    _, env = stub
+    d, env = stub
     r = _run(env, "create", "-", stdin=json.dumps({"summary": "s"}))
     assert r.returncode == 2
     assert "summary and description" in r.stderr
+    # Refused before any API call, not merely exited 2.
+    assert not (d / "sent.json").exists() and not (d / "calls").exists()
+
+
+def test_create_and_update_cut_a_vulnerability_to_the_same_fields(stub):
+    # One WRITABLE filter serves both verbs (#181 review): one vulnerability, one shape sent.
+    d, env = stub
+    vuln = {
+        "package": {"ecosystem": "other", "name": "egzos", "purl": "x"},
+        "vulnerable_version_range": "< 0.3",
+        "cvss": {"score": 9},
+        "extra": True,
+    }
+    body = {"summary": "s", "description": "d", "vulnerabilities": [vuln]}
+    assert _run(env, "create", "-", stdin=json.dumps(body)).returncode == 0
+    created = json.loads((d / "sent.json").read_text())["vulnerabilities"]
+    (d / "filed.json").write_text(json.dumps({**FILED, "vulnerabilities": []}))
+    assert _run(env, "update", GHSA, "-", stdin=json.dumps(body)).returncode == 0
+    updated = json.loads((d / "sent.json").read_text())["vulnerabilities"]
+    assert created == updated == [{
+        "package": {"ecosystem": "other", "name": "egzos"},
+        "vulnerable_version_range": "< 0.3",
+    }]
