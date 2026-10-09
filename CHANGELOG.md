@@ -64,6 +64,15 @@ Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened throu
 
 ### Changed
 
+- `rest.md` §3, §4.1: the REST door's success responses. Every success is `200` with §3's headers
+  and an object body; entries carry the grant beside the item; a move's `result` separates the
+  silent pass from the parked proposal; an ambiguous path tail is a `409` (#187).
+- `authorization-server.md` §2.1, §5 and `rest.md` §7: the Chief's #153 decisions for browser
+  clients (code in the query, registry-derived CORS on token and revocation, the `egzos.io` client
+  id, no `scope` on the request, no RFC 9207 `iss` at v1.0). CORS at the REST door, and the
+  consent-page picker (#200), stay open.
+- `storage.md` §4, `events.md` §1: the staged-bytes purge is proposed (`purge_staged`, a recorded
+  staging time, a container sweep and a count-only `blob.purge`) and awaits the Chief (#198).
 - `storage.md` §3.1, `rest.md` §2 item 7, `authorization-server.md` §11.0 and `_types.py`: all AS
   state is `ContainerState` (#173, option (A)); all six surfaces' throttle rates are decided
   (`AS_THROTTLE_RATES`, #141, #184), and the REST door counts verified-descriptor refusals in a

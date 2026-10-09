@@ -205,6 +205,15 @@ headers. **a1p**, by `authorization-server.md` §7.1's split between `invalid_sc
 `access_denied`. Validation of the request's shape runs **before any lookup**, so a `400` never
 depends on an id the request names.
 
+**An ambiguous path tail gets the third answer.** A scope parameter or body field accepts a node id
+or a path tail, as `resolve_ref` does (`container.md` §2). A tail that matches more than one node the
+token covers is refused and nothing is picked ([0.3 · 1]): status `409`, the same four headers, and
+`{"error":"ambiguous","matches":[<path>, …]}`, the paths sorted. **decided**, that the refusal names
+the matches; **a1p**, the bytes (#187). The candidates are only the nodes the token covers, so the
+answer names nothing the token could not list at `GET /v1/scopes`; a tail whose only matches are
+uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the running MCP door's
+`_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`).
+
 ## 4 · The v1.0 endpoints
 
 Every response body is JSON. An item is serialised per `context-item.md` §1, unknown fields
@@ -248,6 +257,102 @@ the token's principal and `client` = the token's `client`. Never `none` (`events
 **`POST /v1/items` writes text only.** An artifact upload is `TODO(a1p)`, #42: the staging rule for
 an agent-proposed artifact (`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it, and no
 running door uploads over HTTP to derive the shape from.
+
+### 4.1 · Success responses (#187)
+
+**a1p**, every clause of this subsection unless it cites otherwise: the bodies below bind the running
+shapes each row mirrors onto HTTP (`Resolver.resolve`, `store.find`, `Trust.move`, `Trust.pending`,
+`NodeService.create`). A field not named here is not on the wire, and a builder adds none.
+
+**One status, the same headers.** Every success is `200 OK` with the three header lines of §3's
+refusal (`Content-Type: application/json`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`) and
+no `ETag`, `Last-Modified` or `Location`. A write answers `200` too: the body says what happened, and
+a create, a silent move and a parked proposal never differ by status code. A cached success beside an
+uncached refusal would make the two distinguishable in a shared cache, and a body is user data that
+no intermediary keeps. §6's redemption is the one exception: it streams bytes under its own headers.
+
+**Every body is a JSON object, never a bare array.** Each list sits under a key that names its
+members, so a v1.1 key (`[v1.1 · #137 7, 10]`'s cursors) is an addition, not a break. A client
+ignores a top-level key it does not know. No body carries `withheld`, a count, or any other trace of
+what the token was not served (§4's lists rule): the count is the ledger's, as the running doors
+write it. This also closes `container.md` §4's `TODO(a1p)` for this door, since no shape here
+differs between a silent refusal and an empty result.
+
+**No framing.** The MCP door's `banner` and per-response `fence` exist for a model reading the result
+as prompt text. This door returns JSON values, and §4's "data" rule is its framing: a body carries
+neither.
+
+**Request bodies** are JSON objects. A missing required field, a field of the wrong type, or a field
+the row does not name is `400` (§3).
+
+| route | request | `200` body |
+|---|---|---|
+| `GET /v1/fetch` | — | `{"scope": <path>, "chain": [<layer>], "items": [<entry>]}` |
+| `GET /v1/find` | — | `{"items": [<entry>]}` |
+| `GET /v1/items/{id}` | — | `<entry>` |
+| `GET /v1/inbox` | — | `{"items": [<entry>]}` |
+| `GET /v1/scopes` | — | `{"nodes": [<node>]}` |
+| `POST /v1/items` | `{"body", "kind"?, "scope"?, "key"?, "tags"?}` | `{"item": <item>}` |
+| `POST /v1/items/{id}/move` | `{"to"}` | `{"result": "moved", "item": <item>}` or `{"result": "pending", "proposal": <id>}` |
+| `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
+| `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
+
+- **`<item>`** is a `ContextItem` per `context-item.md` §1, unknown fields included, returned as
+  stored. Nothing in this subsection is ever added inside it.
+- **`<entry>`** is `{"item": <item>, "layer": <path>, "layer_type": <type>, "shadowed_by": <id> |
+  null}`, `container.md` §4's `ResolvedItem` with its `trust` key removed as that clause decides,
+  plus, when §6 minted a grant for this read, `"grant": <BlobGrant>` and `"grant_url": <string>`.
+  The two grant keys are absent otherwise, never `null`. **They sit beside `item`, never inside it
+  or its `content`**: a grant is a fact of this read and this token, as `shadowed_by` is a fact of
+  this resolution, and a client that wrote an item back would otherwise persist a credential into
+  it. §6 item 4 is read this way.
+- **`<layer>`** is `{"node": <id>, "path": <path>, "type": <type>, "policy": "serve-unverified" |
+  "verified-only"}`, the running resolver's layer. `chain` lists only the layers the token covers,
+  innermost first (`container.md` §3, §4 invariant 3).
+- **`<node>`** is `{"id", "type", "name", "parent", "created_at", "path"}`: `container.md` §2's
+  persisted node plus its computed path, unknown fields included.
+- **`<proposal>`** is `container.md` §6's parked proposal, `_types.Proposal` with the wire key
+  `from` (`PROPOSAL_WIRE_KEY_FROM`).
+- **`<path>`** is a path as `NodeService.path` renders it (`container.md` §2).
+
+**Per route:**
+
+1. **`GET /v1/fetch`** carries the layering, not a flat list: `scope` is the resolved scope's path,
+   `chain` the covered layers, and `items` every served item in layer order, innermost first,
+   shadowed items included with `shadowed_by` set (`container.md` §4, most-specific-wins). Within a
+   layer the order is newest first by `lifecycle.created_at`, the sqlite backend's running order,
+   with ties broken by `id` descending, which the backend does not yet do.
+2. **`GET /v1/find`** returns its hits newest first by `lifecycle.updated_at`, then by `id`
+   descending, as `store.find` does. `layer` is the hit's own node's path and `shadowed_by` is
+   always `null`: a search resolves no chain.
+3. **`GET /v1/items/{id}`** returns one `<entry>`, `layer` its own node, `shadowed_by` `null`.
+4. **`GET /v1/inbox`** returns the inbox's served items as entries whose `layer` is each item's
+   thread (`egzos_inbox`'s `thread`). This row mints no grant (§4's table has no `blob.grant` on
+   it): an artifact above the threshold carries neither `inline` nor `grant`, and a client reads it
+   at `GET /v1/items/{id}`.
+5. **`GET /v1/scopes`** returns the child nodes of `under`, sorted by path. `under` absent is the
+   personal root, as `egzos_fetch`'s default.
+6. **`POST /v1/items`** returns the item as written: `trust.status` is `unverified` (`container.md`
+   §5). `kind` defaults to `memory`; `scope` absent is pure capture, a fresh auto-titled thread in
+   the inbox (R11), as `egzos_remember`.
+7. **`POST /v1/items/{id}/move`** tells the gate's two branches apart by `result` alone. `moved`
+   is the silent pass (`gate.pass.silent`) and carries the item at its new scope, unverified again
+   where the mover is a client (`_reset_if_agent_run`). `pending` is the parked proposal
+   (`gate.propose`) and carries **its id and nothing else**. The proposal's `audience` names other
+   tokens' owners and clients: credential metadata, which this door serves only to the interactive
+   principal at `GET /v1/pending`, since a client-facing token read needs the event `[v1.1 · #137
+   10]` defers. The flagship's *moved* and *pending* states read `result`.
+8. **`POST /v1/scopes`** returns the created node. `parent` absent is the personal root, as
+   `egzos mk`.
+9. **`GET /v1/pending`** is two lists, as `Trust.pending` returns them: `items`, every `unverified`
+   item in a scope the token covers, and `proposals`, every `open` proposal the token decides over
+   (`Trust.decides_over`: it covers both ends). Both are viewer-scoped; the running CLI lists every
+   pending item and proposal because its owner token covers `*`, and a narrower interactive grant
+   (`authorization-server.md` §7) sees only its own. Quarantined items are never in `items`
+   (`container.md` §4 invariant 2). `TODO(chief)`, #187: `items` includes an unverified `rule`, as
+   `egzos trust pending` and the lifeboat's queue show one today, because promotion is read from
+   this queue. §3 refuses an unverified rule at every other route; confirm the queue is the one
+   place an `interactive` principal reads one.
 
 **Not in this door at v1.0:**
 
@@ -375,24 +480,35 @@ the device-code key `storage.md` §3.1 names.
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
 #138 asks for is `container.md`'s, open on #138.
 
-## 7 · Browser clients: the questions open on #153
+## 7 · Browser clients (#153)
 
-A browser client reaches this door with a token from `authorization-server.md` §2. #153 records five
-questions such a client meets. **All five are the Chief's. This document decides none of them**, and
-carries each so the review reads them in one place:
+A browser client reaches this door with a token from `authorization-server.md` §2. #153's five
+questions are decided, and `authorization-server.md` §2.1 records the answers. Four of them are the
+AS's, and no clause here depends on them: where the code is returned (q1), the flagship's
+`client_id` (q3), the request's `scope` (q4, since this door enforces whatever grant the minted
+token carries), and RFC 9207's `iss` (q5).
 
-- **`[open · #153 q1]`, where the authorization code is returned.** An AS question. No clause here
-  depends on it.
-- **`[open · #153 q2]`, CORS.** #153 asks it of the token and revocation endpoints. The flagship
-  calls this door cross-origin too, so the answer reaches here. **Until the Chief answers, this door
-  sends no `Access-Control-*` header and answers no preflight.** That is the absence of a decision,
-  not one. A builder may not implement CORS on this door against this draft.
-- **`[open · #153 q3]`, the flagship's `client_id`.** An AS question. No clause here depends on it.
-- **`[open · #153 q4]`, what the flagship's request carries as `scope`.** An AS question. This door
-  enforces whatever grant the minted token carries (`authorization-server.md` §7), so it depends on
-  no answer.
-- **`[open · #153 q5]`, RFC 9207's `iss` on the authorization response.** An AS question, and §6's
-  ten-field document. No clause here depends on it.
+**CORS at this door (q2). a1p proposes**, `TODO(chief)`, #153. The Chief's answer names the token
+and revocation endpoints. The flagship calls this door cross-origin too, so the proposal carries the
+same derivation here:
+
+- Every `/v1/` route except `GET /v1/blobs/{sha256}` answers a cross-origin request for exactly the
+  origins `authorization-server.md` §2.1 item 2 derives from the registry, with the same headers,
+  `Vary: Origin` included. A preflight from an allowed origin also gets
+  `Access-Control-Allow-Methods: GET, POST` and `Access-Control-Allow-Headers: Authorization,
+  Content-Type`. `Access-Control-Allow-Credentials` is never sent: a session is not a credential
+  here (§2 item 3).
+- **The headers are identical on a success, a `401`, a `400`, a `409` and §3's refusal**, for one
+  `Origin`. They depend on the `Origin` and the registry only, never on the token, the route's
+  match or what exists. Otherwise a cross-origin caller could tell §3's refusal from a success by
+  whether it could read the response at all.
+- A preflight is answered before authentication and appends nothing. It names no resource, and the
+  throttle (§2 item 7) does not count it: a preflight is not an attempt.
+- The redemption route sends no `Access-Control-*` header. A grant URL is opened as an attachment
+  (§6), never read by a page's script.
+
+Until the Chief confirms it, a builder may not implement CORS at this door, and the door sends no
+`Access-Control-*` header.
 
 ## 8 · What this document does not fix
 
