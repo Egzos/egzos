@@ -71,14 +71,19 @@ agents:
       - "tests/governance/**"
       - "src/egzos/__init__.py"
       - "src/egzos/_types.py"
+      - "src/egzos/container.py"
       - "CHANGELOG.md"
     exclusive: []
 
   # Core store: node model, resolver, embeddings, sqlite backend, blob store, .xmb core.
+  # The flat skeleton modules map to their owners (the Chief on #150, 2026-10-09).
   a3-store:
     paths:
       - "src/egzos/store/**"
       - "src/egzos/vault/**"
+      - "src/egzos/model.py"
+      - "src/egzos/resolver.py"
+      - "src/egzos/backends/**"
       - "tests/store/**"
       - "tests/vault/**"
     exclusive: []
@@ -88,6 +93,8 @@ agents:
     paths:
       - "src/egzos/trust/**"
       - "src/egzos/authz/**"
+      - "src/egzos/trust.py"
+      - "src/egzos/auth.py"
       - "tests/trust/**"
       - "tests/authz/**"
     exclusive: []
@@ -96,6 +103,7 @@ agents:
   a3-ledger:
     paths:
       - "src/egzos/ledger/**"
+      - "src/egzos/ledger.py"
       - "tests/ledger/**"
     exclusive: []
 

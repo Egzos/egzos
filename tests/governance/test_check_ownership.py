@@ -496,3 +496,22 @@ def test_main_backstop_scope_follows_the_agents_exclusive_globs(repo):
         assert _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"}).returncode == 0
     finally:
         OWNERSHIP["agents"]["a6-adversary"] = saved
+
+
+@pytest.mark.parametrize(
+    ("path", "owner"),
+    [
+        ("src/egzos/trust.py", "a3-trust"),
+        ("src/egzos/auth.py", "a3-trust"),
+        ("src/egzos/ledger.py", "a3-ledger"),
+        ("src/egzos/model.py", "a3-store"),
+        ("src/egzos/resolver.py", "a3-store"),
+        ("src/egzos/backends/sqlite.py", "a3-store"),
+        ("src/egzos/container.py", "a1p-planner"),
+    ],
+)
+def test_the_flat_skeleton_modules_have_exactly_their_owner(path, owner):
+    # The Chief's mapping on #150: each flat module the skeleton left at the package root
+    # belongs to the one team whose package it is, so a needed fix there is a PR, not an issue.
+    agents = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["agents"]
+    assert [a for a, spec in agents.items() if co.matches_any(spec["paths"], path)] == [owner]
