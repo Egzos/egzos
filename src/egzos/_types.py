@@ -801,12 +801,12 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 # --- the authorization server's state (storage.md §3.1) — DRAFT binding (a1p), #173 ----------
 #
-# Not frozen. Two Protocols beside `ContainerState`, which is untouched: `ASState` is durable under
-# any answer, and `ASGateState` (sessions, throttle counters) is the half whose partition is the
-# Chief's TODO on #173 — container state, or process memory. Either answer implements the same
-# signatures. No method takes a credential value: every credential key is the lowercase hex sha256
-# of the whole value (`auth.py`'s `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256
-# because the `user_code` is low-entropy. No record carries the value itself.
+# Not frozen. Two Protocols beside `ContainerState`, which is untouched. Both are durable container
+# state on the `ContainerState` substrate, never process memory: the Chief on #173, option (A),
+# 2026-10-09, `ASGateState` (sessions, throttle counters) included. No method takes a credential
+# value: every credential key is the lowercase hex sha256 of the whole value (`auth.py`'s
+# `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256 because the `user_code` is
+# low-entropy. No record carries the value itself.
 
 
 class ASGrant(TypedDict):
@@ -941,8 +941,8 @@ class ASState(Protocol):
 class ASGateState(Protocol):
     """What gates a request before evaluation (§11.0): sessions and throttle counters.
 
-    TODO(chief) #173: container state like `ASState`, or process memory a restart lifts. The
-    signatures are the same either way (storage.md §3.1).
+    Container state on the same substrate as `ASState`, never process memory, so a restart lifts
+    no throttle and ends no session: the Chief on #173, option (A) (storage.md §3.1).
     """
 
     # interactive sessions (§10.1)

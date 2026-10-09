@@ -5,7 +5,7 @@ The authorization server's state, pinned — storage.md §3.1, a DRAFT binding o
 
 Two properties are what the section is for, and these tests fail if either moves: the method
 groups (a single-use object gains a plain getter, or `ContainerState` silently absorbs a group
-whose partition is the Chief's question), and the hash rule (a method or record that carries a
+that #173 placed beside it), and the hash rule (a method or record that carries a
 credential value instead of its sha256). Method sets are written out, not derived, for the same
 reason `test_storage_protocols.py` gives.
 """
@@ -79,7 +79,7 @@ def test_as_gate_state_method_set():
 
 
 def test_container_state_is_untouched_and_disjoint():
-    """The frozen fourteen stay fourteen; the partition question is answered beside them."""
+    """The frozen fourteen stay fourteen; #173's partition is answered beside them, not in them."""
     assert _methods(t.ContainerState) == CONTAINER_STATE
     assert not (AS_STATE & CONTAINER_STATE)
     assert not (AS_GATE_STATE & CONTAINER_STATE)
