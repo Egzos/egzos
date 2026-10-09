@@ -793,7 +793,8 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 # any answer, and `ASGateState` (sessions, throttle counters) is the half whose partition is the
 # Chief's TODO on #173 — container state, or process memory. Either answer implements the same
 # signatures. No method takes a credential value: every credential key is the lowercase hex sha256
-# of the whole value (`auth.py`'s `_hash`), and no record carries the value itself.
+# of the whole value (`auth.py`'s `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256
+# because the `user_code` is low-entropy. No record carries the value itself.
 
 
 class ASGrant(TypedDict):
@@ -824,12 +825,12 @@ class DeviceAuthorizationRecord(TypedDict):
     """§3 / §11.8: the pending authorization, bound to its `device_code` (mitigation 3)."""
 
     device_code_hash: str
-    user_code_hash: str
+    user_code_hash: str  # HMAC-SHA256 under the device-code key, not a bare sha256 (§3.1)
     client_id: str
     decision: DeviceDecision
     grant: ASGrant | None  # set by `decide_device`; None while pending or when denied
     expires_at: str
-    last_polled_at: str | None  # §3 mitigation 1's `slow_down`
+    last_polled_at: str | None  # §3 mitigation 1's `slow_down`; written only by `poll_device`
 
 
 class RefreshRecord(TypedDict):
@@ -867,8 +868,11 @@ class SessionRecord(TypedDict):
 class ASState(Protocol):
     """The AS's durable state (storage.md §3.1). `ContainerState`-class: never delegated (F3).
 
-    Getters and consumers return `None` for absent, expired, spent and revoked alike; every `bool`
-    and `revoke_family`'s list are internal to this boundary (storage.md §5). No client listing.
+    The plain getters return `None` for absent, expired, spent and revoked alike. The consumers do
+    not judge: `consume_code` ignores expiry, and `redeem_refresh` and `poll_device` return the
+    record as it stood before the call, so reuse stays detectable. All of it, every `bool` and
+    `revoke_family`'s list stay inside Trust (storage.md §5). No client listing. The implementer
+    MUST be the `ContainerState` implementer: `revoke_family` revokes its `Token`s.
     """
 
     # clients (§5) — the registry, not a `ContainerConfig` key
@@ -882,7 +886,9 @@ class ASState(Protocol):
 
     # device authorizations (§3, §11.8)
     def put_device(self, record: DeviceAuthorizationRecord) -> None: ...
-    def get_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None: ...
+    #: ^ insert-only: a put on an existing `device_code_hash` changes nothing
+    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None: ...
+    #: ^ sets `last_polled_at` alone, atomically; returns the record as it stood before the call
     def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None: ...
     def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool: ...
     #: ^ pending -> granted/denied exactly once; False if it was not pending

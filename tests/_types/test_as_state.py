@@ -31,7 +31,8 @@ AS_STATE = frozenset(
     {
         "put_client", "get_client", "remove_client",
         "put_code", "consume_code",
-        "put_device", "get_device", "get_device_by_user_code", "decide_device", "consume_device",
+        "put_device", "poll_device", "get_device_by_user_code", "decide_device",
+        "consume_device",
         "put_refresh", "redeem_refresh", "family_of_token", "revoke_family",
         "put_decided", "get_decided", "claim_resubmission",
     }
@@ -88,6 +89,20 @@ def test_container_state_is_untouched_and_disjoint():
 def test_single_use_objects_have_no_plain_getter():
     """§2: a code is spent on the first redemption attempt — `consume_code` is its only read."""
     assert not {"get_code", "get_refresh"} & AS_STATE
+
+
+def test_device_record_is_never_rewritten_whole():
+    """§3.1 rule 2: a poll is its own atomic write, so it cannot overwrite a concurrent decision.
+
+    The read-modify-write shape (`get_device` then `put_device`) is what let one authorization be
+    decided twice; it must not come back as a getter or an update method.
+    """
+    device = {name for name in AS_STATE if name.endswith("_device")}
+    assert device == {"put_device", "poll_device", "decide_device", "consume_device"}
+    params = list(inspect.signature(t.ASState.poll_device).parameters)
+    assert params == ["self", "device_code_hash", "at"]
+    hints = typing.get_type_hints(t.ASState.poll_device)
+    assert hints["return"] == t.DeviceAuthorizationRecord | None
 
 
 def test_no_client_listing():
