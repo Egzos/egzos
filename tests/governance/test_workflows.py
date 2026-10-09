@@ -244,9 +244,53 @@ def test_forge_token_sessions_run_no_interpreter():
         # (#71 review, round 3, finding 1).
         if "Bash(bash " in args:
             tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
-            assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & set(tools), (wf, job_id)
+            edits = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+            writes = [t for t in tools if t.split("(")[0] in edits]
+            # The one write such a session holds reaches the scoped body directory only, which the
+            # runner creates before the model and the scripts read from; never the scripts.
+            assert writes in ([], [AGENT_OUT_GRANT]), (wf, job_id)
+            if writes:
+                names = [s.get("name") for _, j, _, s in _steps() if j == job_id]
+                assert "agent-out" in names, (wf, job_id)
     # Never vacuous: a renamed token step or a token moved to the job still reaches the sweep.
     assert "a6-adversary-nightly" in inspected
+
+
+AGENT_OUT_GRANT = "Edit(//tmp/agent-out/**)"
+# gh verbs that read a file the caller names (--body-file, -F, --input, @file) and post it.
+FILE_READING_GH = re.compile(
+    r"Bash\(gh (?:issue (?:create|comment|edit)|pr (?:create|comment|edit|review)"
+    r"|release|gist|api)\b"
+)
+
+
+def test_no_session_without_an_interpreter_holds_a_gh_verb_that_reads_a_file():
+    # A prefix grant approves every flag, and gh reads whatever path a body-file flag names, so a
+    # session built to hold no interpreter could post /proc/self/environ: Read(//proc/**) denies
+    # the Read tool, not gh. Such sessions write bodies to the scoped directory and post them
+    # through gh_issue.sh or file_advisory.sh, which read nowhere else, or leave the post to a
+    # later step. The builders hold Bash(git:*) and are RD-005's accepted risk.
+    seen = 0
+    for wf, job_id, _, step in _model_steps():
+        args = step["with"]["claude_args"]
+        if "Bash(git:*)" in args:
+            continue
+        tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+        assert not [t for t in tools if FILE_READING_GH.match(t)], (wf, job_id)
+        seen += 1
+    assert seen >= 5
+
+
+def test_a2_design_gap_posts_its_options_from_a_later_step():
+    wf = _load(ROOT / ".github" / "workflows" / "a2-conformance.yml")
+    steps = wf["jobs"]["a2-conformance-design-gap"]["steps"]
+    model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+    assert "gh issue comment" not in steps[model]["with"]["claude_args"]
+    (post,) = [s for s in steps[model + 1:] if s.get("name") == "post-options"]
+    run = post["run"]
+    assert "env -i" in run and "-F body=@/tmp/options.md" in run and "-L /tmp/options.md" in run
+    assert {"PROVIDER_KEY", "PROVIDER_OAUTH", "GH_TOKEN"} <= set(post["env"])
+    assert post["env"]["PATH"] == "/usr/bin:/bin" and post["env"]["BASH_ENV"] == ""
 
 
 def test_every_model_session_denies_the_process_environment():
@@ -638,8 +682,8 @@ def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
     args = steps[model]["with"]["claude_args"]
     tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
     assert set(tools) == {
-        "Read", "Grep", "Glob", "Bash(gh pr view:*)", "Bash(gh pr diff:*)",
-        "Bash(bash .github/scripts/file_advisory.sh:*)",
+        "Read", "Grep", "Glob", "Edit(//tmp/agent-out/**)", "Bash(gh pr view:*)",
+        "Bash(gh pr diff:*)", "Bash(bash .github/scripts/file_advisory.sh:*)",
     }
     assert "inputs.pr" in steps[model]["with"]["prompt"]
     # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs. A

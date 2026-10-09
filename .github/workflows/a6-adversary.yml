@@ -562,6 +562,11 @@ jobs:
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      # The one directory the session may write (its Edit grant is scoped to it): the bodies the
+      # filing scripts read, which refuse a file anywhere else. Created by the runner, mode 700.
+      - name: agent-out
+        run: install -d -m 700 /tmp/agent-out
+
       - name: charter-a6-adversary
         env:
           # Refs via the environment, never ${{ }} into a run: line.
@@ -591,11 +596,11 @@ jobs:
 
             You are a6-adversary running your nightly sweep against main. Execute your standing targets: injected --yes / echo-y; TOCTOU vs manifest binding AND vs the branch-protection configuration; enumeration via error shapes; proposal-target probing; staging abuse; token-sweep gaps; the OAuth surface (PKCE downgrade, redirect allowlist, consent phishing); Herald's distillation pipeline (poisoned PR to misleading digest); catalogue-content injection.
 
-            BEFORE FILING ANYTHING, list what is already filed: `bash .github/scripts/file_advisory.sh list` and `gh issue list --state all --limit 200 --json number,title,labels`. A fresh checkout has no memory of earlier sweeps, so without this check you re-file the same defect every night. If a finding is already filed, do not file it again; if this run adds materially new information (a new vector, a corrected impact, confirmed reachability), update that advisory with `bash .github/scripts/file_advisory.sh update <GHSA id> - <<'JSON'` (the body on standard input, closed by a line reading `JSON`) — write only what this run adds; the script appends it under a dated heading and never replaces the reproduction already filed — or comment on that issue instead.
+            BEFORE FILING ANYTHING, list what is already filed: `bash .github/scripts/file_advisory.sh list` and `gh issue list --state all --limit 200 --json number,title,labels`. A fresh checkout has no memory of earlier sweeps, so without this check you re-file the same defect every night. If a finding is already filed, do not file it again; if this run adds materially new information (a new vector, a corrected impact, confirmed reachability), update that advisory: write a JSON body with a `description` of only what this run adds to a file in /tmp/agent-out/ and run `bash .github/scripts/file_advisory.sh update <GHSA id> /tmp/agent-out/<file>.json` — the script appends it under a dated heading and never replaces the reproduction already filed — or comment on that issue instead: `bash .github/scripts/gh_issue.sh comment <number> /tmp/agent-out/<file>.md`.
 
-            For SECURITY findings: pass the advisory body as JSON (summary, description carrying the full reproduction, severity, vulnerabilities/affected paths) on standard input: `bash .github/scripts/file_advisory.sh create - <<'JSON'`, then the JSON, then a line reading `JSON`. It prints the GHSA id — the egzos-forge identity holds that permission, and that script is your only route to the advisory API. In this run's output write ONLY "security-class finding filed as advisory <GHSA id>". Actions logs on this public repository are public: never write a repro, payload, affected path, or detailed description anywhere but inside the advisory.
+            For SECURITY findings: write the advisory body as JSON (summary, description carrying the full reproduction, severity, vulnerabilities/affected paths) with the Write tool to a file in /tmp/agent-out/, then run `bash .github/scripts/file_advisory.sh create /tmp/agent-out/<file>.json`. It prints the GHSA id — the egzos-forge identity holds that permission, and that script is your only route to the advisory API. In this run's output write ONLY "security-class finding filed as advisory <GHSA id>". Actions logs on this public repository are public: never write a repro, payload, affected path, or detailed description anywhere but inside the advisory.
 
-            For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding with `gh issue create`, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**. This sweep writes nothing to the repository; it writes no file at all. This session holds no write tool, so the script it runs is the one this checkout holds.
+            For NON-SECURITY findings (contract gaps, behavior bugs): file one public issue per finding, labeled `agent:a6-adversary`, so the core queue dispatches you in build mode to add the xfail test under adversarial/**: write its body to a file in /tmp/agent-out/ and run `bash .github/scripts/gh_issue.sh create "<one-line title>" /tmp/agent-out/<file>.md agent:a6-adversary`. This sweep writes nothing to the repository: its one write tool reaches /tmp/agent-out/ and nothing else, so the scripts it runs are the ones this checkout holds, and they read bodies from that directory only.
 
             This session holds the forge token, so it runs no interpreter. A separate job holding no token already ran the adversarial suite against main: read /tmp/adversarial-suite.txt and cite it for what the suite covers. Never claim a reachability the suite does not show; hand anything that needs new code run to build mode as a non-security issue (or, for a security finding, to the advisory).
 
@@ -604,7 +609,7 @@ jobs:
             --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_SONNET }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(bash .github/scripts/file_advisory.sh:*)"
+            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh issue list:*),Bash(bash .github/scripts/gh_issue.sh:*),Bash(bash .github/scripts/file_advisory.sh:*)"
             --disallowedTools "Read(//proc/**)"
 
   # ── Dispatch naming a PR: file its awaiting advisory (#123) ─────────────────────────────────
@@ -664,6 +669,11 @@ jobs:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         run: bash .github/scripts/file_advisory.sh list > /dev/null
 
+      # The one directory the session may write (its Edit grant is scoped to it): the bodies the
+      # filing scripts read, which refuse a file anywhere else. Created by the runner, mode 700.
+      - name: agent-out
+        run: install -d -m 700 /tmp/agent-out
+
       - name: charter-a6-adversary
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -688,12 +698,12 @@ jobs:
 
             You are a6-adversary filing the advisory a PR-mode review of yours left awaiting. This dispatch names PR #${{ inputs.pr }}: its code is not on main. Read it with `gh pr view ${{ inputs.pr }}` and `gh pr diff ${{ inputs.pr }}` only — never check it out or run it — and find its security-class finding against your standing targets.
 
-            First list what is already filed: `bash .github/scripts/file_advisory.sh list`. If the finding is filed, update that advisory only with what this run adds (`bash .github/scripts/file_advisory.sh update <GHSA id> - <<'JSON'`, the body on standard input, closed by a line reading `JSON`); otherwise file it: `bash .github/scripts/file_advisory.sh create - <<'JSON'`, then the JSON (summary, description carrying the full reproduction, severity, vulnerabilities/affected paths), then a line reading `JSON`. That script is your only route to the advisory API, and this session holds no other write. If you find no security-class finding in the PR as it stands now, file nothing.
+            First list what is already filed: `bash .github/scripts/file_advisory.sh list`. Write each body with the Write tool to a file in /tmp/agent-out/, the one place this session can write. If the finding is filed, update that advisory only with what this run adds: a JSON body whose `description` carries just that, then `bash .github/scripts/file_advisory.sh update <GHSA id> /tmp/agent-out/<file>.json`. Otherwise file it: a JSON body (summary, description carrying the full reproduction, severity, vulnerabilities/affected paths), then `bash .github/scripts/file_advisory.sh create /tmp/agent-out/<file>.json`. That script is your only route to the advisory API, and this session holds no other write. If you find no security-class finding in the PR as it stands now, file nothing.
 
             Actions logs on this public repository are public: never write a repro, payload, affected path or detailed description anywhere but inside the advisory. End your output with one line: `filed <id>`, `updated <id>`, `matched <id>, skipped` or `none` — ids only.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_SONNET }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(bash .github/scripts/file_advisory.sh:*)"
+            --allowedTools "Read,Grep,Glob,Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(bash .github/scripts/file_advisory.sh:*)"
             --disallowedTools "Read(//proc/**)"
