@@ -156,6 +156,29 @@ def test_throttle_names_no_rate_or_window_length():
         assert params == ["self", "surface", "bucket_key", "window_key"]
 
 
+def test_device_record_carries_the_request_it_approves():
+    """§3 mitigations 2–3: `/device` names the grant, and approval grants that request only, so the
+    request is stored at insert. Neither field is in a later method's reach (storage.md §3.1)."""
+    hints = typing.get_type_hints(t.DeviceAuthorizationRecord)
+    assert hints["requested"] is t.DeviceRequest
+    assert set(t.DeviceRequest.__annotations__) == {"capabilities", "scopes"}
+    assert set(t.DeviceRequest.__annotations__) < set(t.ASGrant.__annotations__)
+    params = list(inspect.signature(t.ASState.put_device).parameters)
+    assert params == ["self", "record"]
+    for name in ("poll_device", "decide_device", "consume_device"):
+        params = inspect.signature(getattr(t.ASState, name)).parameters
+        assert not set(params) & {"requested", "requester_hint", "record"}, name
+
+
+def test_requester_hint_is_bounded_and_never_a_key():
+    """§11.8: client-supplied, unverified, bounded; no method looks a record up by it."""
+    assert typing.get_type_hints(t.DeviceAuthorizationRecord)["requester_hint"] == str | None
+    assert t.AS_REQUESTER_HINT_MAX_CHARS == 64
+    for protocol in (t.ASState, t.ASGateState):
+        for name in _methods(protocol):
+            assert "requester_hint" not in inspect.signature(getattr(protocol, name)).parameters
+
+
 def test_device_decisions():
     assert typing.get_args(t.DeviceDecision) == ("pending", "granted", "denied")
 
@@ -163,5 +186,5 @@ def test_device_decisions():
 def test_as_state_contracts_are_exported_and_apart_from_the_frozen_set():
     assert t.AS_STATE_CONTRACTS == ("ASState", "ASGateState")
     assert not set(t.AS_STATE_CONTRACTS) & set(t.STORAGE_CONTRACTS)
-    for name in t.AS_STATE_CONTRACTS + tuple(r.__name__ for r in RECORDS):
+    for name in t.AS_STATE_CONTRACTS + tuple(r.__name__ for r in RECORDS) + ("DeviceRequest",):
         assert name in t.__all__

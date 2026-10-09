@@ -248,6 +248,17 @@ callers on the same key — of two concurrent calls, exactly one observes the st
    call**, so Trust compares the prior `last_polled_at` with `at` for §3 mitigation 1's
    `slow_down`. A poll can therefore never write back a stale `pending` copy over a concurrent
    `decide_device`, so one authorization cannot be decided twice.
+   **The request is stored at insert, so `/device` can show it.** `put_device` writes two fields
+   that no later method touches. `requested` holds the `capabilities` and `scopes` that §7 expanded
+   from the device client's `scope` at the device authorization endpoint. That is what §3 mitigation 2's
+   screen renders, and §3 mitigation 3 lets an approval grant only that. `decide_device`'s `grant`
+   carries the same capabilities and scopes, adding only the principal (§10.3) and the clamped expiry
+   (§11.5), per §11.2 consequence 1. An unparseable `scope` is refused at the endpoint (§11.2
+   consequence 2), so no record holds one. `requester_hint` is §11.8's client-supplied device or
+   host name, **unverified**. It is truncated to `AS_REQUESTER_HINT_MAX_CHARS` (64, **a1p**, draft)
+   before the insert and never refused for its length, since a refusal would branch on it. It is no
+   lookup key, enters no `request_key`, and no record or event field that reads as verified ever
+   carries it.
 3. `redeem_refresh` marks the record redeemed and returns it **as it stood before the call**. A
    returned record with a non-null `redeemed_at` is reuse, and Trust then calls `revoke_family`
    (§9.2 rotation clause 2). The store detects nothing; it reports the prior state truthfully.
@@ -287,7 +298,8 @@ land without `client.register`, which [0.3 · 31] makes an audit event. `Contain
 `clients` key.
 
 **Record shapes** (`AuthorizationCodeRecord`, `DeviceAuthorizationRecord`, `RefreshRecord`,
-`DecidedRequestRecord`, `SessionRecord`, and the `ASGrant` they carry) are typed in `_types.py`, each
+`DecidedRequestRecord`, `SessionRecord`, the `ASGrant` they carry and the `DeviceRequest` a device
+record carries) are typed in `_types.py`, each
 field cited there to the clause that requires it. They are **a1p**'s, drafted from those clauses; a
 field a3-trust finds missing is an escalation on #173's thread, not a field added in a builder's PR.
 

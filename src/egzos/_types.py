@@ -820,6 +820,19 @@ class AuthorizationCodeRecord(TypedDict):
 
 DeviceDecision = Literal["pending", "granted", "denied"]
 
+#: §11.8 — the requester hint is bounded. Trust truncates a longer one before `put_device` and never
+#: refuses for it: refusing would branch on the hint. Draft (a1p, storage.md §3.1), not frozen.
+AS_REQUESTER_HINT_MAX_CHARS: int = 64
+
+
+class DeviceRequest(TypedDict):
+    """§3 mitigations 2–3: what the device client asked for, as §7 expands its `scope`. An
+    unparseable `scope` is refused at the endpoint (§11.2 consequence 2), so it never lands here.
+    Principal (§10.3) and the clamped expiry (§11.5) are Trust's at `/device`, not requested."""
+
+    capabilities: list[Capability]
+    scopes: list[str]
+
 
 class DeviceAuthorizationRecord(TypedDict):
     """§3 / §11.8: the pending authorization, bound to its `device_code` (mitigation 3)."""
@@ -827,6 +840,8 @@ class DeviceAuthorizationRecord(TypedDict):
     device_code_hash: str
     user_code_hash: str  # HMAC-SHA256 under the device-code key, not a bare sha256 (§3.1)
     client_id: str
+    requested: DeviceRequest  # written by `put_device` only; what `/device` renders (mitigation 2)
+    requester_hint: str | None  # UNVERIFIED client-supplied text (§11.8); `put_device` only
     decision: DeviceDecision
     grant: ASGrant | None  # set by `decide_device`; None while pending or when denied
     expires_at: str
@@ -891,7 +906,8 @@ class ASState(Protocol):
     #: ^ sets `last_polled_at` alone, atomically; returns the record as it stood before the call
     def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None: ...
     def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool: ...
-    #: ^ pending -> granted/denied exactly once; False if it was not pending
+    #: ^ pending -> granted/denied exactly once; False if it was not pending. Trust builds `grant`
+    #:   from the record's `requested`, capabilities and scopes unchanged (§11.2 consequence 1)
     def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None: ...
     #: ^ None while pending: a poll before the decision spends nothing
 
@@ -951,6 +967,7 @@ __all__ = [
     "AS_METADATA_CLOSED_VALUES",
     "AS_METADATA_ENDPOINT",
     "AS_METADATA_FIELDS",
+    "AS_REQUESTER_HINT_MAX_CHARS",
     "AS_REVOKE_REFUSAL_CAUSES",
     "AS_SCOPE_ALL_NODES",
     "AS_SCOPE_NODE_PREFIX",
@@ -1009,6 +1026,7 @@ __all__ = [
     "DeviceAuthorizationRecord",
     "DeviceDecision",
     "DeviceRedemptionCause",
+    "DeviceRequest",
     "Event",
     "GrantDecision",
     "ItemStore",
