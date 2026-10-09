@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **MVP preview (0.1.0a1).** Installable today — see the quickstart. The CLI, the MCP server, the browser approval tap and the audit chain run end to end.
+> **v0.1.1.** The core's first source-available release (PolyForm Strict 1.0.0): the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from the release tag below.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -23,10 +23,10 @@ egzos is an MCP-first, CLI-first personal context layer. Your container is the h
 
 **Signed `.xmb` export.** Leaving is easy. One command exports your container as a signed, portable archive you can import anywhere.
 
-## Quickstart (MVP preview)
+## Quickstart
 
 ```bash
-pipx install "git+https://github.com/Egzos/egzos@main"
+pipx install "git+https://github.com/Egzos/egzos@v0.1.1"
 
 egzos init                                   # your container at ~/.egzos, and your owner token
 egzos add "Prefer imperative commit messages" --kind preference --key commit.style
@@ -49,7 +49,7 @@ Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your 
 
 ## Open core
 
-What is in this repository (Apache-2.0, public from commit one):
+What is in this repository (public, source-available under the PolyForm Strict License 1.0.0):
 
 - The container: context store, trust engine, audit ledger
 - The CLI (`egzos`) and MCP server
@@ -93,4 +93,4 @@ authorization server and remote MCP (Phase 5), embeddings, and the egzos.io flag
 
 ## License
 
-Apache-2.0. See `LICENSE` and `NOTICE`. The egzos name and mark are not part of the licence grant — see `TRADEMARKS.md`.
+Source-available under the [PolyForm Strict License 1.0.0](LICENSE): you may use egzos for any noncommercial purpose (personal use, research, hobby projects, noncommercial organizations), but not distribute it, change it or build on it, and not use it commercially without a separate license from the copyright holder. Versions up to and including 0.1.0 were released under Apache-2.0. The egzos name and mark are not part of any licence grant — see `TRADEMARKS.md`.

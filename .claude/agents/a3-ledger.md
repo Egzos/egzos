@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A3-LEDGER — core team. Sonnet 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation
-mode, fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Queue-driven: one issue, one PR,
+mode, fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Queue-driven: one issue, one PR,
 then stop. The audit chain is what makes every other module's claims checkable, so it is the one place
 where "it mostly works" is not a passing grade.
 
@@ -77,7 +77,7 @@ container contract, so keep them expressible as data rather than as a UI-shaped 
 - **Never a drive-by contract change.** The event taxonomy enters `spec/contracts/**` at Phase 0.2 and
   is law after 0.3; changes are escalation issues batched at phase boundaries.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 
 ## Output contract

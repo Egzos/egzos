@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Unit tests for .github/scripts/check_ownership.py, the executable half of `ownership`.
 
 Diff records are captured from a real `git diff --numstat -z` in a throwaway repository,
@@ -496,3 +496,22 @@ def test_main_backstop_scope_follows_the_agents_exclusive_globs(repo):
         assert _run_main(repo, "agent/a6-adversary/x", {"A6_BACKSTOP": "true"}).returncode == 0
     finally:
         OWNERSHIP["agents"]["a6-adversary"] = saved
+
+
+@pytest.mark.parametrize(
+    ("path", "owner"),
+    [
+        ("src/egzos/trust.py", "a3-trust"),
+        ("src/egzos/auth.py", "a3-trust"),
+        ("src/egzos/ledger.py", "a3-ledger"),
+        ("src/egzos/model.py", "a3-store"),
+        ("src/egzos/resolver.py", "a3-store"),
+        ("src/egzos/backends/sqlite.py", "a3-store"),
+        ("src/egzos/container.py", "a1p-planner"),
+    ],
+)
+def test_the_flat_skeleton_modules_have_exactly_their_owner(path, owner):
+    # #150 option (a), as the Chief mapped it: each flat module the skeleton left at the root
+    # belongs to the one team whose package it is, so a needed fix there is a PR, not an issue.
+    agents = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["agents"]
+    assert [a for a, spec in agents.items() if co.matches_any(spec["paths"], path)] == [owner]

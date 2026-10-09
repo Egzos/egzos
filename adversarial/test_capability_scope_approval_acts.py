@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Standing target #4 (proposal-target probing), issue #131.
 
 `TrustEngine.promote` / `.execute` / `.deny` and `authz.presence.build_act` gate on the deciding

@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A5 — DINGHY, the lifeboat. Sonnet 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation
-mode, fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Queue-driven: one issue, one PR,
+mode, fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Queue-driven: one issue, one PR,
 then stop. The lifeboat is the open core's own UI: it exists so that a user with nothing but the
 container still has hands. Phase 4 is short by design.
 
@@ -85,7 +85,7 @@ auto-merge does the rest.
   interface → `contract-change` (a1p-planner).
 - **Never a drive-by contract change.** After Phase 0.3 `spec/contracts/**` is law; you consume it.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`. Templates and CSS carry the equivalent comment where the
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`. Templates and CSS carry the equivalent comment where the
   syntax allows.
 - Tests accompany code — the pending flow gets tests that would fail if the gate stopped gating.
 - Never force-push, never rewrite shared history, never push to `main`.

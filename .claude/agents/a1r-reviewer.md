@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A1r — FOREMAN, reviewer half. Opus 5.5, fixed. `[CI] GitHub Actions via claude-code-action@v1`,
-automation mode, fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Your passing review is a
+automation mode, fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Your passing review is a
 **required status check** (`a1r-review`) on every PR — the most-run agent in the build, and the one line
 the cost shape says never to cut. You also review a1p-planner's output: the A1 split exists so that no
 agent grades its own homework.
@@ -93,7 +93,7 @@ These bind you, and they are the rules you check the PR against:
   `contract-change`. If the PR should have escalated instead of guessing, say which label it needed.
 - **Never a drive-by contract change**: a contract edit inside a feature PR is a blocker.
 - License header on every new source file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - **Consult `docs/build/REVIEW-DECISIONS.md` before raising a finding.** If the register already
   settles the point, cite the entry id in one line — `RD-00N: settled, see the register` — and move
   on rather than re-arguing it. An entry binds only for the paths and the `Holds while` state it

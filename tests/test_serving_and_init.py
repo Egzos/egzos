@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Two adversarial follow-ups read off the running code: an artifact's bytes leave only by a path
 the item itself would be served on (#135), and a container is initialized once, however many

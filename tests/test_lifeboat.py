@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """The lifeboat (spec/design/lifeboat.md) through its real ASGI app: the session guard, every
 region's states that apply to this container, the copy, the uniform not-found page, the two-step
 promote with its step-up, the pending pages (tap spec L column) and the scheme switch."""

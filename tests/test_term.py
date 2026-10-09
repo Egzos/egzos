@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Terminal output shows stored text as text: controls become visible escapes, data stays intact."""
 
 from __future__ import annotations

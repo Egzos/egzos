@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 # The a6-adversary nightly sweep's only route to the repository-advisory API. It replaces a raw
 # `gh api:*` grant, which handed the forge token's whole reach to the one session built to read
 # attacker-shaped text (drift F17). Three verbs, one endpoint family, this repository only.
@@ -9,9 +9,14 @@
 #   file_advisory.sh create <json-file | ->                file one; prints its GHSA id
 #   file_advisory.sh update <GHSA-id> <json-file | ->      append to one already filed; prints its id
 #
-# `-` reads the body from standard input. The sweep passes it that way because its session holds no
-# write tool: a session that could write files and also run a script it could have rewritten would
-# hold an interpreter with the forge token behind it (Egzos/egzos#71 review, round 3).
+# A body file must sit in AGENT_OUT_DIR (default /tmp/agent-out), resolved, symlinks included:
+# the a6 sessions write their bodies there with a Write grant scoped to that one directory, which
+# never reaches this script or anything else in the checkout. A session that could rewrite this
+# script and also run it would hold an interpreter with the forge token behind it (Egzos/egzos#71
+# review, round 3). The scope is why a write grant is safe here; the directory check is why no other
+# file on the runner can become an advisory body. `-` reads the body from standard input instead.
+# The sessions used to pass it that way, as a multi-line heredoc command; the two advisory runs of
+# 2026-10-09 each ended in 17 permission denials and filed nothing, so they now write a file.
 #
 # create sends only summary, description, severity or else cvss_vector_string (the API takes one,
 # never both), cwe_ids and vulnerabilities, each vulnerability cut by the same WRITABLE filter
@@ -55,9 +60,23 @@ spool() {
     trap 'rm -f "$BODY"' EXIT
     cat > "$BODY"
   else
-    BODY="${1:-}"
+    local dir
+    dir="$(realpath -m "${AGENT_OUT_DIR:-/tmp/agent-out}")"
+    BODY="$(realpath -e -- "${1:-}" 2>/dev/null)" || BODY=""
+    [[ -n "$BODY" && "$BODY" == "$dir"/* ]] \
+      || { echo "file_advisory.sh: a body file must be in $dir" >&2; exit 2; }
   fi
   [[ -f "$BODY" && -s "$BODY" ]] || { echo "file_advisory.sh: no non-empty body: ${1:-}" >&2; exit 2; }
+  # A body carrying a credential this process can see is refused, as gh_issue.sh refuses one: an
+  # advisory is private, but a token is never part of a reproduction (#188 review).
+  local text cred
+  text="$(cat -- "$BODY")"
+  for cred in "${GH_TOKEN:-}" "${GITHUB_TOKEN:-}" "${ANTHROPIC_API_KEY:-}" "${CLAUDE_CODE_OAUTH_TOKEN:-}"; do
+    if [[ -n "$cred" && "$text" == *"$cred"* ]]; then
+      echo "file_advisory.sh: the body carries a credential; nothing sent" >&2
+      exit 2
+    fi
+  done
   jq -e 'type == "object"' "$BODY" >/dev/null || { echo "file_advisory.sh: body is not a JSON object" >&2; exit 2; }
 }
 
