@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The resolver (v0.3 §2, v0.4 §7): walk the chain innermost-first, most-specific-wins on key
 conflicts, clients may see the full chain with overridden values visible.

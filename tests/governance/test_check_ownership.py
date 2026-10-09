@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Unit tests for .github/scripts/check_ownership.py, the executable half of `ownership`.
 
 Diff records are captured from a real `git diff --numstat -z` in a throwaway repository,

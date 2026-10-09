@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The lifeboat (`egzos web`), built to spec/design/lifeboat.md §0: server-rendered, in-process with
 the container, FastAPI + Jinja + htmx, no JS toolchain, tokens as CSS variables only. The app is

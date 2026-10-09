@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A3-STORE — core team. Sonnet 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation mode,
-fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Queue-driven: one issue, one PR, then
+fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Queue-driven: one issue, one PR, then
 stop. Everyone depends on the node model and the store, so Store lands first in Phase 1 and everything
 downstream inherits your names.
 
@@ -83,7 +83,7 @@ does not exist yet, file the interface request — do not add a bypass "for now"
 - **Never a drive-by contract change.** After Phase 0.3 `spec/contracts/**` is law; changes are
   escalation issues to a1p-planner, batched at phase boundaries.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 
 ## Output contract

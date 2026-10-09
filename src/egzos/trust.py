@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The trust engine (a3-trust body 1): statuses, the pending queue, promotion, quarantine with
 derived_from propagation, and THE CONDITIONAL GATE (v0.4 §2): compute the audience delta of a

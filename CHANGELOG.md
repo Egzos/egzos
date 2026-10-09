@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — source-available under PolyForm Strict 1.0.0 (2026-10-09)
+
+### Changed
+
+- **Relicensed.** From this version on, egzos is source-available under the PolyForm Strict License
+  1.0.0 (`LICENSE`): use for any noncommercial purpose; no distribution, no changes or new works, and
+  no commercial use without a separate license from the copyright holder. Versions up to and
+  including 0.1.0 were released under Apache-2.0 and stay so. Every source header now reads
+  `SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`; `README.md`, `CONTRIBUTING.md`,
+  `TRADEMARKS.md`, `NOTICE`, `CLAUDE.md` and the agent definitions say the same, and the brand's
+  social preview carries the new licence line.
+
 ## [0.1.0] — the open core's first release (2026-10-09)
 
 Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened through review, plus:

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Walking-skeleton tests: one per shape 0.2 must read off the running code. Ugly is allowed;
 these pin behaviour the contracts will freeze, so a1p can point at a test instead of prose.

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Standing target: typing into the terminal cannot complete a human-only act.
 
 An agent with a shell can run the CLI as the user and type into it: `y`, `yes`, `--yes`, or

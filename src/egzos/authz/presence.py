@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The step-up tap, MVP cut (spec/design/step-up-tap-and-pending-approval.md §2, lifeboat baseline).
 

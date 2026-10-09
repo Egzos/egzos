@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The grant an AS token carries (authorization-server.md §7, §11.5): six capabilities and node ids,
 nothing else.
