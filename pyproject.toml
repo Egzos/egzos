@@ -13,7 +13,7 @@ authors = [
     { name = "Ali Sasanian" },
 ]
 dependencies = [
-    "typer>=0.27",
+    "typer>=0.27.2",
     "mcp>=2.2",
     # the lifeboat (spec/design/lifeboat.md §0): FastAPI + Jinja + htmx, in-process
     "fastapi>=0.115",

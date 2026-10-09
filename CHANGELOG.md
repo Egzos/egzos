@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The README installs from PyPI: `pipx install egzos`.
+- `typer>=0.27.2`, the first release that exports `typer.TyperException`, which the usage-error
+  handler catches (0.27.0 and 0.27.1 do not, and do not depend on click either).
 
 ## [0.1.1] — source-available under PolyForm Strict 1.0.0 (2026-10-09)
 
