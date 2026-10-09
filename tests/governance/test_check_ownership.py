@@ -511,7 +511,7 @@ def test_main_backstop_scope_follows_the_agents_exclusive_globs(repo):
     ],
 )
 def test_the_flat_skeleton_modules_have_exactly_their_owner(path, owner):
-    # The Chief's mapping on #150: each flat module the skeleton left at the package root
+    # #150 option (a), as the Chief mapped it: each flat module the skeleton left at the root
     # belongs to the one team whose package it is, so a needed fix there is a PR, not an issue.
     agents = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())["agents"]
     assert [a for a, spec in agents.items() if co.matches_any(spec["paths"], path)] == [owner]

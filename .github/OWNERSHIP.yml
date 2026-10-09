@@ -76,7 +76,7 @@ agents:
     exclusive: []
 
   # Core store: node model, resolver, embeddings, sqlite backend, blob store, .xmb core.
-  # The flat skeleton modules map to their owners (the Chief on #150, 2026-10-09).
+  # The flat skeleton modules map to their owners: #150 option (a), the Chief's mapping of 2026-10-09.
   a3-store:
     paths:
       - "src/egzos/store/**"
