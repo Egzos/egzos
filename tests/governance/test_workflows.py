@@ -764,3 +764,13 @@ def test_release_publishes_to_pypi_only_from_a_published_release_with_no_stored_
     assert pins and all("==" in p for p in pins)
     assert {p.split("==")[0] for p in pins} >= {"build", "hatchling"}
     assert lock.count("--hash=sha256:") >= len(pins)
+
+
+@pytest.mark.parametrize("job_id", ["a6-adversary-nightly", "a6-adversary-pr-advisory"])
+def test_a6_sessions_are_told_the_line_for_a_run_that_finds_nothing(job_id):
+    # denied-tools prints the session's last line only when it is ids only; a session never told
+    # to end a quiet run with `none` ends it in prose, and the log cannot tell a quiet night from
+    # a lost filing.
+    prompt = next(s["with"]["prompt"] for s in _job(job_id)["steps"]
+                  if s.get("uses", "").startswith(ACTION))
+    assert "`none`" in prompt

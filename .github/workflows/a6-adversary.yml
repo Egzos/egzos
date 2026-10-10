@@ -605,7 +605,7 @@ jobs:
 
             This session holds the forge token, so it runs no interpreter. A separate job holding no token already ran the adversarial suite against main: read /tmp/adversarial-suite.txt and cite it for what the suite covers. Never claim a reachability the suite does not show; hand anything that needs new code run to build mode as a non-security issue (or, for a security finding, to the advisory).
 
-            End your output with one line per finding: `filed <id>`, `updated <id>` or `matched <id>, skipped` — ids only.
+            End your output with one line per finding: `filed <id>`, `updated <id>` or `matched <id>, skipped` — ids only. If this run found nothing, end with the one line `none`.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a6-adversary.md
             --model ${{ env.MODEL_SONNET }}
