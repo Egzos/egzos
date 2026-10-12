@@ -12,13 +12,13 @@ never touch it; they receive their own client tokens.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import secrets
 from pathlib import Path
 
 from egzos._ids import ulid
+from egzos.authz.values import digest as _hash
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import ROLE_BUNDLES, TOKEN_PRINCIPALS, Token, now_iso
@@ -29,10 +29,6 @@ class AuthError(Exception):
 
 
 PREFIX = "egz_"
-
-
-def _hash(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def new_secret(token_id: str) -> str:

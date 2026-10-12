@@ -33,9 +33,10 @@ def new_value() -> str:
 
 
 def digest(value: str) -> str:
-    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value, as
-    `auth.py` does for `Token.secret_hash` (storage.md §3.1). Never for a `user_code`, which is
-    low-entropy and keyed by HMAC instead."""
+    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value
+    (storage.md §3.1). It is also the one hash behind `Token.secret_hash`: `auth.py` imports it
+    rather than keeping a copy, so the two lookups cannot drift apart. Never for a `user_code`,
+    which is low-entropy and keyed by HMAC instead."""
     # `surrogatepass`: a lone surrogate from a JSON body hashes like any other string, never raises
     return hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
 
