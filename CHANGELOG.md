@@ -7,11 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
+  argument or a bare group now prints `{"error": …}` on stdout, as every other `--json` failure
+  does, and still exits 2 (#203). A `--json` after `--` is data, not the flag.
+
 ### Changed
 
 - The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzos`,
   which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
   answers only "Ignored the following versions that require a different python version").
+  Homebrew users can install uv with `brew install uv`.
 
 ## [0.1.2] — the CLI works from the home directory (2026-10-09)
 
