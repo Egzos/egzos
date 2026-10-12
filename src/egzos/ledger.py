@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Append-only, hash-chained audit (v0.4 §15; a3-ledger charter). Each entry carries the hash of the
 previous one; verification fails loudly and specifically. Reads are logged, not just writes.

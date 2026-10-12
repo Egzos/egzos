@@ -15,7 +15,7 @@
 | D-T | texture is **dither** — a Bayer 8×8 ordered field on the Lambert shade | contour (latitude hairlines + hatched faces), halftone (45° dot screen) | forbids anti-aliasing on the body field; fixes two field densities and a flat tier (§3) |
 | D1 | **lowercase, always**: `egzos` | `Egzos` at sentence starts and as the org name | copy-editors will want to capitalise it; this file is the answer |
 | D2 | **ink only** — no colour in any mark | `--egz-act` on the human element (the pending slice) | the identity has no colour to be recognised by; recognition rides on shape and the hard offset |
-| D3 | the marks are **excluded from Apache-2.0** — `TRADEMARKS.md` at the repository root | marks fully Apache-2.0 with the code | a one-page policy the Chief owns; a sentence in `CONTRIBUTING.md` points at it |
+| D3 | the marks are **excluded from the code licence** (Apache-2.0 through 0.1.0, PolyForm Strict 1.0.0 since) — `TRADEMARKS.md` at the repository root | marks under the code's licence | a one-page policy the Chief owns; a sentence in `CONTRIBUTING.md` points at it |
 | D4 | assets live in **`spec/design/brand/`** (A2's tree; no `OWNERSHIP.yml` change) | a top-level `brand/` (Chief-only `OWNERSHIP.yml` edit) | consumers copy rendered exports through their own PRs; the masters stay A2-owned |
 | D5 | GitHub App avatars are **identity variants**: chief-proxy wears the whole orb, egzos-forge the orb with the slice out | no App avatars | both Apps get a white (#FFFFFF) badge background set by the Chief in each App's settings |
 | D6 | the org avatar is **one file, the light record**, on both GitHub themes | a dark card | the dark badge master is used only where egzos controls the canvas |
@@ -323,7 +323,7 @@ Rendered verbatim wherever the key is used; never paraphrased. Keys are lowercas
 | `brand.name` | `egzos` | everywhere the name is written |
 | `brand.tagline` | `personal context layer · mcp-first · cli-first · your container is the home` | README header, social preview (outlined) |
 | `brand.social.url` | `github.com/Egzos/egzos` | social preview |
-| `brand.social.licence` | `apache-2.0 · open core` | social preview |
+| `brand.social.licence` | `polyform strict 1.0` | social preview |
 | `brand.alt.mark` | `egzos` | `aria-label` of any lone in-product mark or lockup |
 | `brand.alt.header` | `egzos — personal context layer` | README `<img alt>` |
 | `brand.alt.app.chief` | `chief-proxy` | the App's display name (GitHub renders it beside the avatar; the avatar itself has no alt) |

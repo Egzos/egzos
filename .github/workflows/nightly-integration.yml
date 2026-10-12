@@ -112,6 +112,11 @@ jobs:
       # Charter: the definition's body (frontmatter stripped) is appended to the system prompt.
       # Phase 0.0 verified that --agent applies the frontmatter tools list as a hard restriction on the
       # tool pool, which removed StructuredOutput (--json-schema), the sticky-comment MCP tool and Skill.
+      # The one directory the session may write (its Edit grant is scoped to it): the drift report's
+      # body, which gh_issue.sh reads and refuses from anywhere else. Created by the runner, mode 700.
+      - name: agent-out
+        run: install -d -m 700 /tmp/agent-out
+
       - name: charter-a1r-reviewer
         env:
           # Refs via the environment, never ${{ }} into a run: line.
@@ -140,17 +145,48 @@ jobs:
 
             1. The suites already ran, in a job of their own that held no token. Their full output is `/tmp/suite/suite.txt`: install, `pytest -q -rfExX tests` (the integration, conformance and governance suites; `adversarial/` is a6's sweep and not in this run), per-file collection counts, and `ruff check .`, each with its exit status. Read it; execute nothing — this session holds no interpreter, by design (drift F22). If the file says the suite job produced no result, report that as the night's first finding.
             2. Check for drift: compare the code on main against spec/contracts/** (if it exists) and CLAUDE.md invariants, by reading.
-            3. Write or update ONE GitHub issue titled "drift report $(date +%F)" labelled `drift`:
+            3. Write or update ONE GitHub issue titled "drift report YYYY-MM-DD" (today's UTC date, written out) labelled `drift`. Write the body with the Write tool to /tmp/agent-out/drift.md, the one place this session can write; the script below reads bodies from there only.
                - First search: `gh issue list --label drift --search "drift report" --state open --json number,title`
-               - If a matching issue exists, read it with `gh issue view <number>` and update it with `gh issue edit <number> --body "..."`.
-               - If no match, create it: `gh issue create --title "drift report $(date +%F)" --label drift --body "..."`.
+               - If a matching issue exists, read it with `gh issue view <number>` and replace its body: `bash .github/scripts/gh_issue.sh edit <number> /tmp/agent-out/drift.md`.
+               - If no match, create it: `bash .github/scripts/gh_issue.sh create "drift report YYYY-MM-DD" /tmp/agent-out/drift.md drift`.
             4. The body must summarise: suites run, pass/fail counts, any drift findings, and the date.
           claude_args: >-
             --append-system-prompt-file /tmp/charter-a1r-reviewer.md
             --model ${{ env.MODEL_OPUS }}
             --max-turns ${{ env.MAX_TURNS }}
-            --allowedTools "Read,Grep,Glob,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"
+            --add-dir /tmp/agent-out
+            --allowedTools "Read,Grep,Glob,Write(//tmp/agent-out/**),Edit(//tmp/agent-out/**),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh issue list:*),Bash(gh issue view:*),Bash(bash .github/scripts/gh_issue.sh:*)"
             --disallowedTools "Read(//proc/**)"
+
+      # Which tools the session was refused, by name and count only: a drift report that never
+      # appears because its route was refused shows here, and nothing of the session's text does.
+      - name: denied-tools
+        if: ${{ !cancelled() && steps.review.outputs.execution_file != '' }}
+        env:
+          PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          # The session could append to $GITHUB_ENV; a step's own env wins over it, so these are blanked.
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          EXEC_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          python3 -I - <<'PYEOF'
+          import collections, json, os, re
+          try:
+              data = json.load(open(os.environ["EXEC_FILE"]))
+          except (OSError, ValueError):
+              raise SystemExit
+          items = data if isinstance(data, list) else [data]
+          res = next((d for d in reversed(items) if isinstance(d, dict) and d.get("type") == "result"), {})
+          denials = [d for d in res.get("permission_denials") or [] if isinstance(d, dict)]
+          names = collections.Counter(str(d.get("tool_name", "?"))[:40] for d in denials)
+          print("denied tools: " + (", ".join(f"{n} x{c}" for n, c in sorted(names.items())) or "none"))
+          # The session's last line is ids only by its prompt (`filed <id>`, `none`, ...); print it
+          # only when it is exactly that shape, so no other text of the session reaches the log.
+          last = (str(res.get("result") or "").strip().splitlines() or [""])[-1].strip().strip("`")
+          ok = r"(?:(?:filed|updated) (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+)|matched (?:GHSA(?:-[a-z0-9]{4}){3}|#?\d+), skipped|none)"
+          print("outcome: " + (last if re.fullmatch(ok, last) else "(not in the ids-only shape)"))
+          PYEOF
 
       # The same diagnosis the PR reviewers carry (drift F21): without it a drift report that never
       # appears is indistinguishable from a quiet night. Copied from a1r-review.yml.

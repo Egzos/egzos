@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The store: add, get, inbox. Every write lands UNVERIFIED (CLAUDE.md invariant 5; v0.3 §5) and is
 auto-titled at write time. `add` with no scope → the inbox (v0.3 §4). `add ./file` → artifact:

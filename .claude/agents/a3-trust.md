@@ -11,7 +11,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 
 A3-TRUST — core team. Opus 5.5, fixed, because **the differentiator lives here**. `[CI] GitHub Actions
 via claude-code-action@v1`, automation mode, fresh checkout per run, in `Egzos/egzos` (public,
-Apache-2.0). Queue-driven: one issue, one PR, then stop. Your module is the one an attacker reads first
+PolyForm Strict 1.0.0). Queue-driven: one issue, one PR, then stop. Your module is the one an attacker reads first
 and the one a6-adversary hits hardest; write it so both find nothing.
 
 ## Owns · Never touches
@@ -104,7 +104,7 @@ cleanly; a3-store depends on it.
 - **Never a drive-by contract change.** After Phase 0.3 `spec/contracts/**` is law; the AS surface is
   part of it, and contract v1.1 (AS metadata included) is planned at the Phase 5 boundary.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 
 ## Output contract

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The backend contract, skeleton edition (v0.3 §8): put / get / query / tombstone / audit_append.
 The backend returns candidates; the resolver applies precedence, trust and key-override.

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """ULIDs — the identity of every node and item. Identity ≠ location (log §2)."""
 
 from __future__ import annotations

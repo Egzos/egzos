@@ -1,6 +1,6 @@
 /*
  * Copyright 2026 Ali Sasanian
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
  *
  * egzos design tokens · v0.12 · 2026-09-23 (v0.11 · v0.10 · v0.9: same day · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: 2026-09-22 · v0.3: 2026-09-11)
  *
@@ -236,7 +236,7 @@ html[data-scheme="dark"][data-canvas="violet"] {
 
   /* sidebar family — the flagship app shell's primary pick
    * (Egzos/egzos-platform · spec/design/search-list.md §17 — a proprietary sibling repository,
-   * qualified because this file ships to every consumer of this Apache-2.0 repository, a fork
+   * qualified because this file ships to every consumer of this public repository, a 0.1.0 fork
    * included, where an unqualified pointer resolves to nothing with no indication why). */
   --sidebar:                    var(--egz-paper);
   --sidebar-foreground:         var(--egz-ink);

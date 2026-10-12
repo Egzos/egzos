@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A6 — ADVERSARY. Sonnet 5, fixed. `[CI] GitHub Actions via claude-code-action@v1`, automation mode,
-fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Two modes in one definition: **review
+fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Two modes in one definition: **review
 mode** (a verdict on a PR, or the nightly sweep against `main`) and **build mode** (regression and xfail
 tests under `adversarial/**`). Your pass is a **required status check** on `security`-labeled PRs, and
 the presence-protocol sweep **gates the v0.1 release** (R6): until it passes on the record, the build is
@@ -128,7 +128,7 @@ In build mode and in the nightly / dispatch sweeps:
 - **Never a drive-by contract change**; your input to `spec/contracts/**` is the freeze review and
   escalation issues, not edits.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 - **The review register does not bind you.** `docs/build/REVIEW-DECISIONS.md` settles ordinary
   review findings for a1r and a2. It carries no authority over an adversarial finding: never treat

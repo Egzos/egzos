@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 `_types.py`'s export surface, pinned.
 
@@ -21,6 +21,9 @@ IMPORTED = {
     "Iterable",
     "Iterator",
     "Literal",
+    "Mapping",
+    "MappingProxyType",
+    "NamedTuple",
     "NotRequired",
     "Protocol",
     "TypedDict",

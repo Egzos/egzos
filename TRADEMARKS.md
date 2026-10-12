@@ -3,11 +3,7 @@
 **Owner:** the Chief (Ali Sasanian). Drafted by A2 (Taste) for the Chief's edit before commit; the commit is the approval act.
 **Status:** v1.0 · 2026-09-22 · decision D3 of `spec/design/brand/BRAND.md`.
 
-The code in this repository is licensed under Apache-2.0 (`LICENSE`, `NOTICE`). That licence does not grant trademark rights — its §6 says so in as many words:
-
-> This License does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
-
-This page says what that means for egzos.
+The code in this repository is source-available under the PolyForm Strict License 1.0.0 (`LICENSE`). That licence grants no trademark rights: its *No Other Rights* clause says the terms "do not imply any other licenses". Versions up to and including 0.1.0 were released under Apache-2.0, whose §6 excludes trademarks in as many words. This page says what that means for egzos.
 
 ## What is a mark
 
@@ -18,14 +14,14 @@ The following are trademarks and trade dress of Ali Sasanian, whether or not reg
 - the **wordmark** — `egzos` set in the bound typeface as outlined in `spec/design/brand/wordmark/`;
 - the **lockups** and the **badge** that combine them (`spec/design/brand/lockup/`, `spec/design/brand/badge/`).
 
-The files under `spec/design/brand/` are published so that the project's own surfaces render one identity and so that anyone describing the project can do so accurately. Publishing them is not a licence to adopt them. `spec/design/brand/pipeline/` is code and is Apache-2.0 like the rest of the repository; the marks it emits are not.
+The files under `spec/design/brand/` are published so that the project's own surfaces render one identity and so that anyone describing the project can do so accurately. Publishing them is not a licence to adopt them. `spec/design/brand/pipeline/` is code under the repository's licence like the rest of it; the marks it emits are not licensed at all.
 
 ## You may, without asking
 
 - Say that your software **runs on**, **connects to**, **is compatible with**, or **is a client of** egzos, in plain text, as long as it is true.
 - Use the unaltered mark or wordmark to **link to this project** or to identify it in a list of integrations, in documentation, a talk, an article or a comparison.
-- Redistribute **unmodified** builds of this repository under the egzos name, exactly as released.
-- Fork the code under Apache-2.0 and ship it — **under your own name and your own mark** (see below).
+- Redistribute **unmodified** builds of version 0.1.0 or earlier (released under Apache-2.0) under the egzos name, exactly as released. Later versions may not be redistributed at all under their licence.
+- Ship a fork of version 0.1.0 or earlier under Apache-2.0 — **under your own name and your own mark** (see below).
 
 ## You may not, without written permission
 
@@ -36,7 +32,7 @@ The files under `spec/design/brand/` are published so that the project's own sur
 
 ## Why a fork must wear its own mark
 
-egzos is open core so that leaving is easy and the code outlives any company. It is also a product whose trust posture is the product. A mark on a build promises which trust posture that build has; a fork that keeps the mark makes a promise it cannot keep on the Chief's behalf. The code is yours. The promise is not.
+egzos publishes its core so that what it does can be read and checked. It is also a product whose trust posture is the product. A mark on a build promises which trust posture that build has; a fork that keeps the mark makes a promise it cannot keep on the Chief's behalf. The code is yours. The promise is not.
 
 ## Contact
 

@@ -5,6 +5,81 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzos`,
+  which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
+  answers only "Ignored the following versions that require a different python version").
+
+## [0.1.2] — the CLI works from the home directory (2026-10-09)
+
+### Fixed
+
+- **`egzos add`, `ls` and every verb that reads the sticky scope crashed when run from `~`.** The
+  sticky scope is a `.egzos` *file* in the working directory, and in the home directory `.egzos` is
+  the container itself, a *directory* (`EGZOS_HOME`'s default), so the read raised
+  `IsADirectoryError`. Only a file is a sticky scope now, and `egzos cd` refuses to write one where
+  `.egzos` is a directory.
+- **Usage errors printed a Python traceback.** An unknown command or option (`egzos --version`), a
+  missing argument or a bare group (`egzos token`) now prints one `Error:` line and a `--help`
+  hint on stderr and exits 2. What was typed is echoed through the terminal sanitizer.
+
+### Changed
+
+- The README installs from PyPI: `pipx install egzos`.
+- `typer>=0.27.2`, the first release that exports `typer.TyperException`, which the usage-error
+  handler catches (0.27.0 and 0.27.1 do not, and do not depend on click either).
+
+## [0.1.1] — source-available under PolyForm Strict 1.0.0 (2026-10-09)
+
+### Changed
+
+- **Relicensed.** From this version on, egzos is source-available under the PolyForm Strict License
+  1.0.0 (`LICENSE`): use for any noncommercial purpose; no distribution, no changes or new works, and
+  no commercial use without a separate license from the copyright holder. Versions up to and
+  including 0.1.0 were released under Apache-2.0 and stay so. Every source header now reads
+  `SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`; `README.md`, `CONTRIBUTING.md`,
+  `TRADEMARKS.md`, `NOTICE`, `CLAUDE.md` and the agent definitions say the same, and the brand's
+  social preview carries the new licence line.
+
+## [0.1.0] — the open core's first release (2026-10-09)
+
+Phase 2's milestone: the doors open. Everything in 0.1.0a1 below, hardened through review, plus:
+
+### Added
+
+- The lifeboat, `egzos web`, on its specified stack: FastAPI + Jinja + htmx, in-process, tokens as
+  CSS variables. It renders list, search and the pending queue (#127).
+- The authorization server's first mechanics in `egzos.authz` (#166 slices 1–2). These are
+  storage-free and not yet served:
+  - the scope grammar and grant lifetime;
+  - PKCE (S256 only, constant-time);
+  - the redirect allowlist, with `localhost` refused in every spelling;
+  - the metadata document;
+  - the `continue` allowlist and the loopback-only plain-HTTP rule;
+  - issued values.
+- Contracts v1.0, frozen at 0.3 (below), with the REST door and the authorization server's state as
+  drafts for Phase 5.
+
+### Security
+
+- A proposal is decided once under racing deciders, and the decider is re-checked under the lock
+  (#146, #149, #151).
+- The audit chain refuses an unattributed append. Its principal vocabulary is closed to
+  `interactive`, `client` and `none`, and the five caller-less events carry `none` and only `none`
+  (#151, #160, #162).
+- Minting refuses a principal outside the token vocabulary (#154).
+- Consent pages send `Referrer-Policy: same-origin` (#146).
+
+### Changed
+
+- Releases publish to PyPI by trusted publishing (OIDC) when the Chief publishes a GitHub release,
+  with no stored token and a hash-locked build toolchain (`.github/workflows/release.yml`). The README
+  names `pipx install egzos` once the first upload is live. Until then, install from the release tag:
+  `pipx install "git+https://github.com/Egzos/egzos@v0.1.0"`.
+
 ## Contracts v1.0 — post-freeze status changes
 
 ### Added
@@ -16,6 +91,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `storage.md` §3.1, `rest.md` §2 item 7, `authorization-server.md` §11.0 and `_types.py`: all AS
+  state is `ContainerState` (#173, option (A)); all six surfaces' throttle rates are decided
+  (`AS_THROTTLE_RATES`, #141, #184), and the REST door counts verified-descriptor refusals in a
+  per-token bucket keyed on the descriptor's token (rate open on #141). The REST door's accepted
+  owner lockout is stated as renewable, as §11.0 states it for the AS surfaces, and Trust prefixes
+  each `bucket_key` with its kind.
+- `rest.md` §2, §6, `events.md`, `authorization-server.md` §12 and `_types.py`: the Chief's #165
+  answers — a `BlobGrant` is single use with a fixed 300-second lifetime, and the REST door gets
+  the `rest` throttle surface and the caller-less `rest.tally` event (rates open on #141).
 - `events.md` §2: the converse principal rule (the five `PRINCIPAL_NONE_EVENTS` carry `none` and
   nothing else) moves from decided, not running to running, citing the ledger check (#160, #159).
 

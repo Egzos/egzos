@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """§2: PKCE is mandatory, `S256` only, verified before anything is issued."""
 
 from __future__ import annotations

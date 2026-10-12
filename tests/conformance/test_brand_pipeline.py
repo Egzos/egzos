@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """The brand masters conform to BRAND.md: `pipeline/check.py` on its default path (stdlib only,
 no fonts, no numpy, no network) exits 0. The font-dependent regeneration (F-09) stays
 designer-local (BRAND.md §15)."""

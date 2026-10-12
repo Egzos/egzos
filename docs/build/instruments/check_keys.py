@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Copy keys: does every key a spec renders resolve to a row in an owning §13?
 
 Every spec's §16 checks copy *by key, verbatim*, so a key must name exactly one string. Two

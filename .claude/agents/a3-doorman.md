@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A3-DOORMAN — the product surfaces. Opus 5.5, fixed. `[CI] GitHub Actions via claude-code-action@v1`,
-automation mode, fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). Queue-driven: one issue,
+automation mode, fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). Queue-driven: one issue,
 one PR, then stop. **The CLI/MCP seam is the injection boundary — one frontier owner**, and that owner
 is you. Everything hostile arrives here first.
 
@@ -88,7 +88,7 @@ is v0.1-rc.
 - **Never a drive-by contract change.** After Phase 0.3 `spec/contracts/**` is law; the container
   contract and the AS surface are part of it.
 - License header, first two lines of every Python file: `# Copyright 2026 Ali Sasanian` then
-  `# SPDX-License-Identifier: Apache-2.0`.
+  `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 
 ## Output contract

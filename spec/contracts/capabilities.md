@@ -67,8 +67,8 @@ and the container enforces on it. **running** for the first two; `none` is **dec
 
 **A token carries `interactive` or `client`, never `none`.** `none` is an *audit entry's* principal
 only: the value `events.md` §2 writes when an append has no caller to name —
-`authorization-server.md` §12.2's rows (a), (b), (d), (e) and (h), which fire before any session or
-token exists, or on no request at all. A third closed word rather than a nullable field, so that
+`authorization-server.md` §12.2's rows (a), (b), (d), (e) and (h), and `rest.md` §2's `rest.tally`
+(#165), which fire before any session or token exists, or on no request at all. A third closed word rather than a nullable field, so that
 `principal` stays mandatory and every `audit` reader carries no null branch. `_types.py` types this
 split: `Principal` is the three words, `TokenPrincipal` the two a `Token`, an `AudienceMember` or an
 item's provenance may carry.

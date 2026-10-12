@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Is the local tree what the branch holds? Compared by git blob SHA, nothing else.
 
 Two ways this comparison has been done wrong before, both recorded here so they stay wrong:

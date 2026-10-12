@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Shared types — owned by a1p-planner.
 
@@ -21,8 +21,9 @@ twice, and ``__all__`` complete (``tests/_types/test_exports.py``) and isort-sor
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
-from typing import Any, Literal, NotRequired, Protocol, TypedDict, get_args
+from collections.abc import Iterable, Iterator, Mapping
+from types import MappingProxyType
+from typing import Any, Literal, NamedTuple, NotRequired, Protocol, TypedDict, get_args
 
 # The runtime tuples below are DERIVED from their Literal unions, never written out twice: a
 # vocabulary that can drift from its own type is a vocabulary that will.
@@ -205,6 +206,12 @@ class BlobGrant(TypedDict):
     sig: str
 
 
+#: rest.md §6 — a `BlobGrant`'s `expires_at` is its mint time plus this, and the first verified
+#: redemption spends it. A fixed contract value, never a config key: the Chief on #165 item 1,
+#: option (a), 2026-10-09. A leaked grant URL is dead after one pull or five minutes at most.
+BLOB_GRANT_LIFETIME_SECONDS: int = 300
+
+
 # --- the audit chain (spec/contracts/events.md) ---------------------------------------------
 
 Event = Literal[
@@ -238,6 +245,7 @@ Event = Literal[
     "authz.grant",
     "client.register",
     "config.set",
+    "rest.tally",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -246,21 +254,23 @@ Event = Literal[
 #: code that emits it. The nine `authz.*` names and `client.register` are the same case: decided at
 #: the 0.3 freeze (authorization-server.md §12 rows (a), (b), (d)–(h), §11.9, §9.3 and §5;
 #: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
-#: (container.md §8, [0.3 · 40]), with no config surface. events.md §1 says the same thing from the
-#: contract's side.
+#: (container.md §8, [0.3 · 40]), with no config surface; and so is `rest.tally`, the REST door's
+#: per-window tally (rest.md §2, the Chief on #165 items 2 and 3), with no REST door in this tree.
+#: events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
 #: The only events an entry with `principal: none` may carry (events.md §2): the caller-less rows
-#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2. An append with `principal: none`
-#: under any other event MUST be rejected — a read or an act is never unattributed. The converse
-#: binds too: an append under one of these five MUST carry `principal: none` (events.md §2).
-#: [0.3 · 34]
+#: (a), (b), (d), (e) and (h) of authorization-server.md §12.2, and the REST door's tally (rest.md
+#: §2, #165). An append with `principal: none` under any other event MUST be rejected — a read or an
+#: act is never unattributed. The converse binds too: an append under one of these six MUST carry
+#: `principal: none` (events.md §2). [0.3 · 34]
 PRINCIPAL_NONE_EVENTS: tuple[Event, ...] = (
     "authz.login",
     "authz.redeem",
     "authz.refuse",
     "authz.release",
     "authz.tally",
+    "rest.tally",
 )
 
 #: Genesis `prev_hash`: 64 ASCII zeros.
@@ -521,11 +531,41 @@ AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
 #: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
 #: by citing the decision rather than restating it in an entry of its own — never unused, only
 #: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
-#: ([0.3 · 11]). The caller's network identifier is NEVER the actor ([0.3 · 34]): a network
-#: identifier may key a throttle bucket (§11.0, [0.3 · 24]) and never enters the chain.
-#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]).
-ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke"]
+#: ([0.3 · 11]). `rest` is the REST door's, the sixth: one surface covering the sweep at its 401 and
+#: descriptor redemption (rest.md §2, the Chief on #165 item 3). The caller's network identifier
+#: is NEVER the actor ([0.3 · 34]): a network identifier may key a throttle bucket (§11.0,
+#: [0.3 · 24]) and never enters the chain.
+#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]),
+#: and `rest.tally` for the REST door's per-window tally.
+ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke", "rest"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
+
+#: §11.0 and rest.md §2 item 7 (#141): every surface counts over one fixed window, and a bucket that
+#: engages holds until its window closes. Decided by the Chief on #141, 2026-10-09.
+AS_THROTTLE_WINDOW_SECONDS: int = 300
+
+
+class ThrottleRate(NamedTuple):
+    """§11.0's two buckets, both enforced: counted attempts admitted per window."""
+
+    container_global: int
+    per_source: int  # keyed on the transport source address, never on a caller-supplied value
+
+
+#: §11.0's rate table, all six decided: `rest` by the Chief on #141, the five AS surfaces as a1p
+#: proposed them, confirmed by the Chief on #184 (2026-10-09), tightest on `login` and `device`.
+#: rest.md §2 item 7's per-token bucket is not here: its rate is open on #141. Read-only, so no
+#: caller can loosen a bound at runtime.
+AS_THROTTLE_RATES: Mapping[ThrottleSurface, ThrottleRate] = MappingProxyType(
+    {
+        "login": ThrottleRate(container_global=30, per_source=5),
+        "device": ThrottleRate(container_global=30, per_source=5),
+        "authorize": ThrottleRate(container_global=300, per_source=30),
+        "tap": ThrottleRate(container_global=60, per_source=10),
+        "revoke": ThrottleRate(container_global=120, per_source=20),
+        "rest": ThrottleRate(container_global=300, per_source=30),
+    }
+)
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
 #: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
@@ -789,12 +829,12 @@ STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore"
 
 # --- the authorization server's state (storage.md §3.1) — DRAFT binding (a1p), #173 ----------
 #
-# Not frozen. Two Protocols beside `ContainerState`, which is untouched: `ASState` is durable under
-# any answer, and `ASGateState` (sessions, throttle counters) is the half whose partition is the
-# Chief's TODO on #173 — container state, or process memory. Either answer implements the same
-# signatures. No method takes a credential value: every credential key is the lowercase hex sha256
-# of the whole value (`auth.py`'s `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256
-# because the `user_code` is low-entropy. No record carries the value itself.
+# Not frozen. Two Protocols beside `ContainerState`, which is untouched. Both are durable container
+# state on the `ContainerState` substrate, never process memory: the Chief on #173, option (A),
+# 2026-10-09, `ASGateState` (sessions, throttle counters) included. No method takes a credential
+# value: every credential key is the lowercase hex sha256 of the whole value (`auth.py`'s
+# `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256 because the `user_code` is
+# low-entropy. No record carries the value itself.
 
 
 class ASGrant(TypedDict):
@@ -929,8 +969,8 @@ class ASState(Protocol):
 class ASGateState(Protocol):
     """What gates a request before evaluation (§11.0): sessions and throttle counters.
 
-    TODO(chief) #173: container state like `ASState`, or process memory a restart lifts. The
-    signatures are the same either way (storage.md §3.1).
+    Container state on the same substrate as `ASState`, never process memory, so a restart lifts
+    no throttle and ends no session: the Chief on #173, option (A) (storage.md §3.1).
     """
 
     # interactive sessions (§10.1)
@@ -939,7 +979,7 @@ class ASGateState(Protocol):
     def touch_session(self, session_hash: str, at: str) -> bool: ...
     def end_session(self, session_hash: str) -> bool: ...
 
-    # throttle counters (§11.0, §12) — no rate, no window length (#141); keys are Trust's
+    # throttle counters (§11.0, §12) — no rate, no window length (Trust's, #141); keys are Trust's
     def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
 
@@ -974,9 +1014,12 @@ __all__ = [
     "AS_SESSION_ABSOLUTE_SECONDS",
     "AS_SESSION_IDLE_SECONDS",
     "AS_STATE_CONTRACTS",
+    "AS_THROTTLE_RATES",
     "AS_THROTTLE_SURFACES",
+    "AS_THROTTLE_WINDOW_SECONDS",
     "AS_USER_CODE_ALPHABET",
     "AS_USER_CODE_LENGTH",
+    "BLOB_GRANT_LIFETIME_SECONDS",
     "CAPABILITIES",
     "CONSENT_KINDS",
     "CONSENT_KIND_FROM_CLIENT_TYPE",
@@ -1048,6 +1091,7 @@ __all__ = [
     "SessionRecord",
     "StructureFloor",
     "TextContent",
+    "ThrottleRate",
     "ThrottleSurface",
     "Token",
     "TokenPrincipal",

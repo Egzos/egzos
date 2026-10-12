@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Control-plane invariants over .github/workflows/*.yml (#44 item 2).
 
 Each of these was established by a fix and, until now, held only as long as the next reviewer
@@ -244,9 +244,63 @@ def test_forge_token_sessions_run_no_interpreter():
         # (#71 review, round 3, finding 1).
         if "Bash(bash " in args:
             tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
-            assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & set(tools), (wf, job_id)
+            edits = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+            writes = [t for t in tools if t.split("(")[0] in edits]
+            # The one write such a session holds reaches the scoped body directory only, which the
+            # runner creates before the model and the scripts read from; never the scripts.
+            assert not writes or set(writes) == set(AGENT_OUT_GRANTS), (wf, job_id)
+            if writes:
+                names = [s.get("name") for _, j, _, s in _steps() if j == job_id]
+                assert "agent-out" in names and "denied-tools" in names, (wf, job_id)
+                assert "--add-dir /tmp/agent-out" in args, (wf, job_id)
     # Never vacuous: a renamed token step or a token moved to the job still reaches the sweep.
     assert "a6-adversary-nightly" in inspected
+
+
+# Write creates the body file; Edit alone did not (the #184 dispatch after #188: one refusal,
+# nothing filed). --add-dir puts the directory inside the session's reach as well.
+AGENT_OUT_GRANTS = ("Write(//tmp/agent-out/**)", "Edit(//tmp/agent-out/**)")
+# gh verbs that read a file the caller names (--body-file, -F, --input, @file) and post it.
+FILE_READING_GH = re.compile(
+    r"Bash\(gh (?:issue (?:create|comment|edit)|pr (?:create|comment|edit|review)"
+    r"|release|gist|api)\b"
+)
+
+
+def test_no_session_without_an_interpreter_holds_a_gh_verb_that_reads_a_file():
+    # A prefix grant approves every flag, and gh reads whatever path a body-file flag names, so a
+    # session built to hold no interpreter could post /proc/self/environ: Read(//proc/**) denies
+    # the Read tool, not gh. Such sessions write bodies to the scoped directory and post them
+    # through gh_issue.sh or file_advisory.sh, which read nowhere else, or leave the post to a
+    # later step. The builders hold Bash(git:*) and are RD-005's accepted risk.
+    seen = 0
+    for wf, job_id, _, step in _model_steps():
+        args = step["with"]["claude_args"]
+        if "Bash(git:*)" in args:
+            continue
+        tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+        assert not [t for t in tools if FILE_READING_GH.match(t)], (wf, job_id)
+        seen += 1
+    assert seen >= 5
+
+
+def test_a2_design_gap_posts_its_options_from_a_later_step():
+    wf = _load(ROOT / ".github" / "workflows" / "a2-conformance.yml")
+    steps = wf["jobs"]["a2-conformance-design-gap"]["steps"]
+    model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+    assert "gh issue comment" not in steps[model]["with"]["claude_args"]
+    (post,) = [s for s in steps[model + 1:] if s.get("name") == "post-options"]
+    run = post["run"]
+    assert "env -i" in run and "-F body=@/tmp/agent-out/options.md" in run
+    assert "-L /tmp/agent-out/options.md" in run
+    # Its one write reaches the options directory only, created before the model.
+    tools = re.search(r'--allowedTools "([^"]*)"', steps[model]["with"]["claude_args"]).group(1)
+    writes = [t for t in tools.split(",") if t.split("(")[0] in {"Write", "Edit", "MultiEdit"}]
+    assert set(writes) == set(AGENT_OUT_GRANTS)
+    assert "--add-dir /tmp/agent-out" in steps[model]["with"]["claude_args"]
+    assert [s.get("name") for s in steps].index("agent-out") < model
+    assert {"PROVIDER_KEY", "PROVIDER_OAUTH", "GH_TOKEN"} <= set(post["env"])
+    assert post["env"]["PATH"] == "/usr/bin:/bin" and post["env"]["BASH_ENV"] == ""
 
 
 def test_every_model_session_denies_the_process_environment():
@@ -614,3 +668,109 @@ def test_core_queue_wip_cap_cannot_read_zero_while_a_pr_is_open():
     # gh pr list under the default token: a private repository refuses it without this scope, and
     # a refused list fails the step, so no builder dispatches at all.
     assert job["permissions"].get("pull-requests") == "read"
+
+
+def test_a6_dispatch_can_name_the_pr_whose_finding_awaits_an_advisory():
+    # #123: a PR-mode security finding sits in code that is not on main, so a dispatch may name the
+    # PR. Its unmerged diff is attacker-written text on a public repository, so it is read in a job
+    # of its own whose session can file an advisory and nothing else, and only after a gate has
+    # checked the number is digits and the PR carries the `security` label.
+    wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
+    on = wf.get("on", wf.get(True))
+    assert on["workflow_dispatch"]["inputs"]["pr"]["required"] is False
+    job = wf["jobs"]["a6-adversary-pr-advisory"]
+    assert job["if"] == "${{ github.event_name == 'workflow_dispatch' && inputs.pr }}"
+    assert job["permissions"] == {"contents": "read", "pull-requests": "read"}
+    steps = job["steps"]
+    names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
+    gate = names.index("pr-input")
+    model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+    assert gate < names.index("forge") < model
+    run = steps[gate]["run"]
+    assert "^[0-9]+$" in run and 'index("security")' in run
+    assert steps[gate]["env"]["PR"] == "${{ inputs.pr }}"
+    args = steps[model]["with"]["claude_args"]
+    tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
+    assert set(tools) == {
+        "Read", "Grep", "Glob", *AGENT_OUT_GRANTS, "Bash(gh pr view:*)",
+        "Bash(gh pr diff:*)", "Bash(bash .github/scripts/file_advisory.sh:*)",
+    }
+    assert "--add-dir /tmp/agent-out" in args
+    assert "inputs.pr" in steps[model]["with"]["prompt"]
+    # The sweep of main reads no named PR: the untrusted diff never reaches its issue verbs. A
+    # dispatch naming a PR runs neither the suite nor the sweep (#177 review).
+    sweep = wf["jobs"]["a6-adversary-nightly"]["steps"]
+    assert "inputs.pr" not in str(sweep)
+    # Spelled per event, so the cron never rests on how a null input compares (#181 review).
+    for name in ("a6-adversary-suite", "a6-adversary-nightly"):
+        cond = wf["jobs"][name]["if"]
+        assert "github.event_name == 'schedule' ||" in cond, name
+        assert "github.event_name == 'workflow_dispatch' && !inputs.pr" in cond, name
+
+
+def test_a6_forge_tokens_are_minted_with_only_what_each_session_reaches():
+    # The App's grant is wider than either a6 session needs; the token each one holds is narrowed
+    # at mint, so GitHub enforces the boundary and not the tool list alone (#177 review).
+    wf = _load(ROOT / ".github" / "workflows" / "a6-adversary.yml")
+    want = {
+        "a6-adversary-nightly": {
+            "permission-contents": "read", "permission-issues": "write",
+            "permission-pull-requests": "read", "permission-repository-advisories": "write",
+        },
+        "a6-adversary-pr-advisory": {
+            "permission-contents": "read", "permission-pull-requests": "read",
+            "permission-repository-advisories": "write",
+        },
+    }
+    for job_id, perms in want.items():
+        steps = wf["jobs"][job_id]["steps"]
+        (mint,) = [s for s in steps if s.get("id") == "forge"]
+        got = {k: v for k, v in mint["with"].items() if k.startswith("permission-")}
+        assert got == perms, job_id
+        # The advisory scope rides an input the action does not declare, so the job proves it
+        # reaches the API right after the mint and before any model runs (#181 review).
+        names = [s.get("name") or s.get("id") or s.get("uses", "") for s in steps]
+        probe = names.index("forge-reaches-advisories")
+        model = next(i for i, s in enumerate(steps) if s.get("uses", "").startswith(ACTION))
+        assert names.index("forge") < probe < model, job_id
+        assert steps[probe]["run"] == "bash .github/scripts/file_advisory.sh list > /dev/null"
+        assert steps[probe]["env"]["GH_TOKEN"] == "${{ steps.forge.outputs.token }}"
+
+
+def test_release_publishes_to_pypi_only_from_a_published_release_with_no_stored_token():
+    # The release is the Chief's act; the workflow only carries it out. Trusted publishing: the
+    # upload job holds an OIDC token and nothing else, in the environment PyPI trusts, and a tag
+    # that disagrees with the package version stops the build before anything is uploaded.
+    wf = _load(ROOT / ".github" / "workflows" / "release.yml")
+    on = wf.get("on", wf.get(True))
+    assert on == {"release": {"types": ["published"]}}
+    assert wf["permissions"] == {}
+    build, publish = wf["jobs"]["build"], wf["jobs"]["publish"]
+    assert build["permissions"] == {"contents": "read"}
+    names = [s.get("name") or s.get("uses", "") for s in build["steps"]]
+    assert names.index("version-matches-tag") < names.index("build")
+    assert publish["needs"] == "build"
+    assert publish["environment"] == "pypi"
+    assert publish["permissions"] == {"id-token": "write"}
+    assert "secrets." not in str(wf)
+    (up,) = [s for s in publish["steps"] if "gh-action-pypi-publish" in s.get("uses", "")]
+    assert "with" not in up  # no password, no token: OIDC only
+    # The toolchain that produces the published files is hash-locked; the backend is the locked one.
+    (step,) = [s for s in build["steps"] if s.get("name") == "build"]
+    assert "--require-hashes" in step["run"] and ".github/release-requirements.txt" in step["run"]
+    assert "python -m build --no-isolation" in step["run"]
+    lock = (ROOT / ".github" / "release-requirements.txt").read_text()
+    pins = [line for line in lock.splitlines() if line and not line.startswith((" ", "#"))]
+    assert pins and all("==" in p for p in pins)
+    assert {p.split("==")[0] for p in pins} >= {"build", "hatchling"}
+    assert lock.count("--hash=sha256:") >= len(pins)
+
+
+@pytest.mark.parametrize("job_id", ["a6-adversary-nightly", "a6-adversary-pr-advisory"])
+def test_a6_sessions_are_told_the_line_for_a_run_that_finds_nothing(job_id):
+    # denied-tools prints the session's last line only when it is ids only; a session never told
+    # to end a quiet run with `none` ends it in prose, and the log cannot tell a quiet night from
+    # a lost filing.
+    prompt = next(s["with"]["prompt"] for s in _job(job_id)["steps"]
+                  if s.get("uses", "").startswith(ACTION))
+    assert "`none`" in prompt

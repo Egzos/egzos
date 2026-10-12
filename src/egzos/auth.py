@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 Principals and tokens, skeleton edition (v0.4 §5, v0.3 §5). Bearer tokens cannot prove a human;
 tokens carry `principal: interactive | client`. Human-only acts demand the interactive principal

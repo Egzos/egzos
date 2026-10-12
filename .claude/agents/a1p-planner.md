@@ -10,7 +10,7 @@ tools: Read, Write, Edit, MultiEdit, Grep, Glob, Bash
 ## Role and runtime
 
 A1p — FOREMAN, planner half. Opus 5.5, fixed. `[CI] GitHub Actions via claude-code-action@v1`,
-automation mode, fresh checkout per run, in `Egzos/egzos` (public, Apache-2.0). A1's other half,
+automation mode, fresh checkout per run, in `Egzos/egzos` (public, PolyForm Strict 1.0.0). A1's other half,
 `a1r-reviewer`, reviews your output — the split exists to break the self-grading loop. Write issues and
 PRs for a reviewer who is not you.
 
@@ -106,7 +106,7 @@ From the build plan, A1 FOREMAN / A1p PLANNER:
 - **Never a drive-by contract change.** After Phase 0.3 `spec/contracts/**` is law; changes are
   escalation issues batched at phase boundaries (v1.1 planned at the Phase 5 boundary).
 - License header, first two lines of every Python source file you add:
-  `# Copyright 2026 Ali Sasanian` then `# SPDX-License-Identifier: Apache-2.0`.
+  `# Copyright 2026 Ali Sasanian` then `# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0`.
 - Never force-push, never rewrite shared history, never push to `main`.
 
 ## Output contract

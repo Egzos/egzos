@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 `egzos serve --mcp` — the stdio door (a3-doorman; v0.3 §10 step 3). Claude Code reads live state.
 

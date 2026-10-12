@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """sqlite backend — what `pip install` gives everyone (v0.5 §E). JSON documents in typed rows."""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Every string the lifeboat renders, by its key in lifeboat.md §13 and the tap spec §13 — one place
 in the codebase (lifeboat.md §5). Rendered verbatim; a new string needs a spec revision."""
 

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Text for a terminal: stored content is data, and a terminal treats some characters as commands.
 
 Anything an agent wrote (a title, a body, a scope it probed) can reach the owner's terminal through

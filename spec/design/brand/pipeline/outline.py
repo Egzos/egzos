@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Outline a string into SVG path data using a TTF (IBM Plex), so wordmarks never depend on
 installed fonts. Pure fontTools. Units: the returned path is in font units scaled to `size` px,
 baseline at y=0 (SVG y-down), origin at x=0. Applies kerning from GPOS pair adjustments where

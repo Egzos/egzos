@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """file_advisory.sh against a stub `gh`: update appends and never replaces the filed body."""
 
 import json
@@ -60,7 +60,9 @@ def stub(tmp_path):
         "STUB_DIR": str(tmp_path),
         "GHSA": GHSA,
         "GITHUB_REPOSITORY": "Egzos/x",
-        "GH_TOKEN": "t",
+        "GH_TOKEN": "ghs_stub_token_in_no_body",
+        # The one directory a body file may come from; the sessions write nowhere else.
+        "AGENT_OUT_DIR": str(tmp_path),
     }
     return tmp_path, env
 
@@ -201,3 +203,108 @@ def test_stdin_body_must_be_a_json_object(stub, stdin):
 def test_unknown_verb_is_refused(stub):
     _, env = stub
     assert _run(env, "delete", GHSA).returncode == 2
+
+
+def test_create_sends_only_the_advisory_fields(stub):
+    # #177 review: create is reachable from a session that read an unmerged diff. The endpoint also
+    # takes credits, collaborating users and teams and a private fork; none of them may pass, or an
+    # injected body could add an outside account to a private advisory.
+    d, env = stub
+    body = {
+        "summary": "s",
+        "description": "REPRO",
+        "severity": "high",
+        "cvss_vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:H/I:N/A:N",
+        "cwe_ids": ["CWE-601"],
+        "vulnerabilities": [{
+            "package": {"ecosystem": "other", "name": "egzos", "purl": "x"},
+            "vulnerable_version_range": "< 0.2",
+            "cvss": None,
+        }],
+        "credits": [{"login": "outsider", "type": "reporter"}],
+        "collaborating_users": ["outsider"],
+        "collaborating_teams": ["outsiders"],
+        "start_private_fork": True,
+        "cve_id": "CVE-0000-0000",
+    }
+    r = _run(env, "create", "-", stdin=json.dumps(body))
+    assert r.returncode == 0, r.stderr
+    sent = json.loads((d / "sent.json").read_text())
+    # severity wins over cvss_vector_string: the API takes one, never both.
+    assert set(sent) == {"summary", "description", "severity", "cwe_ids", "vulnerabilities"}
+    assert sent["vulnerabilities"] == [{
+        "package": {"ecosystem": "other", "name": "egzos"},
+        "vulnerable_version_range": "< 0.2",
+    }]
+
+
+def test_create_refuses_a_body_without_summary_and_description(stub):
+    d, env = stub
+    r = _run(env, "create", "-", stdin=json.dumps({"summary": "s"}))
+    assert r.returncode == 2
+    assert "summary and description" in r.stderr
+    # Refused before any API call, not merely exited 2.
+    assert not (d / "sent.json").exists() and not (d / "calls").exists()
+
+
+def test_create_and_update_cut_a_vulnerability_to_the_same_fields(stub):
+    # One WRITABLE filter serves both verbs (#181 review): one vulnerability, one shape sent.
+    d, env = stub
+    vuln = {
+        "package": {"ecosystem": "other", "name": "egzos", "purl": "x"},
+        "vulnerable_version_range": "< 0.3",
+        "cvss": {"score": 9},
+        "extra": True,
+    }
+    body = {"summary": "s", "description": "d", "vulnerabilities": [vuln]}
+    assert _run(env, "create", "-", stdin=json.dumps(body)).returncode == 0
+    created = json.loads((d / "sent.json").read_text())["vulnerabilities"]
+    (d / "filed.json").write_text(json.dumps({**FILED, "vulnerabilities": []}))
+    assert _run(env, "update", GHSA, "-", stdin=json.dumps(body)).returncode == 0
+    updated = json.loads((d / "sent.json").read_text())["vulnerabilities"]
+    assert created == updated == [{
+        "package": {"ecosystem": "other", "name": "egzos"},
+        "vulnerable_version_range": "< 0.3",
+    }]
+
+
+@pytest.mark.parametrize(
+    ("given", "kept"),
+    [
+        ({"cvss_vector_string": "CVSS:3.1/AV:N"}, {"cvss_vector_string": "CVSS:3.1/AV:N"}),
+        ({"severity": "low", "cvss_vector_string": "CVSS:3.1/AV:N"}, {"severity": "low"}),
+        ({"severity": {"not": "a string"}}, {}),
+    ],
+)
+def test_create_sends_one_well_typed_severity_field(stub, given, kept):
+    d, env = stub
+    body = {"summary": "s", "description": "d", **given}
+    assert _run(env, "create", "-", stdin=json.dumps(body)).returncode == 0
+    sent = json.loads((d / "sent.json").read_text())
+    assert {k: v for k, v in sent.items() if k in ("severity", "cvss_vector_string")} == kept
+
+
+@pytest.mark.parametrize("verb", ["create", "update"])
+def test_a_body_file_outside_the_scoped_directory_is_refused(stub, tmp_path_factory, verb):
+    # Any other path on the runner, /proc/self/environ included, never becomes an advisory body.
+    tmp, env = stub
+    outside = tmp_path_factory.mktemp("elsewhere") / "body.json"
+    outside.write_text(json.dumps({"summary": "s", "description": "d"}))
+    link = tmp / "link.json"
+    link.symlink_to(outside)
+    args = [GHSA] if verb == "update" else []
+    dotdot = f"{tmp}/../{outside.parent.name}/body.json"
+    for path in (str(outside), str(link), "/proc/self/environ", dotdot):
+        r = _run(env, verb, *args, path)
+        assert r.returncode == 2, path
+        assert "must be in" in r.stderr
+    assert not (tmp / "sent.json").exists()
+
+
+def test_a_body_carrying_a_credential_is_refused(stub):
+    tmp, env = stub
+    body = tmp / "b.json"
+    body.write_text(json.dumps({"summary": "s", "description": f"repro {env['GH_TOKEN']}"}))
+    r = _run(env, "create", str(body))
+    assert r.returncode == 2 and "credential" in r.stderr
+    assert not (tmp / "sent.json").exists()

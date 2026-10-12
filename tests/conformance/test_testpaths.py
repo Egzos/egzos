@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """`adversarial/` stays in pytest's `testpaths`, and the `tests` check still runs it (#81, #87).
 
 The adversarial suite runs at all only because `[tool.pytest.ini_options].testpaths` in

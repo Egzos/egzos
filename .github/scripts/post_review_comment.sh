@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 # Post or update exactly ONE review comment on a PR, identified by its first line ("## <agent> review")
 # AND by author. Deterministic replacement for the action's tag-mode sticky comment, which never
 # exists in automation mode.

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Bearer values: the id is public, the value is >= 128 random bits and is never stored."""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # Copyright 2026 Ali Sasanian
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
 The container — the user's home (v0.4 §1). One process-local assembly of backend, ledger, nodes,
 store, blobs and auth rooted at EGZOS_HOME (default ~/.egzos). The container is the availability
