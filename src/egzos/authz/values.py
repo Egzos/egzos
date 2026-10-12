@@ -16,6 +16,7 @@ and is resolved by `token_id_of` like any other; a second format would be a seco
 
 from __future__ import annotations
 
+import hashlib
 import secrets
 
 from egzos._types import AS_USER_CODE_ALPHABET, AS_USER_CODE_LENGTH
@@ -29,6 +30,14 @@ def new_value() -> str:
 
     Never an access token's bearer value: that is `egzos.auth`'s, through the `Token` mint."""
     return secrets.token_urlsafe(VALUE_BYTES)
+
+
+def digest(value: str) -> str:
+    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value, as
+    `auth.py` does for `Token.secret_hash` (storage.md §3.1). Never for a `user_code`, which is
+    low-entropy and keyed by HMAC instead."""
+    # `surrogatepass`: a lone surrogate from a JSON body hashes like any other string, never raises
+    return hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def new_user_code() -> str:
