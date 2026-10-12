@@ -23,6 +23,13 @@ size_exception_approvers:
   - "Gond-ul"
   - "chief-proxy[bot]"
 
+# Whose PR comments, reviews and inline comments a builder's reviews step forwards as the
+# Chief's: the Chief directly, or chief-proxy registering the Chief's reply. Its own list, not
+# size_exception_approvers, so an edit to either trust boundary never moves the other (#211, a6).
+chief_identities:
+  - "Gond-ul"
+  - "chief-proxy[bot]"
+
 # GitHub identities that open agent PRs. A PR one of these opens is judged by agent rules whatever
 # its branch is called: a branch outside branch_prefix fails the check instead of reading as the
 # Chief's. The branch name is the agent's choice; the PR author is not.

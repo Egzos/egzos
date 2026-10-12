@@ -802,7 +802,7 @@ def test_a_redispatched_builder_reads_the_reviews_first(name, prompt):
     assert "Never mark a PR ready" in prompt
     # Anyone can comment on this public repository and the session holds the forge token, so the
     # session reads the filtered file and never the comments (#211, a6).
-    assert "This session cannot read the PR's comments itself" in prompt
+    assert "Read the PR's reviews from that file only" in prompt
     assert "--comments" not in prompt
     assert "title, body, comments, commits" in prompt
 
@@ -820,10 +820,11 @@ def test_the_reviews_step_runs_before_the_session_on_the_default_token(job_id):
     step = job["steps"][names.index("reviews")]
     assert step["env"]["GH_TOKEN"] == "${{ github.token }}"
     ownership = yaml.safe_load((ROOT / ".github" / "OWNERSHIP.yml").read_text())
-    assert json.loads(step["env"]["CHIEF"]) == ownership["size_exception_approvers"]
+    assert json.loads(step["env"]["CHIEF"]) == ownership["chief_identities"]
     args = job["steps"][model]["with"]["claude_args"]
     assert "--add-dir /tmp/agent-in" in args
-    # The file is the only way in: no grant that reads a PR's comments (#211, a6 round 3).
+    # No first-class gh reader of a PR's comments (#211, a6 round 3). The session still holds an
+    # interpreter, so this pins the path, not a boundary: that residual is RD-005 (platform#42).
     tools = re.search(r'--allowedTools "([^"]*)"', args).group(1).split(",")
     readers = ("Bash(gh pr view", "Bash(gh pr list", "Bash(gh api")
     assert not [t for t in tools if t.startswith(readers)]
