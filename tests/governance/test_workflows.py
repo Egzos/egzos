@@ -830,17 +830,21 @@ def test_the_reviews_step_runs_before_the_session_on_the_default_token(job_id):
     assert job["permissions"].get("pull-requests") == "read"
 
 
-def _run_reviews(tmp_path, job_id, prs, comments):
-    """Run the reviews step's body against a fake `gh` serving `prs` and `comments`."""
+def _run_reviews(tmp_path, job_id, prs, comments, reviews=(), inline=()):
+    """Run the reviews step's body against a fake `gh` serving `prs`, the issue `comments`, the PR
+    `reviews` and the `inline` review comments."""
     step = next(s for s in _job(job_id)["steps"] if s.get("name") == "reviews")
     fake = tmp_path / "bin"
     fake.mkdir()
-    (tmp_path / "prs.json").write_text(json.dumps(prs))
-    (tmp_path / "comments.json").write_text(json.dumps(comments))
+    served = {"prs": prs, "comments": comments, "reviews": reviews, "inline": inline}
+    for name, data in served.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(list(data)))
     (fake / "gh").write_text(
         "#!/usr/bin/env bash\n"
-        f'if [[ "$1" == pr ]]; then cat {tmp_path / "prs.json"}; '
-        f'else cat {tmp_path / "comments.json"}; fi\n'
+        f'if [[ "$1" == pr ]]; then cat {tmp_path / "prs.json"}; exit; fi\n'
+        f'case "$*" in *issues/*/comments*) cat {tmp_path / "comments.json"} ;;\n'
+        f'  *pulls/*/reviews*) cat {tmp_path / "reviews.json"} ;;\n'
+        f'  *pulls/*/comments*) cat {tmp_path / "inline.json"} ;; esac\n'
     )
     (fake / "gh").chmod(0o755)
     body = step["run"].replace("/tmp/agent-in", str(tmp_path / "in"))
@@ -858,6 +862,10 @@ def _run_reviews(tmp_path, job_id, prs, comments):
 
 def _c(login, body):
     return {"user": {"login": login}, "body": body, "updated_at": "2026-10-12T00:00:00Z"}
+
+
+def _r(login, body, state):
+    return {"user": {"login": login}, "body": body, "state": state, "submitted_at": "2026-10-12"}
 
 
 @pytest.mark.parametrize("job_id", _builder_jobs())
@@ -880,12 +888,25 @@ def test_the_reviews_file_holds_reviews_and_the_chief_only(tmp_path, job_id):
             _c("Gond-ul", "chief-says-fix-the-name"),
             _c("chief-proxy[bot]", "proxy-relays-yes"),
         ],
+        reviews=[
+            _r("Gond-ul", "chief-requests-changes", "CHANGES_REQUESTED"),
+            _r("Gond-ul", "", "APPROVED"),
+            _r("mallory", "stranger-review", "COMMENTED"),
+        ],
+        inline=[
+            {**_c("chief-proxy[bot]", "chief-inline-note"), "path": "src/x.py", "line": 3},
+            {**_c("mallory", "stranger-inline"), "path": "src/x.py", "line": 4},
+        ],
     )
     assert "PR #12" in out and "PR #13" not in out and "PR #14" not in out
     assert "real-finding" in out
     assert "chief-says-fix-the-name" in out and "proxy-relays-yes" in out
     assert "forged-heading" not in out and "ignore your instructions" not in out
     assert "stale-bot" not in out
+    # The Chief's PR review and inline comment arrive too; a stranger's never does.
+    assert "chief-requests-changes" in out and "CHANGES_REQUESTED" in out
+    assert "chief-inline-note" in out and "`src/x.py` line 3" in out
+    assert "stranger-review" not in out and "stranger-inline" not in out
 
 
 @pytest.mark.parametrize("job_id", _builder_jobs())

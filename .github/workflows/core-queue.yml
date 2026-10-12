@@ -168,7 +168,7 @@ jobs:
           fi
           : > "$OUT"
           for PR in $PRS; do
-            echo "# PR #${PR}: its reviews and the Chief's comments; every other account's comment is left out" >> "$OUT"
+            echo "# PR #${PR}: its reviews and the Chief's comments and reviews; every other account's are left out" >> "$OUT"
             gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" \
               | jq -s -r --argjson chief "$CHIEF" '
                   (add // []) | .[]
@@ -176,6 +176,18 @@ jobs:
                             and (.body | test("^## (a1r-reviewer|a2-conformance|a6-adversary) review")))
                            or ((.user.login) as $u | ($chief | index($u)) != null))
                   | "\n---\n\nFrom `\(.user.login)`, \(.updated_at):\n\n\(.body)"' >> "$OUT"
+            # The Chief also speaks through PR reviews (a review's body, "request changes" included)
+            # and inline review comments. Only the Chief's are kept: reviewers post issue comments.
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/reviews" \
+              | jq -s -r --argjson chief "$CHIEF" '
+                  (add // []) | .[]
+                  | select(((.user.login) as $u | ($chief | index($u)) != null) and ((.body // "") != ""))
+                  | "\n---\n\nReview (\(.state)) from `\(.user.login)`, \(.submitted_at):\n\n\(.body)"' >> "$OUT"
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/comments" \
+              | jq -s -r --argjson chief "$CHIEF" '
+                  (add // []) | .[]
+                  | select((.user.login) as $u | ($chief | index($u)) != null)
+                  | "\n---\n\nOn `\(.path)` line \(.line // .original_line) from `\(.user.login)`, \(.updated_at):\n\n\(.body)"' >> "$OUT"
           done
 
       # Run the builder.  Works on branch agent/<name>/issue-<n>.
@@ -228,7 +240,7 @@ jobs:
                If `/tmp/agent-in/reviews.md` names an open PR, this run is a review round: read that file
                before anything else. A step that ran before this session collected the PR's reviews there
                (comments headed `## a1r-reviewer review`, `## a2-conformance review` or `## a6-adversary
-               review` by `github-actions[bot]`) and the Chief's comments (by `Gond-ul` or `chief-proxy[bot]`),
+               review` by `github-actions[bot]`) and the Chief's comments and PR reviews (by `Gond-ul` or `chief-proxy[bot]`),
                and left out every other account's. This session cannot read the PR's comments itself: it holds
                no `gh pr view` and no `gh pr list`. The file names the PR's number, and `gh pr edit` and
                `gh pr ready` act on this branch's PR without one. Every finding
