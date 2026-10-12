@@ -3,6 +3,8 @@
 """The CLI from the home directory, where `./.egzos` is the container itself, and usage errors:
 one line and a hint, exit 2, never a traceback."""
 
+import json
+
 import pytest
 
 from egzos.cli import main
@@ -70,3 +72,35 @@ def test_a_usage_error_echoes_what_was_typed_inert(at_home, capsys):
     err = capsys.readouterr().err
     assert "\x1b" not in err and "\x07" not in err
     assert "\\x1b" in err
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--json", "nosuchcommand"],
+        ["--json", "add"],
+        ["--json", "token"],
+        ["--json"],
+    ],
+)
+def test_a_usage_error_under_json_is_json_and_exit_2(at_home, capsys, argv):
+    capsys.readouterr()
+    assert main(argv) == 2
+    out = capsys.readouterr()
+    assert set(json.loads(out.out)) == {"error"}
+    assert out.err == ""
+
+
+def test_json_after_a_double_dash_is_data_not_the_flag(at_home, capsys):
+    capsys.readouterr()
+    assert main(["nosuchcommand", "--", "--json"]) == 2
+    out = capsys.readouterr()
+    assert out.out == "" and out.err.startswith("Error: ")
+
+
+def test_a_usage_error_under_json_echoes_what_was_typed_inert(at_home, capsys):
+    capsys.readouterr()
+    assert main(["--json", "no\x1b]52;c;aGk=\x07such"]) == 2
+    out = capsys.readouterr().out
+    assert "\x1b" not in out and "\x07" not in out
+    assert "such" in json.loads(out)["error"]
