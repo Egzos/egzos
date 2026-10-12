@@ -4,15 +4,24 @@
 # Post or update exactly ONE review comment on a PR, identified by its first line ("## <agent> review")
 # AND by author. Deterministic replacement for the action's tag-mode sticky comment, which never
 # exists in automation mode.
-# Usage: bash .github/scripts/post_review_comment.sh <pr-number> <body-file>
+# Usage: bash .github/scripts/post_review_comment.sh <pr-number> <body-file> [<head-sha>]
+# With <head-sha>, the comment ends with a `Reviewed head:` line, so a later run can tell an
+# unchanged head from a new one and keep its verdict on the former (platform#100). The line is
+# written here, after the model, from the event payload: the model cannot forge or drop it.
 # Requires: GH_TOKEN with pull-requests: write (the default Actions token is enough); GITHUB_REPOSITORY set.
 set -euo pipefail
-PR="${1:?pr number}"; BODY_FILE="${2:?body file}"; REPO="${GITHUB_REPOSITORY:?}"
+PR="${1:?pr number}"; BODY_FILE="${2:?body file}"; HEAD_SHA="${3:-}"; REPO="${GITHUB_REPOSITORY:?}"
 MARKER="$(head -n1 "$BODY_FILE")"
 case "$MARKER" in
   "## "*" review") ;;
   *) echo "::error::review body must start with '## <agent> review' (got: ${MARKER:0:60})"; exit 2 ;;
 esac
+if [[ -n "$HEAD_SHA" ]]; then
+  [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::head sha must be 40 hex characters"; exit 2; }
+  STAMPED="$(mktemp)"
+  { cat "$BODY_FILE"; printf '\n\nReviewed head: `%s`\n' "$HEAD_SHA"; } > "$STAMPED"
+  BODY_FILE="$STAMPED"
+fi
 
 # Author filter is load-bearing, not cosmetic: on a public repository any account can post a comment
 # starting with this marker. Without it the reviewer would PATCH that comment, putting its verdict

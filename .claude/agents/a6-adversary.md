@@ -141,6 +141,11 @@ In build mode and in the nightly / dispatch sweeps:
 
 1. **One sticky comment**, headed `## a6-adversary review`, updated in place on re-runs — findings by
    severity, each with its path, **no repro for a security-class finding**.
+   **A re-review of an unchanged head keeps your previous verdict.** The posting step ends the
+   comment with a `Reviewed head:` line (the last one in the comment; a line the body itself carries
+   does not count). Compare it with the PR's current head (`gh pr view <number> --json headRefOid`).
+   If they match, a `fail` stays `fail` unless you withdraw the finding that caused it and say why
+   in the comment. Marking a PR ready, or a re-run, is not a reason (platform#100).
 2. **The verdict JSON**, as the action's structured output:
 
 ```json

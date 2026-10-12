@@ -138,6 +138,8 @@ jobs:
           ENV: ""
           LD_PRELOAD: ""
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # The head this review saw; the posting script stamps it on the comment (platform#100).
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR: ${{ github.event.pull_request.number }}
           # Everything env -i forwards is pinned here too, so $GITHUB_ENV cannot set it.
           GH_TOKEN: ${{ github.token }}
@@ -177,7 +179,7 @@ jobs:
           clean gh api -H "Accept: application/vnd.github.raw" \
             "repos/${GITHUB_REPOSITORY}/contents/.github/scripts/post_review_comment.sh?ref=${BASE_SHA}" > "$S"
           test -s "$S"
-          clean bash --noprofile --norc "$S" "$PR" /tmp/review.md
+          clean bash --noprofile --norc "$S" "$PR" /tmp/review.md "$HEAD_SHA"
 
       # Three different faults all surface as "did not return structured_output", and the number
       # that separates them lives only in the login-gated run log. #35, the tier cap and #47 each
