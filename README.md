@@ -29,7 +29,7 @@ egzos needs Python 3.11 or newer. [uv](https://docs.astral.sh/uv/) fetches one f
 system Python is older (macOS ships 3.9):
 
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh   # once; then open a new terminal
+curl -LsSf https://astral.sh/uv/install.sh | sh   # once (or: brew install uv); then open a new terminal
 uv tool install egzos                       # or, with Python 3.11+: pipx install egzos
 
 egzos init                                   # your container at ~/.egzos, and your owner token

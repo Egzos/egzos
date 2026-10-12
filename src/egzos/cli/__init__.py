@@ -819,6 +819,11 @@ def connect(
     )
 
 
+def _json_requested(args: list[str]) -> bool:
+    """Whether `--json` was typed as an option: anywhere before a `--`, after which it is data."""
+    return "--json" in (args[: args.index("--")] if "--" in args else args)
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns an exit code (tests call main([]))."""
     args = sys.argv[1:] if argv is None else argv
@@ -831,9 +836,14 @@ def main(argv: list[str] | None = None) -> int:
         # A usage error (unknown command or option, missing argument): one line and a hint on
         # stderr, never a traceback. The message can echo what was typed, so it goes through safe.
         msg = e.format_message() if hasattr(e, "format_message") else str(e)
-        ctx = getattr(e, "ctx", None)
-        path = safe(ctx.command_path if ctx else "egzos")
-        typer.echo(f"Error: {safe(msg)}\nTry '{path} --help'.", err=True)
+        if _json_requested(args):
+            # A `--json` caller gets JSON every time, as `_fail` gives it (#203). Parsing failed
+            # before the app callback ran, so the flag is read from the arguments, not `_state`.
+            typer.echo(safe(json.dumps({"error": msg}, indent=2, ensure_ascii=False), json=True))
+        else:
+            ctx = getattr(e, "ctx", None)
+            path = safe(ctx.command_path if ctx else "egzos")
+            typer.echo(f"Error: {safe(msg)}\nTry '{path} --help'.", err=True)
         return int(getattr(e, "exit_code", 2))
     except SystemExit as e:
         return int(e.code or 0)
