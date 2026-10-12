@@ -64,9 +64,12 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/agent-in
           OUT=/tmp/agent-in/reviews.md
-          PRS="$(gh pr list --state open --limit 1000 --json number,headRefName \
+          # A fork can name its branch anything, an agent's included: only a branch in this
+          # repository, which only the forge App and the Chief can push, is the builder's own.
+          PRS="$(gh pr list --state open --limit 1000 --json number,headRefName,isCrossRepository \
             | jq -r --arg m "$HEAD_MATCH" \
-                '.[] | select(if ($m | endswith("/")) then (.headRefName | startswith($m))
+                '.[] | select(.isCrossRepository | not)
+                     | select(if ($m | endswith("/")) then (.headRefName | startswith($m))
                               else .headRefName == $m end) | .number')"
           if [[ -z "$PRS" ]]; then
             echo "No open PR on this branch: this run is not a review round." > "$OUT"

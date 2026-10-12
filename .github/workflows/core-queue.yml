@@ -113,9 +113,11 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "::error::issue '$ISSUE' is not a number"; exit 1; }
-          COUNT=$(gh pr list --state open --limit 1000 --json headRefName,isDraft \
+          # Only a branch in this repository is an agent's: a fork can name its branch anything, and
+          # one named after an agent's would otherwise hold that agent's WIP slot.
+          COUNT=$(gh pr list --state open --limit 1000 --json headRefName,isDraft,isCrossRepository \
             | jq --arg prefix "agent/${AGENT}/" --arg own "agent/${AGENT}/issue-${ISSUE}" \
-                '[.[] | select(.headRefName | startswith($prefix))
+                '[.[] | select(.isCrossRepository | not) | select(.headRefName | startswith($prefix))
                       | select((.isDraft and .headRefName == $own) | not)] | length')
           echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
           echo "WIP PRs for ${AGENT} (excluding this issue's own draft): ${COUNT}"
@@ -153,9 +155,12 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/agent-in
           OUT=/tmp/agent-in/reviews.md
-          PRS="$(gh pr list --state open --limit 1000 --json number,headRefName \
+          # A fork can name its branch anything, an agent's included: only a branch in this
+          # repository, which only the forge App and the Chief can push, is the builder's own.
+          PRS="$(gh pr list --state open --limit 1000 --json number,headRefName,isCrossRepository \
             | jq -r --arg m "$HEAD_MATCH" \
-                '.[] | select(if ($m | endswith("/")) then (.headRefName | startswith($m))
+                '.[] | select(.isCrossRepository | not)
+                     | select(if ($m | endswith("/")) then (.headRefName | startswith($m))
                               else .headRefName == $m end) | .number')"
           if [[ -z "$PRS" ]]; then
             echo "No open PR on this branch: this run is not a review round." > "$OUT"
