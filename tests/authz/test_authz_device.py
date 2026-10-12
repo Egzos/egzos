@@ -27,11 +27,16 @@ T0 = datetime(2026, 10, 12, 9, 0, 0, tzinfo=UTC)
 KEY = b"k" * 32  # a fixture key; provisioning the real one is #143's
 CLIENT = "egzos-cli"
 URI = "https://box.example/device"
+INTERVAL = timedelta(seconds=device.POLL_INTERVAL_SECONDS)
 
 
 class Devices:
-    """storage.md §3.1's device methods this slice calls, in memory, with rule 2's semantics:
-    an insert-only put and a decision that moves a record out of pending once."""
+    """storage.md §3.1's five device methods, in memory, with rule 2's semantics: insert-only
+    put, a poll that returns the prior record, decide once, consume nothing while pending.
+
+    `get_device_by_user_code` here returns expired and decided records too. §3.1 lists it among the
+    plain getters, which return None for those, so that is the open question #214 item 1; `enter`
+    keeps its fail-closed checks for both until #214 is answered."""
 
     def __init__(self) -> None:
         self.rows: dict[str, DeviceAuthorizationRecord] = {}
@@ -40,6 +45,14 @@ class Devices:
 
     def put_device(self, record: DeviceAuthorizationRecord) -> None:
         self.rows.setdefault(record["device_code_hash"], copy.deepcopy(record))
+
+    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None:
+        row = self.rows.get(device_code_hash)
+        if row is None:
+            return None
+        prior = copy.deepcopy(row)
+        row["last_polled_at"] = at
+        return prior
 
     def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None:
         self.lookups.append(user_code_hash)
@@ -56,6 +69,12 @@ class Devices:
         row["decision"] = "granted" if grant is not None else "denied"
         row["grant"] = copy.deepcopy(grant)
         return True
+
+    def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None:
+        row = self.rows.get(device_code_hash)
+        if row is None or row["decision"] == "pending":
+            return None
+        return self.rows.pop(device_code_hash)
 
 
 def _issue(state: Devices, **over: Any) -> DeviceAuthorization:
@@ -79,6 +98,10 @@ def _decide(state: Devices, user_code: str | None, **over: Any) -> bool:
     args: dict[str, Any] = {"key": KEY, "approve": True, "now": T0 + timedelta(seconds=30)}
     return device.decide(state, user_code=user_code, **{**args, **over})  # type: ignore[arg-type]
 
+
+def _poll(state: Devices, device_code: str | None, **over: Any) -> device.Poll:
+    args: dict[str, Any] = {"client_id": CLIENT, "now": T0 + timedelta(seconds=60)}
+    return device.poll(state, device_code=device_code, **{**args, **over})  # type: ignore[arg-type]
 
 
 # --- authorize ---------------------------------------------------------------------------------
@@ -324,6 +347,113 @@ def test_a_late_or_unknown_code_decides_nothing():
     assert _row(state)["decision"] == "pending"
 
 
+# --- poll (token endpoint) ---------------------------------------------------------------------
+
+
+def test_the_flow_end_to_end():
+    state = Devices()
+    response = _issue(state)
+    dc = response["device_code"]
+    assert _poll(state, dc, now=T0 + INTERVAL) == device.Poll("authorization_pending")
+    assert _decide(state, response["user_code"])
+    result = _poll(state, dc, now=T0 + 2 * INTERVAL)
+    assert result.error is None and result.record is not None
+    assert result.record["grant"] is not None and result.record["grant"]["principal"] == "client"
+    # spent: the second redemption finds nothing
+    assert _poll(state, dc, now=T0 + 3 * INTERVAL) == device.Poll("invalid_grant")
+
+
+def test_a_denied_authorization_answers_access_denied_once():
+    state = Devices()
+    response = _issue(state)
+    assert _decide(state, response["user_code"], approve=False)
+    assert _poll(state, response["device_code"]) == device.Poll("access_denied")
+    later = T0 + timedelta(seconds=60) + INTERVAL
+    assert _poll(state, response["device_code"], now=later) == device.Poll("invalid_grant")
+
+
+def test_polling_faster_than_the_interval_is_slow_down():
+    state = Devices()
+    dc = _issue(state)["device_code"]
+    assert _poll(state, dc, now=T0).error == "authorization_pending"
+    assert _poll(state, dc, now=T0 + INTERVAL - timedelta(seconds=1)).error == "slow_down"
+    # the too-fast poll is itself the last poll
+    assert _poll(state, dc, now=T0 + INTERVAL).error == "slow_down"
+    assert _poll(state, dc, now=T0 + 3 * INTERVAL).error == "authorization_pending"
+
+
+def test_slow_down_holds_even_once_approved():
+    state = Devices()
+    response = _issue(state)
+    assert _poll(state, response["device_code"], now=T0).error == "authorization_pending"
+    assert _decide(state, response["user_code"])
+    assert _poll(state, response["device_code"], now=T0 + timedelta(seconds=1)).error == "slow_down"
+    assert _poll(state, response["device_code"], now=T0 + 2 * INTERVAL).error is None
+
+
+def test_an_unreadable_last_poll_fails_closed():
+    state = Devices()
+    dc = _issue(state)["device_code"]
+    _row(state)["last_polled_at"] = "earlier"
+    assert _poll(state, dc).error == "slow_down"
+
+
+def test_an_expired_authorization_is_expired_token_even_if_approved():
+    state = Devices()
+    response = _issue(state)
+    assert _decide(state, response["user_code"])
+    late = T0 + timedelta(seconds=device.DEVICE_CODE_LIFETIME_SECONDS)
+    assert _poll(state, response["device_code"], now=late) == device.Poll("expired_token")
+    assert len(state.rows) == 1  # nothing spent
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"client_id": "other-client"},
+        {"client_id": "EGZOS-CLI"},
+        {"client_id": None},
+        {"client_id": "\ud800"},
+    ],
+)
+def test_another_clients_poll_is_invalid_grant(over):
+    state = Devices()
+    response = _issue(state)
+    assert _decide(state, response["user_code"])
+    assert _poll(state, response["device_code"], **over) == device.Poll("invalid_grant")
+    assert len(state.rows) == 1  # and spends nothing
+
+
+@pytest.mark.parametrize("dc", [None, "", "not-a-device-code", "\ud800", "x" * 10_000])
+def test_unknown_and_malformed_device_codes_are_invalid_grant(dc):
+    state = Devices()
+    _issue(state)
+    assert _poll(state, dc) == device.Poll("invalid_grant")
+
+
+def test_a_naive_clock_at_poll_touches_nothing():
+    state = Devices()
+    dc = _issue(state)["device_code"]
+    assert _poll(state, dc, now=datetime(2026, 10, 12, 9, 1, 0)) == device.Poll("invalid_grant")
+    assert _row(state)["last_polled_at"] is None
+
+
+def test_a_concurrently_spent_authorization_is_invalid_grant():
+    state = Devices()
+    response = _issue(state)
+    assert _decide(state, response["user_code"])
+    state.consume_device = lambda _h: None  # type: ignore[method-assign]
+    assert _poll(state, response["device_code"]) == device.Poll("invalid_grant")
+
+
+def test_a_granted_record_without_a_grant_mints_nothing():
+    state = Devices()
+    response = _issue(state)
+    assert _decide(state, response["user_code"])
+    _row(state)["grant"] = None
+    assert _poll(state, response["device_code"]) == device.Poll("access_denied")
+
+
 def test_every_step_defaults_to_the_wall_clock():
     state: Any = Devices()
     response = device.authorize(
@@ -337,3 +467,4 @@ def test_every_step_defaults_to_the_wall_clock():
     user_code = response["user_code"]
     assert device.enter(state, key=KEY, user_code=user_code).record is not None
     assert device.decide(state, key=KEY, user_code=user_code, approve=True)
+    assert device.poll(state, device_code=response["device_code"], client_id=CLIENT).error is None
