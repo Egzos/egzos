@@ -26,12 +26,13 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Literal, cast
 
 from egzos._types import (
     AS_REQUESTER_HINT_MAX_CHARS,
     ASGrant,
     ASState,
+    Capability,
     DeviceAuthorization,
     DeviceAuthorizationRecord,
     DeviceRedemptionCause,
@@ -95,6 +96,16 @@ def _parse(text: str | None) -> datetime | None:
         return None
 
 
+def _same(given: str | None, stored: str) -> bool:
+    # Bytes, as `codes` does: `compare_digest` raises on non-ASCII `str`, and a raise would be a
+    # second answer shape beside `invalid_grant`.
+    if not isinstance(given, str):
+        return False
+    return hmac.compare_digest(
+        given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
+    )
+
+
 def _expired(record: DeviceAuthorizationRecord, at: datetime) -> bool:
     until = _parse(record["expires_at"])
     return until is None or at >= until  # an expiry nobody can read fails closed
@@ -141,7 +152,7 @@ def authorize(
             user_code_hash=code_hash,
             client_id=client_id,
             requested=DeviceRequest(
-                capabilities=list(expanded.capabilities),  # type: ignore[arg-type]
+                capabilities=cast(list[Capability], list(expanded.capabilities)),
                 scopes=list(expanded.scopes),
             ),
             requester_hint=hint,
@@ -224,13 +235,7 @@ def poll(
         return Poll("invalid_grant")
     device_hash = values.digest(device_code)
     prior = state.poll_device(device_hash, _iso(at))
-    if prior is None or not (
-        isinstance(client_id, str)
-        and hmac.compare_digest(
-            client_id.encode("utf-8", "surrogatepass"),
-            prior["client_id"].encode("utf-8", "surrogatepass"),
-        )
-    ):
+    if prior is None or not _same(client_id, prior["client_id"]):
         return Poll("invalid_grant")
     if _expired(prior, at):
         return Poll("expired_token")
