@@ -3,7 +3,7 @@
 """
 The device-code flow (authorization-server.md §3, §11.8), against `ASState` (storage.md §3.1).
 
-Four steps, one function each, none of them HTTP:
+Three steps here, one function each, none of them HTTP:
 
 - `authorize`: the device authorization endpoint. Expands `scope` by §7 (refused whole, never
   narrowed), stores the pending record under the `device_code`'s digest and the `user_code`'s keyed
@@ -13,7 +13,8 @@ Four steps, one function each, none of them HTTP:
 - `decide`: the owner's approve or deny at `/device`. The grant is built here from the stored
   `requested`, capabilities and scopes unchanged, so no caller can widen it (§3 mitigation 3,
   §11.2 consequence 1). Device-flow tokens carry `principal: client` (§10.3).
-- `poll`: the token endpoint's `device_code` grant, up to (not including) the mint.
+
+The token endpoint's poll (`slow_down`, consume on decision) is the next slice.
 
 The device-code key is a container secret whose provisioning is #143's; it is a parameter here and
 is never stored beside the hashes it keys. Throttling (§3 mitigation 1's attempt bound, §11.0) and
@@ -26,12 +27,13 @@ import hashlib
 import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import cast
 
 from egzos._types import (
     AS_REQUESTER_HINT_MAX_CHARS,
     ASGrant,
     ASState,
+    Capability,
     DeviceAuthorization,
     DeviceAuthorizationRecord,
     DeviceRedemptionCause,
@@ -49,10 +51,6 @@ POLL_INTERVAL_SECONDS = 5
 _USER_CODE_DRAWS = 8
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
 
-PollError = Literal[
-    "authorization_pending", "slow_down", "access_denied", "expired_token", "invalid_grant"
-]
-
 
 @dataclass(frozen=True)
 class Entry:
@@ -64,22 +62,9 @@ class Entry:
     cause: DeviceRedemptionCause | None
 
 
-@dataclass(frozen=True)
-class Poll:
-    """The token endpoint's answer. `record` is set, with its `grant`, exactly when `error` is
-    None: the authorization was approved and is now spent."""
-
-    error: PollError | None
-    record: DeviceAuthorizationRecord | None = None
-
-
-def _aware(at: datetime) -> bool:
-    return at.tzinfo is not None and at.utcoffset() is not None
-
-
 def _clock(now: datetime | None) -> datetime:
     at = now or datetime.now(UTC)
-    if not _aware(at):
+    if at.tzinfo is None or at.utcoffset() is None:
         raise ValueError("authz.device needs an aware datetime")
     return at
 
@@ -88,16 +73,12 @@ def _iso(at: datetime) -> str:
     return at.astimezone(UTC).strftime(_ISO)
 
 
-def _parse(text: str | None) -> datetime | None:
-    try:
-        return datetime.strptime(text, _ISO).replace(tzinfo=UTC)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
 def _expired(record: DeviceAuthorizationRecord, at: datetime) -> bool:
-    until = _parse(record["expires_at"])
-    return until is None or at >= until  # an expiry nobody can read fails closed
+    try:
+        until = datetime.strptime(record["expires_at"], _ISO).replace(tzinfo=UTC)
+    except (TypeError, ValueError):
+        return True  # an expiry nobody can read fails closed
+    return at >= until
 
 
 def user_code_hash(key: bytes, code: str) -> str:
@@ -141,7 +122,7 @@ def authorize(
             user_code_hash=code_hash,
             client_id=client_id,
             requested=DeviceRequest(
-                capabilities=list(expanded.capabilities),  # type: ignore[arg-type]
+                capabilities=cast(list[Capability], list(expanded.capabilities)),
                 scopes=list(expanded.scopes),
             ),
             requester_hint=hint,
@@ -208,41 +189,3 @@ def decide(
         grant_expires_at=_iso(at + timedelta(seconds=grant.clamp_grant_lifetime(lifetime_seconds))),
     )
     return state.decide_device(record["device_code_hash"], decided)
-
-
-def poll(
-    state: ASState,
-    *,
-    device_code: str | None,
-    client_id: str | None,
-    now: datetime | None = None,
-) -> Poll:
-    """RFC 8628 §3.5 at the token endpoint. An unknown `device_code`, another client's, a spent
-    one and a naive clock all answer `invalid_grant`, alike."""
-    at = now or datetime.now(UTC)
-    if not isinstance(device_code, str) or not device_code or not _aware(at):
-        return Poll("invalid_grant")
-    device_hash = values.digest(device_code)
-    prior = state.poll_device(device_hash, _iso(at))
-    if prior is None or not (
-        isinstance(client_id, str)
-        and hmac.compare_digest(
-            client_id.encode("utf-8", "surrogatepass"),
-            prior["client_id"].encode("utf-8", "surrogatepass"),
-        )
-    ):
-        return Poll("invalid_grant")
-    if _expired(prior, at):
-        return Poll("expired_token")
-    if prior["last_polled_at"] is not None:
-        last = _parse(prior["last_polled_at"])
-        if last is None or at - last < timedelta(seconds=POLL_INTERVAL_SECONDS):
-            return Poll("slow_down")
-    if prior["decision"] == "pending":
-        return Poll("authorization_pending")
-    spent = state.consume_device(device_hash)
-    if spent is None:
-        return Poll("invalid_grant")  # a concurrent poll spent it first
-    if spent["decision"] == "granted" and spent["grant"] is not None:
-        return Poll(None, spent)
-    return Poll("access_denied")
