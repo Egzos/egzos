@@ -14,7 +14,9 @@ Issuance and rotation (authorization-server.md §9.2, §9.3 rows 1, 2 and 5), ag
   `token.mint` (row 5). The new token carries the stored grant unchanged, so rotation can neither
   widen it nor upgrade its principal (clause 3), and the owner is the first token's.
 
-Every refusal is `None`, alike; which check failed never leaves this module. An access token
+Every refusal from `mint`, `exchange_code` and `refresh` is `None`, alike; which check failed
+never leaves this module. `exchange_device` is the one exception: it returns the error words
+RFC 8628 §3.5 requires the device client to see (`device.PollError`). An access token
 always expires: `AS_ACCESS_TOKEN_LIFETIME_SECONDS` after issue, or at the grant's own expiry if
 that is sooner, never null ([0.3 · 17]). The access token's value is `egzos.auth`'s format, so it
 resolves through `Auth.use` like any other token (`values` module docstring). No HTTP here; the
