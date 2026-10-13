@@ -20,8 +20,11 @@ and `Answer.body` as JSON.
    lookup (RFC 7009 §2.1), so `unsupported_token_type` is never answered.
 
 The only entry is `token.revoke`, appended by `revoke` for a token really revoked ([0.3 · 30]). A
-refusal appends nothing. The endpoint is not among `AS_THROTTLE_SURFACES`: §9.2's `revoke`
-surface is the owner path's (§11.9), and this one is bounded by §9.1's entropy alone.
+refusal appends nothing. Whether this endpoint counts against the `revoke` throttle surface is
+open: §11.9 and the `AS_THROTTLE_SURFACES` list tie `revoke` to the owner page, while §12's rate
+rationale counts "RFC 7009 calls a client makes on sign-out" under it. #249 item 5 asks a1p to
+reconcile the two. This module runs no throttle either way; the router does not mount it until
+that answer lands.
 
 §9.2's time budget is the router's to keep, with `budget.Budget` started before `respond` and
 settled after it. A token really revoked writes and appends, and an unknown one returns before the
