@@ -127,10 +127,13 @@ def admit(
         return None
     query, entry, challenge = found
     redirect_uri = query["redirect_uri"]
+    # RFC 6749 §3.1: a parameter sent without a value is treated as omitted, so `state=` and no
+    # `state` are one request to §11.4, and an empty `state` never reaches §11.6's redirect.
+    request_state, scope = query.get("state") or None, query.get("scope") or None
     key = decided.request_key(
         client_id=entry.client_id,
         redirect_uri=redirect_uri,
-        state=query.get("state"),
+        state=request_state,
         code_challenge=challenge,
     )
     # `replayed` appends its own row (d).
@@ -140,7 +143,7 @@ def admit(
         client=entry,
         redirect_uri=redirect_uri,
         code_challenge=challenge,
-        state=query.get("state"),
-        scope=query.get("scope"),
+        state=request_state,
+        scope=scope,
         key=key,
     )
