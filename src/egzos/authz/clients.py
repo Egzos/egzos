@@ -20,10 +20,10 @@ amendment moves an existing `client_id` onto the browser flow that mints `intera
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, Protocol
 
 from egzos._ids import ulid
-from egzos._types import AS_CLIENT_TYPES, ASState, ClientRegistration
+from egzos._types import AS_CLIENT_TYPES, ASState, ClientRegisterOp, ClientRegistration
+from egzos.authz import AuditLedger
 from egzos.authz.redirects import RedirectURIRefused, check_registrable
 from egzos.model import Token
 
@@ -34,16 +34,10 @@ class ClientRefused(ValueError):
     """A registration act the owner must correct, or a caller who is not the owner."""
 
 
-class AuditLedger(Protocol):
-    def append(
-        self, event: str, *, actor: str, principal: str, subject: str | None = None, **details: Any
-    ) -> dict[str, Any]: ...
-
-
-def _owner(by: Token) -> None:
-    if not isinstance(by, Token) or by.principal != "interactive" or not by.has("admin"):
+def _owner(token: Token) -> None:
+    if not isinstance(token, Token) or token.principal != "interactive" or not token.has("admin"):
         raise ClientRefused("registering a client is the owner's act")
-    if "*" not in by.scopes:
+    if "*" not in token.scopes:
         raise ClientRefused("registering a client is the owner's act")
 
 
@@ -68,12 +62,17 @@ def _uris(redirect_uris: object) -> list[str]:
 
 
 def _record(
-    ledger: AuditLedger, by: Token, actor: str, client_id: str, op: str, uris: list[str]
+    ledger: AuditLedger,
+    token: Token,
+    actor: str,
+    client_id: str,
+    op: ClientRegisterOp,
+    uris: list[str],
 ) -> None:
     ledger.append(
         "client.register",
         actor=actor,
-        principal=by.principal,
+        principal=token.principal,
         subject=client_id,
         client_id=client_id,
         op=op,
@@ -85,7 +84,7 @@ def register(
     state: ASState,
     ledger: AuditLedger,
     *,
-    by: Token,
+    token: Token,
     actor: str,
     client_name: str,
     client_type: str,
@@ -94,7 +93,7 @@ def register(
 ) -> ClientRegistration:
     """Add a client entry (`op: add`). The `client_id` is minted here, never chosen by a caller,
     so no registration can take over an existing entry's id."""
-    _owner(by)
+    _owner(token)
     if client_type not in AS_CLIENT_TYPES:
         raise ClientRefused("a client is browser, cli or mcp")
     entry = ClientRegistration(
@@ -105,7 +104,7 @@ def register(
         registered_at=(now or datetime.now(UTC)).astimezone(UTC).strftime(_ISO),
     )
     state.put_client(entry)
-    _record(ledger, by, actor, entry["client_id"], "add", entry["redirect_uris"])
+    _record(ledger, token, actor, entry["client_id"], "add", entry["redirect_uris"])
     return entry
 
 
@@ -113,7 +112,7 @@ def amend(
     state: ASState,
     ledger: AuditLedger,
     *,
-    by: Token,
+    token: Token,
     actor: str,
     client_id: str,
     client_name: str | None = None,
@@ -121,7 +120,7 @@ def amend(
 ) -> ClientRegistration:
     """Change an entry's name or allowlist (`op: amend`). `client_type` and `registered_at` keep
     their values. An amendment that changes nothing still appends: the act happened."""
-    _owner(by)
+    _owner(token)
     entry = state.get_client(client_id) if isinstance(client_id, str) else None
     if entry is None:
         raise ClientRefused("no such client")
@@ -130,14 +129,16 @@ def amend(
     if redirect_uris is not None:
         entry["redirect_uris"] = _uris(redirect_uris)
     state.put_client(entry)
-    _record(ledger, by, actor, client_id, "amend", entry["redirect_uris"])
+    _record(ledger, token, actor, client_id, "amend", entry["redirect_uris"])
     return entry
 
 
-def remove(state: ASState, ledger: AuditLedger, *, by: Token, actor: str, client_id: str) -> None:
+def remove(
+    state: ASState, ledger: AuditLedger, *, token: Token, actor: str, client_id: str
+) -> None:
     """Remove an entry (`op: remove`, `redirect_uris` empty). Tokens already issued to it are not
     revoked here: that is `token rm`, one `token.revoke` each (§9.2)."""
-    _owner(by)
+    _owner(token)
     if not isinstance(client_id, str) or not state.remove_client(client_id):
         raise ClientRefused("no such client")
-    _record(ledger, by, actor, client_id, "remove", [])
+    _record(ledger, token, actor, client_id, "remove", [])
