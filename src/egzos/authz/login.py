@@ -84,6 +84,8 @@ def attempt(
         cause: LoginCause = "wrong"
         ledger.append("authz.login", actor="login", principal="none", outcome="failed", cause=cause)
         return Login(None, None)
+    # The location first: nothing is stored or appended until every part of the answer exists.
+    location = continuation.resolve(continue_value)
     session = sessions.establish(gate, now=at)
     ledger.append("authz.login", actor="login", principal="none", outcome="established")
-    return Login(session, continuation.resolve(continue_value))
+    return Login(session, location)
