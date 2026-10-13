@@ -3,11 +3,12 @@
 """
 The AS's own issued values (authorization-server.md §9.1, §11.8).
 
-Authorization codes, `device_code`s and refresh tokens carry 256 bits from the platform CSPRNG
-(`secrets`), twice §9.1's 128-bit floor, and nothing derived from a counter, a clock, a client id
-or an owner. The `user_code` is the one exception, bounded by the attempt limit and expiry rather
-than by entropy ([0.3 · 20]): 8 characters of RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX`,
-matched case-insensitively with the hyphen ignored.
+Authorization codes, `device_code`s, refresh tokens and interactive session identifiers (§10.1)
+carry 256 bits from the platform CSPRNG (`secrets`), twice §9.1's 128-bit floor, and nothing
+derived from a counter, a clock, a client id or an owner. The `user_code` is the one exception,
+bounded by the attempt limit and expiry rather than by entropy ([0.3 · 20]): 8 characters of
+RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX`, matched case-insensitively with the hyphen
+ignored.
 
 Access tokens are not minted here. A token the AS issues IS a `Token` (§7, `capabilities.md` §5),
 so its bearer value is `egz_<id>_<256 bits>` from `egzos.auth`, the same path as `token mint`,
@@ -26,7 +27,8 @@ VALUE_BYTES = 32
 
 
 def new_value() -> str:
-    """An opaque, unguessable value for an authorization code, a `device_code` or a refresh token.
+    """An opaque, unguessable value for an authorization code, a `device_code`, a refresh token
+    or an interactive session (§10.1; a session is not a `Token`).
 
     Never an access token's bearer value: that is `egzos.auth`'s, through the `Token` mint."""
     return secrets.token_urlsafe(VALUE_BYTES)
