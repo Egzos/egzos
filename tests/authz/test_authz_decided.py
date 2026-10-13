@@ -230,7 +230,7 @@ def test_one_session_can_decide_more_than_one_request(state, chain):
 
 
 @pytest.mark.parametrize("session_hash", [None, "", 7])
-def test_first_replay_without_a_session_matches_nothing_and_reads_nothing(state, chain, session_hash):
+def test_first_replay_without_a_session_reads_nothing(state, chain, session_hash):
     key = _decide(state)
     assert not decided.first_replay(state, Ledger(chain), session_hash=session_hash, key=key)  # type: ignore[arg-type]
     assert state.claims == [] and chain.entries == []

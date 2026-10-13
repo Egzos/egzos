@@ -51,7 +51,8 @@ def request_key(
     requests. The requester hint never enters it (storage.md §3.1 rule 2).
 
     Call it on values `/authorize` has already admitted (a registered client, a matched redirect,
-    a well-formed S256 challenge). A non-string argument is a caller's bug and raises `TypeError`."""
+    a well-formed S256 challenge). A non-string argument is a caller's bug and raises
+    `TypeError`."""
     for value in (client_id, redirect_uri, code_challenge):
         if not isinstance(value, str):
             raise TypeError("request_key takes strings")
@@ -77,8 +78,9 @@ def record(
     `authz.grant`, is the caller's (§9.3). This holds for sequential requests only: storage.md
     §3.1 does not make `put_decided` insert-only, so two submissions that both read before
     either writes both land. Until #226 gives the store an atomic answer, no endpoint wires a
-    decision to the mint through this function. A naive `now`, an empty key or session, or a decision
-    outside `AS_GRANT_DECISIONS` is a caller's bug and raises `ValueError`; nothing is stored."""
+    decision to the mint through this function. A naive `now`, an empty key or session, or a
+    decision outside `AS_GRANT_DECISIONS` is a caller's bug and raises `ValueError`; nothing is
+    stored."""
     at = now or datetime.now(UTC)
     if not _aware(at):
         raise ValueError("decided.record needs an aware datetime")
@@ -102,7 +104,9 @@ def _refuse(ledger: AuditLedger) -> None:
     ledger.append("authz.refuse", actor="authorize", principal="none", cause="replayed")
 
 
-def first_replay(state: ASState, ledger: AuditLedger, *, session_hash: str | None, key: str) -> bool:
+def first_replay(
+    state: ASState, ledger: AuditLedger, *, session_hash: str | None, key: str
+) -> bool:
     """§11.0 substep 1, and §12.1 rule 6's one unthrottled path: is this the deciding session's
     first re-submission of this request? Run it before the throttle counter, at `/authorize` only.
 
