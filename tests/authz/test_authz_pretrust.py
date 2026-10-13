@@ -129,6 +129,31 @@ def test_state_and_scope_are_optional_here(state: State, chain: Chain) -> None:
     assert admitted.state is None and admitted.scope is None
 
 
+def test_an_empty_state_is_treated_as_omitted(state: State, chain: Chain) -> None:
+    admitted = _admit(state, chain, _with(state=""))
+    assert admitted is not None
+    assert admitted.state is None
+    assert admitted.key == decided.request_key(
+        client_id=CLIENT, redirect_uri=CB, state=None, code_challenge=CHALLENGE
+    )
+    # One request to §11.4: deciding it with `state=` replays it without `state`.
+    _decide(state, admitted.key, "denied")
+    assert _admit(state, chain, _with(state=None)) is None
+    _refused(chain, "replayed")
+
+
+def test_an_empty_scope_is_treated_as_omitted(state: State, chain: Chain) -> None:
+    admitted = _admit(state, chain, _with(scope=""))
+    assert admitted is not None
+    assert admitted.scope is None
+    assert chain.entries == []
+
+
+def test_a_repeated_empty_state_is_still_malformed(state: State, chain: Chain) -> None:
+    assert _admit(state, chain, _with(state="") + [("state", "")]) is None
+    _refused(chain, "malformed")
+
+
 def test_a_loopback_redirect_is_admitted_on_any_port(state: State, chain: Chain) -> None:
     admitted = _admit(state, chain, _with(redirect_uri="http://127.0.0.1:8731/cb"))
     assert admitted is not None
