@@ -247,3 +247,29 @@ def test_a_failure_under_token_is_one_no_store_server_error(state, chain, monkey
     assert answer.headers["pragma"] == "no-cache"
     assert str(failure.args[0]) not in answer.text
     assert chain.entries == []
+
+
+def test_a_failure_under_token_logs_its_type_and_no_request_material(
+    state, chain, monkeypatch, caplog
+):
+    code = _code(state)
+    secrets = (code, VERIFIER)
+
+    def respond(*args, **kwargs):
+        try:
+            raise LookupError(f"no row for {code}")
+        except LookupError as cause:
+            raise ValueError(f"bad verifier {VERIFIER} for {code}") from cause
+
+    monkeypatch.setattr(router.token_endpoint, "respond", respond)
+    app = FastAPI()
+    app.include_router(_routes(state, chain))
+    caplog.set_level("DEBUG")
+    answer = TestClient(app).post(metadata.TOKEN_PATH, data=_code_form(code))
+    assert answer.status_code == 500
+    records = [r for r in caplog.records if r.name == router.__name__]
+    assert [r.getMessage() for r in records] == ["the token endpoint raised ValueError"]
+    assert all(r.exc_info is None and r.exc_text is None for r in records)
+    assert not any(s in caplog.text for s in secrets)
+    for record in caplog.records:
+        assert record.exc_info is None or not any(s in str(record.exc_info[1]) for s in secrets)
