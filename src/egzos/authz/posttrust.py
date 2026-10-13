@@ -58,11 +58,13 @@ def _reject(ledger: AuditLedger, actor: str, cause: AuthorizePosttrustCause) -> 
 
 
 def _reached(reaches: Callable[[str], bool], node: str) -> bool:
-    # Only `True` reaches. A lookup that raises on an unknown id is one more way of saying the
-    # node is not there, and it gets the same answer as an unreachable one (§7.1).
+    # Only `True` reaches. A lookup that raises `LookupError` on an unknown id is one more way of
+    # saying the node is not there, and it gets the same answer as an unreachable one (§7.1).
+    # Anything else (an outage, a bug) surfaces with nothing appended: the owner's ledger must not
+    # record an infrastructure failure as row (f) `cause: scope` (§12.1 rule 1).
     try:
         return reaches(node) is True
-    except Exception:
+    except LookupError:
         return False
 
 

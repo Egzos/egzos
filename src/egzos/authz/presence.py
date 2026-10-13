@@ -54,6 +54,7 @@ from urllib.parse import parse_qs
 
 from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_DEFAULTS
+from egzos.authz import values
 from egzos.container import OWNER, Container
 from egzos.model import Token
 
@@ -662,7 +663,7 @@ class Tap:
         return (
             self.outcome is None
             and path.startswith("/tap/")
-            and secrets.compare_digest(path[len("/tap/"):], self.token)
+            and values.same(path[len("/tap/"):], self.token)  # a latin-1 path must not raise
         )
 
     def get(self) -> tuple[int, str]:

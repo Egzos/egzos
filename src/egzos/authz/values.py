@@ -18,6 +18,7 @@ and is resolved by `token_id_of` like any other; a second format would be a seco
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 
 from egzos._types import AS_USER_CODE_ALPHABET, AS_USER_CODE_LENGTH
@@ -41,6 +42,18 @@ def digest(value: str) -> str:
     which is low-entropy and keyed by HMAC instead."""
     # `surrogatepass`: a lone surrogate from a JSON body hashes like any other string, never raises
     return hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def same(given: object, stored: object) -> bool:
+    """Constant-time equality for the AS's stored strings: a `client_id`, a digest, a hash.
+    Anything but two `str`s is unequal. `hmac.compare_digest` raises on a non-ASCII `str` and
+    `encode` on a lone surrogate, and a raise would be a second answer shape beside the refusal,
+    so both sides compare as bytes. The one helper every comparison in `authz` goes through."""
+    if not isinstance(given, str) or not isinstance(stored, str):
+        return False
+    return hmac.compare_digest(
+        given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
+    )
 
 
 def new_user_code() -> str:

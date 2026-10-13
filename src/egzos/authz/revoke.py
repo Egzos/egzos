@@ -14,9 +14,10 @@ Revocation's two paths and one result (authorization-server.md §9.2, §11.9; ca
   alone. That comparison is defence in depth and **not a boundary**: no client authenticates, so
   this path is bounded by the entropy of the value alone (§9.1).
 
-Either path revokes exactly as `token rm` does: the named `Token` is marked revoked, and one
-`token.revoke` is appended carrying the refresh-family id where the token has one ([0.3 · 30]). An
-already-revoked token is not revoked twice and gets no second `token.revoke`.
+Either path marks the named `Token` revoked and appends one `token.revoke` carrying the
+refresh-family id where the token has one ([0.3 · 30]). An already-revoked token is not revoked
+twice and gets no second `token.revoke`. That is §9.2's rule, and stricter than `Auth.revoke`
+(`token rm`) today, which appends again for a revoked token and carries no family id (#242).
 
 Not built here, pending #240: whether revoking an access token takes its refresh family with it
 (storage.md §3.1 rule 4 leaves it open), a refresh-token value at the endpoint (`ASState` has no
@@ -25,8 +26,6 @@ is §11.0's throttle (#208). The response, its time budget included, belongs to 
 """
 
 from __future__ import annotations
-
-import hmac
 
 from egzos._types import RevokeRefusalCause
 from egzos.auth import token_id_of
@@ -85,10 +84,8 @@ def by_value(
     held = state.get_token(token_id) if token_id else None
     if held is None or held.revoked or not held.secret_hash:
         return
-    if not hmac.compare_digest(values.digest(token), held.secret_hash):
+    if not values.same(values.digest(token), held.secret_hash):
         return
-    if not hmac.compare_digest(
-        client_id.encode("utf-8", "surrogatepass"), held.client.encode("utf-8", "surrogatepass")
-    ):
+    if not values.same(client_id, held.client):
         return
     _revoke(state, ledger, held, actor=client_id, principal="client")

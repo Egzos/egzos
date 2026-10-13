@@ -96,16 +96,6 @@ def _parse(text: str | None) -> datetime | None:
         return None
 
 
-def _same(given: str | None, stored: str) -> bool:
-    # Bytes, as `codes` does: `compare_digest` raises on non-ASCII `str`, and a raise would be a
-    # second answer shape beside `invalid_grant`.
-    if not isinstance(given, str):
-        return False
-    return hmac.compare_digest(
-        given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
-    )
-
-
 def _expired(record: DeviceAuthorizationRecord, at: datetime) -> bool:
     until = _parse(record["expires_at"])
     return until is None or at >= until  # an expiry nobody can read fails closed
@@ -235,7 +225,7 @@ def poll(
         return Poll("invalid_grant")
     device_hash = values.digest(device_code)
     prior = state.poll_device(device_hash, _iso(at))
-    if prior is None or not _same(client_id, prior["client_id"]):
+    if prior is None or not values.same(client_id, prior["client_id"]):
         return Poll("invalid_grant")
     if _expired(prior, at):
         return Poll("expired_token")
