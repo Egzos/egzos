@@ -17,8 +17,11 @@ Served here:
   decode (not ASCII, a percent-escape that is not UTF-8, more than `MAX_FIELDS` pairs), is
   `invalid_request` before anything is read or spent. `owner` is the router's argument, the
   container's identity, never request input (#216's review). If `respond` or the store under it
-  raises, the answer is `SERVER_ERROR`, still under `token_endpoint.HEADERS` (RFC 6749 §5.1), and
-  never the framework's default 500, which carries no `Cache-Control: no-store`.
+  raises, the answer is `SERVER_ERROR`, and never the framework's default 500, which carries no
+  `Cache-Control: no-store`: it goes out under `token_endpoint.HEADERS`, the headers RFC 6749 §5.1
+  requires on every token response. The server log gets the exception's type and nothing else (no
+  message, no traceback), since either could carry a code, a `code_verifier` or a refresh token
+  from the request (#256's review).
 
 Not served yet, each held on a question this build does not answer by guessing:
 
@@ -71,7 +74,8 @@ HELD: Mapping[str, str] = MappingProxyType(
 )
 
 _INVALID_REQUEST = token_endpoint.Answer(400, {"error": "invalid_request"})
-#: The answer when the work under `/token` raises. It names no cause.
+#: The answer when the work under `/token` raises. It names no cause. RFC 6749 §5.2 has no word
+#: for a server failure, so this borrows §4.1.2.1's; the contract names no `/token` vocabulary.
 SERVER_ERROR = token_endpoint.Answer(500, {"error": "server_error"})
 
 _log = logging.getLogger(__name__)
@@ -167,8 +171,9 @@ def _build(*, state: TokenState, ledger: AuditLedger, issuer: str, owner: str) -
                 authorization=request.headers.get("authorization"),
                 owner=owner,
             )
-        except Exception:  # any failure: one no-store answer that names no cause
-            _log.exception("the token endpoint raised")
+        except Exception as failure:  # any failure: one no-store answer that names no cause
+            # The type only: a message or a traceback can quote request material.
+            _log.error("the token endpoint raised %s", type(failure).__name__)
             answer = SERVER_ERROR
         return _send(answer)
 
