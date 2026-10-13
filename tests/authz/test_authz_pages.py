@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 from html.parser import HTMLParser
 from importlib import resources
 from pathlib import Path
@@ -55,6 +56,17 @@ def test_every_string_is_consent_md_s13_verbatim() -> None:
         rendered = rendered.replace("{", "<").replace("}", ">")
         assert key in table, key
         assert f"`{rendered}`" in table, key
+
+
+def test_copy_lacks_only_the_outcome_and_print_keys() -> None:
+    # A missing key passes the verbatim test above; this one catches it. The keys left out
+    # belong to the outcome, error-card and print renders, which no slice has built yet.
+    spec = SPEC.read_text(encoding="utf-8")
+    table = spec[spec.index("## 13. Copy") : spec.index("## 14.")]
+    keys = set(re.findall(r"(?m)(?:^\| |· )([a-z]+(?:\.[a-z]+)*) (?=\||`)", table)) - {"key"}
+    later = {"title.done", "done.title", "done.minted", "denied.title", "denied.at"}
+    later |= {"fail.error", "fail.retry", "print.header", "print.footer"}
+    assert keys - set(pages.COPY) == later
 
 
 def test_headers_are_s10_and_s18s() -> None:
