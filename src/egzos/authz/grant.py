@@ -29,6 +29,7 @@ from egzos._types import (
     AS_SCOPE_ALL_NODES,
     AS_SCOPE_NODE_PREFIX,
     CAPABILITIES,
+    TOKEN_PRINCIPALS,
     ASClientType,
     ASGrant,
     TokenPrincipal,
@@ -121,6 +122,19 @@ class Offer:
     scopes: tuple[str, ...]
     principal: TokenPrincipal
     lifetime_seconds: int
+
+    def __post_init__(self) -> None:
+        # Built directly rather than through `offer`, it still holds only what §7, §10.3 and
+        # §11.5 allow: a lifetime past the maximum is not clamped here but refused, as a misuse.
+        if (
+            not all(c in CAPABILITIES for c in self.capabilities)
+            or not all(isinstance(s, str) and s for s in self.scopes)
+            or self.principal not in TOKEN_PRINCIPALS
+            or isinstance(self.lifetime_seconds, bool)
+            or not isinstance(self.lifetime_seconds, int)
+            or not 0 < self.lifetime_seconds <= AS_GRANT_LIFETIME_MAX_SECONDS
+        ):
+            raise ValueError("an offer holds §7's grant, a principal and a clamped lifetime")
 
     def decided(self, at: datetime) -> ASGrant | None:
         """The `ASGrant` for a decision taken at `at`. None for a naive clock, which has no instant

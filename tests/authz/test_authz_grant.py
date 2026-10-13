@@ -160,6 +160,24 @@ def test_the_grant_expiry_counts_from_the_decision_in_utc():
     assert made.decided(plus_two)["grant_expires_at"] == "2026-10-13T12:01:00Z"
 
 
+@pytest.mark.parametrize(
+    "fields",
+    [
+        (("fetch",), ("a",), "interactive", AS_GRANT_LIFETIME_MAX_SECONDS + 1),
+        (("fetch",), ("a",), "interactive", 0),
+        (("fetch",), ("a",), "interactive", True),
+        (("fetch",), ("a",), "interactive", 60.0),
+        (("reader",), ("a",), "interactive", 60),
+        (("fetch",), ("",), "interactive", 60),
+        (("fetch",), (None,), "interactive", 60),
+        (("fetch",), ("a",), "owner", 60),
+    ],
+)
+def test_an_offer_built_directly_still_holds_only_what_the_contract_allows(fields):
+    with pytest.raises(ValueError):
+        Offer(*fields)
+
+
 def test_a_naive_clock_decides_nothing():
     made = offer("fetch node:a", client_type="browser", lifetime_seconds=None)
     assert made.decided(datetime(2026, 10, 13, 12, 0, 0)) is None
