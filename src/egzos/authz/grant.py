@@ -81,7 +81,9 @@ def parse_scope(value: str | None) -> Grant:
         elif word.startswith(AS_SCOPE_NODE_PREFIX):
             # The prefix does not survive the mint: `node:*` lands as `["*"]` (§7 consequence 3).
             node = "*" if word == AS_SCOPE_ALL_NODES else word[len(AS_SCOPE_NODE_PREFIX) :]
-            if not node:
+            # A node id is a ULID (context-item.md), so `node:node:x` is no id at all: refused
+            # here, it never reaches an `Offer` that would have to refuse its prefixed form.
+            if not node or node.startswith(AS_SCOPE_NODE_PREFIX):
                 raise ScopeVocabularyError()
             if node not in scopes:
                 scopes.append(node)
@@ -110,6 +112,17 @@ def clamp_grant_lifetime(requested_seconds: int | None) -> int:
     return min(requested_seconds, AS_GRANT_LIFETIME_MAX_SECONDS)
 
 
+def _bare_node_id(value: object) -> bool:
+    """A scope entry as the token holds it: `*` or an id, never the request's `node:` form."""
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and value.isprintable()
+        and not any(c.isspace() for c in value)
+        and not value.startswith(AS_SCOPE_NODE_PREFIX)
+    )
+
+
 @dataclass(frozen=True)
 class Offer:
     """§11.2: what the consent screen renders and what the mint produces, as one value.
@@ -126,9 +139,18 @@ class Offer:
     def __post_init__(self) -> None:
         # Built directly rather than through `offer`, it still holds only what §7, §10.3 and
         # §11.5 allow: a lifetime past the maximum is not clamped here but refused, as a misuse.
+        # Both fields are tuples, so nothing mutates them between render and `decided` (§11.2
+        # consequence 1); ids are bare (§7 consequence 3); and neither field repeats an entry.
+        # Membership is tested only on strings, so an unhashable entry is refused, never raised on.
+        caps, scopes = self.capabilities, self.scopes
         if (
-            not all(c in CAPABILITIES for c in self.capabilities)
-            or not all(isinstance(s, str) and s for s in self.scopes)
+            not isinstance(caps, tuple)
+            or not isinstance(scopes, tuple)
+            or not all(isinstance(c, str) and c in CAPABILITIES for c in caps)
+            or len(set(caps)) != len(caps)
+            or not all(_bare_node_id(s) for s in scopes)
+            or len(set(scopes)) != len(scopes)
+            or not isinstance(self.principal, str)
             or self.principal not in TOKEN_PRINCIPALS
             or isinstance(self.lifetime_seconds, bool)
             or not isinstance(self.lifetime_seconds, int)
