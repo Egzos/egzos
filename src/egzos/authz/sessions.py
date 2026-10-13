@@ -18,7 +18,8 @@ clock, so no stream of page loads can keep a session alive past it. An ended ses
 the store too, so the next `resolve` finds nothing.
 
 Every answer that is not a live session is `None`: unknown, idle-ended, absolute-ended, signed
-out, and a record whose clocks cannot be read. Which one never leaves this module.
+out, a record whose clocks cannot be read, and a `now` that reads well behind the record's
+clocks. Which one never leaves this module. Only the last leaves the session in the store.
 
 This module appends nothing. The login's row (a) `authz.login` is §11.7's, and needs §11.0's
 throttle in front of it (#208). A session ending on its clocks is not one of §9.3's seven
@@ -41,6 +42,9 @@ _ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 _IDLE = timedelta(seconds=AS_SESSION_IDLE_SECONDS)
 _ABSOLUTE = timedelta(seconds=AS_SESSION_ABSOLUTE_SECONDS)
+# How far `now` may read behind a stored stamp and still be judged: two requests racing on one
+# session, stamps truncated to the second. This implementation's number, not a contract value.
+_SKEW = timedelta(seconds=2)
 
 
 def _aware(at: datetime) -> bool:
@@ -58,13 +62,21 @@ def _parse(text: object) -> datetime | None:
         return None
 
 
-def _live(record: SessionRecord, at: datetime) -> bool:
+def _judge(record: SessionRecord, at: datetime) -> bool | None:
+    """True for live, False for ended, `None` for a `now` earlier than the record's clocks.
+
+    `now` can run up to `_SKEW` behind a stored stamp without anything being wrong. Two requests
+    on one session race: B reads `now`, A then touches with a later second, and B reads A's
+    stamp. A live session in that window is judged live. Further behind (an NTP step backwards)
+    there is no instant to measure from, so the request is refused and the session is not ended.
+    The owner is not signed out for the host's clock, and the clocks keep running from the
+    stored stamps, which nothing here moves backwards."""
     created = _parse(record.get("created_at"))
     seen = _parse(record.get("last_seen_at"))
     if created is None or seen is None:
         return False  # a clock nobody can read fails closed
-    if at < created or at < seen:
-        return False  # so does a clock that runs backwards: no instant to measure from
+    if at < created - _SKEW or at < seen - _SKEW:
+        return None
     return at - seen < _IDLE and at - created < _ABSOLUTE
 
 
@@ -101,12 +113,18 @@ def resolve(gate: ASGateState, value: str | None, *, now: datetime | None = None
     record = gate.get_session(session_hash)
     if record is None:
         return None
-    if not _live(record, at):
+    live = _judge(record, at)
+    if live is None:
+        return None  # refused; the session stays for a request whose clock reads true
+    if not live:
         gate.end_session(session_hash)
         return None
+    # The later of the two stamps, so a request inside `_SKEW` never moves the idle clock back.
+    # Both are `_ISO` strings `_judge` has parsed, so they compare as text.
+    stamp = max(_iso(at), record["last_seen_at"])
     # `touch_session` is False when the record went between the read and the write (a sign-out
     # in another request): that session is no longer live, whatever the read said.
-    return session_hash if gate.touch_session(session_hash, _iso(at)) else None
+    return session_hash if gate.touch_session(session_hash, stamp) else None
 
 
 def end(gate: ASGateState, value: str | None) -> None:

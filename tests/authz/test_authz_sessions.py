@@ -170,11 +170,48 @@ def test_a_missing_clock_field_fails_closed():
 
 
 @pytest.mark.parametrize("field", ["created_at", "last_seen_at"])
-def test_a_clock_running_backwards_fails_closed(field):
+def test_a_clock_stepped_backwards_refuses_and_keeps_the_session(field):
     gate = Sessions()
     value = sessions.establish(gate, now=T0)  # type: ignore[arg-type]
     gate.rows[values.digest(value)][field] = "2026-10-13T10:00:00Z"  # type: ignore[literal-required]
     assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
+    assert len(gate.rows) == 1 and gate.ended == [] and gate.touches == []
+
+
+def test_after_a_backwards_step_the_session_is_judged_on_its_stamps_again():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0 + timedelta(hours=1))  # type: ignore[arg-type]
+    assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
+    later = T0 + timedelta(hours=1, seconds=1)
+    assert sessions.resolve(gate, value, now=later) == values.digest(value)  # type: ignore[arg-type]
+
+
+def test_just_beyond_the_skew_is_refused_and_ends_nothing():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0 + timedelta(seconds=3))  # type: ignore[arg-type]
+    assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
+    assert len(gate.rows) == 1 and gate.ended == []
+
+
+def test_two_requests_racing_on_one_session_both_stay_signed_in():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0)  # type: ignore[arg-type]
+    session_hash = values.digest(value)
+    b_now = T0 + timedelta(minutes=5, microseconds=500_000)  # B reads its clock first
+    a_now = T0 + timedelta(minutes=5, seconds=1, microseconds=200_000)  # A reads later
+    assert sessions.resolve(gate, value, now=a_now) == session_hash  # type: ignore[arg-type]
+    # B now reads A's stamp, a second after B's own `now`: judged live, not signed out
+    assert sessions.resolve(gate, value, now=b_now) == session_hash  # type: ignore[arg-type]
+    assert gate.ended == []
+    # and B's earlier `now` never moves the idle clock back
+    assert gate.rows[session_hash]["last_seen_at"] == "2026-10-13T09:05:01Z"
+
+
+def test_the_skew_cannot_stretch_the_idle_clock():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0)  # type: ignore[arg-type]
+    gate.rows[values.digest(value)]["last_seen_at"] = "2026-10-13T09:00:02Z"
+    assert sessions.resolve(gate, value, now=T0 + timedelta(seconds=2) + IDLE) is None  # type: ignore[arg-type]
     assert gate.rows == {}
 
 
