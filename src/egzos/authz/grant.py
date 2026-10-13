@@ -81,8 +81,9 @@ def parse_scope(value: str | None) -> Grant:
         elif word.startswith(AS_SCOPE_NODE_PREFIX):
             # The prefix does not survive the mint: `node:*` lands as `["*"]` (§7 consequence 3).
             node = "*" if word == AS_SCOPE_ALL_NODES else word[len(AS_SCOPE_NODE_PREFIX) :]
-            # A node id is a ULID (context-item.md), so `node:node:x` is no id at all: refused
-            # here, it never reaches an `Offer` that would have to refuse its prefixed form.
+            # `node:node:x` is the one form refused here: its id would reach the token still
+            # prefixed, which the mint cannot round-trip (§7 consequence 3). Ids stay opaque
+            # otherwise (§7.1), and an `Offer` never has to refuse the prefixed form.
             if not node or node.startswith(AS_SCOPE_NODE_PREFIX):
                 raise ScopeVocabularyError()
             if node not in scopes:
