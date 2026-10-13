@@ -74,7 +74,10 @@ def record(
 
     Call it with the decision and before the mint, so no code exists for a request that a
     re-submission could still reach a second decision on. The decision's own event,
-    `authz.grant`, is the caller's (§9.3). A naive `now`, an empty key or session, or a decision
+    `authz.grant`, is the caller's (§9.3). This holds for sequential requests only: storage.md
+    §3.1 does not make `put_decided` insert-only, so two submissions that both read before
+    either writes both land. Until #226 gives the store an atomic answer, no endpoint wires a
+    decision to the mint through this function. A naive `now`, an empty key or session, or a decision
     outside `AS_GRANT_DECISIONS` is a caller's bug and raises `ValueError`; nothing is stored."""
     at = now or datetime.now(UTC)
     if not _aware(at):
