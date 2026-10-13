@@ -164,7 +164,7 @@ jobs:
           mkdir -p docs/build
           git show "${B}:docs/build/REVIEW-DECISIONS.md" > docs/build/REVIEW-DECISIONS.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
@@ -583,7 +583,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         id: sweep
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
@@ -719,7 +719,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         id: file
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}

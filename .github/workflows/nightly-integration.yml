@@ -131,7 +131,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a1r-reviewer.md
           test -s /tmp/charter-a1r-reviewer.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1
         id: review
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
