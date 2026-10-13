@@ -144,7 +144,17 @@ def test_continue_carries_the_authorize_query_untouched(gate, chain):
 
 @pytest.mark.parametrize(
     "value",
-    [None, "", "//evil.example/x", "/\\x", "/%2F%2Fx", "/items/a/b", "/elsewhere", "https://e.x/"],
+    [
+        None,
+        "",
+        "//evil.example/x",
+        "/\\x",
+        "/%2F%2Fx",
+        "/items/a/b",
+        "/elsewhere",
+        "https://e.x/",
+        "/authorize?\ud800",
+    ],
 )
 def test_a_continue_failing_d_c5_lands_on_root_with_the_session(gate, chain, value):
     answer = _attempt(gate, chain, SECRET, continue_value=value)
@@ -275,4 +285,16 @@ class Broken:
 def test_a_verifier_failure_establishes_nothing_and_appends_nothing(gate, chain):
     with pytest.raises(RuntimeError):
         _attempt(gate, chain, SECRET, secret=Broken())
+    assert gate.rows == {} and chain.entries == []
+
+
+def test_the_location_is_resolved_before_anything_is_stored(gate, chain, monkeypatch):
+    # Should `continue` ever fail to resolve, the attempt leaves no session and no entry behind it.
+    def unresolvable(value: str | None) -> str:
+        assert gate.rows == {} and chain.entries == []
+        raise RuntimeError("unresolvable")
+
+    monkeypatch.setattr(login.continuation, "resolve", unresolvable)
+    with pytest.raises(RuntimeError):
+        _attempt(gate, chain, SECRET)
     assert gate.rows == {} and chain.entries == []

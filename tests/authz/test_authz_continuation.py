@@ -51,6 +51,8 @@ def test_continue_allowlist_carries_what_d_c5_carries(value, location):
         "/authorize?a\r\nLocation: //evil",
         "/authorize?a b",
         "/authorize?é",
+        "/authorize?\ud800",
+        "/\udfff",
         "/AUTHORIZE",
         "/authorize?" + "a" * AS_CONTINUE_MAX_BYTES,
     ],
