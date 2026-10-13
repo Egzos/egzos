@@ -6,7 +6,8 @@ Issuance and rotation (authorization-server.md §9.2, §9.3 rows 1, 2 and 5), ag
 - `mint`: a decided `ASGrant` becomes a `Token` (`capabilities.md` §5) and the first refresh token
   of its family, and appends `token.mint` carrying the family id (§9.3 row 1, [0.3 · 30]).
 - `exchange_code`: the token endpoint's `authorization_code` grant, `codes.redeem` then `mint`.
-  The `device_code` grant's twin (`device.poll` then `mint`) is the next slice's.
+- `exchange_device`: the `device_code` grant, `device.poll` then `mint`. Only a grant carrying
+  `principal: client` mints here (§10.3).
 - `refresh`: the `refresh_token` grant. Single-use: the presented value is spent by the store
   before anything is judged. Reuse revokes the whole family and appends one `token.revoke` per
   revoked `Token` (§9.2 rotation clause 2). A successful rotation appends only the new
@@ -37,7 +38,7 @@ from egzos._types import (
     RefreshRecord,
 )
 from egzos.auth import new_secret
-from egzos.authz import codes, values
+from egzos.authz import codes, device, values
 from egzos.model import Token
 
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
@@ -203,6 +204,32 @@ def exchange_code(
     return mint(
         state, ledger, grant=record["grant"], client_id=record["client_id"], owner=owner, now=at
     )
+
+
+def exchange_device(
+    state: TokenState,
+    ledger: AuditLedger,
+    *,
+    device_code: str | None,
+    client_id: str | None,
+    owner: str,
+    now: datetime | None = None,
+) -> Issued | device.PollError:
+    """The `device_code` grant (RFC 8628 §3.4, §3.5): `device.poll`'s error word, or the mint.
+
+    `owner` is the container's identity, which the endpoint supplies and never reads from the
+    request. Once `poll` has spent an approved authorization, any refusal here is `invalid_grant`:
+    the code is gone, so a retry cannot mint."""
+    at = now or datetime.now(UTC)
+    answer = device.poll(state, device_code=device_code, client_id=client_id, now=at)
+    if answer.error is not None:
+        return answer.error
+    record = answer.record
+    decided = record["grant"] if record is not None else None
+    if record is None or decided is None or decided.get("principal") != "client":
+        return "invalid_grant"  # §10.3: a device-flow token carries `client`, never more
+    issued = mint(state, ledger, grant=decided, client_id=record["client_id"], owner=owner, now=at)
+    return issued if issued is not None else "invalid_grant"
 
 
 def refresh(

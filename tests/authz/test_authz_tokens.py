@@ -1,6 +1,6 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""§9.2 / §9.3 the mint, the code exchange and refresh rotation (authz/tokens.py)."""
+"""§9.2 / §9.3 the mint, the code and device exchanges and refresh rotation (authz/tokens.py)."""
 
 from __future__ import annotations
 
@@ -15,10 +15,11 @@ from egzos._types import (
     GENESIS_HASH,
     ASGrant,
     AuthorizationCodeRecord,
+    DeviceAuthorizationRecord,
     RefreshRecord,
 )
 from egzos.auth import token_id_of
-from egzos.authz import codes, pkce, tokens, values
+from egzos.authz import codes, device, pkce, tokens, values
 from egzos.ledger import Ledger
 from egzos.model import Token
 
@@ -44,6 +45,7 @@ class State:
         self.tokens: dict[str, Token] = {}
         self.refresh: dict[str, RefreshRecord] = {}
         self.codes: dict[str, AuthorizationCodeRecord] = {}
+        self.devices: dict[str, DeviceAuthorizationRecord] = {}
 
     def put_token(self, token: Token) -> None:
         self.tokens[token.id] = copy.deepcopy(token)
@@ -76,6 +78,38 @@ class State:
 
     def consume_code(self, code_hash: str) -> AuthorizationCodeRecord | None:
         return self.codes.pop(code_hash, None)
+
+    # §3.1 rule 2's device methods, as `test_authz_device.Devices` has them (its #214 note applies)
+    def put_device(self, record: DeviceAuthorizationRecord) -> None:
+        self.devices.setdefault(record["device_code_hash"], copy.deepcopy(record))
+
+    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None:
+        row = self.devices.get(device_code_hash)
+        if row is None:
+            return None
+        prior = copy.deepcopy(row)
+        row["last_polled_at"] = at
+        return prior
+
+    def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None:
+        for row in self.devices.values():
+            if row["user_code_hash"] == user_code_hash:
+                return copy.deepcopy(row)
+        return None
+
+    def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool:
+        row = self.devices.get(device_code_hash)
+        if row is None or row["decision"] != "pending":
+            return False
+        row["decision"] = "granted" if grant is not None else "denied"
+        row["grant"] = copy.deepcopy(grant)
+        return True
+
+    def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None:
+        row = self.devices.get(device_code_hash)
+        if row is None or row["decision"] == "pending":
+            return None
+        return self.devices.pop(device_code_hash)
 
 
 class Chain:
@@ -225,6 +259,111 @@ def test_exchange_code_mints_once_and_appends_token_mint(state, chain):
 def test_exchange_code_with_a_wrong_verifier_mints_nothing(state, chain):
     assert _exchange(state, chain, _code(state), "w" * 43) is None
     assert not state.tokens and not state.refresh and not chain.entries
+
+
+# --- the device exchange --------------------------------------------------------------------
+
+KEY = b"k" * 32  # a fixture device-code key; provisioning the real one is #143's
+CLI = "egzos-cli"
+
+
+def _pending(state: State) -> tuple[str, str]:
+    """A pending device authorization issued at T0: (device_code, user_code)."""
+    response = device.authorize(
+        state,  # type: ignore[arg-type]
+        key=KEY,
+        client_id=CLI,
+        scope="fetch remember node:*",
+        requester_hint=None,
+        verification_uri="https://box.example/device",
+        now=T0,
+    )
+    return response["device_code"], response["user_code"]
+
+
+def _decided(state: State, *, approve: bool = True) -> str:
+    device_code, user_code = _pending(state)
+    assert device.decide(
+        state,  # type: ignore[arg-type]
+        key=KEY,
+        user_code=user_code,
+        approve=approve,
+        now=T0 + timedelta(seconds=30),
+    )
+    return device_code
+
+
+def _exchange_device(
+    state: State, chain: Chain, device_code: str | None, **over: Any
+) -> tokens.Issued | str:
+    args: dict[str, Any] = {"client_id": CLI, "owner": OWNER, "now": T0 + timedelta(seconds=60)}
+    return tokens.exchange_device(
+        state,  # type: ignore[arg-type]
+        _ledger(chain),
+        device_code=device_code,
+        **{**args, **over},
+    )
+
+
+def test_exchange_device_mints_a_client_token_once(state, chain):
+    device_code = _decided(state)
+    issued = _exchange_device(state, chain, device_code)
+    assert isinstance(issued, tokens.Issued)
+    token = state.tokens[issued.token.id]
+    assert (token.principal, token.owner, token.client) == ("client", OWNER, CLI)
+    assert (token.capabilities, token.scopes) == (["fetch", "remember"], ["*"])
+    assert _events(chain) == ["token.mint"]
+    assert chain.entries[0]["details"]["family_id"] == issued.family_id
+    later = T0 + timedelta(seconds=120)
+    assert _exchange_device(state, chain, device_code, now=later) == "invalid_grant"
+    assert _events(chain) == ["token.mint"] and len(state.tokens) == 1
+
+
+def test_a_pending_authorization_mints_nothing_and_stays_pending(state, chain):
+    device_code, _ = _pending(state)
+    assert _exchange_device(state, chain, device_code) == "authorization_pending"
+    assert not state.tokens and not state.refresh and not chain.entries
+    assert len(state.devices) == 1
+
+
+def test_a_denied_authorization_mints_nothing(state, chain):
+    device_code = _decided(state, approve=False)
+    assert _exchange_device(state, chain, device_code) == "access_denied"
+    assert not state.tokens and not state.refresh and not chain.entries
+    assert not state.devices  # spent
+
+
+@pytest.mark.parametrize(
+    "over",
+    [
+        {"client_id": "egzos.io"},
+        {"client_id": None},
+        {"device_code": "unknown-device-code"},
+        {"device_code": None},
+        {"now": datetime(2026, 10, 12, 9, 1, 0)},  # naive
+    ],
+)
+def test_exchange_device_refusals_are_invalid_grant_and_mint_nothing(state, chain, over):
+    args = {"device_code": _decided(state), **over}
+    assert _exchange_device(state, chain, **args) == "invalid_grant"
+    assert not state.tokens and not state.refresh and not chain.entries
+
+
+@pytest.mark.parametrize(
+    "tampered",
+    [
+        {"principal": "interactive"},  # §10.3: only §2's browser flow mints this
+        {"principal": "owner"},
+        {"grant_expires_at": "2026-10-12T09:00:30Z"},  # expired before the exchange
+    ],
+)
+def test_a_stored_grant_the_device_flow_may_not_mint_is_spent_and_refused(state, chain, tampered):
+    device_code = _decided(state)
+    (row,) = state.devices.values()
+    row["grant"] = {**row["grant"], **tampered}  # type: ignore[typeddict-item]
+    assert _exchange_device(state, chain, device_code) == "invalid_grant"
+    assert not state.tokens and not state.refresh and not chain.entries
+    assert not state.devices  # spent: a retry cannot mint either
 
 
 # --- refresh rotation ------------------------------------------------------------------------
