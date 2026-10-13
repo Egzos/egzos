@@ -73,6 +73,8 @@ def test_role_bundles_are_refused(bundle):
         "interactive node:*",
         "FETCH node:*",
         "fetch nodes:*",
+        "fetch node:node:a",  # no ULID carries the prefix; it never reaches an `Offer`
+        "fetch node:node:*",
         "fetch node:a " + "x" * 5000,
     ],
 )
@@ -171,11 +173,28 @@ def test_the_grant_expiry_counts_from_the_decision_in_utc():
         (("fetch",), ("",), "interactive", 60),
         (("fetch",), (None,), "interactive", 60),
         (("fetch",), ("a",), "owner", 60),
+        # a1r minor 1 on #233: mutable fields, prefixed ids and duplicates.
+        (["fetch"], ("a",), "interactive", 60),
+        (("fetch",), ["a"], "interactive", 60),
+        (("fetch",), ("node:a",), "interactive", 60),
+        (("fetch",), ("node:*",), "interactive", 60),
+        (("fetch", "fetch"), ("a",), "interactive", 60),
+        (("fetch",), ("a", "a"), "interactive", 60),
+        (("fetch",), ("a b",), "interactive", 60),
+        (("fetch",), ("a\x00",), "interactive", 60),
+        ((["fetch"],), ("a",), "interactive", 60),
+        (("fetch",), ("a",), ["interactive"], 60),
     ],
 )
 def test_an_offer_built_directly_still_holds_only_what_the_contract_allows(fields):
     with pytest.raises(ValueError):
         Offer(*fields)
+
+
+def test_an_offer_built_directly_from_the_contract_shapes_is_accepted():
+    built = Offer(("fetch", "admin"), ("*", "01J0000000000000000000000A"), "client", 60)
+    assert built.decided(NOW)["scopes"] == ["*", "01J0000000000000000000000A"]
+    assert Offer((), (), "interactive", AS_GRANT_LIFETIME_MAX_SECONDS).decided(NOW) is not None
 
 
 def test_a_naive_clock_decides_nothing():
