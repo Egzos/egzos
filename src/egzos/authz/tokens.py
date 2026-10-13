@@ -28,7 +28,7 @@ from __future__ import annotations
 import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol
+from typing import Protocol
 
 from egzos._ids import ulid
 from egzos._types import (
@@ -40,7 +40,7 @@ from egzos._types import (
     RefreshRecord,
 )
 from egzos.auth import new_secret
-from egzos.authz import codes, device, values
+from egzos.authz import AuditLedger, codes, device, values
 from egzos.model import Token
 
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
@@ -52,12 +52,6 @@ class TokenState(ASState, Protocol):
 
     def put_token(self, token: Token) -> None: ...
     def get_token(self, token_id: str) -> Token | None: ...
-
-
-class AuditLedger(Protocol):
-    def append(
-        self, event: str, *, actor: str, principal: str, subject: str | None = None, **details: Any
-    ) -> dict[str, Any]: ...
 
 
 @dataclass(frozen=True)

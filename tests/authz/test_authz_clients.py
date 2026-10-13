@@ -6,12 +6,18 @@ from __future__ import annotations
 
 import copy
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, get_type_hints
 
 import pytest
 
-from egzos._types import AS_CLIENT_REGISTRY_READ_FIELDS, GENESIS_HASH, ClientRegistration
-from egzos.authz import clients
+from egzos import authz
+from egzos._types import (
+    AS_CLIENT_REGISTRY_READ_FIELDS,
+    GENESIS_HASH,
+    ClientRegisterOp,
+    ClientRegistration,
+)
+from egzos.authz import clients, tokens
 from egzos.ledger import Ledger
 from egzos.model import Token
 
@@ -76,7 +82,7 @@ def chain() -> Chain:
 
 def _register(state: Clients, chain: Chain, **over: Any) -> ClientRegistration:
     args: dict[str, Any] = {
-        "by": _token(),
+        "token": _token(),
         "actor": OWNER_ACTOR,
         "client_name": "egzos.io",
         "client_type": "browser",
@@ -171,7 +177,7 @@ def test_register_refuses_a_malformed_entry(
 
 
 @pytest.mark.parametrize(
-    "by",
+    "token",
     [
         _token(principal="client"),
         _token(capabilities=["fetch", "remember", "organize", "publish", "curate"]),
@@ -181,11 +187,11 @@ def test_register_refuses_a_malformed_entry(
         None,
     ],
 )
-def test_only_the_owner_registers(state: Clients, chain: Chain, by: Token | None) -> None:
+def test_only_the_owner_registers(state: Clients, chain: Chain, token: Token | None) -> None:
     """[0.3 · 10]: no open registration. A client token, a non-admin, a scoped token and a dead
     token are all refused, before anything is stored or appended."""
     with pytest.raises(clients.ClientRefused, match="owner's act"):
-        _register(state, chain, by=by)
+        _register(state, chain, token=token)
     assert state.rows == {} and chain.entries == []
 
 
@@ -197,7 +203,7 @@ def test_amend_replaces_the_allowlist_and_appends_it_whole(state: Clients, chain
     out = clients.amend(
         state,  # type: ignore[arg-type]
         Ledger(chain),  # type: ignore[arg-type]
-        by=_token(),
+        token=_token(),
         actor=OWNER_ACTOR,
         client_id=entry["client_id"],
         redirect_uris=["https://fork.example/cb"],
@@ -219,7 +225,7 @@ def test_amend_renames_and_appends_even_with_the_allowlist_unchanged(
     out = clients.amend(
         state,  # type: ignore[arg-type]
         Ledger(chain),  # type: ignore[arg-type]
-        by=_token(),
+        token=_token(),
         actor=OWNER_ACTOR,
         client_id=entry["client_id"],
         client_name="flagship",
@@ -235,7 +241,7 @@ def test_amend_takes_no_client_type(state: Clients, chain: Chain) -> None:
         clients.amend(  # type: ignore[call-arg]
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(),
+            token=_token(),
             actor=OWNER_ACTOR,
             client_id=entry["client_id"],
             client_type="browser",
@@ -249,7 +255,7 @@ def test_amend_refuses_an_unsafe_uri_and_leaves_the_entry(state: Clients, chain:
         clients.amend(
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(),
+            token=_token(),
             actor=OWNER_ACTOR,
             client_id=entry["client_id"],
             redirect_uris=["http://localhost/cb"],
@@ -264,7 +270,7 @@ def test_amend_refuses_an_unknown_client(state: Clients, chain: Chain, client_id
         clients.amend(
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(),
+            token=_token(),
             actor=OWNER_ACTOR,
             client_id=client_id,
             client_name="x",
@@ -278,7 +284,7 @@ def test_amend_is_the_owners_act(state: Clients, chain: Chain) -> None:
         clients.amend(
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(principal="client"),
+            token=_token(principal="client"),
             actor=OWNER_ACTOR,
             client_id=entry["client_id"],
             redirect_uris=["https://evil.example/cb"],
@@ -294,7 +300,7 @@ def test_remove_deletes_and_appends_an_empty_allowlist(state: Clients, chain: Ch
     clients.remove(
         state,  # type: ignore[arg-type]
         Ledger(chain),  # type: ignore[arg-type]
-        by=_token(),
+        token=_token(),
         actor=OWNER_ACTOR,
         client_id=entry["client_id"],
     )
@@ -312,7 +318,7 @@ def test_remove_refuses_an_unknown_client(state: Clients, chain: Chain, client_i
         clients.remove(
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(),
+            token=_token(),
             actor=OWNER_ACTOR,
             client_id=client_id,
         )
@@ -325,8 +331,22 @@ def test_remove_is_the_owners_act(state: Clients, chain: Chain) -> None:
         clients.remove(
             state,  # type: ignore[arg-type]
             Ledger(chain),  # type: ignore[arg-type]
-            by=_token(capabilities=["fetch"]),
+            token=_token(capabilities=["fetch"]),
             actor=OWNER_ACTOR,
             client_id=entry["client_id"],
         )
     assert entry["client_id"] in state.rows and len(chain.entries) == 1
+
+
+# --- shape -----------------------------------------------------------------------------------
+
+
+def test_the_ledger_protocol_has_one_definition() -> None:
+    assert clients.AuditLedger is tokens.AuditLedger is authz.AuditLedger
+
+
+def test_record_takes_a_client_register_op() -> None:
+    """A misspelt `op` fails the type check, not the ledger guard at run time."""
+    hints = get_type_hints(clients._record)
+    assert hints["op"] == ClientRegisterOp
+    assert hints["token"] is Token
