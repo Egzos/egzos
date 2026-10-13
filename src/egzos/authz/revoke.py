@@ -16,8 +16,8 @@ Revocation's two paths and one result (authorization-server.md §9.2, §11.9; ca
 
 Either path marks the named `Token` revoked and appends one `token.revoke` carrying the
 refresh-family id where the token has one ([0.3 · 30]). An already-revoked token is not revoked
-twice and gets no second `token.revoke`. That is §9.2's rule, and stricter than `Auth.revoke`
-(`token rm`) today, which appends again for a revoked token and carries no family id (#242).
+twice and gets no second `token.revoke`. That is §9.2's rule, which `Auth.revoke` (`token rm`)
+keeps too; its event still carries no family id, as `Backend` has no family read (#242).
 
 Not built here, pending #240: whether revoking an access token takes its refresh family with it
 (storage.md §3.1 rule 4 leaves it open), a refresh-token value at the endpoint (`ASState` has no
