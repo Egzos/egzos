@@ -47,8 +47,10 @@ def request_key(
     *, client_id: str, redirect_uri: str, state: str | None, code_challenge: str
 ) -> str:
     """§11.4's request identity: the lowercase hex sha256 of the four values, encoded so that no
-    two distinct tuples share an encoding. A missing `state` and an empty one are different
-    requests. The requester hint never enters it (storage.md §3.1 rule 2).
+    two distinct tuples share an encoding. A missing `state` and an empty one encode differently,
+    but `pretrust.admit`, the only caller, folds an empty `state` into `None` first (RFC 6749
+    §3.1), so they reach here as one request. The requester hint never enters it (storage.md §3.1
+    rule 2).
 
     Call it on values `/authorize` has already admitted (a registered client, a matched redirect,
     a well-formed S256 challenge). A non-string argument is a caller's bug and raises
