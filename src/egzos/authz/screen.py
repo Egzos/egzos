@@ -77,8 +77,11 @@ def client_entry(state: ASState, client_id: str | None) -> ClientEntry | None:
     name = entry.get("client_name")
     uris = entry.get("redirect_uris")
     registered = entry.get("registered_at")
+    # `isinstance` before the mapping lookup: an unhashable `client_type` (a list, a dict) would
+    # raise `TypeError` from `in`, a second answer shape beside the uniform `None`.
     if (
         entry.get("client_id") != client_id
+        or not isinstance(kind, str)
         or kind not in CONSENT_KIND_FROM_CLIENT_TYPE
         or not isinstance(name, str)
         or not isinstance(uris, list)
