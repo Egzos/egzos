@@ -102,6 +102,19 @@ def _form(content_type: str | None) -> bool:
     return content_type.split(";", 1)[0].strip().lower() == _FORM
 
 
+def form_body(params: Sequence[tuple[str, str]], content_type: str | None) -> dict[str, str] | None:
+    """Check 1 above, which the device authorization endpoint shares: the body's parameters, or
+    None for `invalid_request`."""
+    return _single(params) if _form(content_type) else None
+
+
+def authenticates(form: dict[str, str], authorization: str | None) -> bool:
+    """Check 2 above, also shared: True when the request attempts client authentication."""
+    return bool(isinstance(authorization, str) and authorization.strip()) or bool(
+        _CLIENT_AUTH & form.keys()
+    )
+
+
 def _single(params: Sequence[tuple[str, str]]) -> dict[str, str] | None:
     """Every parameter once, an empty one dropped as omitted; None when one repeats or a pair is
     not two strings. Unlike `/authorize`'s, every name counts: a repeated unknown is still a
@@ -132,10 +145,8 @@ def respond(
 ) -> Answer:
     """One token request. `params` is the form body as decoded pairs, in order; `content_type`
     and `authorization` are the request's headers; `owner` is the container's identity."""
-    form = _single(params) if _form(content_type) else None
-    if form is None:
-        return _error("invalid_request")
-    if (isinstance(authorization, str) and authorization.strip()) or _CLIENT_AUTH & form.keys():
+    form = form_body(params, content_type)
+    if form is None or authenticates(form, authorization):
         return _error("invalid_request")
     grant_type = form.get("grant_type")
     if grant_type is None:
