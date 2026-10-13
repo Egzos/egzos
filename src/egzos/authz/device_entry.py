@@ -8,8 +8,9 @@
   (§12.1 rule 1): outcome `found`, or `failed` with row (b)'s closed cause. The page gets the
   pending record or `None`, one answer for all five causes (§11.8). The entry carries
   `principal: none` and `actor: device` (§12.2), because the redemption is reachable without a
-  session and is not an owner act (§11.0 substep 3). It never carries the `user_code`, the
-  requester hint or the client's id (§12.1 rule 7).
+  session and is not an owner act (§11.0 substep 3). It never carries the `user_code` (§12.1
+  rule 7), nor the requester hint or the client's id: row (b)'s shape is closed at `outcome` and
+  `cause` (§12), and the hint is untrusted client text (§11.8).
 - `decide`: the owner's approve or deny, inside a session the endpoint has already checked.
   When this call moves the authorization out of pending, it appends one `authz.grant
   {client_id, decision, scopes, capabilities}` with `principal: interactive`, carrying what was
@@ -63,19 +64,22 @@ def decide(
     """The owner's decision for one pending authorization. True exactly when this call decided it.
 
     `actor` is the session owner's identity, which the endpoint supplies and never reads from the
-    request. An empty one is a caller's bug and raises `ValueError` before anything is read. A
-    `lifetime_seconds` that is not a positive integer is refused before the lookup, with the same
-    `False` as a code that is no longer pending (#213's review). Anything else is clamped by
-    §11.5. A naive `now` raises `ValueError` before anything is read."""
+    request. An empty one is a caller's bug and raises `ValueError` before anything is read. On an
+    approval, a `lifetime_seconds` that is not a positive integer is refused before the lookup,
+    with the same `False` as a code that is no longer pending (#213's review); anything else is
+    clamped by §11.5. A deny carries no lifetime, so it never reads one: an unrelated field cannot
+    starve a deny (#250's review). A naive `now` raises `ValueError` before anything is read."""
     if not isinstance(actor, str) or not actor:
         raise ValueError("device_entry.decide needs the session owner as actor")
     at = now or datetime.now(UTC)
     if at.tzinfo is None or at.utcoffset() is None:
         raise ValueError("device_entry.decide needs an aware datetime")
-    try:
-        grant.clamp_grant_lifetime(lifetime_seconds)  # type: ignore[arg-type]
-    except ValueError:
-        return False
+    approved = approve is True
+    if approved:
+        try:
+            grant.clamp_grant_lifetime(lifetime_seconds)  # type: ignore[arg-type]
+        except ValueError:
+            return False
     # Read for the entry's fields. `client_id` and `requested` never change after `put_device`,
     # and `device.decide` reads the record again for the grant it stores.
     record = device.enter(state, key=key, user_code=user_code, now=at).record
@@ -85,13 +89,13 @@ def decide(
         state,
         key=key,
         user_code=user_code,
-        approve=approve,
-        lifetime_seconds=lifetime_seconds,  # type: ignore[arg-type]
+        approve=approved,
+        lifetime_seconds=lifetime_seconds if approved else None,  # type: ignore[arg-type]
         now=at,
     )
     if not moved:
         return False
-    decision: GrantDecision = "granted" if approve is True else "denied"
+    decision: GrantDecision = "granted" if approved else "denied"
     requested = record["requested"]
     ledger.append(
         "authz.grant",

@@ -280,6 +280,15 @@ def test_a_malformed_lifetime_is_refused_before_the_lookup(
     assert chain.entries == [] and _row(state)["decision"] == "pending"
 
 
+@pytest.mark.parametrize("lifetime", [0, -1, True, 1.5, "3600", [3600]])
+def test_a_malformed_lifetime_never_starves_a_deny(state: Devices, chain: Chain, lifetime: Any):
+    shown = _issue(state)
+    assert _decide(state, chain, shown, approve=False, lifetime_seconds=lifetime)
+    assert _row(state)["decision"] == "denied" and _row(state)["grant"] is None
+    (entry,) = chain.entries
+    assert entry["event"] == "authz.grant" and entry["details"]["decision"] == "denied"
+
+
 def test_a_huge_lifetime_is_clamped_not_refused(state: Devices, chain: Chain):
     shown = _issue(state)
     assert _decide(state, chain, shown, lifetime_seconds=10**100)
