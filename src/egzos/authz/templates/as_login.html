@@ -1,0 +1,18 @@
+{#- §2.1 and R2. `carry` is the one permitted position for `continue` (contract §11.7): a hidden
+    input, already matched by D-C5, contextually escaped. The secret field never carries a value. -#}
+{% extends "as_base.html" %}
+{% block body %}
+<h1 tabindex="-1"{% if not failed %} autofocus{% endif %}>{{ heading }}</h1>
+<form method="post" action="{{ action }}">
+{%- if carry %}
+<input type="hidden" name="continue" value="{{ carry }}">
+{%- endif %}
+<label for="secret">{{ C["login.secret"] }}</label>
+<input id="secret" name="secret" type="password" autocomplete="current-password"
+{%- if failed %} autofocus aria-invalid="true" aria-describedby="login-error"{% endif %}>
+{%- if failed %}
+<p id="login-error" role="status">{{ C["login.error"] }}</p>
+{%- endif %}
+<button>{{ C["login.act"] }}</button>
+</form>
+{% endblock %}
