@@ -45,8 +45,14 @@ class Tags(HTMLParser):
 def test_every_string_is_consent_md_s13_verbatim() -> None:
     spec = SPEC.read_text(encoding="utf-8")
     table = spec[spec.index("## 13. Copy") : spec.index("## 14.")]
+    # Each format field and the placeholder §13 writes in its place.
+    fields = {"{host}": "<host:port>", "{hhmm}": "HH:MM", "{time}": "HH:MM:SS", "{n}": "N"}
+    fields |= {"{code}": "XXXX-XXXX", "{left}": "N d"}
     for key, value in pages.COPY.items():
-        rendered = value.replace("{name}", "<name>").replace("{host}", "<host:port>")
+        rendered = value
+        for field, placeholder in fields.items():
+            rendered = rendered.replace(field, placeholder)
+        rendered = rendered.replace("{", "<").replace("}", ">")
         assert key in table, key
         assert f"`{rendered}`" in table, key
 
