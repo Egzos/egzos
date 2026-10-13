@@ -170,27 +170,45 @@ def test_a_missing_clock_field_fails_closed():
 
 
 @pytest.mark.parametrize("field", ["created_at", "last_seen_at"])
-def test_a_clock_stepped_backwards_refuses_and_keeps_the_session(field):
+def test_a_clock_stepped_backwards_fails_closed_and_ends_the_session(field):
     gate = Sessions()
     value = sessions.establish(gate, now=T0)  # type: ignore[arg-type]
     gate.rows[values.digest(value)][field] = "2026-10-13T10:00:00Z"  # type: ignore[literal-required]
     assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
-    assert len(gate.rows) == 1 and gate.ended == [] and gate.touches == []
+    assert gate.rows == {} and gate.touches == []
 
 
-def test_after_a_backwards_step_the_session_is_judged_on_its_stamps_again():
+def test_stamps_written_ahead_do_not_survive_the_correction():
     gate = Sessions()
+    # a login while the host clock ran an hour ahead
     value = sessions.establish(gate, now=T0 + timedelta(hours=1))  # type: ignore[arg-type]
     assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
-    later = T0 + timedelta(hours=1, seconds=1)
-    assert sessions.resolve(gate, value, now=later) == values.digest(value)  # type: ignore[arg-type]
+    later = T0 + timedelta(hours=1, seconds=1)  # true time reaches the stamps: still ended
+    assert sessions.resolve(gate, value, now=later) is None  # type: ignore[arg-type]
+    assert gate.rows == {}
 
 
-def test_just_beyond_the_skew_is_refused_and_ends_nothing():
+def test_just_beyond_the_skew_fails_closed():
     gate = Sessions()
     value = sessions.establish(gate, now=T0 + timedelta(seconds=3))  # type: ignore[arg-type]
     assert sessions.resolve(gate, value, now=T0) is None  # type: ignore[arg-type]
-    assert len(gate.rows) == 1 and gate.ended == []
+    assert gate.rows == {} and gate.ended == [values.digest(value)]
+
+
+def test_just_inside_the_skew_is_live_and_keeps_the_later_stamp():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0 + timedelta(seconds=2))  # type: ignore[arg-type]
+    assert sessions.resolve(gate, value, now=T0) == values.digest(value)  # type: ignore[arg-type]
+    assert gate.rows[values.digest(value)]["last_seen_at"] == "2026-10-13T09:00:02Z"
+
+
+def test_the_later_stamp_is_chosen_by_instant_not_by_text():
+    gate = Sessions()
+    value = sessions.establish(gate, now=T0)  # type: ignore[arg-type]
+    gate.rows[values.digest(value)]["last_seen_at"] = "2026-10-13T9:05:01Z"  # unpadded, parses
+    at = T0 + timedelta(minutes=5, seconds=30)  # later, though "T09:" sorts before "T9:"
+    assert sessions.resolve(gate, value, now=at) == values.digest(value)  # type: ignore[arg-type]
+    assert gate.rows[values.digest(value)]["last_seen_at"] == "2026-10-13T09:05:30Z"
 
 
 def test_two_requests_racing_on_one_session_both_stay_signed_in():
