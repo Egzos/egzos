@@ -447,7 +447,7 @@ button:focus-visible,a:focus-visible{outline:var(--egz-focus);outline-offset:3px
 
 def tap_css() -> str:
     """The tap page's whole stylesheet: the tokens and TAP_STYLE, for a host that serves it."""
-    return _tokens_css() + TAP_STYLE
+    return tokens_css() + TAP_STYLE
 
 
 def _style(stylesheet: str | None) -> str:
@@ -455,10 +455,12 @@ def _style(stylesheet: str | None) -> str:
     lifeboat hosts the page, so the lifeboat's CSP stays `style-src 'self'` (lifeboat.md §18)."""
     if stylesheet:
         return f'<link rel=stylesheet href="{_e(stylesheet)}">'
-    return f"<style>{_tokens_css()}{TAP_STYLE}</style>"
+    return f"<style>{tokens_css()}{TAP_STYLE}</style>"
 
 
-def _tokens_css() -> str:
+def tokens_css() -> str:
+    """`tokens.css`, vendored at `egzos/web/tokens.css`: the head of every stylesheet the AS's
+    pages serve (this one's and `pages.css()`)."""
     from importlib import resources
 
     return resources.files("egzos.web").joinpath("tokens.css").read_text(encoding="utf-8")
@@ -741,7 +743,7 @@ def empty_page() -> str:
     return (
         "<!doctype html><html lang=en><head><meta charset=utf-8>"
         '<meta name=viewport content="width=device-width,initial-scale=1">'
-        f"<title>egzos · presence</title><style>{_tokens_css()}{TAP_STYLE}</style></head>"
+        f"<title>egzos · presence</title><style>{tokens_css()}{TAP_STYLE}</style></head>"
         f"<body><main><h1 tabindex=-1 autofocus>{_e(TAP_COPY['tap.empty'])}</h1></main>"
         "</body></html>"
     )

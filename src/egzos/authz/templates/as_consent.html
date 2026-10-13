@@ -1,0 +1,94 @@
+{#- §2.3 and R4 to R11. Every grant field is the offer's: the screen renders what the mint produces
+    (contract §11.2). The heading takes first focus, never an act. No script: a wide grant's two
+    presses are two POSTs, the second carrying the server-held `arm`, and the 10 s is the server's. -#}
+{% extends "as_base.html" %}
+{% block body %}
+<p class="ref">{{ reference }}</p>
+<h1 tabindex="-1" autofocus title="{{ full_name }}">{{ heading }}</h1>
+{%- if invalid %}
+<p role="status">{{ C["invalid"] }}</p>
+<section><h2>{{ C["section.caps"] }}</h2></section>
+<section><h2>{{ C["section.scopes"] }}</h2></section>
+<section><h2>{{ C["section.expiry"] }}</h2></section>
+{%- else %}
+<dl class="client">
+<dt>{{ C["client.label"] }}</dt><dd title="{{ full_name }}">{{ client_name }}</dd>
+<dt>{{ C["client.id"] }}</dt><dd><code title="{{ client_id }}">{{ short_id }}</code></dd>
+</dl>
+<ul class="lines">
+{%- if redirect %}
+<li class="mono">{{ redirect }}</li>
+{%- endif %}
+<li>{{ registered }}</li>
+<li class="mono">{{ kind }}</li>
+</ul>
+{%- if interactive %}
+<p class="box principal" role="note">{{ C["principal.interactive"] }}</p>
+{%- else %}
+<p class="principal">{{ C["principal.client"] }}</p>
+{%- endif %}
+<section{% if caps_wide %} class="framed"{% endif %}>
+<h2>{{ C["section.caps"] }}</h2>
+<ul class="stamps" aria-label="Capabilities">
+{%- for word, requested in stamps %}
+<li class="stamp stamp--{{ 'solid' if requested else 'outline' }}"{% if requested %} aria-description="requested"{% endif %}>{{ word }}</li>
+{%- endfor %}
+</ul>
+<ul class="lines">
+{%- for word, meaning in caps %}
+<li><code>{{ word }}</code>{{ meaning }}</li>
+{%- endfor %}
+</ul>
+<p class="mono">{{ role }}</p>
+</section>
+<section{% if scopes_wide %} class="framed"{% endif %}>
+<h2>{{ C["section.scopes"] }}</h2>
+{%- if everything %}
+<p class="mono">{{ whole }}</p>
+<p class="box" role="note">{{ C["scope.all"] }}</p>
+{%- endif %}
+{%- if scopes %}
+<ul class="lines" aria-label="Scopes">
+{%- for line, coverage, flagged in scopes %}
+<li><code{% if flagged %} class="chip--wide" aria-description="wide scope"{% endif %}>{{ line }}</code><p>{{ coverage }}</p></li>
+{%- endfor %}
+</ul>
+{%- endif %}
+{%- if more %}
+<a class="more" href="{{ more[0] }}">{{ more[1] }}</a>
+{%- endif %}
+</section>
+<section>
+<h2>{{ C["section.expiry"] }}</h2>
+<p><time datetime="{{ expires_iso }}">{{ expires }}</time></p>
+{%- if clamped %}
+<p>{{ C["expiry.clamped"] }}</p>
+{%- endif %}
+</section>
+{%- if existing %}
+<p role="note">{{ existing }}</p>
+{%- endif %}
+<p class="hint">{{ hint }}<code>egzos token mint</code></p>
+{%- if wide %}
+<p class="wide" id="wide-note">{{ C["wide.note"] }}</p>
+{%- endif %}
+{%- if failed %}
+<p class="alarm" role="status">{{ C["act.error"] }}</p>
+{%- endif %}
+<form method="post" action="{{ action }}" class="acts">
+{%- for name, value in fields %}
+<input type="hidden" name="{{ name }}" value="{{ value }}">
+{%- endfor %}
+{%- if arm %}
+<input type="hidden" name="arm" value="{{ arm }}">
+<button class="act" name="step" value="confirm" aria-describedby="wide-note">{{ C["act.confirm"] }}</button>
+{%- elif wide %}
+<button class="act" name="step" value="arm" aria-describedby="wide-note">{{ C["act.authorize"] }}</button>
+{%- else %}
+<button class="act" name="step" value="authorize">{{ C["act.authorize"] }}</button>
+{%- endif %}
+<button class="deny" name="step" value="deny">{{ C["act.deny"] }}</button>
+</form>
+<p class="mono" aria-live="polite">{% if arm %}{{ C["act.confirm.sr"] }}{% endif %}</p>
+{%- endif %}
+{% endblock %}
