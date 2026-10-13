@@ -30,15 +30,6 @@ GRANT = ASGrant(
     grant_expires_at="2099-01-01T00:00:00Z",
 )
 
-#: §6 advertises these, and the router does not serve them yet. Each names its hold; the §6
-#: acceptance criterion is met when this is empty.
-HELD = {
-    metadata.AUTHORIZE_PATH: "#208 throttle, #234 redirect query",
-    metadata.DEVICE_AUTHORIZATION_PATH: "#253 unknown-client answer",
-    metadata.REVOCATION_PATH: "#249 item 5 throttle surface",
-}
-
-
 @pytest.fixture
 def state() -> State:
     return State()
@@ -51,7 +42,7 @@ def chain() -> Chain:
 
 def _routes(state: State, chain: Chain, issuer: object = ISSUER) -> router.APIRouter:
     ledger = Ledger(chain)  # type: ignore[arg-type]
-    return router.router(state=state, ledger=ledger, issuer=issuer, owner=OWNER)  # type: ignore[arg-type]
+    return router._build(state=state, ledger=ledger, issuer=issuer, owner=OWNER)  # type: ignore[arg-type]
 
 
 @pytest.fixture
@@ -103,12 +94,31 @@ def test_every_advertised_endpoint_answers_or_is_held_by_name(client):
     for url in endpoints:
         path = urlsplit(url).path
         status = client.post(path).status_code
-        if path in HELD:
+        if path in router.HELD:
             assert status == 404, f"{path} is served now: lift its hold"
         else:
             assert status != 404
             served.append(path)
     assert served == [metadata.TOKEN_PATH]
+    assert set(router.HELD) == {urlsplit(url).path for url in endpoints} - set(served)
+    assert all(router.HELD.values())  # each hold names its question
+
+
+def test_the_mount_entry_refuses_to_build_while_an_endpoint_is_held(state, chain):
+    assert router.HELD
+    with pytest.raises(RuntimeError, match="does not serve yet"):
+        router.router(state=state, ledger=Ledger(chain), issuer=ISSUER, owner=OWNER)  # type: ignore[arg-type]
+
+
+def test_the_mount_entry_builds_once_no_endpoint_is_held(state, chain, monkeypatch):
+    monkeypatch.setattr(router, "HELD", {})
+    routes = router.router(state=state, ledger=Ledger(chain), issuer=ISSUER, owner=OWNER)  # type: ignore[arg-type]
+    assert {route.path for route in routes.routes} >= {router.METADATA_PATH, metadata.TOKEN_PATH}
+
+
+def test_held_cannot_be_edited_at_run_time():
+    with pytest.raises(TypeError):
+        router.HELD[metadata.TOKEN_PATH] = "x"  # type: ignore[index]
 
 
 def test_a_trailing_slash_on_the_issuer_is_dropped(state, chain):
@@ -127,11 +137,25 @@ def test_a_trailing_slash_on_the_issuer_is_dropped(state, chain):
         "https://box.example?x=1",
         "https://box.example#f",
         "https://user@box.example",
+        "https://box.example:abc",
+        "https://box.example:",
+        "https://box.example:0",
+        "https://box.example:65536",
+        "https://:8443",
     ],
 )
 def test_an_issuer_that_is_not_an_origin_is_refused(state, chain, issuer):
     with pytest.raises(ValueError):
         _routes(state, chain, issuer)
+
+
+@pytest.mark.parametrize(
+    "issuer", ["https://box.example", "https://box.example:8443", "http://127.0.0.1:8080"]
+)
+def test_an_origin_with_or_without_a_port_is_accepted(state, chain, issuer):
+    app = FastAPI()
+    app.include_router(_routes(state, chain, issuer))
+    assert TestClient(app).get(router.METADATA_PATH).json()["issuer"] == issuer
 
 
 def test_an_issuer_that_is_not_a_string_is_refused(state, chain):
@@ -205,3 +229,21 @@ def test_an_unknown_grant_type_is_unsupported(client):
 
 def test_token_is_post_only(client):
     assert client.get(metadata.TOKEN_PATH).status_code == 405
+
+
+@pytest.mark.parametrize("failure", [RuntimeError("store down"), KeyError("x"), OSError("disk")])
+def test_a_failure_under_token_is_one_no_store_server_error(state, chain, monkeypatch, failure):
+    def respond(*args, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(router.token_endpoint, "respond", respond)
+    app = FastAPI()
+    app.include_router(_routes(state, chain))
+    answer = TestClient(app, raise_server_exceptions=True).post(
+        metadata.TOKEN_PATH, data=_code_form(_code(state))
+    )
+    assert (answer.status_code, answer.json()) == (500, {"error": "server_error"})
+    assert answer.headers["cache-control"] == "no-store"
+    assert answer.headers["pragma"] == "no-cache"
+    assert str(failure.args[0]) not in answer.text
+    assert chain.entries == []
