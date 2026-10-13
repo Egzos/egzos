@@ -53,6 +53,37 @@ def test_token_secrets_and_issued_values_share_one_digest():
     )
 
 
+@pytest.mark.parametrize(
+    ("given", "stored", "equal"),
+    [
+        ("client", "client", True),
+        ("client", "Client", False),
+        ("ñ", "ñ", True),  # non-ASCII `str` would raise in a bare `compare_digest`
+        ("ñ", "n", False),
+        ("\ud800", "\ud800", True),  # a lone surrogate would raise in a bare `encode`
+        ("\ud800", "x", False),
+        (None, "client", False),
+        ("client", None, False),
+        (b"client", "client", False),
+        (["client"], "client", False),
+        ("", "", True),
+    ],
+)
+def test_same_is_total_and_never_raises(given, stored, equal):
+    assert values.same(given, stored) is equal
+
+
+def test_every_authz_comparison_goes_through_one_helper():
+    # Four private copies once existed (#241's review); a fifth must not reappear.
+    from pathlib import Path
+
+    root = Path(values.__file__).parent
+    for path in root.glob("*.py"):
+        if path.name in ("values.py", "pkce.py"):  # pkce compares two ASCII base64url digests
+            continue
+        assert "compare_digest" not in path.read_text(), path.name
+
+
 def test_a_bearer_value_with_a_lone_surrogate_is_refused_not_raised(tmp_path):
     from egzos.container import OWNER, Container
 

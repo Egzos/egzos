@@ -25,7 +25,6 @@ throttle and the response shape belong to the endpoint that calls these.
 
 from __future__ import annotations
 
-import hmac
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Protocol
@@ -79,14 +78,6 @@ def _parse(text: object) -> datetime | None:
         return datetime.strptime(text, _ISO).replace(tzinfo=UTC)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-
-
-def _same(given: str | None, stored: str) -> bool:
-    if not isinstance(given, str):
-        return False
-    return hmac.compare_digest(
-        given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
-    )
 
 
 def _sound(decided: ASGrant) -> bool:
@@ -249,7 +240,7 @@ def refresh(
         _revoke_family(state, ledger, prior)
         return None
     previous = state.get_token(prior["access_token_id"])  # whose owner the new token keeps
-    if previous is None or not _same(client_id, prior["client_id"]):
+    if previous is None or not values.same(client_id, prior["client_id"]):
         return None
     return mint(
         state,

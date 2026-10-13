@@ -16,7 +16,6 @@ any failure is `None` — the same answer as an unknown code, an expired one and
 
 from __future__ import annotations
 
-import hmac
 from datetime import UTC, datetime, timedelta
 
 from egzos._types import AS_CODE_LIFETIME_SECONDS, ASGrant, ASState, AuthorizationCodeRecord
@@ -33,12 +32,6 @@ def _aware(at: datetime) -> bool:
 
 def _iso(at: datetime) -> str:
     return at.astimezone(UTC).strftime(_ISO)
-
-
-def _b(text: str) -> bytes:
-    # `compare_digest` raises on a non-ASCII `str` and `encode` on a lone surrogate; a raise would
-    # be a different answer from a refusal, so every string compares as bytes.
-    return text.encode("utf-8", "surrogatepass")
 
 
 def _expired(expires_at: str, now: datetime) -> bool:
@@ -105,7 +98,7 @@ def redeem(
     at = now or datetime.now(UTC)
     # A list, not `and`: every check runs on every attempt, so no failure is cheaper than another.
     checks = [
-        isinstance(client_id, str) and hmac.compare_digest(_b(client_id), _b(record["client_id"])),
+        values.same(client_id, record["client_id"]),
         isinstance(redirect_uri, str) and redirect_uri == record["redirect_uri"],  # §5.1: exact
         pkce.verify(code_verifier, record["code_challenge"]),
         not _expired(record["expires_at"], at),

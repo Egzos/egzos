@@ -188,6 +188,23 @@ def test_only_true_reaches(chain: Chain, answer: Any) -> None:
     assert out == posttrust.Rejected("access_denied")
 
 
+@pytest.mark.parametrize("failure", [RuntimeError("backend down"), OSError("disk"), TypeError()])
+def test_a_lookup_failure_is_not_recorded_as_a_scope_rejection(
+    chain: Chain, failure: Exception
+) -> None:
+    def reaches(_node: str) -> bool:
+        raise failure
+
+    with pytest.raises(type(failure)):
+        posttrust.judge(
+            _admitted(f"fetch node:{NODE_A}"),
+            Ledger(chain),  # type: ignore[arg-type]
+            actor=OWNER,
+            reaches=reaches,
+        )
+    assert chain.entries == []
+
+
 # --- shape -----------------------------------------------------------------------------------
 
 
