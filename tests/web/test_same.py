@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from egzos.authz.values import same
-from egzos.container import OWNER, Container
+from egzos.container import Container
 from egzos.web.app import Lifeboat, _same, create_app
 
 ORIGIN = "http://testserver"
