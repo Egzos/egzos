@@ -1,1 +1,3 @@
+{#- Copyright 2026 Ali Sasanian -#}
+{#- SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0 -#}
 <tr{% if r.quarantined %} class="qrow"{% endif %}><td>{{ r.kind }}</td><td>{{ r.title }}</td><td><span class="stamp stamp--{{ r.now }}">{{ r.now }}</span></td><td>{% if r.quarantined %}<span class="stamp stamp--quarantined">quarantined</span>{% else %}<span class="stamp stamp--{{ r.after }}">{{ r.after }}</span>{% if r.reset %} <span class="ink-3">{{ S["moves.reset"] }}</span>{% endif %}{% endif %}</td></tr>
