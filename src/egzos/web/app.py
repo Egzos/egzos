@@ -57,6 +57,7 @@ from egzos.authz.presence import (
     tap_timeout,
     window_seconds,
 )
+from egzos.authz.values import same as _same
 from egzos.container import OWNER, Container
 from egzos.store.find import QueryError, find, shown
 from egzos.trust import TrustError
@@ -159,14 +160,6 @@ def return_target(value: str | None) -> str:
             if _UNRESERVED.fullmatch(ident) and ident not in (".", ".."):
                 return path
     return "/"
-
-
-
-def _same(given: str, held: str) -> bool:
-    """Constant-time equality for caller-supplied text. `compare_digest` raises on a non-ASCII
-    str, which would turn a forged key, cookie or cursor into a 500 instead of the one refusal;
-    as UTF-8 bytes any text compares, and a mismatch is just False."""
-    return secrets.compare_digest(given.encode("utf-8", "surrogatepass"), held.encode("utf-8"))
 
 
 class Lifeboat:
