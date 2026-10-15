@@ -25,6 +25,7 @@ from __future__ import annotations
 import hmac
 import json
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -90,9 +91,14 @@ def _events(box: Box, event: str) -> list[dict[str, Any]]:
     return [e for e in _chain(box) if e["event"] == event]
 
 
+def _read(box: Box, sql: str, *args: Any) -> list[tuple[Any, ...]]:
+    # `closing`, not `with sqlite3.connect()`: the latter commits and never closes (#267's review).
+    with closing(sqlite3.connect(f"file:{box.path}?mode=ro", uri=True)) as db:
+        return db.execute(sql, args).fetchall()
+
+
 def _refresh_rows(box: Box, family_id: str) -> list[dict[str, Any]]:
-    with sqlite3.connect(f"file:{box.path}?mode=ro", uri=True) as db:
-        rows = db.execute("SELECT doc FROM as_refresh WHERE family_id=?", (family_id,)).fetchall()
+    rows = _read(box, "SELECT doc FROM as_refresh WHERE family_id=?", family_id)
     return [json.loads(doc) for (doc,) in rows]
 
 
@@ -181,8 +187,7 @@ def test_a_wrong_credential_stores_no_session_and_appends_one_failed_login(box: 
         box.backend, box.ledger, _Secret(), credential="not-it", continue_value="/", now=T0
     )
     assert answer == login.Login(None, None)
-    with sqlite3.connect(f"file:{box.path}?mode=ro", uri=True) as db:
-        assert db.execute("SELECT COUNT(*) FROM as_sessions").fetchone() == (0,)
+    assert _read(box, "SELECT COUNT(*) FROM as_sessions") == [(0,)]
     (entry,) = _events(box, "authz.login")
     assert entry["principal"] == "none"
     assert entry["details"] == {"outcome": "failed", "cause": "wrong"}
@@ -389,8 +394,8 @@ def test_the_device_flow_against_the_real_store_mints_one_client_token(box: Box)
         box.backend, box.ledger, key=KEY, user_code=user_code, now=T0 + timedelta(seconds=20)
     )
     assert record is not None and record["client_id"] == CLI
-    session = sessions.establish(box.backend, now=T0 + timedelta(seconds=25))
-    assert sessions.resolve(box.backend, session, now=T0 + timedelta(seconds=30)) is not None
+    # No session here: `decide` takes only `actor`, and binding the gate to the decision is the
+    # router PR's (#208, #234), so a session established beside it would prove nothing.
     assert device_entry.decide(
         box.backend,
         box.ledger,
@@ -421,7 +426,6 @@ def test_the_device_flow_against_the_real_store_mints_one_client_token(box: Box)
         device_code,
         user_code,
         values.normalize_user_code(user_code) or "",
-        session,
         done.body["access_token"],
         done.body["refresh_token"],
     )
