@@ -11,7 +11,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from egzos._types import SessionRecord, ThrottleSurface
+from egzos._types import (
+    AuthorizationCodeRecord,
+    ClientRegistration,
+    DecidedRequestRecord,
+    SessionRecord,
+    ThrottleSurface,
+)
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -44,6 +50,12 @@ CREATE TABLE IF NOT EXISTS as_sessions (session_hash TEXT PRIMARY KEY, doc TEXT 
 CREATE TABLE IF NOT EXISTS as_throttle (
   surface TEXT NOT NULL, bucket_key TEXT NOT NULL, window_key TEXT NOT NULL,
   count INTEGER NOT NULL, PRIMARY KEY (surface, bucket_key, window_key));
+-- ASState (storage.md §3.1, draft binding on #173): clients, codes and decided requests, on the
+-- same file and connection as ContainerState. No column here holds a credential value: `code_hash`
+-- and `request_key` arrive already hashed/digested, never a bare code or token.
+CREATE TABLE IF NOT EXISTS as_clients (client_id TEXT PRIMARY KEY, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS as_codes (code_hash TEXT PRIMARY KEY, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS as_decided (request_key TEXT PRIMARY KEY, doc TEXT NOT NULL);
 """
 
 
@@ -310,3 +322,81 @@ class SqliteBackend:
             (surface, bucket_key, window_key),
         ).fetchone()
         return row[0] if row else 0
+
+    # -- ASState: clients (storage.md §3.1, draft binding on #173) ----------------------
+    # Registration is an owner act (§5); this is the registry itself, not a `ContainerConfig`
+    # key, and there is no listing method (§11.1, §7.1).
+    def put_client(self, registration: ClientRegistration) -> None:
+        """Add and amend: a second put on the same `client_id` replaces the entry whole."""
+        self.db.execute(
+            "INSERT OR REPLACE INTO as_clients(client_id,doc) VALUES(?,?)",
+            (registration["client_id"], json.dumps(registration)),
+        )
+        self._commit()
+
+    def get_client(self, client_id: str) -> ClientRegistration | None:
+        row = self.db.execute(
+            "SELECT doc FROM as_clients WHERE client_id=?", (client_id,)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def remove_client(self, client_id: str) -> bool:
+        cur = self.db.execute("DELETE FROM as_clients WHERE client_id=?", (client_id,))
+        self._commit()
+        return cur.rowcount > 0
+
+    # -- ASState: codes (storage.md §3.1 rule 1) -----------------------------------------
+    def put_code(self, record: AuthorizationCodeRecord) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO as_codes(code_hash,doc) VALUES(?,?)",
+            (record["code_hash"], json.dumps(record)),
+        )
+        self._commit()
+
+    def consume_code(self, code_hash: str) -> AuthorizationCodeRecord | None:
+        """Returns the record and invalidates it in one step: of two concurrent callers on the
+        same `code_hash`, exactly one observes it, and every later call is a miss. Does not judge
+        expiry or the §2 bindings — that is Trust's, on what this returns."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_codes WHERE code_hash=?", (code_hash,)
+            ).fetchone()
+            if row is None:
+                return None
+            self.db.execute("DELETE FROM as_codes WHERE code_hash=?", (code_hash,))
+        return json.loads(row[0])
+
+    # -- ASState: decided requests (storage.md §3.1 rule 5, §11.4) ----------------------
+    def put_decided(self, record: DecidedRequestRecord) -> None:
+        """Insert-only (#226): a put on an existing `request_key` changes nothing."""
+        self.db.execute(
+            "INSERT OR IGNORE INTO as_decided(request_key,doc) VALUES(?,?)",
+            (record["request_key"], json.dumps(record)),
+        )
+        self._commit()
+
+    def get_decided(self, request_key: str) -> DecidedRequestRecord | None:
+        row = self.db.execute(
+            "SELECT doc FROM as_decided WHERE request_key=?", (request_key,)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def claim_resubmission(self, session_hash: str, request_key: str) -> bool:
+        """`True` exactly once per `(session_hash, request_key)` that `put_decided` recorded,
+        atomically against a concurrent claim on the same key; `False` otherwise, including an
+        unrecorded `request_key` or a `session_hash` that does not match the deciding session."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_decided WHERE request_key=?", (request_key,)
+            ).fetchone()
+            if row is None:
+                return False
+            record = json.loads(row[0])
+            if record["session_hash"] != session_hash or record["resubmission_seen"]:
+                return False
+            record["resubmission_seen"] = True
+            self.db.execute(
+                "UPDATE as_decided SET doc=? WHERE request_key=?",
+                (json.dumps(record), request_key),
+            )
+        return True

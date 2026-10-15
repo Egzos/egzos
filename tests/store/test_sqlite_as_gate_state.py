@@ -141,6 +141,41 @@ def test_touch_session_is_atomic_across_two_connections(tmp_path):
     assert record["last_seen_at"] in ("2026-10-12T09:05:00Z", "2026-10-12T09:06:00Z")
 
 
+def test_touch_after_end_is_false_across_two_connections(tmp_path):
+    """Carry-forward from #263's review (a1r minor 1): a `touch_session` that races a concurrent
+    `end_session` on another connection must not resurrect the session. Unlike
+    `test_touch_session_is_atomic_across_two_connections` and
+    `test_end_session_is_atomic_across_two_connections`, which race a method against itself, this
+    races the two methods against each other."""
+    path = tmp_path / "container.db"
+    a = SqliteBackend(path)
+    a.put_session(_session())
+    b = SqliteBackend(path)
+
+    results: dict[str, bool] = {}
+    barrier = threading.Barrier(2)
+
+    def end(conn: SqliteBackend) -> None:
+        barrier.wait()
+        results["end"] = conn.end_session(SESSION_HASH)
+
+    def touch(conn: SqliteBackend) -> None:
+        barrier.wait()
+        results["touch"] = conn.touch_session(SESSION_HASH, "2026-10-12T09:05:00Z")
+
+    t1 = threading.Thread(target=end, args=(a,))
+    t2 = threading.Thread(target=touch, args=(b,))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+
+    # `end_session` always finds the session, whichever side ran first: `touch_session` never
+    # recreates an absent record, so the session is never resurrected after it ends.
+    assert results["end"] is True
+    assert a.get_session(SESSION_HASH) is None
+
+
 def test_end_session_is_atomic_across_two_connections(tmp_path):
     """Of two concurrent `end_session` calls on the same key, exactly one observes the record
     before the other's delete — the other finds it already gone."""
