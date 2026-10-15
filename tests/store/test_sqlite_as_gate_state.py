@@ -141,12 +141,13 @@ def test_touch_session_is_atomic_across_two_connections(tmp_path):
     assert record["last_seen_at"] in ("2026-10-12T09:05:00Z", "2026-10-12T09:06:00Z")
 
 
-def test_touch_after_end_is_false_across_two_connections(tmp_path):
+def test_touch_racing_end_never_resurrects_the_session(tmp_path):
     """Carry-forward from #263's review (a1r minor 1): a `touch_session` that races a concurrent
     `end_session` on another connection must not resurrect the session. Unlike
     `test_touch_session_is_atomic_across_two_connections` and
     `test_end_session_is_atomic_across_two_connections`, which race a method against itself, this
-    races the two methods against each other."""
+    races the two methods against each other. `touch`'s own return is not asserted on: it is
+    legitimately `True` when touch wins the race (carry-forward from #264's review, a1r minor)."""
     path = tmp_path / "container.db"
     a = SqliteBackend(path)
     a.put_session(_session())
