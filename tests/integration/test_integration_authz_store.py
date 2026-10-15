@@ -33,9 +33,15 @@ from typing import Any
 
 import pytest
 
-from egzos._types import ASGrant, ClientRegistration
+from egzos._types import (
+    AS_THROTTLE_SURFACES,
+    PRINCIPAL_NONE_EVENTS,
+    ASGrant,
+    ClientRegistration,
+)
 from egzos.authz import (
     codes,
+    decided,
     device_authorization,
     device_entry,
     gate,
@@ -537,3 +543,68 @@ def test_the_device_flow_against_the_real_store_mints_one_client_token(box: Box)
         done.body["access_token"],
         done.body["refresh_token"],
     )
+
+
+# -- the caller-less events (events.md §2, §12.2; #166) ------------------------------------------
+
+
+def test_every_caller_less_emitter_on_main_appends_principal_none_and_only_it(box: Box):
+    """#166: each `PRINCIPAL_NONE_EVENTS` member the AS emits is driven through the AS's own
+    functions, not the ledger, and lands on the real chain with `principal: none`; every entry
+    beside them names a caller. `authz.release` and `authz.tally` are the throttle's (#208) and
+    `rest.tally` the REST door's: none has an emitter on `main` to drive yet."""
+    _register_browser(box)
+    box.backend.put_client(
+        ClientRegistration(
+            client_id=CLI,
+            client_name=CLI,
+            client_type="cli",
+            redirect_uris=[],
+            registered_at="2026-10-01T09:00:00Z",
+        )
+    )
+    for credential in ("not-it", CONTAINER_SECRET):  # row (a): failed, then established
+        login.attempt(
+            box.backend, box.ledger, _Secret(), credential=credential, continue_value="/", now=T0
+        )
+    started = device_authorization.respond(
+        box.backend,
+        [("client_id", CLI), ("scope", "fetch")],
+        content_type=FORM,
+        authorization=None,
+        key=KEY,
+        issuer=ISSUER,
+        now=T0,
+    )
+    user_code = started.body["user_code"]
+    device_entry.redeem(box.backend, box.ledger, key=KEY, user_code="!!", now=T0)  # row (b)
+    device_entry.redeem(box.backend, box.ledger, key=KEY, user_code=user_code, now=T0)
+    device_entry.decide(
+        box.backend, box.ledger, key=KEY, user_code=user_code, approve=True, actor=OWNER, now=T0
+    )
+    found = gate.check(
+        box.backend, box.ledger, session=None, authorization="Bearer x", query="", now=T0
+    )
+    assert isinstance(found, gate.Refused)  # row (d) token_presented
+    params = _authorize([("code_challenge", CHALLENGE), ("code_challenge_method", "S256")])
+    assert pretrust.admit(box.backend, box.ledger, params[1:]) is None  # row (d) malformed
+    admitted = pretrust.admit(box.backend, box.ledger, params)
+    assert admitted is not None
+    session = values.digest(sessions.establish(box.backend, now=T0))
+    decided.record(box.backend, key=admitted.key, session_hash=session, decision="granted", now=T0)
+    assert decided.first_replay(box.backend, box.ledger, session_hash=session, key=admitted.key)
+    assert pretrust.admit(box.backend, box.ledger, params) is None  # row (d) replayed, keyed
+
+    chain = _chain(box)
+    caller_less = [e for e in chain if e["event"] in PRINCIPAL_NONE_EVENTS]
+    assert {e["event"] for e in caller_less} == {"authz.login", "authz.redeem", "authz.refuse"}
+    assert len(caller_less) == 2 + 2 + 4
+    for entry in chain:
+        assert (entry["principal"] == "none") == (entry["event"] in PRINCIPAL_NONE_EVENTS), entry
+    for entry in caller_less:
+        assert entry["actor"] in AS_THROTTLE_SURFACES and entry["subject"] is None
+    causes = [e["details"]["cause"] for e in _events(box, "authz.refuse")]
+    assert causes == ["token_presented", "malformed", "replayed", "replayed"]
+    (granted,) = _events(box, "authz.grant")
+    assert granted["principal"] == "interactive"
+    _assert_clean(box, CONTAINER_SECRET, user_code, started.body["device_code"])
