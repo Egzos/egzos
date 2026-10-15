@@ -143,14 +143,25 @@ def backend(tmp_path):
 
 def _race(*calls: object) -> list[object]:
     """Runs each zero-arg callable in its own thread, released together by a shared barrier, and
-    returns their results (order undetermined — the race between them is the point)."""
+    returns their results (order undetermined — the race between them is the point).
+
+    A thread's exception does not propagate to the caller on its own (Python prints it to stderr
+    and the thread dies quietly), which would let a test pass even though one of the raced calls
+    errored. Collected here and re-raised after every thread has joined, so a call that raises
+    makes `_race` raise."""
     barrier = threading.Barrier(len(calls))
     results: list[object] = []
+    errors: list[BaseException] = []
     lock = threading.Lock()
 
     def run(call: object) -> None:
         barrier.wait()
-        result = call()
+        try:
+            result = call()
+        except BaseException as exc:  # noqa: BLE001 - re-raised below, not swallowed
+            with lock:
+                errors.append(exc)
+            return
         with lock:
             results.append(result)
 
@@ -159,7 +170,20 @@ def _race(*calls: object) -> list[object]:
         t.start()
     for t in threads:
         t.join()
+    if errors:
+        raise errors[0]
     return results
+
+
+def test_race_reraises_a_raced_calls_exception():
+    """A call that raises makes `_race` raise, instead of the exception dying quietly in its
+    thread and `_race` returning as if every call had succeeded (#262's leftover, a1r on #265)."""
+
+    def boom():
+        raise ValueError("raced call failed")
+
+    with pytest.raises(ValueError, match="raced call failed"):
+        _race(lambda: 1, boom)
 
 
 def test_method_set_matches_the_protocol():
