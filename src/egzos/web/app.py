@@ -242,8 +242,17 @@ class Lifeboat:
     def token(self):
         return self.c.require_token()
 
+    def open_proposals(self) -> list[dict[str, Any]]:
+        """Open proposals this viewer's token decides over (`Trust.decides_over`, the rule
+        `build_act` already applies to a single id). The nav count and the queue page share
+        this one filter so they cannot disagree (F33); a token covering only one end of a
+        proposal does not see it, as if it did not exist (silence-not-errors)."""
+        token = self.token()
+        return [p for p in self.c.backend.list_proposals(status="open")
+                if self.c.trust.decides_over(token, p)]
+
     def pending_count(self) -> int:
-        return len(self.c.backend.list_proposals(status="open"))
+        return len(self.open_proposals())
 
     def read(self, view: str, **details: Any) -> None:
         """Every page is a read: one `context.fetch`, the nav's pending count included."""
@@ -726,8 +735,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     # -- the pending pages (the tap spec §3, §4, §18 — L column) -----------------------------------
     def queue() -> list[dict[str, Any]]:
         rows = []
-        for p in sorted(boat.c.backend.list_proposals(status="open"),
-                        key=lambda p: p.get("created_at", "")):
+        for p in sorted(boat.open_proposals(), key=lambda p: p.get("created_at", "")):
             by = p.get("proposed_by") or {}
             rows.append({
                 "id": p["id"],
