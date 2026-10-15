@@ -57,6 +57,7 @@ from egzos.authz.presence import (
     tap_timeout,
     window_seconds,
 )
+from egzos.authz.values import same as _same
 from egzos.container import OWNER, Container
 from egzos.store.find import QueryError, find, shown
 from egzos.trust import TrustError
@@ -161,14 +162,6 @@ def return_target(value: str | None) -> str:
     return "/"
 
 
-
-def _same(given: str, held: str) -> bool:
-    """Constant-time equality for caller-supplied text. `compare_digest` raises on a non-ASCII
-    str, which would turn a forged key, cookie or cursor into a 500 instead of the one refusal;
-    as UTF-8 bytes any text compares, and a mismatch is just False."""
-    return secrets.compare_digest(given.encode("utf-8", "surrogatepass"), held.encode("utf-8"))
-
-
 class Lifeboat:
     """Request handling, independent of the socket server so tests drive it through TestClient."""
 
@@ -249,8 +242,17 @@ class Lifeboat:
     def token(self):
         return self.c.require_token()
 
+    def open_proposals(self) -> list[dict[str, Any]]:
+        """Open proposals this viewer's token decides over (`Trust.decides_over`, the rule
+        `build_act` already applies to a single id). The nav count and the queue page share
+        this one filter so they cannot disagree (F33); a token covering only one end of a
+        proposal does not see it, as if it did not exist (silence-not-errors)."""
+        token = self.token()
+        return [p for p in self.c.backend.list_proposals(status="open")
+                if self.c.trust.decides_over(token, p)]
+
     def pending_count(self) -> int:
-        return len(self.c.backend.list_proposals(status="open"))
+        return len(self.open_proposals())
 
     def read(self, view: str, **details: Any) -> None:
         """Every page is a read: one `context.fetch`, the nav's pending count included."""
@@ -733,8 +735,7 @@ def create_app(boat: Lifeboat, origin: str) -> FastAPI:
     # -- the pending pages (the tap spec §3, §4, §18 — L column) -----------------------------------
     def queue() -> list[dict[str, Any]]:
         rows = []
-        for p in sorted(boat.c.backend.list_proposals(status="open"),
-                        key=lambda p: p.get("created_at", "")):
+        for p in sorted(boat.open_proposals(), key=lambda p: p.get("created_at", "")):
             by = p.get("proposed_by") or {}
             rows.append({
                 "id": p["id"],

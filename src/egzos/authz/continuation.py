@@ -43,8 +43,15 @@ _ALLOWED = re.compile(r"[\x21-\x7e]*")
 
 def resolve(value: str | None) -> str:
     """The relative reference a successful login 303s to: an allowlisted path, with its query
-    where step 3 carries one, or `/` when the value fails any step."""
-    if not isinstance(value, str) or len(value.encode("utf-8")) > AS_CONTINUE_MAX_BYTES:
+    where step 3 carries one, or `/` when the value fails any step. It never raises: a value with
+    no UTF-8 form (a lone surrogate) is the root like any other failure, on the GET and the POST."""
+    if not isinstance(value, str):
+        return ROOT
+    try:
+        received = len(value.encode("utf-8"))
+    except UnicodeEncodeError:
+        return ROOT
+    if received > AS_CONTINUE_MAX_BYTES:
         return ROOT
     # Step 1, before anything is parsed.
     if not value.startswith("/") or value.startswith(("//", "/\\")) or "\\" in value:

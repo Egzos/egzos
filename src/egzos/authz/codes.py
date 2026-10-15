@@ -16,7 +16,6 @@ any failure is `None` — the same answer as an unknown code, an expired one and
 
 from __future__ import annotations
 
-import hmac
 from datetime import UTC, datetime, timedelta
 
 from egzos._types import AS_CODE_LIFETIME_SECONDS, ASGrant, ASState, AuthorizationCodeRecord
@@ -25,14 +24,14 @@ from egzos.authz import pkce, values
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 
+def _aware(at: datetime) -> bool:
+    # A naive `datetime` has no instant: `astimezone` would read it as local time and comparing it
+    # with an aware one raises. Neither is an answer this module may give.
+    return at.tzinfo is not None and at.utcoffset() is not None
+
+
 def _iso(at: datetime) -> str:
     return at.astimezone(UTC).strftime(_ISO)
-
-
-def _b(text: str) -> bytes:
-    # `compare_digest` raises on a non-ASCII `str` and `encode` on a lone surrogate; a raise would
-    # be a different answer from a refusal, so every string compares as bytes.
-    return text.encode("utf-8", "surrogatepass")
 
 
 def _expired(expires_at: str, now: datetime) -> bool:
@@ -40,7 +39,7 @@ def _expired(expires_at: str, now: datetime) -> bool:
         until = datetime.strptime(expires_at, _ISO).replace(tzinfo=UTC)
     except (TypeError, ValueError):
         return True  # an expiry nobody can read fails closed
-    return now >= until
+    return not _aware(now) or now >= until  # so does a clock nobody can place
 
 
 def issue(
@@ -57,8 +56,11 @@ def issue(
     caller puts in the redirect and nowhere else.
 
     `redirect_uri` and `code_challenge` are the ones the request was admitted with (`redirects`,
-    `pkce.check_challenge`); this function binds them and does not re-validate them."""
+    `pkce.check_challenge`); this function binds them and does not re-validate them. A naive
+    `now` is a caller's bug and raises `ValueError`; no code is stored."""
     at = now or datetime.now(UTC)
+    if not _aware(at):
+        raise ValueError("codes.issue needs an aware datetime")
     value = values.new_value()
     state.put_code(
         AuthorizationCodeRecord(
@@ -87,7 +89,7 @@ def redeem(
 
     Returns the spent record when every §2 check holds, else `None` for every failure alike. The
     code is spent by the attempt either way; a second attempt with the right verifier finds
-    nothing."""
+    nothing. A naive `now` counts as expired: `None`, never a raise."""
     if not isinstance(code, str) or not code:
         return None
     record = state.consume_code(values.digest(code))
@@ -96,7 +98,7 @@ def redeem(
     at = now or datetime.now(UTC)
     # A list, not `and`: every check runs on every attempt, so no failure is cheaper than another.
     checks = [
-        isinstance(client_id, str) and hmac.compare_digest(_b(client_id), _b(record["client_id"])),
+        values.same(client_id, record["client_id"]),
         isinstance(redirect_uri, str) and redirect_uri == record["redirect_uri"],  # §5.1: exact
         pkce.verify(code_verifier, record["code_challenge"]),
         not _expired(record["expires_at"], at),

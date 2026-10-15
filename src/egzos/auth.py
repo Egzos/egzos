@@ -12,13 +12,14 @@ never touch it; they receive their own client tokens.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import secrets
 from pathlib import Path
 
 from egzos._ids import ulid
+from egzos.authz.values import digest as _hash
+from egzos.authz.values import same
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import ROLE_BUNDLES, TOKEN_PRINCIPALS, Token, now_iso
@@ -29,10 +30,6 @@ class AuthError(Exception):
 
 
 PREFIX = "egz_"
-
-
-def _hash(value: str) -> str:
-    return hashlib.sha256(value.encode()).hexdigest()
 
 
 def new_secret(token_id: str) -> str:
@@ -101,9 +98,15 @@ class Auth:
         return token
 
     def revoke(self, token_id: str, *, actor: str, principal: str) -> bool:
+        """`token rm`. `True` when the token is revoked, whether by this call or before it; an
+        already-revoked token is not revoked twice and gets no second `token.revoke`
+        (authorization-server.md §9.2, as `authz.revoke`). The event carries no `family_id`:
+        `Backend` has no family read yet (#242)."""
         token = self.backend.get_token(token_id)
         if not token:
             return False
+        if token.revoked:
+            return True
         token.revoked = True
         self.backend.put_token(token)
         self.ledger.append("token.revoke", actor=actor, principal=principal, subject=token.id)
@@ -133,7 +136,7 @@ class Auth:
         token = self.backend.get_token(tid) if tid else None
         if not token or not token.live or not token.secret_hash:
             return None
-        if not secrets.compare_digest(_hash(value), token.secret_hash):
+        if not same(_hash(value), token.secret_hash):
             return None
         token.last_used = now_iso()
         self.backend.put_token(token)

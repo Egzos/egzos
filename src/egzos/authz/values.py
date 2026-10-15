@@ -3,11 +3,12 @@
 """
 The AS's own issued values (authorization-server.md §9.1, §11.8).
 
-Authorization codes, `device_code`s and refresh tokens carry 256 bits from the platform CSPRNG
-(`secrets`), twice §9.1's 128-bit floor, and nothing derived from a counter, a clock, a client id
-or an owner. The `user_code` is the one exception, bounded by the attempt limit and expiry rather
-than by entropy ([0.3 · 20]): 8 characters of RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX`,
-matched case-insensitively with the hyphen ignored.
+Authorization codes, `device_code`s, refresh tokens and interactive session identifiers (§10.1)
+carry 256 bits from the platform CSPRNG (`secrets`), twice §9.1's 128-bit floor, and nothing
+derived from a counter, a clock, a client id or an owner. The `user_code` is the one exception,
+bounded by the attempt limit and expiry rather than by entropy ([0.3 · 20]): 8 characters of
+RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX`, matched case-insensitively with the hyphen
+ignored.
 
 Access tokens are not minted here. A token the AS issues IS a `Token` (§7, `capabilities.md` §5),
 so its bearer value is `egz_<id>_<256 bits>` from `egzos.auth`, the same path as `token mint`,
@@ -17,6 +18,7 @@ and is resolved by `token_id_of` like any other; a second format would be a seco
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 
 from egzos._types import AS_USER_CODE_ALPHABET, AS_USER_CODE_LENGTH
@@ -26,18 +28,32 @@ VALUE_BYTES = 32
 
 
 def new_value() -> str:
-    """An opaque, unguessable value for an authorization code, a `device_code` or a refresh token.
+    """An opaque, unguessable value for an authorization code, a `device_code`, a refresh token
+    or an interactive session (§10.1; a session is not a `Token`).
 
     Never an access token's bearer value: that is `egzos.auth`'s, through the `Token` mint."""
     return secrets.token_urlsafe(VALUE_BYTES)
 
 
 def digest(value: str) -> str:
-    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value, as
-    `auth.py` does for `Token.secret_hash` (storage.md §3.1). Never for a `user_code`, which is
-    low-entropy and keyed by HMAC instead."""
+    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value
+    (storage.md §3.1). It is also the one hash behind `Token.secret_hash`: `auth.py` imports it
+    rather than keeping a copy, so the two lookups cannot drift apart. Never for a `user_code`,
+    which is low-entropy and keyed by HMAC instead."""
     # `surrogatepass`: a lone surrogate from a JSON body hashes like any other string, never raises
     return hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
+
+
+def same(given: object, stored: object) -> bool:
+    """Constant-time equality for the AS's stored strings: a `client_id`, a digest, a hash.
+    Anything but two `str`s is unequal. `hmac.compare_digest` raises on a non-ASCII `str` and
+    `encode` on a lone surrogate, and a raise would be a second answer shape beside the refusal,
+    so both sides compare as bytes. The one helper every comparison in `authz` goes through."""
+    if not isinstance(given, str) or not isinstance(stored, str):
+        return False
+    return hmac.compare_digest(
+        given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
+    )
 
 
 def new_user_code() -> str:

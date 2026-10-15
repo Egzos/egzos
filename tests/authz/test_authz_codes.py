@@ -144,6 +144,22 @@ def test_an_unreadable_expiry_fails_closed():
     assert _redeem(state, code) is None
 
 
+def test_a_naive_clock_at_redemption_fails_closed():
+    # A naive `now` cannot be placed against the stored UTC expiry: refused like an expired code,
+    # never a `TypeError` (a second answer shape), and the code is spent all the same.
+    state = Codes()
+    code = _issue(state)
+    assert _redeem(state, code, now=datetime(2026, 10, 12, 9, 0, 5)) is None
+    assert state.rows == {}
+
+
+def test_a_naive_clock_at_issuance_stores_nothing():
+    state = Codes()
+    with pytest.raises(ValueError):
+        _issue(state, now=datetime(2026, 10, 12, 9, 0, 0))
+    assert state.rows == {}
+
+
 def test_the_code_is_spent_before_any_check_runs():
     # Even a request missing every binding reaches `consume_code`: a code that survived a failed
     # attempt could be retried with a guessed verifier.

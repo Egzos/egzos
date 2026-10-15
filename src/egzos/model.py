@@ -19,6 +19,7 @@ from typing import Any
 # Imported from the contract types, never restated: a second copy is a copy that drifts.
 from egzos._types import (
     CAPABILITIES,
+    CONTAINER_CONFIG_DEFAULTS,
     CONTAINER_TYPES,
     HUMAN_ONLY_ACTS,
     KINDS,
@@ -57,8 +58,10 @@ __all__ = [
 # Structure-creation is a permission (v0.3 §2): threads/projects baseline; the rest need admin.
 BASELINE_CREATE: frozenset[str] = frozenset({"thread", "project"})
 # Small blobs inline on fetch; above the threshold the contract returns a BlobGrant descriptor
-# minted by Trust (F5). The number itself is container config at 0.2; 64 KiB is the skeleton's.
-INLINE_BLOB_LIMIT = 64 * 1024
+# minted by Trust (F5). The number is container config (container.md §8, `blobs_inline_max_bytes`);
+# this name is kept only as an alias of that default so no existing import breaks — `Store` reads
+# the actual, possibly container-configured, limit off `self.inline_blob_limit` (F30, #271).
+INLINE_BLOB_LIMIT = CONTAINER_CONFIG_DEFAULTS["blobs_inline_max_bytes"]
 
 
 def now_iso() -> str:
