@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from egzos._types import SessionRecord, ThrottleSurface
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -36,6 +37,13 @@ CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit
   BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
   BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
+-- ASGateState (storage.md §3.1, draft binding on #173): the AS's gate, on this same substrate and
+-- connection as ContainerState, never process memory, so a restart lifts no throttle and ends no
+-- session. A credential value never lands in a column here: `session_hash` is already a digest.
+CREATE TABLE IF NOT EXISTS as_sessions (session_hash TEXT PRIMARY KEY, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS as_throttle (
+  surface TEXT NOT NULL, bucket_key TEXT NOT NULL, window_key TEXT NOT NULL,
+  count INTEGER NOT NULL, PRIMARY KEY (surface, bucket_key, window_key));
 """
 
 
@@ -238,3 +246,67 @@ class SqliteBackend:
         else:
             rows = self.db.execute("SELECT doc FROM proposals ORDER BY rowid")
         return [json.loads(r[0]) for r in rows]
+
+    # -- ASGateState (storage.md §3.1, draft binding on #173) ---------------------------
+    # Sessions and throttle counters, on this file and this connection, never process memory
+    # (the Chief on #173, option (A)). No method here takes a credential value: `session_hash`
+    # reaches the store only as `values.digest` of the session value (sessions.py).
+    def put_session(self, record: SessionRecord) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO as_sessions(session_hash,doc) VALUES(?,?)",
+            (record["session_hash"], json.dumps(record)),
+        )
+        self._commit()
+
+    def get_session(self, session_hash: str) -> SessionRecord | None:
+        row = self.db.execute(
+            "SELECT doc FROM as_sessions WHERE session_hash=?", (session_hash,)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def touch_session(self, session_hash: str, at: str) -> bool:
+        """Sets `last_seen_at` alone, atomically against a concurrent `end_session` on the same
+        key: of two concurrent calls, exactly one observes the record before the other's change."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_sessions WHERE session_hash=?", (session_hash,)
+            ).fetchone()
+            if row is None:
+                return False
+            record = json.loads(row[0])
+            record["last_seen_at"] = at
+            self.db.execute(
+                "UPDATE as_sessions SET doc=? WHERE session_hash=?",
+                (json.dumps(record), session_hash),
+            )
+        return True
+
+    def end_session(self, session_hash: str) -> bool:
+        """Ends the session: a later `get_session` on this key is a miss, like any other absent
+        key (silence-not-errors). `True` when a session was found and ended, `False` otherwise."""
+        with self.atomic():
+            cur = self.db.execute("DELETE FROM as_sessions WHERE session_hash=?", (session_hash,))
+        return cur.rowcount > 0
+
+    def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        """Increments and returns the new count, atomically: of two concurrent callers on the
+        same key, each observes its own correctly incremented total, never the other's. Names no
+        rate and no window length (Trust's, #141); the three keys are compared as opaque values."""
+        with self.atomic():
+            self.db.execute(
+                "INSERT INTO as_throttle(surface,bucket_key,window_key,count) VALUES(?,?,?,1) "
+                "ON CONFLICT(surface,bucket_key,window_key) DO UPDATE SET count=count+1",
+                (surface, bucket_key, window_key),
+            )
+            row = self.db.execute(
+                "SELECT count FROM as_throttle WHERE surface=? AND bucket_key=? AND window_key=?",
+                (surface, bucket_key, window_key),
+            ).fetchone()
+        return row[0]
+
+    def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        row = self.db.execute(
+            "SELECT count FROM as_throttle WHERE surface=? AND bucket_key=? AND window_key=?",
+            (surface, bucket_key, window_key),
+        ).fetchone()
+        return row[0] if row else 0
