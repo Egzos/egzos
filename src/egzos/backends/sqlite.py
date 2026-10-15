@@ -484,8 +484,11 @@ class SqliteBackend:
 
     # -- ASState: refresh chains (storage.md §3.1 rules 3-4, §9.2) ----------------------
     def put_refresh(self, record: RefreshRecord) -> None:
+        """Insert-only, like `put_device`: a second put on an existing `refresh_hash` changes
+        nothing, so it can never reset `redeemed_at` or un-revoke a row and silence reuse
+        detection."""
         self.db.execute(
-            "INSERT OR REPLACE INTO as_refresh"
+            "INSERT OR IGNORE INTO as_refresh"
             "(refresh_hash,family_id,access_token_id,revoked,doc) VALUES(?,?,?,?,?)",
             (
                 record["refresh_hash"],
@@ -527,8 +530,10 @@ class SqliteBackend:
     def revoke_family(self, family_id: str) -> list[str]:
         """Revokes every unrevoked refresh record in the family and every `Token` they name, in
         one transaction on the `tokens` table this file already owns. Until #214 items 4/5 are
-        answered, returns only the newly revoked ids: a family already revoked returns `[]`,
-        so a replayed reuse never double-counts or double-fires `token.revoke`."""
+        answered, returns only the ids whose `Token` actually moved from unrevoked to revoked
+        here: a token already revoked on its own (`authz/revoke.py::_revoke`) or absent
+        (`get_token` gives `None`) is never returned, so a replayed reuse or a prior individual
+        revoke never double-fires `token.revoke`."""
         with self.atomic():
             rows = self.db.execute(
                 "SELECT refresh_hash, doc FROM as_refresh WHERE family_id=? AND revoked=0",
@@ -542,8 +547,8 @@ class SqliteBackend:
                     (json.dumps(record), refresh_hash),
                 )
                 token = self.get_token(record["access_token_id"])
-                if token is not None:
+                if token is not None and not token.revoked:
                     token.revoked = True
                     self.put_token(token)
-                token_ids.append(record["access_token_id"])
+                    token_ids.append(record["access_token_id"])
         return token_ids

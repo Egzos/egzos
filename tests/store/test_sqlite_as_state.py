@@ -482,6 +482,23 @@ def test_put_then_redeem_refresh(backend: SqliteBackend):
     assert backend.redeem_refresh(REFRESH_HASH) == _refresh()
 
 
+def test_put_refresh_does_not_reset_redeemed_at(backend: SqliteBackend):
+    """A second put on an existing `refresh_hash` changes nothing, like `put_device`: it can
+    never reset `redeemed_at` and silence reuse detection."""
+    backend.put_refresh(_refresh())
+    backend.redeem_refresh(REFRESH_HASH)
+    backend.put_refresh(_refresh(redeemed_at=None))
+    record = backend.redeem_refresh(REFRESH_HASH)
+    assert record["redeemed_at"] is not None
+
+
+def test_put_refresh_does_not_un_revoke_an_existing_record(backend: SqliteBackend):
+    """A second put on an existing `refresh_hash` can never un-revoke the row either."""
+    backend.put_refresh(_refresh(revoked=True))
+    backend.put_refresh(_refresh(revoked=False))
+    assert backend.family_of_token(ACCESS_TOKEN_ID) is None
+
+
 def test_redeem_refresh_is_none_for_an_absent_hash(backend: SqliteBackend):
     assert backend.redeem_refresh("unknown") is None
 
@@ -569,7 +586,7 @@ def test_revoke_family_revokes_the_refresh_record_and_its_token(backend: SqliteB
     assert backend.redeem_refresh(REFRESH_HASH)["revoked"] is True
 
 
-def test_revoke_family_is_insert_only_in_effect_a_second_call_returns_nothing(
+def test_revoke_family_is_idempotent_a_second_call_returns_nothing(
     backend: SqliteBackend,
 ):
     """Until #214 items 4/5 are answered: a family already revoked returns `[]`, so a replayed
@@ -578,6 +595,31 @@ def test_revoke_family_is_insert_only_in_effect_a_second_call_returns_nothing(
     backend.put_refresh(_refresh())
     assert backend.revoke_family(FAMILY_ID) == [ACCESS_TOKEN_ID]
     assert backend.revoke_family(FAMILY_ID) == []
+
+
+def test_revoke_family_does_not_return_a_token_already_revoked_on_its_own(
+    backend: SqliteBackend,
+):
+    """A token first revoked on its own (`authz/revoke.py::_revoke` leaves the refresh row
+    unrevoked) must not come back when its family is later revoked for reuse, or Trust would
+    write a second `token.revoke` for it, which §9.2 forbids ("written once")."""
+    token = _token()
+    backend.put_token(token)
+    backend.put_refresh(_refresh())
+    token.revoked = True
+    backend.put_token(token)
+
+    assert backend.revoke_family(FAMILY_ID) == []
+    assert backend.get_token(ACCESS_TOKEN_ID).revoked is True
+    assert backend.redeem_refresh(REFRESH_HASH)["revoked"] is True
+
+
+def test_revoke_family_does_not_return_an_id_whose_token_is_absent(backend: SqliteBackend):
+    """An id whose `Token` is absent (`get_token` -> `None`) must not be returned either, so a
+    caller cannot be told a token was revoked when none such exists."""
+    backend.put_refresh(_refresh())
+    assert backend.revoke_family(FAMILY_ID) == []
+    assert backend.redeem_refresh(REFRESH_HASH)["revoked"] is True
 
 
 def test_revoke_family_is_empty_for_an_unknown_family(backend: SqliteBackend):
