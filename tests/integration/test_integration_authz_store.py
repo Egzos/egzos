@@ -38,8 +38,10 @@ from egzos.authz import (
     codes,
     device_authorization,
     device_entry,
+    gate,
     login,
     pkce,
+    pretrust,
     revoke,
     sessions,
     token_endpoint,
@@ -55,6 +57,7 @@ BROWSER = "egzos.io"
 CLI = "egzos-cli"
 REDIRECT = "https://egzos.io/connect/callback"
 VERIFIER = "v" * 43  # RFC 7636's minimum length; the challenge is its S256
+CHALLENGE = pkce.s256(VERIFIER)
 FORM = "application/x-www-form-urlencoded"
 KEY = b"k" * 32  # a fixture device-code key; provisioning the real one is #143's
 ISSUER = "https://box.example/"
@@ -263,6 +266,111 @@ def test_a_wrong_verifier_spends_the_code_in_the_real_store(box: Box):
             is None
         )
     assert _events(box, "token.mint") == [] and box.backend.list_tokens() == []
+    _assert_clean(box, code, session)
+
+
+# -- PKCE downgrades (§2, §5.3) -------------------------------------------------------------------
+
+
+def _register_browser(box: Box) -> None:
+    box.backend.put_client(
+        ClientRegistration(
+            client_id=BROWSER,
+            client_name=BROWSER,
+            client_type="browser",
+            redirect_uris=[REDIRECT],
+            registered_at="2026-10-01T09:00:00Z",
+        )
+    )
+
+
+def _authorize(pkce_params: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    return [
+        ("response_type", "code"),
+        ("client_id", BROWSER),
+        ("redirect_uri", REDIRECT),
+        ("state", "s"),
+        *pkce_params,
+    ]
+
+
+def _nothing_stored(box: Box) -> None:
+    for table in ("as_codes", "as_decided", "as_refresh"):
+        assert _read(box, f"SELECT COUNT(*) FROM {table}") == [(0,)], table
+    assert box.backend.list_tokens() == [] and _events(box, "token.mint") == []
+
+
+@pytest.mark.parametrize(
+    ("pkce_params", "cause"),
+    [
+        ([("code_challenge", VERIFIER), ("code_challenge_method", "plain")], "missing_pkce"),
+        ([("code_challenge", CHALLENGE)], "missing_pkce"),  # no method is no default
+        ([("code_challenge", CHALLENGE), ("code_challenge_method", "s256")], "missing_pkce"),
+        ([("code_challenge_method", "S256")], "missing_pkce"),
+        ([("code_challenge", ""), ("code_challenge_method", "S256")], "missing_pkce"),
+        ([("code_challenge", "short"), ("code_challenge_method", "S256")], "malformed"),
+        ([("code_challenge", "+" * 43), ("code_challenge_method", "S256")], "malformed"),
+    ],
+    ids=["plain", "no-method", "lowercase-method", "no-challenge", "empty", "short", "alphabet"],
+)
+def test_a_pkce_downgrade_is_refused_at_pretrust_with_nothing_stored(
+    box: Box, pkce_params: list[tuple[str, str]], cause: str
+):
+    _register_browser(box)
+    session = sessions.establish(box.backend, now=T0)
+    assert isinstance(
+        gate.check(box.backend, box.ledger, session=session, authorization=None, query="", now=T0),
+        gate.Session,
+    )
+    assert pretrust.admit(box.backend, box.ledger, _authorize(pkce_params)) is None
+    (refused,) = _chain(box)
+    assert refused["event"] == "authz.refuse" and refused["principal"] == "none"
+    assert refused["details"] == {"cause": cause}
+    _nothing_stored(box)
+    _assert_clean(box, session, VERIFIER)
+
+
+def test_the_s256_control_is_admitted_and_admission_stores_nothing(box: Box):
+    _register_browser(box)
+    params = [("code_challenge", pkce.s256(VERIFIER)), ("code_challenge_method", "S256")]
+    admitted = pretrust.admit(box.backend, box.ledger, _authorize(params))
+    assert admitted is not None and admitted.code_challenge == pkce.s256(VERIFIER)
+    assert _chain(box) == []
+    _nothing_stored(box)
+
+
+@pytest.mark.parametrize(
+    "verifier", [pkce.s256(VERIFIER), None, ""], ids=["challenge", "none", "empty"]
+)
+def test_a_plain_or_missing_verifier_spends_the_code_and_mints_nothing(box: Box, verifier):
+    # Presenting the challenge itself is `plain`'s check, which this AS never runs (§2).
+    session = sessions.establish(box.backend, now=T0)
+    code = codes.issue(
+        box.backend,
+        client_id=BROWSER,
+        redirect_uri=REDIRECT,
+        code_challenge=pkce.s256(VERIFIER),
+        session_hash=values.digest(session),
+        grant=_code_grant(),
+        now=T0,
+    )
+    assert _read(box, "SELECT COUNT(*) FROM as_codes") == [(1,)]
+    for presented in (verifier, VERIFIER):  # the right verifier second: the code is already spent
+        assert (
+            tokens.exchange_code(
+                box.backend,
+                box.ledger,
+                code=code,
+                client_id=BROWSER,
+                redirect_uri=REDIRECT,
+                code_verifier=presented,
+                owner=OWNER,
+                now=T0,
+            )
+            is None
+        )
+    _nothing_stored(box)
+    assert _chain(box) == []
     _assert_clean(box, code, session)
 
 
