@@ -141,6 +141,27 @@ def backend(tmp_path):
     return SqliteBackend(tmp_path / "container.db")
 
 
+def _race(*calls: object) -> list[object]:
+    """Runs each zero-arg callable in its own thread, released together by a shared barrier, and
+    returns their results (order undetermined — the race between them is the point)."""
+    barrier = threading.Barrier(len(calls))
+    results: list[object] = []
+    lock = threading.Lock()
+
+    def run(call: object) -> None:
+        barrier.wait()
+        result = call()
+        with lock:
+            results.append(result)
+
+    threads = [threading.Thread(target=run, args=(call,)) for call in calls]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    return results
+
+
 def test_method_set_matches_the_protocol():
     """`SqliteBackend` offers every method this slice adds, with no renaming."""
     for name in SLICE_METHODS:
@@ -362,18 +383,10 @@ def test_put_device_is_atomic_across_two_connections(tmp_path):
     a = SqliteBackend(path)
     b = SqliteBackend(path)
 
-    barrier = threading.Barrier(2)
-
-    def put(conn: SqliteBackend, client_id: str) -> None:
-        barrier.wait()
-        conn.put_device(_device(client_id=client_id))
-
-    t1 = threading.Thread(target=put, args=(a, "client-a"))
-    t2 = threading.Thread(target=put, args=(b, "client-b"))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    _race(
+        lambda: a.put_device(_device(client_id="client-a")),
+        lambda: b.put_device(_device(client_id="client-b")),
+    )
 
     record = a.get_device_by_user_code(USER_CODE_HASH)
     assert record["client_id"] in ("client-a", "client-b")  # exactly one insert survives
@@ -388,22 +401,10 @@ def test_poll_device_is_atomic_across_two_connections(tmp_path):
     a.put_device(_device())
     b = SqliteBackend(path)
 
-    results: list[DeviceAuthorizationRecord | None] = []
-    lock = threading.Lock()
-    barrier = threading.Barrier(2)
-
-    def poll(conn: SqliteBackend, at: str) -> None:
-        barrier.wait()
-        prior = conn.poll_device(DEVICE_CODE_HASH, at)
-        with lock:
-            results.append(prior)
-
-    t1 = threading.Thread(target=poll, args=(a, "2026-10-12T09:01:00Z"))
-    t2 = threading.Thread(target=poll, args=(b, "2026-10-12T09:02:00Z"))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    results = _race(
+        lambda: a.poll_device(DEVICE_CODE_HASH, "2026-10-12T09:01:00Z"),
+        lambda: b.poll_device(DEVICE_CODE_HASH, "2026-10-12T09:02:00Z"),
+    )
 
     first = [r for r in results if r["last_polled_at"] is None]
     second = [r for r in results if r["last_polled_at"] is not None]
@@ -422,22 +423,10 @@ def test_decide_device_is_atomic_across_two_connections(tmp_path):
     a.put_device(_device())
     b = SqliteBackend(path)
 
-    results: list[bool] = []
-    lock = threading.Lock()
-    barrier = threading.Barrier(2)
-
-    def decide(conn: SqliteBackend, grant: ASGrant | None) -> None:
-        barrier.wait()
-        result = conn.decide_device(DEVICE_CODE_HASH, grant)
-        with lock:
-            results.append(result)
-
-    t1 = threading.Thread(target=decide, args=(a, _grant()))
-    t2 = threading.Thread(target=decide, args=(b, None))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    results = _race(
+        lambda: a.decide_device(DEVICE_CODE_HASH, _grant()),
+        lambda: b.decide_device(DEVICE_CODE_HASH, None),
+    )
 
     assert sorted(results) == [False, True]
 
@@ -451,22 +440,9 @@ def test_consume_device_is_atomic_across_two_connections(tmp_path):
     a.decide_device(DEVICE_CODE_HASH, _grant())
     b = SqliteBackend(path)
 
-    results: list[DeviceAuthorizationRecord | None] = []
-    lock = threading.Lock()
-    barrier = threading.Barrier(2)
-
-    def consume(conn: SqliteBackend) -> None:
-        barrier.wait()
-        record = conn.consume_device(DEVICE_CODE_HASH)
-        with lock:
-            results.append(record)
-
-    t1 = threading.Thread(target=consume, args=(a,))
-    t2 = threading.Thread(target=consume, args=(b,))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    results = _race(
+        lambda: a.consume_device(DEVICE_CODE_HASH), lambda: b.consume_device(DEVICE_CODE_HASH)
+    )
 
     winners = [r for r in results if r is not None]
     losers = [r for r in results if r is None]
@@ -537,22 +513,7 @@ def test_redeem_refresh_is_atomic_across_two_connections(tmp_path):
     a.put_refresh(_refresh())
     b = SqliteBackend(path)
 
-    results: list[RefreshRecord] = []
-    lock = threading.Lock()
-    barrier = threading.Barrier(2)
-
-    def redeem(conn: SqliteBackend) -> None:
-        barrier.wait()
-        record = conn.redeem_refresh(REFRESH_HASH)
-        with lock:
-            results.append(record)
-
-    t1 = threading.Thread(target=redeem, args=(a,))
-    t2 = threading.Thread(target=redeem, args=(b,))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    results = _race(lambda: a.redeem_refresh(REFRESH_HASH), lambda: b.redeem_refresh(REFRESH_HASH))
 
     fresh = [r for r in results if r["redeemed_at"] is None]
     reused = [r for r in results if r["redeemed_at"] is not None]
@@ -648,22 +609,7 @@ def test_revoke_family_is_atomic_across_two_connections(tmp_path):
     a.put_refresh(_refresh())
     b = SqliteBackend(path)
 
-    results: list[list[str]] = []
-    lock = threading.Lock()
-    barrier = threading.Barrier(2)
-
-    def revoke(conn: SqliteBackend) -> None:
-        barrier.wait()
-        ids = conn.revoke_family(FAMILY_ID)
-        with lock:
-            results.append(ids)
-
-    t1 = threading.Thread(target=revoke, args=(a,))
-    t2 = threading.Thread(target=revoke, args=(b,))
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
+    results = _race(lambda: a.revoke_family(FAMILY_ID), lambda: b.revoke_family(FAMILY_ID))
 
     winners = [r for r in results if r == [ACCESS_TOKEN_ID]]
     losers = [r for r in results if r == []]
