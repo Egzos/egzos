@@ -1008,3 +1008,25 @@ def test_a_fork_branch_named_after_an_agent_holds_no_wip_slot(tmp_path):
     out.unlink()
     subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True, text=True)
     assert "has_wip=true" in out.read_text()
+
+
+def test_tests_check_runs_the_requires_python_floor():
+    # #10 F27: the package declares a floor that CI must exercise. The job stays one job named
+    # `tests`, since a matrix would rename the required check out from under branch protection.
+    floor = re.search(
+        r'requires-python\s*=\s*">=(\d+\.\d+)"', (ROOT / "pyproject.toml").read_text()
+    ).group(1)
+    doc = _load(ROOT / ".github" / "workflows" / "tests.yml")
+    job = doc["jobs"]["tests"]
+    assert job["name"] == "tests" and "strategy" not in job
+    versions = [
+        str(s["with"]["python-version"])
+        for s in job["steps"]
+        if s.get("uses", "").startswith("actions/setup-python@")
+    ]
+    assert floor in versions
+    names = [s.get("name") for s in job["steps"]]
+    floor_name = "pytest on the requires-python floor"
+    floor_run = next(s for s in job["steps"] if s.get("name") == floor_name)
+    assert names.index(floor_run["name"]) > names.index("pytest")
+    assert "pytest" in floor_run["run"] and "pip install -e" in floor_run["run"]

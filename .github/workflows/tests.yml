@@ -54,3 +54,17 @@ jobs:
 
       - name: pytest
         run: pytest -q
+
+      # pyproject.toml declares requires-python >= 3.11, so the floor runs as well (#10 F27). It is
+      # a second interpreter in the same job, not a matrix: the required check is named `tests`, and
+      # a matrix would rename it to `tests (3.11)` / `tests (3.12)`, which branch protection would
+      # never see.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: pytest on the requires-python floor
+        run: |
+          python -m venv /tmp/floor
+          /tmp/floor/bin/pip install -e ".[dev]"
+          /tmp/floor/bin/pytest -q
