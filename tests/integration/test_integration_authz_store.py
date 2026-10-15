@@ -14,9 +14,10 @@ ids it newly revoked (#214). So each flow below asserts what lands in the store 
 not only what the function returns, and ends with `_assert_clean`: the chain verifies by the
 ledger's own walk, and no credential value appears in the chain or in the sqlite file's bytes.
 
-Two reads go beneath the protocols on purpose. `ASState` has no read of a refresh record that
+Three reads go beneath the protocols on purpose. `ASState` has no read of a refresh record that
 does not spend it, so `_refresh_rows` reads the store's table through a second, read-only sqlite
-connection; and the byte scan reads the database file and its WAL. Both are the store's layout,
+connection; `_nothing_stored` counts the AS tables the same way, because no protocol read lists
+them; and the byte scan reads the database file and its WAL. Both are the store's layout,
 pinned here as of #265: a rename in `backends/sqlite.py` fails this suite loudly, never silently.
 """
 
