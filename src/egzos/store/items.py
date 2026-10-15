@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from egzos._ids import ulid
+from egzos._types import CONTAINER_CONFIG_DEFAULTS, ContainerConfig
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
-from egzos.model import INLINE_BLOB_LIMIT, KINDS, ContextItem, Node, Token, now_iso
+from egzos.model import KINDS, ContextItem, Node, Token, now_iso
 from egzos.store.autotitle import DegradedTitler, Titler
 from egzos.store.blobs import BlobStore
 from egzos.store.nodes import NodeService
@@ -35,12 +36,20 @@ class Store:
         nodes: NodeService,
         blobs: BlobStore,
         titler: Titler | None = None,
+        config: ContainerConfig | None = None,
     ):
         self.backend = backend
         self.ledger = ledger
         self.nodes = nodes
         self.blobs = blobs
         self.titler = titler or DegradedTitler()
+        # F5/F30 (#271): the container's `blobs_inline_max_bytes`, never a second constant.
+        # `config` may omit the key (absence tested by absence, per `_types.py`'s own loading
+        # rule) — `CONTAINER_CONFIG_DEFAULTS` is the fallback either way.
+        default_limit = CONTAINER_CONFIG_DEFAULTS["blobs_inline_max_bytes"]
+        self.inline_blob_limit = (
+            default_limit if config is None else config.get("blobs_inline_max_bytes", default_limit)
+        )
         # coverage predicate, wired by the container once the trust engine exists
         self.covers: Callable[[Token, Node], bool] | None = None
         # the serving predicate search uses (`find.shown`), wired by the container likewise
@@ -87,7 +96,7 @@ class Store:
             sha = self.blobs.put(data)
             mime = mimetypes.guess_type(str(file))[0] or "application/octet-stream"
             content.update(sha256=sha, mime=mime, size=len(data), filename=Path(file).name)
-            if len(data) <= INLINE_BLOB_LIMIT and mime.startswith("text/"):
+            if len(data) <= self.inline_blob_limit and mime.startswith("text/"):
                 content["inline"] = data.decode("utf-8", errors="replace")
             self.ledger.append(
                 "blob.put",
