@@ -12,14 +12,17 @@ from pathlib import Path
 from typing import Any
 
 from egzos._types import (
+    ASGrant,
     AuthorizationCodeRecord,
     ClientRegistration,
     DecidedRequestRecord,
+    DeviceAuthorizationRecord,
+    RefreshRecord,
     SessionRecord,
     ThrottleSurface,
 )
 from egzos.backends.base import ChainConflict
-from egzos.model import ContextItem, Node, Token
+from egzos.model import ContextItem, Node, Token, now_iso
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -56,6 +59,16 @@ CREATE TABLE IF NOT EXISTS as_throttle (
 CREATE TABLE IF NOT EXISTS as_clients (client_id TEXT PRIMARY KEY, doc TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS as_codes (code_hash TEXT PRIMARY KEY, doc TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS as_decided (request_key TEXT PRIMARY KEY, doc TEXT NOT NULL);
+-- ASState: device authorizations and refresh chains (storage.md §3.1 rules 2-4). `user_code_hash`
+-- and `access_token_id` get their own column only to key the lookups `ASState` names
+-- (`get_device_by_user_code`, `family_of_token`); the record itself still lives whole in `doc`.
+CREATE TABLE IF NOT EXISTS as_devices (
+  device_code_hash TEXT PRIMARY KEY, user_code_hash TEXT NOT NULL, doc TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS as_devices_user_code ON as_devices(user_code_hash);
+CREATE TABLE IF NOT EXISTS as_refresh (
+  refresh_hash TEXT PRIMARY KEY, family_id TEXT NOT NULL, access_token_id TEXT NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0, doc TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS as_refresh_family ON as_refresh(family_id);
 """
 
 
@@ -400,3 +413,137 @@ class SqliteBackend:
                 (json.dumps(record), request_key),
             )
         return True
+
+    # -- ASState: device authorizations (storage.md §3.1 rule 2) -----------------------
+    def put_device(self, record: DeviceAuthorizationRecord) -> None:
+        """Insert-only: a put on an existing `device_code_hash` changes nothing."""
+        self.db.execute(
+            "INSERT OR IGNORE INTO as_devices(device_code_hash,user_code_hash,doc) "
+            "VALUES(?,?,?)",
+            (record["device_code_hash"], record["user_code_hash"], json.dumps(record)),
+        )
+        self._commit()
+
+    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None:
+        """Sets `last_polled_at` alone, atomically; returns the record as it stood before the
+        call, so Trust compares the prior stamp with `at` for §3 mitigation 1's `slow_down`."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_devices WHERE device_code_hash=?", (device_code_hash,)
+            ).fetchone()
+            if row is None:
+                return None
+            prior = json.loads(row[0])
+            record = {**prior, "last_polled_at": at}
+            self.db.execute(
+                "UPDATE as_devices SET doc=? WHERE device_code_hash=?",
+                (json.dumps(record), device_code_hash),
+            )
+        return prior
+
+    def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None:
+        row = self.db.execute(
+            "SELECT doc FROM as_devices WHERE user_code_hash=?", (user_code_hash,)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool:
+        """Moves a pending record to decided exactly once, atomically; sets only `decision` and
+        `grant`. `False` if the record was not pending, including an absent one."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_devices WHERE device_code_hash=?", (device_code_hash,)
+            ).fetchone()
+            if row is None:
+                return False
+            record = json.loads(row[0])
+            if record["decision"] != "pending":
+                return False
+            record["decision"] = "granted" if grant is not None else "denied"
+            record["grant"] = grant
+            self.db.execute(
+                "UPDATE as_devices SET doc=? WHERE device_code_hash=?",
+                (json.dumps(record), device_code_hash),
+            )
+        return True
+
+    def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None:
+        """`None` while the record is pending — a poll before the decision spends nothing — and
+        spends a decided one exactly once, atomically."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_devices WHERE device_code_hash=?", (device_code_hash,)
+            ).fetchone()
+            if row is None:
+                return None
+            record = json.loads(row[0])
+            if record["decision"] == "pending":
+                return None
+            self.db.execute("DELETE FROM as_devices WHERE device_code_hash=?", (device_code_hash,))
+        return record
+
+    # -- ASState: refresh chains (storage.md §3.1 rules 3-4, §9.2) ----------------------
+    def put_refresh(self, record: RefreshRecord) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO as_refresh"
+            "(refresh_hash,family_id,access_token_id,revoked,doc) VALUES(?,?,?,?,?)",
+            (
+                record["refresh_hash"],
+                record["family_id"],
+                record["access_token_id"],
+                1 if record["revoked"] else 0,
+                json.dumps(record),
+            ),
+        )
+        self._commit()
+
+    def redeem_refresh(self, refresh_hash: str) -> RefreshRecord | None:
+        """Marks the record redeemed and returns it as it stood before the call, atomically, so
+        a non-null `redeemed_at` on the returned record is visible reuse. A record already
+        redeemed keeps its original `redeemed_at` rather than being overwritten."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT doc FROM as_refresh WHERE refresh_hash=?", (refresh_hash,)
+            ).fetchone()
+            if row is None:
+                return None
+            prior = json.loads(row[0])
+            if prior["redeemed_at"] is None:
+                record = {**prior, "redeemed_at": now_iso()}
+                self.db.execute(
+                    "UPDATE as_refresh SET doc=? WHERE refresh_hash=?",
+                    (json.dumps(record), refresh_hash),
+                )
+        return prior
+
+    def family_of_token(self, token_id: str) -> str | None:
+        """`None` for absent, expired, spent and revoked alike: a revoked family reads as
+        `None`, like any other plain getter (silence-not-errors)."""
+        row = self.db.execute(
+            "SELECT family_id FROM as_refresh WHERE access_token_id=? AND revoked=0", (token_id,)
+        ).fetchone()
+        return row[0] if row else None
+
+    def revoke_family(self, family_id: str) -> list[str]:
+        """Revokes every unrevoked refresh record in the family and every `Token` they name, in
+        one transaction on the `tokens` table this file already owns. Until #214 items 4/5 are
+        answered, returns only the newly revoked ids: a family already revoked returns `[]`,
+        so a replayed reuse never double-counts or double-fires `token.revoke`."""
+        with self.atomic():
+            rows = self.db.execute(
+                "SELECT refresh_hash, doc FROM as_refresh WHERE family_id=? AND revoked=0",
+                (family_id,),
+            ).fetchall()
+            token_ids: list[str] = []
+            for refresh_hash, doc in rows:
+                record = {**json.loads(doc), "revoked": True}
+                self.db.execute(
+                    "UPDATE as_refresh SET revoked=1, doc=? WHERE refresh_hash=?",
+                    (json.dumps(record), refresh_hash),
+                )
+                token = self.get_token(record["access_token_id"])
+                if token is not None:
+                    token.revoked = True
+                    self.put_token(token)
+                token_ids.append(record["access_token_id"])
+        return token_ids
