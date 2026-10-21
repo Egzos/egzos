@@ -536,6 +536,9 @@ def test_the_scheme_switch_sets_the_cookie_and_returns_safely(lb):
     page = client.get("/").text
     assert '<html lang="en" data-scheme="dark" data-canvas="violet">' in page
     assert 'aria-pressed="true">dark · violet' in page
+    # Replace the cookie, as a browser would. Setting it alongside the server's host-scoped one
+    # sends both, and which one the server reads is the test client's header order (#10 F40).
+    client.cookies.delete("egz-scheme")
     client.cookies.set("egz-scheme", "<script>")
     assert "<html lang=\"en\">" in client.get("/").text  # invalid cookie is no cookie
 
