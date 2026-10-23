@@ -599,7 +599,8 @@ storage (v0.7 §S).
   `DELETE /v1/uploads/{id}` (its opener, or a person with `admin` over the whole container), which
   deletes the staged bytes and appends **`upload.discard`** (`opener`, and `bytes_deleted`: false
   when another live upload or staged item holds the same bytes, which then stay). Its opener may
-  discard an open upload the same way, to free its slot before the hour is up. **a1p.**
+  discard an open upload the same way, to free its slot before the hour is up; an admin
+  discards only an orphan. **#291, for the Chief to ratify by its merge** (a1r on #291).
 - **A staged artifact item past `blobs.staging_retention_days`** appears in `GET /v1/pending` under
   `"staged": [<item>]` — to an interactive principal covering its scope, and **instead of** in `items`,
   never both — until a person promotes it or tombstones it; a tombstone deletes the **staged** bytes

@@ -243,7 +243,7 @@ list_credentials(person=None)                    -> list[ConfirmCredential]   # 
 ## 3.4 · Uploads — `UploadState`
 
 **Status of this section: contract v1.1** (`rest.md` §4.4). One Protocol beside `ContainerState`, on
-its substrate and never delegated (F3). **a1p.**
+its substrate and never delegated (F3). **#291, for the Chief to ratify by its merge.**
 
 ```
 # UploadState — rest.md §4.4's uploads

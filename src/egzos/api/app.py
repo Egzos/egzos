@@ -82,6 +82,11 @@ def ambiguous(paths: list[str]) -> Response:
     return _json(409, {"error": "ambiguous", "matches": sorted(paths)})
 
 
+def admin_over_all(token: Token) -> bool:
+    """`admin` over `["*"]`, held by a person: the one form of that check at this door."""
+    return token.principal == "interactive" and token.has("admin") and "*" in token.scopes
+
+
 class Invalid(Exception):
     """The request's shape is wrong: answered `400` before any lookup."""
 
@@ -389,7 +394,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 (staged if old else items).append(i.to_dict())
         proposals = [p for p in queue["proposals"] if c.trust.decides_over(token, p)]
         wire = [{("from" if k == "from_" else k): v for k, v in p.items()} for p in proposals]
-        orphans = c.uploads.orphans(token, admin=token.has("admin") and "*" in token.scopes)
+        orphans = c.uploads.orphans(token, admin=admin_over_all(token))
         uploads = [{"upload": r["id"], **{k: r[k] for k in ORPHAN_KEYS}} for r in orphans]
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, view="pending", items=[i["id"] for i in items],
@@ -485,8 +490,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
     async def discard_upload(request: Request, upload_id: str):
         token: Token = request.state.token
         _only(request.query_params, set())
-        admin = token.principal == "interactive" and token.has("admin") and "*" in token.scopes
-        if not c.uploads.discard(token, upload_id, admin=admin):
+        if not c.uploads.discard(token, upload_id, admin=admin_over_all(token)):
             d.probe(token, upload_id)
             return refusal()
         return _json(200, {"result": "discarded"})

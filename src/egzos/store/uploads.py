@@ -187,14 +187,15 @@ class Uploads:
 
     # -- the orphan's discard -------------------------------------------------------------------
     def discard(self, token: Token, upload_id: str, *, admin: bool) -> bool:
-        """Discard an upload no item was written from — the caller's own, or as an admin anyone's —
-        with its staged bytes, unless another upload still holds the same bytes. False is §3's
-        refusal."""
+        """Discard an upload no item was written from — the caller's own, open or orphaned, or as
+        an admin anyone's orphan — with its staged bytes, unless another upload still holds the
+        same bytes. False is §3's refusal."""
         with self.backend.atomic():
             record = self.backend.get_upload(upload_id)
-            if (record is None or record["discarded"] or record["item"] is not None
-                    or (record["principal"] != token.id and not admin)):
+            if record is None or record["discarded"] or record["item"] is not None:
                 return False
+            if record["principal"] != token.id and not (admin and self.orphan(record)):
+                return False  # another's upload still open is its opener's alone (a1r on #291)
             delete = record["staged"] and not self._shared(record)
             self.backend.put_upload({**record, "discarded": True})
             self.ledger.append("upload.discard", actor=token.owner, principal=token.principal,

@@ -336,3 +336,12 @@ def test_a_staged_artifact_past_the_retention_is_asked_about_apart(c, door, note
     assert item not in [i["id"] for i in body["items"]] and text.id in [i["id"] for i in
                                                                         body["items"]]
     assert _events(c, "context.fetch")[-1]["details"]["staged"] == [item]
+
+
+def test_an_admin_discards_an_orphan_never_anothers_open_upload(c, door, notes):
+    agent = _agent(c)
+    uid = _upload(door, agent, notes.id)
+    assert door.delete(f"/v1/uploads/{uid}", headers=_auth(c.owner)).content == NOT_FOUND
+    c.clock.now += UPLOAD_TTL_SECONDS  # now an orphan: an admin's to discard
+    assert door.delete(f"/v1/uploads/{uid}", headers=_auth(c.owner)).json() == {
+        "result": "discarded"}
