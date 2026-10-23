@@ -73,6 +73,9 @@ only: the value `events.md` §2 writes when an append has no caller to name —
 split: `Principal` is the three words, `TokenPrincipal` the two a `Token`, an `AudienceMember` or an
 item's provenance may carry.
 
+- **Amended by `identity.md` (v1.1):** a provider session token without `client_id` is
+  `principal: interactive`, one with `client_id` is `principal: client` (`identity.md` §4); the AS
+  login below is retired.
 - `principal: interactive` — established, for browser sessions, by the login PKCE performs against
   the container. The flow is `authorization-server.md` §2; **where in it the principal is established
   is issue #61** (Part B, presence composition), as `container.md` §9 already says. In the skeleton
@@ -109,6 +112,11 @@ human (§3), and an `interactive` token can be minted to software, so the gate h
    human-only violation. **decided, not running** (Phase 2.2). Until then the interactive owner
    token is the proof (§3), a stated and dated gap.
 
+**Amended by `identity.md` (v1.1):** the backstop is the confirm, `identity.md` §5 — a WebAuthn
+assertion with user verification, or the button where the device has none, which is refused to a
+`client` principal; the localhost tap is retired. The text below that cites the retired
+`authorization-server.md` is the record of 0.3.
+
 The backstop's full text, and the test a conforming container must pass, is
 `authorization-server.md` §10.4. A call site that lacks the act's source, destination or manifest
 shape cannot evaluate this gate and must not approximate it.
@@ -123,7 +131,9 @@ expires (§5), and the backstop above, not the session, is what gates a human-on
 { id, principal, owner, client, capabilities, scopes, created_at, last_used, revoked, expires_at }
 ```
 
-**running.** Notes that are contract, not implementation:
+**running.** **Amended by `identity.md` (v1.1):** a provider-signed access token is the second
+credential; it is not a `Token` record, and what it may do is its grant's (`identity.md` §4). Notes
+that are contract, not implementation:
 
 - **`scopes` are node ids.** Coverage is **computed down the path at check time**, not expanded at
   mint time: a token scoped to a node covers containers created under it afterwards. `["*"]` means
