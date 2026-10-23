@@ -30,7 +30,7 @@ from starlette.responses import Response
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, person_of
 from egzos.container import Container
-from egzos.identity import GrantToken
+from egzos.identity import GrantToken, display_name
 from egzos.ledger import acting_for
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
@@ -658,7 +658,11 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         if token.principal != "interactive" or origin is None:
             d.probe(token, "credentials")
             return refusal()
-        name = _str(body.get("name"), optional=True, limit=CREDENTIAL_NAME_MAX) or "this device"
+        raw = _str(body.get("name"), optional=True, limit=CREDENTIAL_NAME_MAX)
+        try:
+            name = display_name(raw, limit=CREDENTIAL_NAME_MAX) if raw else "this device"
+        except ValueError as e:
+            raise Invalid from e
         if "challenge" not in body:
             if "attestation" in body or "confirm" in body:
                 raise Invalid

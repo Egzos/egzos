@@ -21,6 +21,7 @@ import ipaddress
 import json
 import threading
 import time
+import unicodedata
 import urllib.request
 from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager, nullcontext
@@ -79,6 +80,24 @@ class ConfigError(ValueError):
 
 class LastAdmin(Exception):
     """§4: the last live grant holding `admin` over `["*"]` is never revoked."""
+
+
+#: A name shown to a person deciding something — who would newly see an item, an agent's own
+#: claim, a device — is at most this long.
+DISPLAY_NAME_MAX = 128
+#: Characters a display name never holds: controls, and the formatting characters (bidi
+#: overrides among them) that make text read other than it is (a6 on #289).
+_HIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+
+def display_name(value: Any, *, limit: int = DISPLAY_NAME_MAX) -> str:
+    """A display name as given, or `ValueError`. Untrusted display data every surface escapes;
+    this keeps it short and free of characters that hide what it says."""
+    if not isinstance(value, str) or not value.strip() or len(value) > limit:
+        raise ValueError(f"a name of 1 to {limit} characters")
+    if any(unicodedata.category(ch) in _HIDDEN for ch in value):
+        raise ValueError("a name holds no control or formatting characters")
+    return value
 
 
 # -- configuration (§2) --------------------------------------------------------------------------
@@ -462,6 +481,7 @@ class Identity:
             raise PermissionError("granting access is a person's act")
         if not isinstance(sub, str) or not sub.strip() or len(sub) > 255:
             raise ValueError("a grant names the provider's user id")
+        name = display_name(name)
         if (role is None) == (capabilities is None):
             raise ValueError("a grant names a role or capabilities, not both")
         if role is not None and role not in ROLE_BUNDLES:

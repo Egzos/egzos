@@ -211,3 +211,13 @@ def test_a_revoke_and_its_entry_land_together(box, monkeypatch):
     with pytest.raises(RuntimeError):
         box.identity.revoke_user(BOB, **KW)
     assert not box.backend.get_user_grant(BOB)["revoked"]
+
+
+@pytest.mark.parametrize("name", ["", " ", "x" * 129, "Bob\u202eevil", "Bob\x00", "a\u2028b"])
+def test_a_grants_display_name_is_short_and_shows_what_it_says(name, tmp_path):
+    c = Container(tmp_path)
+    c.init()
+    with pytest.raises(ValueError):
+        c.identity.grant_user("bob", name=name, role="reader", scopes=["*"], actor=OWNER,
+                              principal="interactive")
+    assert c.backend.get_user_grant("bob") is None
