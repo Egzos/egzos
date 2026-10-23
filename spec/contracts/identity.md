@@ -25,22 +25,24 @@ retired). A request reaches it with one of two:
    minted with `token mint`. Used by the CLI, MCP over stdio and the lifeboat, and accepted at the REST
    door. Unchanged. **carried.**
 2. **An access token signed by the container's identity provider**: Supabase Auth, the egzos project for
-   a container egzos hosts, the owner's own for a self-hosted one (§S). A user's session token and an
-   agent's OAuth token are both this kind. **decided** (§S, §T).
+   a container egzos hosts, the owner's own for a self-hosted one (§S). A person's token, issued to this
+   container's own client, and an agent's OAuth token are both this kind, and each is bound to this one
+   container (§3a). **decided** (§S, §T); **a1p** the binding.
 
 A container with no identity provider configured (§2) accepts only the first, and is exactly the
 container that runs today. **a1p.**
 
 ## 2 · Configuration
 
-Five keys join the container-config object (`container.md` §8), changed by the same `admin` act and
-recorded by the same `config.set`. None holds a secret: the provider's keys are public (§3). **a1p**, all
-five. They enter `container.md` §8's table and `_types.py`'s `ContainerConfig` with the code that reads
+Six keys join the container-config object (`container.md` §8), changed by the same `admin` act and
+recorded by the same `config.set`. None holds a secret: the provider's keys are public (§3), and the
+container's client is a public client. **a1p**, all six. They enter `container.md` §8's table and `_types.py`'s `ContainerConfig` with the code that reads
 them, as that table's conformance test requires.
 
 | key | default | what it is |
 |---|---|---|
 | `identity.issuer` | absent | the provider's issuer URL, e.g. `https://<project>.supabase.co/auth/v1`. Absent: no provider (§1) |
+| `identity.client_id` | absent | this container's own OAuth client at the provider (§3a), registered when the container is linked to it |
 | `identity.audience` | `authenticated` | the `aud` value an access token must carry |
 | `identity.algorithms` | `ES256 RS256` | the signing algorithms accepted. Never `none`, never a symmetric `HS*` |
 | `identity.browser_origins` | `https://egzos.io` | origins the REST door answers CORS for (§6) |
@@ -65,14 +67,37 @@ for the order.
 3. **Audience.** `aud` is, or contains, `identity.audience`.
 4. **Time.** `exp` is in the future and `iat` is not, each with at most 60 seconds of skew.
 5. **Subject.** `sub` is present: the provider's user id.
-6. **Grant.** §4 finds a live user grant for `sub`; and, when the token carries `client_id`, a live agent
-   registration for that `client_id` too.
+6. **Binding.** The token carries `client_id`, and it names **this** container: either it equals
+   `identity.client_id` (a person using this container), or it names a live agent registration made
+   here (§4). A token with no `client_id` — a provider session issued to egzos.io itself — is refused,
+   because it is not bound to any one container (§3a).
+7. **Grant.** §4 finds a live user grant for `sub`; for an agent, its registration is live too.
 
 **Every failure is one answer**: `rest.md` §2's `401`, byte-identical whether the header was missing,
-the signature bad, the issuer foreign, the audience wrong, the token expired, the user never granted or
-the client never registered. **decided** (`capabilities.md` §6 clause 1; §S: an unregistered client is
-refused like an unknown token). Every account in the provider holds a validly signed session, so check 6
-is what keeps a stranger with a real egzos account out of someone else's container.
+the signature bad, the issuer foreign, the audience wrong, the token expired, the token bound to another
+container or to none, the user never granted or the client never registered. **decided**
+(`capabilities.md` §6 clause 1; §S: an unregistered client is refused like an unknown token). Every
+account in the provider holds a validly signed session, so check 7 is what keeps a stranger with a real
+egzos account out of someone else's container.
+
+### 3a · Every token is bound to one container
+
+**a1p**, closing a1r's finding 1 on #282, and the reason for check 6. A provider session is valid at every
+container that trusts the provider, and the shared audience (`authenticated`) does not tell containers
+apart; the provider issues no resource indicators. A container that received a person's session could
+therefore present it at another container the same person can reach. So no container accepts a bare
+session. Each token is bound to one container through the provider's own OAuth 2.1 server:
+
+- **Each container is a public OAuth client of the provider** (`identity.client_id`), registered when the
+  container is linked to it, with egzos.io's callback and the container's own origin as its only
+  redirect URIs. PKCE is required, as for every public client.
+- **A person reaches a container with a token issued to that container's client.** egzos.io runs the
+  authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
+  approves a person's own containers without asking again. One sign-in still covers every container:
+  no second password, no second login (§T). The token is presented only to the container it names.
+- **An agent's token is bound by its own registration.** MCP clients register with the provider per
+  resource (`/mcp` of one container, §7), and a container accepts only a `client_id` registered here.
+- **A token for one container is refused at every other**, at check 6, with the one `401`.
 
 **The audit entry may say which check failed; the response may not** (`capabilities.md` §6 clause 3).
 **carried.**
@@ -88,16 +113,25 @@ UserGrant          { sub, capabilities, scopes, created_at, revoked }
 AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked }
 ```
 
-- **The owner's grant** is written when the container is provisioned: the provider user who created it,
-  all six capabilities, `["*"]`. **a1p.**
+- **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
+  created it, all six capabilities, `["*"]`. A container made by `init` (a local, or a self-hosted one)
+  has no provider user until its owner links it: the link is run by the holder of the owner `Token`
+  (the CLI), and it registers the container's client (§3a) and writes the owner's grant for the `sub`
+  the owner signs in as. **a1p.**
+- **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
+  revoked; the owner `Token` from `init` stays the way back in. **a1p.**
 - **Every other grant and registration is the owner's act**, under `admin`, from an interactive
-  principal. A role bundle is expanded at grant time, as it is at mint (`capabilities.md` §2). **a1p.**
+  principal, **and it requires the confirm** (§5): a grant or a registration widens who can see
+  everything it covers, so it is gated like a move that widens an audience (§U), never a silent write.
+  A role bundle is expanded at grant time, as it is at mint (`capabilities.md` §2). **a1p.**
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
-  server, the consent page egzos.io hosts shows the request in `token ls` vocabulary; approving it writes
-  the registration here (`POST /v1/agents`, `rest.md`) before the provider is told to issue. Without the
-  registration the provider's token is refused at check 6. **a1p.**
-- **Principal.** A token without `client_id` is a user's own session: `principal: interactive`. A token
-  with one is an agent acting for that user: `principal: client`. **a1p**, onto `capabilities.md` §3.
+  server, the consent page egzos.io hosts shows the request in `token ls` vocabulary; approving it (with
+  the confirm) writes the registration here before the provider is told to issue. Its route arrives with
+  the next contract PR (`rest.md`). Without the registration the provider's token is refused at checks 6
+  and 7. **a1p.**
+- **Principal.** A token whose `client_id` is this container's own (`identity.client_id`) is a person:
+  `principal: interactive`. A token whose `client_id` names a registered agent is that agent acting for
+  the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
 - **What a request may do.** For a session: the user grant's capabilities and scopes. For an agent: the
   registration's, **intersected** with the user grant's — an agent never holds more than the user it acts
   for. Coverage is computed down the path at check time, as for a `Token` (`capabilities.md` §5).
@@ -105,7 +139,7 @@ AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked 
 - **Audience** (`capabilities.md` §5) is every live `Token`, user grant and agent registration whose
   coverage reaches a container. The gate computes its delta over all three. **a1p.**
 - **Revocation** is the owner revoking a grant or a registration here, effective on the next request
-  (check 6 runs every time). Signing the user out at the provider ends their tokens at `exp`.
+  (check 7 runs every time). Signing the user out at the provider ends their tokens at `exp`.
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
   `capabilities` and `scopes`. They enter `events.md` §1 with the code that appends them. **a1p.**
 
@@ -114,9 +148,10 @@ AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked 
 `capabilities.md` §4's backstop — presence proven inside the window for every human-only act — is now
 **the confirm**. **decided** (§U).
 
-- **When.** Every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`), and every move or
-  copy whose audience delta is non-empty: the person is shown, inline, who will newly see the item, and
-  confirms. **decided** (§U, §V).
+- **When.** Every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`); every move or copy
+  whose audience delta is non-empty: the person is shown, inline, who will newly see the item, and
+  confirms (**decided**, §U, §V); and every user grant and agent registration (§4), which widen an
+  audience the same way (**a1p**, a1r's finding 2 on #282).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public

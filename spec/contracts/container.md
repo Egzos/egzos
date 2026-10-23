@@ -381,5 +381,6 @@ entry shape and the hash chain → `events.md`. How nodes, tokens and proposals 
 `BlobGrant`'s rendering → `storage.md`. **Who may call the container, and the confirm, are `identity.md`** (v1.1; the
 retired `authorization-server.md` is the 0.3 record); nothing above constrains them beyond §5's
 human-only clause.
-Presence, the localhost step-up tap and the consent pages are Phase 2.2 and A2's spec (issue #61);
-only `step_up.window_seconds` and the `step_up` event (running since the MVP tap) are frozen now.
+Presence is the confirm (`identity.md` §5, v1.1), which retires the localhost step-up tap; the agent
+consent page is egzos.io's. `step_up.window_seconds` and the `step_up` event (running since the MVP
+tap) stay frozen.

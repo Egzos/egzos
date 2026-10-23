@@ -77,9 +77,9 @@ own.
    revoked token, an expired token, and every failure of `identity.md` §3 get status `401`, the body
    `{"error":"unauthorized"}`, and `WWW-Authenticate: Bearer` with no parameters, byte-identical
    across all of them. **a1p**, applying
-   `authorization-server.md` §9.2's silence rule: an answer that varied would test a token value
-   without holding one. RFC 9728's `resource_metadata` parameter is the MCP surface, `[v1.1]` by
-   `authorization-server.md` §4, and is not sent.
+   `capabilities.md` §6 clause 1: an answer that varied would test a token value without holding one.
+   RFC 9728's `resource_metadata` parameter belongs to the MCP surface at `/mcp` (`identity.md` §7)
+   and is not sent on `/v1/`.
 6. **An unauthenticated request appends no entry of its own.** It read nothing, and it has no caller
    to name. **a1p.** Item 7's throttle counts it, and the window's `rest.tally` records it.
 7. **The door is throttled on its own `surface` word, `rest`. decided** (the Chief on #165 item 3,
