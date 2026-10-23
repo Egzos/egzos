@@ -38,12 +38,14 @@ trust_app = typer.Typer(help="Trust: pending queue, promotion, quarantine.")
 audit_app = typer.Typer(help="Audit: the hash-chained ledger.")
 token_app = typer.Typer(help="Tokens: client principals and their capabilities.")
 config_app = typer.Typer(help="Config: the container's settings (container.md §8).")
+credential_app = typer.Typer(help="Credentials: the Face ID / Touch ID keys people confirm with.")
 grant_app = typer.Typer(help="Grants: people who sign in at your provider and may use this.")
 app.add_typer(trust_app, name="trust")
 app.add_typer(audit_app, name="audit")
 app.add_typer(token_app, name="token")
 app.add_typer(config_app, name="config")
 app.add_typer(grant_app, name="grant")
+app.add_typer(credential_app, name="credential")
 
 _state: dict[str, Any] = {"json": False}
 
@@ -786,6 +788,36 @@ def grant_rm(sub: str = typer.Argument(..., help="The provider user id to revoke
     if not revoked:
         _fail("no live grant for that user")
     _out({"sub": sub, "revoked": True}, f"revoked {sub}")
+
+
+@credential_app.command("ls")
+def credential_ls():
+    """Every confirm credential registered here, whose and for which site. Never the key."""
+    c = _container()
+    token = _admin(c, "the credential list")
+    creds = [x for x in c.backend.list_credentials() if not x["removed"]]
+    c.ledger.append(
+        "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
+        read="credentials", items=[], layers=[], withheld=0,
+    )
+    rows = [{k: x[k] for k in ("id", "person", "name", "rp_id", "created_at", "last_used")}
+            for x in creds]
+    _out(rows, "\n".join(f"{r['id']}  {r['person']:<24} {r['name']:<16} {r['rp_id']:<20} "
+                          f"last_used={r['last_used'] or '-'}" for r in rows) or "(none)")
+
+
+@credential_app.command("rm")
+def credential_rm(credential_id: str = typer.Argument(..., help="An id from `credential ls`")):
+    """Remove a confirm credential: the owner's recovery path (rest.md §4.3), held by the owner
+    token. The person then confirms with the button until they enrol again, where buttons are on."""
+    c = _container()
+    token = _admin(c, "removing a credential")
+    cred = c.backend.get_credential(credential_id)
+    if cred is None or cred["removed"]:
+        _fail("no credential with that id")
+    with c.backend.atomic():
+        c.confirm.remove(token, cred)
+    _out({"id": credential_id, "removed": True}, f"removed {credential_id} ({cred['person']})")
 
 
 # -- audit ------------------------------------------------------------------------------------

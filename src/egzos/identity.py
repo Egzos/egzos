@@ -239,10 +239,22 @@ class GrantToken(Token):
     acting_for: str | None = field(default=None, compare=False)
     #: The grant's or registration's display name: untrusted display data (rest.md §4.3).
     name: str = field(default="", compare=False)
+    #: When the person last signed in at the provider (the newest `amr` timestamp): rest.md §4.3's
+    #: fresh sign-in for a first credential. None when the token says nothing.
+    auth_time: int | None = field(default=None, compare=False)
 
 
 def _number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _auth_time(amr: Any) -> int | None:
+    """The newest authentication time in Supabase's `amr` claim: `[{method, timestamp}, …]`."""
+    times = [
+        int(entry["timestamp"]) for entry in amr or ()
+        if isinstance(entry, dict) and _number(entry.get("timestamp"))
+    ] if isinstance(amr, list) else []
+    return max(times) if times else None
 
 
 def _live(record: UserGrant | AgentRegistration | None) -> bool:
@@ -347,9 +359,10 @@ class Identity:
         ):
             return None
         # 7 · Grant: a live user grant, and for an agent a live registration serving this `sub`.
-        if person:
-            return self._person(sub, client_id)
-        return self._agent(client_id, sub)
+        who = self._person(sub, client_id) if person else self._agent(client_id, sub)
+        if who is not None:
+            who.auth_time = _auth_time(claims.get("amr"))
+        return who
 
     # -- §4: what a verified caller may do ------------------------------------------------------
     def _person(self, sub: str, client_id: str) -> GrantToken | None:

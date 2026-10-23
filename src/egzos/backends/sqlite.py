@@ -11,7 +11,13 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from egzos._types import AgentRegistration, ConfirmChallenge, ThrottleSurface, UserGrant
+from egzos._types import (
+    AgentRegistration,
+    ConfirmChallenge,
+    ConfirmCredential,
+    ThrottleSurface,
+    UserGrant,
+)
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -62,6 +68,9 @@ CREATE TABLE IF NOT EXISTS challenges (
   id TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL,
   doc TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS challenges_expiry ON challenges(expires_at);
+CREATE TABLE IF NOT EXISTS credentials (
+  id TEXT PRIMARY KEY, person TEXT NOT NULL, doc TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS credentials_person ON credentials(person);
 """
 
 
@@ -382,3 +391,25 @@ class SqliteBackend:
                 return None
             self.db.execute("UPDATE challenges SET spent=1 WHERE id=?", (challenge_id,))
         return {**json.loads(row[1]), "spent": bool(row[0])}
+
+    def put_credential(self, credential: ConfirmCredential) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO credentials(id,person,doc) VALUES(?,?,?)",
+            (credential["id"], credential["person"], json.dumps(credential)),
+        )
+        self._commit()
+
+    def get_credential(self, credential_id: str) -> ConfirmCredential | None:
+        row = self.db.execute(
+            "SELECT doc FROM credentials WHERE id=?", (credential_id,)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_credentials(self, person: str | None = None) -> list[ConfirmCredential]:
+        if person is None:
+            rows = self.db.execute("SELECT doc FROM credentials ORDER BY rowid")
+        else:
+            rows = self.db.execute(
+                "SELECT doc FROM credentials WHERE person=? ORDER BY rowid", (person,)
+            )
+        return [json.loads(r[0]) for r in rows]

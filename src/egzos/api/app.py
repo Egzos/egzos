@@ -28,7 +28,9 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from egzos.api.throttle import Throttle, throttle_key
+from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, person_of
 from egzos.container import Container
+from egzos.identity import GrantToken
 from egzos.ledger import acting_for
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
@@ -424,8 +426,14 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         granted = {t.id: t for t in c.identity.audience_tokens()}
         return [granted[m["token"]].name if m["token"] in granted else m["client"] for m in delta]
 
+    def origin_of(request: Request) -> str | None:
+        """The request's browser origin, when it is one this container answers (identity.md §6):
+        the relying party a WebAuthn credential belongs to. Any other origin is no origin."""
+        origin = request.headers.get("origin")
+        return origin if origin in d.origins() else None
+
     def first_leg(token: Token, *, act: str, subject: str, destination: str | None,
-                  delta: list[dict[str, Any]]) -> Response:
+                  delta: list[dict[str, Any]], origin: str | None) -> Response:
         newly = names(delta)
         # Showing who would newly see an item is a read of credential metadata (§4.2 item 2).
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
@@ -433,7 +441,8 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                         confirm_for=act, newly=newly)
         return _json(200, c.confirm.issue(token, act=act, subject=subject,
                                           destination=destination,
-                                          delta=[m["token"] for m in delta], newly=newly))
+                                          delta=[m["token"] for m in delta], newly=newly,
+                                          origin=origin))
 
     def presented(body: dict[str, Any]) -> dict[str, Any] | None:
         value = body.get("confirm")
@@ -450,6 +459,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
 
     async def move_or_copy(request: Request, item_id: str, act: str) -> Response:
         token: Token = request.state.token
+        origin = origin_of(request)
         _only(request.query_params, set())
         body = await _object(request, {"to", "confirm"}, {"to"})
         ref = _str(body["to"])
@@ -475,7 +485,9 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             return _json(200, {"result": "moved" if act == "move" else "copied",
                                "item": landed.to_dict()})
         if proof is None:
-            return first_leg(token, act=act, subject=item.id, destination=to.id, delta=delta)
+            return first_leg(
+                token, act=act, subject=item.id, destination=to.id, delta=delta, origin=origin
+            )
         try:
             with c.backend.atomic():
                 # Recomputed under the lock: the confirm binds the delta as it stands now.
@@ -490,7 +502,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 else:
                     reason = c.confirm.conclude(token, proof, act=act, subject=item.id,
                                                 destination=to.id,
-                                                delta=[m["token"] for m in delta])
+                                                delta=[m["token"] for m in delta], origin=origin)
                     if reason is None:
                         landed = c.trust.confirmed(item, to, token=token, actor=token.owner,
                                                    act=act, delta=delta,
@@ -499,7 +511,9 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, item_id)
             return refusal()
         if landed is None:
-            return first_leg(token, act=act, subject=item.id, destination=to.id, delta=delta)
+            return first_leg(
+                token, act=act, subject=item.id, destination=to.id, delta=delta, origin=origin
+            )
         return _json(200, {"result": "moved" if act == "move" else "copied",
                            "item": landed.to_dict()})
 
@@ -518,6 +532,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
 
     async def decide(request: Request, proposal_id: str, act: str) -> Response:
         token: Token = request.state.token
+        origin = origin_of(request)
         _only(request.query_params, set())
         proof = presented(await optional_body(request))
         p = c.backend.get_proposal(proposal_id)
@@ -529,14 +544,16 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         # delta; a denial changes nobody's view (§4.2 item 1; a1r on #289).
         widens = list(p.get("audience_delta") or []) if act == "approve" else []
         if proof is None:
-            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
+            return first_leg(
+                token, act=act, subject=proposal_id, destination=None, delta=widens, origin=origin
+            )
         outcome: str | None = None
         result: dict[str, Any] = {}
         try:
             with c.backend.atomic():
                 reason = c.confirm.conclude(token, proof, act=act, subject=proposal_id,
                                             destination=None,
-                                            delta=[m["token"] for m in widens])
+                                            delta=[m["token"] for m in widens], origin=origin)
                 if reason is None:
                     try:
                         if act == "approve":
@@ -554,7 +571,9 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, proposal_id)
             return refusal()
         if outcome is None:
-            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
+            return first_leg(
+                token, act=act, subject=proposal_id, destination=None, delta=widens, origin=origin
+            )
         if outcome == "executed":
             # A move's item is where it went; a copy's is the new one, not its source.
             made = result.get("copies") or p["items"]
@@ -573,6 +592,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
     @app.post("/v1/items/{item_id}/promote")
     async def promote(request: Request, item_id: str):
         token: Token = request.state.token
+        origin = origin_of(request)
         _only(request.query_params, set())
         proof = presented(await optional_body(request))
         item = c.store.get(item_id)
@@ -582,20 +602,129 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, item_id)
             return refusal()
         if proof is None:
-            return first_leg(token, act="promote", subject=item.id, destination=None, delta=[])
+            return first_leg(
+                token, act="promote", subject=item.id, destination=None, delta=[], origin=origin
+            )
         promoted = None
         try:
             with c.backend.atomic():
                 reason = c.confirm.conclude(token, proof, act="promote", subject=item.id,
-                                            destination=None, delta=[])
+                                            destination=None, delta=[], origin=origin)
                 if reason is None:
                     promoted = c.trust.promote(item, token=token, actor=token.owner)
         except (TrustError, HumanOnly):
             d.probe(token, item_id)
             return refusal()
         if promoted is None:
-            return first_leg(token, act="promote", subject=item.id, destination=None, delta=[])
+            return first_leg(
+                token, act="promote", subject=item.id, destination=None, delta=[], origin=origin
+            )
         return _json(200, {"result": "promoted", "item": promoted.to_dict()})
+
+    # -- confirm credentials (§4.3) -------------------------------------------------------------
+    def whose(token: Token, sub: str | None) -> str | None:
+        """The person a credential route acts on: the caller, or with `sub` another person, which
+        only an admin over the whole container may name. None is §3's refusal."""
+        if sub is None or f"user:{sub}" == person_of(token):
+            return person_of(token)
+        if token.has("admin") and "*" in token.scopes:
+            return f"user:{sub}"
+        return None
+
+    def wire(cred: dict[str, Any]) -> dict[str, Any]:
+        return {k: cred[k] for k in ("id", "name", "created_at", "last_used")}
+
+    @app.get("/v1/credentials")
+    async def credentials(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, {"sub"})
+        person = whose(token, request.query_params.get("sub")) if (
+            token.principal == "interactive") else None
+        if person is None:
+            d.probe(token, "credentials")
+            return refusal()
+        creds = c.confirm.credentials(person)
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read="credentials", items=[], layers=[],
+                        withheld=0)
+        return _json(200, {"credentials": [wire(x) for x in creds]})
+
+    @app.post("/v1/credentials")
+    async def register(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        origin = origin_of(request)
+        body = await optional_body_of(request, {"challenge", "attestation", "confirm", "name"})
+        if token.principal != "interactive" or origin is None:
+            d.probe(token, "credentials")
+            return refusal()
+        name = _str(body.get("name"), optional=True, limit=CREDENTIAL_NAME_MAX) or "this device"
+        if "challenge" not in body:
+            if "attestation" in body or "confirm" in body:
+                raise Invalid
+            out = c.confirm.begin_registration(token, origin=origin, name=name)
+            if "confirm" in out:
+                # The assertion's options list the person's credentials: a read (rest.md §4.3).
+                c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                                client=token.client, read="credentials", items=[], layers=[],
+                                withheld=0)
+            return _json(200, out)
+        challenge = _str(body["challenge"])
+        proof = presented(body)
+        auth_time = token.auth_time if isinstance(token, GrantToken) else None
+        fresh = not isinstance(token, GrantToken) or (
+            auth_time is not None and c.confirm.clock() - auth_time <= FRESH_SIGN_IN_SECONDS)
+        with c.backend.atomic():
+            cred, reason = c.confirm.finish_registration(
+                token, origin=origin, challenge_id=challenge, attestation=body.get("attestation"),
+                presented=proof, name=name, fresh=fresh,
+                owner_surface=not isinstance(token, GrantToken))
+        if reason is not None:
+            out = c.confirm.begin_registration(token, origin=origin, name=name)
+            return _json(200, out)
+        return _json(200, {"credential": wire(cred)})
+
+    async def optional_body_of(request: Request, allowed: set[str]) -> dict[str, Any]:
+        if not await request.body():
+            return {}
+        return await _object(request, allowed, set())
+
+    @app.delete("/v1/credentials/{credential_id}")
+    async def remove(request: Request, credential_id: str):
+        token: Token = request.state.token
+        _only(request.query_params, {"sub"})
+        origin = origin_of(request)
+        proof = presented(await optional_body_of(request, {"confirm"}))
+        person = whose(token, request.query_params.get("sub")) if (
+            token.principal == "interactive") else None
+        cred = c.backend.get_credential(credential_id)
+        if person is None or cred is None or cred["removed"] or cred["person"] != person:
+            d.probe(token, credential_id)
+            return refusal()
+        if proof is None:
+            return first_leg(
+                token, act="credential.remove", subject=credential_id, destination=None,
+                delta=[], origin=origin
+            )
+        removed = False
+        with c.backend.atomic():
+            # A biometric proof only, never the button: the caller's own (rest.md §4.3).
+            reason = c.confirm.conclude(token, proof, act="credential.remove",
+                                        subject=credential_id, destination=None, delta=[],
+                                        origin=origin, biometric_only=True)
+            if reason is None:
+                c.confirm.remove(token, cred)
+                removed = True
+            else:
+                c.ledger.append("identity.credential", actor=token.owner,
+                                principal=token.principal, subject=cred["person"], op="remove",
+                                outcome="refused", reason=reason, credential=credential_id)
+        if not removed:
+            return first_leg(
+                token, act="credential.remove", subject=credential_id, destination=None,
+                delta=[], origin=origin
+            )
+        return _json(200, {"result": "removed"})
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],

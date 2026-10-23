@@ -29,8 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The confirm at the door** (`rest.md` §4.2): a move or copy that someone new would see, and
   approve, deny and promote, ask first. The first answer shows who would newly see it and issues a
   one-time challenge; the second spends it with a proof, and the act lands in the same transaction.
-  The button is the proof today (`confirm.allow_button`); Face ID and Touch ID come with credential
-  registration next. An agent's widening move or copy still parks for a person to decide.
+  An agent's widening move or copy still parks for a person to decide.
+- **Face ID / Touch ID for the confirm** (`rest.md` §4.3, `identity.md` §5): register a device's
+  WebAuthn credential at `/v1/credentials`, and confirm with it. Once a person has a credential,
+  the button is refused for them, so a stolen session cannot skip the biometric; adding a second
+  credential needs the first one's biometric, and removing one needs a biometric, never the button.
+  A first credential needs the button and a sign-in under five minutes old. The owner's recovery
+  path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 
