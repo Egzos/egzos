@@ -23,6 +23,7 @@ import threading
 import time
 import urllib.request
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
@@ -248,10 +249,14 @@ class Identity:
         *,
         ancestors: Callable[[str], list[str] | None],
         jwks: Callable[[str], Jwks] | None = None,
+        atomic: Callable[[], AbstractContextManager[Any]] = nullcontext,
     ):
         self.state = state
         self.ledger = ledger
         self.config = config
+        # One transaction on the container's store: a grant's check, its write and its entry land
+        # together, and two concurrent revokes are serialised (BEGIN IMMEDIATE on sqlite).
+        self.atomic = atomic
         # Node id -> the ids of its ancestors, itself included; None for a node that is absent.
         self.ancestors = ancestors
         self._jwks_for = jwks or self._jwks
@@ -446,57 +451,76 @@ class Identity:
             "created_at": now_iso(),
             "revoked": False,
         }
-        self.state.put_user_grant(grant)
-        self.ledger.append(
-            "identity.grant",
-            actor=actor,
-            principal=principal,
-            subject=sub,
-            kind="user",
-            capabilities=caps,
-            scopes=list(scopes),
-        )
-        return grant
+        with self.atomic():
+            # Re-granting the last whole-container admin something narrower removes the last
+            # admin as surely as revoking it does (§4), so it is refused the same way.
+            narrows = not _whole(grant) and self._last_admin(sub)
+            if not narrows:
+                self.state.put_user_grant(grant)
+                self.ledger.append(
+                    "identity.grant",
+                    actor=actor,
+                    principal=principal,
+                    subject=sub,
+                    kind="user",
+                    outcome="granted",
+                    capabilities=caps,
+                    scopes=list(scopes),
+                )
+                return grant
+        self._refused("identity.grant", sub, actor=actor, principal=principal)
+        raise LastAdmin(sub)
 
     def revoke_user(self, sub: str, *, actor: str, principal: str) -> bool:
         """Revoke a person's grant. Narrowing is never gated (§4). `False` for no live grant; the
-        last live grant holding `admin` over `["*"]` raises `LastAdmin` and appends a refusal."""
-        grant = self.state.get_user_grant(sub)
-        if not _live(grant):
-            return False
-        if self._last_admin(sub):
-            self.ledger.append(
-                "identity.revoke",
-                actor=actor,
-                principal=principal,
-                subject=sub,
-                kind="user",
-                outcome="refused",
-                reason="last_admin",
-            )
-            raise LastAdmin(sub)
-        self.state.put_user_grant({**grant, "revoked": True})
+        last live grant holding `admin` over `["*"]` raises `LastAdmin` and appends a refusal.
+
+        The read, the last-admin check, the write and the entry are one transaction, so two
+        concurrent revokes of the last two whole-container admins cannot both pass the check, and
+        a revoke never stands without its entry. The refusal is appended after it, not inside: a
+        refusal rolled back with the act it refused would leave no trace."""
+        with self.atomic():
+            grant = self.state.get_user_grant(sub)
+            if not _live(grant):
+                return False
+            if not self._last_admin(sub):
+                self.state.put_user_grant({**grant, "revoked": True})
+                self.ledger.append(
+                    "identity.revoke",
+                    actor=actor,
+                    principal=principal,
+                    subject=sub,
+                    kind="user",
+                    outcome="revoked",
+                    capabilities=grant["capabilities"],
+                    scopes=grant["scopes"],
+                )
+                return True
+        self._refused("identity.revoke", sub, actor=actor, principal=principal)
+        raise LastAdmin(sub)
+
+    def _refused(self, event: str, sub: str, *, actor: str, principal: str) -> None:
         self.ledger.append(
-            "identity.revoke",
+            event,
             actor=actor,
             principal=principal,
             subject=sub,
             kind="user",
-            outcome="revoked",
-            capabilities=grant["capabilities"],
-            scopes=grant["scopes"],
+            outcome="refused",
+            reason="last_admin",
         )
-        return True
 
     def _last_admin(self, sub: str) -> bool:
-        def whole(g: UserGrant) -> bool:
-            return _live(g) and "admin" in g["capabilities"] and "*" in g["scopes"]
-
+        """Whether `sub` holds the only live grant with `admin` over the whole container."""
         grants = self.state.list_user_grants()
         mine = next((g for g in grants if g["sub"] == sub), None)
-        return bool(mine and whole(mine)) and not any(
-            whole(g) for g in grants if g["sub"] != sub
+        return bool(mine and _whole(mine)) and not any(
+            _whole(g) for g in grants if g["sub"] != sub
         )
+
+
+def _whole(grant: UserGrant) -> bool:
+    return _live(grant) and "admin" in grant["capabilities"] and "*" in grant["scopes"]
 
 
 def node_ancestors(get_node: Callable[[str], Node | None], ancestors: Callable[[Node], list[Node]]):

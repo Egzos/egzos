@@ -60,6 +60,7 @@ class Container:
             self.ledger,
             self.config_value,
             ancestors=node_ancestors(self.backend.get_node, self.nodes.ancestors),
+            atomic=self.backend.atomic,
         )
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh

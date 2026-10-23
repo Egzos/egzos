@@ -89,7 +89,8 @@ def test_a_grant_is_recorded_with_what_it_covers(box):
     assert g["capabilities"] == ["fetch"] and not g["revoked"]
     (entry,) = _events(box, "identity.grant")
     assert entry["subject"] == ALICE
-    assert entry["details"] == {"kind": "user", "capabilities": ["fetch"], "scopes": ["*"]}
+    assert entry["details"] == {"kind": "user", "outcome": "granted", "capabilities": ["fetch"],
+                                "scopes": ["*"]}
 
 
 @pytest.mark.parametrize(
@@ -152,3 +153,60 @@ def test_moving_into_a_granted_persons_scope_widens_and_parks(box):
     assert result.get("gate") != "silent"
     (proposal,) = box.backend.list_proposals("open")
     assert [a["token"] for a in proposal["audience_delta"]] == [f"user:{BOB}"]
+
+
+def test_narrowing_the_last_admin_is_refused_like_revoking_it(box):
+    box.identity.grant_user(ALICE, name="alice", role="admin", scopes=["*"], **KW)
+    with pytest.raises(LastAdmin):
+        box.identity.grant_user(ALICE, name="alice", role="reader", scopes=["*"], **KW)
+    assert "admin" in box.backend.get_user_grant(ALICE)["capabilities"]
+    refused = _events(box, "identity.grant")[-1]
+    assert refused["details"] == {"kind": "user", "outcome": "refused", "reason": "last_admin"}
+    box.identity.grant_user(BOB, name="bob", role="admin", scopes=["*"], **KW)
+    box.identity.grant_user(ALICE, name="alice", role="reader", scopes=["*"], **KW)
+    assert box.backend.get_user_grant(ALICE)["capabilities"] == ["fetch"]
+
+
+def test_two_concurrent_revokes_never_remove_the_last_admin(tmp_path):
+    """a1r on #287: the check and the write are one transaction, so of two revokes racing on the
+    only two whole-container admins, exactly one lands. Two containers on one file are two
+    connections, as two processes would be."""
+    import threading
+
+    first = Container(tmp_path)
+    first.init()
+    for sub in (ALICE, BOB):
+        first.identity.grant_user(sub, name=sub, role="admin", scopes=["*"], **KW)
+    second = Container(tmp_path)
+    gate = threading.Barrier(2)
+    outcomes: dict[str, str] = {}
+
+    def revoke(c, sub):
+        gate.wait()
+        try:
+            outcomes[sub] = "revoked" if c.identity.revoke_user(sub, **KW) else "none"
+        except LastAdmin:
+            outcomes[sub] = "refused"
+
+    threads = [threading.Thread(target=revoke, args=(first, ALICE)),
+               threading.Thread(target=revoke, args=(second, BOB))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(outcomes.values()) == ["refused", "revoked"]
+    live = [g for g in first.backend.list_user_grants() if not g["revoked"]]
+    assert len(live) == 1
+
+
+def test_a_revoke_and_its_entry_land_together(box, monkeypatch):
+    box.identity.grant_user(ALICE, name="alice", role="admin", scopes=["*"], **KW)
+    box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the chain cannot take an entry")
+
+    monkeypatch.setattr(box.ledger, "append", broken)
+    with pytest.raises(RuntimeError):
+        box.identity.revoke_user(BOB, **KW)
+    assert not box.backend.get_user_grant(BOB)["revoked"]
