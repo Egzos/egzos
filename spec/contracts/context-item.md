@@ -79,7 +79,7 @@ renders a grant into a URL and decides nothing. A stdio client receives the desc
 it at the REST door (Phase 2); how long a grant lives and how often it is redeemed is `rest.md`
 §6's (#165). The mint is one audit event (`blob.grant`) and the redemption
 another (`blob.pull`) — see `events.md`. **running** at the REST door's reads (`rest.md` §6);
-`egzos_fetch` does not carry one yet, and the REST door does not redeem one yet.
+`egzos_fetch` does not carry one yet.
 
 **`BlobGrant.sig` is an HMAC over `sha256`, `item`, `token` and `expires_at` under a
 container-held key. [0.3 · 45]** The key never leaves the container, and the grant id is not the

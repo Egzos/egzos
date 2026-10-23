@@ -196,7 +196,8 @@ class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
     `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]); the grant id is not the
-    bearer secret.
+    bearer secret. Redeemed at the REST door, once, within `BLOB_GRANT_LIFETIME_SECONDS` (rest.md
+    §6).
     """
 
     sha256: str

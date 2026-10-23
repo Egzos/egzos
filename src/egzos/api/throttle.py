@@ -14,6 +14,10 @@ No attempt appends an entry. When a window closes, each bucket that engaged appe
 `rest.tally`. Both carry `principal: none` and `actor: rest`, and a `window_key` derived from the
 bucket under a per-container secret: it pairs a release with its tally, rotates with the window,
 and never discloses the bucket's key — a source address never reaches the chain.
+
+A `BlobGrant` redemption whose descriptor does not verify counts as a `401` does, and the tally
+counts it under `forged` (rest.md §6). A third bucket, keyed on the `Token.id` a verified
+descriptor names, counts that token's refused redemptions alone (the Chief on #184).
 """
 
 from __future__ import annotations
@@ -41,9 +45,13 @@ KEY_FILE = "throttle.key"
 KEY_BYTES = 32
 #: How many key names a container tries, `throttle.key` first, passing over short ones.
 KEY_SLOTS = 4
+#: rest.md §2 item 7: refused redemptions per token per window. a1p's proposal, the per-source
+#: number; not in `_types.py` until the Chief confirms it (TODO(chief), #141).
+PER_TOKEN = 30
 
 _REFUSED = "!refused"
 _ADMITTED_401 = "!401"
+_FORGED = "!forged"
 _CLOSED = "!closed"
 
 
@@ -94,6 +102,9 @@ class Throttle:
         return self._digest(f"window|{bucket}|{window}")[:16]
 
     # -- per request ------------------------------------------------------------------------------
+    def _token(self, token_id: str) -> str:
+        return "t:" + self._digest(f"token|{token_id}")[:32]
+
     def holds(self, address: str | None) -> bool:
         """Whether either bucket holds in this window. Read first, for every request."""
         w = str(self._window())
@@ -102,8 +113,9 @@ class Throttle:
             or self.state.throttle_count(SURFACE, self._source(address), w) >= RATE.per_source
         )
 
-    def count(self, address: str | None, *, refused: bool) -> None:
-        """One counted attempt: a `401` the door admitted, or an attempt refused while holding."""
+    def count(self, address: str | None, *, refused: bool, forged: bool = False) -> None:
+        """One counted attempt: a `401` or a forged redemption the door admitted, or an attempt
+        refused while holding."""
         w = str(self._window())
         source = self._source(address)
         for bucket in (GLOBAL, source):
@@ -111,7 +123,21 @@ class Throttle:
             if refused:
                 self.state.throttle_incr(SURFACE, bucket + _REFUSED, w)
         if not refused:
-            self.state.throttle_incr(SURFACE, GLOBAL + _ADMITTED_401, w)
+            self.state.throttle_incr(SURFACE, GLOBAL + (_FORGED if forged else _ADMITTED_401), w)
+
+    def token_holds(self, token_id: str) -> bool:
+        """Whether the bucket of the token a verified descriptor names holds (§6: read between
+        checks 2 and 3)."""
+        return self.state.throttle_count(
+            SURFACE, self._token(token_id), str(self._window())) >= PER_TOKEN
+
+    def count_token(self, token_id: str, *, refused: bool) -> None:
+        """A verified redemption refused at check 3 or later, or refused while its token's bucket
+        holds: the token's own bucket, never the two outer ones."""
+        w, bucket = str(self._window()), self._token(token_id)
+        self.state.throttle_incr(SURFACE, bucket, w)
+        if refused:
+            self.state.throttle_incr(SURFACE, bucket + _REFUSED, w)
 
     # -- per window -------------------------------------------------------------------------------
     def close(self) -> None:
@@ -140,7 +166,8 @@ class Throttle:
         for bucket, total in sorted(counts.items()):
             if "!" in bucket:
                 continue
-            rate = RATE.container_global if bucket == GLOBAL else RATE.per_source
+            rate = (RATE.container_global if bucket == GLOBAL
+                    else PER_TOKEN if bucket.startswith("t:") else RATE.per_source)
             if total >= rate:
                 self.ledger.append(
                     "authz.release",
@@ -151,12 +178,13 @@ class Throttle:
                     window_key=self.window_key(bucket, w),
                 )
         admitted = counts.get(GLOBAL + _ADMITTED_401, 0)
-        if admitted:
+        forged = counts.get(GLOBAL + _FORGED, 0)
+        if admitted or forged:
             self.ledger.append(
                 "rest.tally",
                 actor=SURFACE,
                 principal="none",
                 unauthorized=admitted,
-                forged=0,
+                forged=forged,
                 window_key=self.window_key(GLOBAL, w),
             )

@@ -11,7 +11,8 @@ matches — TOCTOU closed (v0.4 §5).
 Human-only acts (approve-from-pending, confirming a publish) demand the interactive principal.
 No capability reaches them: a maximally granted client can only PROPOSE.
 
-Trust alone mints a `BlobGrant` (F5, rest.md §6), on a fetch's check: artifact download IS fetch.
+Trust alone mints a `BlobGrant` (F5, rest.md §6): artifact download IS fetch, so a grant is minted
+on the check a fetch applies, and a redemption runs that check again, as things stand then.
 """
 
 from __future__ import annotations
@@ -54,6 +55,28 @@ def _utc(at: float) -> str:
     return datetime.fromtimestamp(at, UTC).strftime(_UTC)
 
 
+_UTC_WIDTH = len(_utc(0.0))
+
+
+def grant_expiry(text: str) -> float | None:
+    """A descriptor's `expires_at` as a time, or None when it is not written as `_utc` writes."""
+    if len(text) != _UTC_WIDTH:
+        return None
+    try:
+        return datetime.strptime(text, _UTC).replace(tzinfo=UTC).timestamp()
+    except ValueError:
+        return None
+
+
+def _after(text: str, when: float) -> bool:
+    """Whether an ISO-8601 time is later than `when`. One nobody can read counts as later."""
+    try:
+        at = datetime.fromisoformat(text)
+    except (TypeError, ValueError):
+        return True
+    return (at if at.tzinfo else at.replace(tzinfo=UTC)).timestamp() > when
+
+
 class TrustEngine:
     def __init__(self, backend: Backend, ledger: Ledger, nodes: NodeService):
         self.backend = backend
@@ -67,8 +90,10 @@ class TrustEngine:
         # (storage.md §4); the container wires in its blob store's `promote`.
         self.promote_blob: Callable[[str], bool] = lambda sha: False
         # rest.md §6, wired by the container: the grant key, read at every use so a new one
-        # reaches every process; and a fetch's `find.shown`. Unwired, nothing is signed or served.
+        # reaches every process; the principal a grant names, as it stands now; and the serving
+        # predicate a fetch applies (`find.shown`). Unwired, nothing is signed and nothing served.
         self.grant_key: Callable[[], bytes] = bytes
+        self.named: Callable[[str], Token | None] = lambda token_id: None
         self.shown: Callable[[Token, ContextItem, Node], bool] = lambda token, item, node: False
         self.clock: Callable[[], float] = time.time
 
@@ -118,8 +143,10 @@ class TrustEngine:
 
     # -- BlobGrant (F5, rest.md §6) --------------------------------------------------------------
     def authorize_pull(self, token: Token, item: ContextItem) -> BlobGrant | None:
-        """A grant to pull this artifact's bytes, or silence: `pull_refusal`'s check, or a key that
-        cannot be read. A mint appends `blob.grant`; silence nothing: the read is on the record."""
+        """A grant to pull this artifact's bytes, or silence: `pull_refusal`'s check, the one a
+        redemption runs again. A mint appends `blob.grant`; silence appends nothing of its own, as
+        the read that served the item is already on the record. A key that cannot be read is
+        silence too: downloads stop, and reads go on."""
         sha, key = item.content.get("sha256"), self._key()
         if (key is None or item.kind != "artifact" or not _is_digest(sha)
                 or self.pull_refusal(token, item)):
@@ -137,8 +164,13 @@ class TrustEngine:
         return grant
 
     def _key(self) -> bytes | None:
-        """The grant key, read afresh at every use; None unless it is `GRANT_KEY_BYTES` long."""
-        key = self.grant_key()
+        """The container's grant key, read afresh at every use; None when it cannot be read or is
+        not `GRANT_KEY_BYTES` long, so nothing is signed or verified under it and reads go on
+        without a grant (a1r on #304)."""
+        try:
+            key = self.grant_key()
+        except OSError:
+            return None
         return key if len(key) == GRANT_KEY_BYTES else None
 
     @staticmethod
@@ -149,13 +181,31 @@ class TrustEngine:
         body = canonical({k: v for k, v in grant.items() if k != "sig"})
         return hmac.new(key, body.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    def pull_refusal(self, token: Token, item: ContextItem) -> int | None:
-        """rest.md §6's checks 5 and 6, as they stand now: 5 when the token is not live or lacks
-        `fetch` over the item's scope; 6 when the item is not served to it. None when both pass."""
-        node = self.backend.get_node(item.scope)
-        if not token.has("fetch") or (node and not self.covers(token, node)):
+    def verify_grant(self, grant: BlobGrant) -> bool:
+        """rest.md §6 check 2: `sig` verifies under the container key, in constant time."""
+        key = self._key()
+        return key is not None and hmac.compare_digest(
+            self._sign(grant, key).encode(), grant["sig"].encode())
+
+    def spend_grant(self, grant: BlobGrant) -> bool:
+        """Check 4: the first verified redemption spends the grant, atomically, whatever the
+        later checks decide. Keyed on the sha256 of its `sig`, kept at least until it expires."""
+        digest = hashlib.sha256(grant["sig"].encode()).hexdigest()
+        return self.backend.spend_grant(digest, grant["expires_at"])
+
+    def pull_refusal(
+        self, token: Token | None, item: ContextItem | None, minted: float | None = None
+    ) -> int | None:
+        """rest.md §6's checks 5 and 6, as they stand now: 5 when the token is not live, lacks
+        `fetch` over the item's scope, or was granted after `minted` (revoked and granted again
+        since, it is not the grant the descriptor named); 6 when the item is not served to it —
+        absent or tombstoned, quarantined, outside the serving policy, or its bytes still staged.
+        None when both pass."""
+        node = self.backend.get_node(item.scope) if item is not None else None
+        if (token is None or not token.has("fetch") or (node and not self.covers(token, node))
+                or (minted is not None and _after(token.created_at, minted))):
             return 5
-        if (node is None or item.status == "quarantined"
+        if (item is None or node is None or item.status == "quarantined"
                 or not self.shown(token, item, node) or self._staged(item)):
             return 6
         return None
