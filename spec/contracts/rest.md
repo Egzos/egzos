@@ -244,7 +244,7 @@ spec's job).
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
 | `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
 | `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
-| `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | — (new) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
+| `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -301,6 +301,11 @@ row and these bullets:
   failure rolls the tombstone back with it. Promoted bytes are never deleted ([0.3 · 44]).
 - **Absent, uncovered, already tombstoned, quarantined, or without `organize`**: §3's refusal and
   §4's probe, the same for each.
+- **`egzos rm <id>`** tombstones an item no person has promoted, with the owner `Token` (`admin` over
+  the whole container), and appends the same `item.tombstone`. A promoted item it refuses, whatever
+  its status now: any process that can run the terminal could run `rm`, so a promoted item is
+  tombstoned only at the door, where the confirm asks the person. A quarantined item reads as absent,
+  as at the door. **a1p.**
 
 ### 4.1 · Success responses (#187)
 
