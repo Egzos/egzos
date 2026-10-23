@@ -41,9 +41,23 @@ def test_the_key_is_created_once_whole_and_private(tmp_path):
     assert sorted(p.name for p in tmp_path.iterdir()) == ["throttle.key"]
 
 
-def test_a_short_key_left_by_a_crash_is_replaced(tmp_path):
-    (tmp_path / "throttle.key").write_bytes(b"")
-    assert len(throttle_key(tmp_path)) == KEY_BYTES
+def test_a_short_key_left_by_a_crash_is_passed_over_never_rewritten(tmp_path):
+    (tmp_path / "throttle.key").write_bytes(b"short")
+    keys: list[bytes] = []
+    gate = threading.Barrier(8)
+
+    def read():
+        gate.wait()
+        keys.append(throttle_key(tmp_path))
+
+    threads = [threading.Thread(target=read) for _ in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert len(set(keys)) == 1 and len(keys[0]) == KEY_BYTES  # one key, whoever repaired
+    assert (tmp_path / "throttle.key").read_bytes() == b"short"
+    assert (tmp_path / "throttle.key.1").read_bytes() == keys[0]
 
 
 def test_a_window_closed_while_the_door_was_down_still_releases(tmp_path):

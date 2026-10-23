@@ -15,8 +15,9 @@ from typing import Any
 from egzos._types import CONTAINER_CONFIG_DEFAULTS, CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
 from egzos.auth import Auth
 from egzos.backends import SqliteBackend
+from egzos.confirm import Confirm
 from egzos.identity import (
-    IDENTITY_KEYS,
+    SETTABLE_KEYS,
     ConfigError,
     GrantToken,
     Identity,
@@ -31,6 +32,12 @@ from egzos.store.find import shown
 from egzos.trust import TrustEngine
 
 OWNER = "self"
+
+
+def _step_up_window() -> int:
+    from egzos.authz.presence import window_seconds
+
+    return window_seconds()
 
 
 def default_home() -> Path:
@@ -64,6 +71,9 @@ class Container:
         )
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
+        self.confirm = Confirm(
+            self.backend, self.ledger, self.config_value, window_seconds=_step_up_window
+        )
 
     def _refresh(self, token: Token) -> Token | None:
         """The caller as it stands now: a minted token re-read, a grant re-derived (§4)."""
@@ -86,7 +96,7 @@ class Container:
         the rest are still the constants they always were, and setting one would be a lie."""
         if token.principal != "interactive" or not token.has("admin") or "*" not in token.scopes:
             raise PermissionError("changing the container's config is an admin's act")
-        if key not in IDENTITY_KEYS:
+        if key not in SETTABLE_KEYS:
             raise ConfigError(f"{key}: not a key this container sets")
         value = validate(key, value)
         with self.backend.atomic():

@@ -53,7 +53,7 @@ def _events(c, name):
     return [e for e in c.ledger.tail(1000) if e["event"] == name]
 
 
-# -- §2: one unauthenticated answer ---------------------------------------------------------------
+# -- §2: one unauthenticated answer ----------------------------------------------------------------
 @pytest.mark.parametrize(
     "headers",
     [{}, {"Authorization": "Basic x"}, {"Authorization": "Bearer "},
@@ -88,7 +88,7 @@ def test_an_unauthenticated_request_appends_nothing(c, door):
     assert len(c.ledger.tail(1000)) == before
 
 
-# -- §3: the one refusal, 400 and 409 ------------------------------------------------------------
+# -- §3: the one refusal, 400 and 409 --------------------------------------------------------------
 def test_absent_and_uncovered_are_byte_identical(c, door):
     mine = _project(c, "mine")
     other = _project(c, "other")
@@ -103,7 +103,7 @@ def test_absent_and_uncovered_are_byte_identical(c, door):
 
 def test_undeclared_paths_and_methods_are_the_refusal(c, door):
     for method, path in [("GET", "/v1/nope"), ("PATCH", "/v1/fetch"), ("DELETE", "/v1/items/x"),
-                         ("GET", "/elsewhere"), ("POST", "/v1/items/x/move")]:
+                         ("GET", "/elsewhere"), ("POST", "/v1/items/x/archive")]:
         r = door.request(method, path, headers=_auth(c.owner))
         assert (r.status_code, r.content) == (404, NOT_FOUND), (method, path)
 
@@ -137,7 +137,7 @@ def test_an_ambiguous_tail_names_only_what_the_token_covers(c, door):
     assert door.get("/v1/fetch?scope=thread:same", headers=_auth(t)).status_code == 200
 
 
-# -- §4: reads ------------------------------------------------------------------------------------
+# -- §4: reads -------------------------------------------------------------------------------------
 def test_fetch_carries_the_layering_and_no_trust_key(c, door):
     p = _project(c, "health")
     c.store.add(body="walk daily", scope=p, token=c.owner, **KW)
@@ -182,7 +182,7 @@ def test_pending_is_the_interactive_principals(c, door):
     assert set(body) == {"items", "proposals"}
 
 
-# -- §4: writes without a confirm -----------------------------------------------------------------
+# -- §4: writes without a confirm ------------------------------------------------------------------
 def test_a_write_lands_unverified_and_attributed(c, door):
     p = _project(c, "notes")
     r = door.post("/v1/items", headers=_auth(c.owner), json={"body": "hello", "scope": p.id})
@@ -344,7 +344,7 @@ def test_an_agents_entries_name_who_it_acts_for(c, door, linked):
     assert door.get("/v1/pending", headers=h).content == NOT_FOUND
 
 
-# -- §1: TLS -------------------------------------------------------------------------------------
+# -- §1: TLS ---------------------------------------------------------------------------------------
 def test_plain_http_is_for_a_loopback_socket_only(c):
     assert loopback("127.0.0.1") and loopback("::1") and loopback("localhost")
     assert not loopback("0.0.0.0") and not loopback("10.0.0.1")

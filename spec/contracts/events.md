@@ -11,23 +11,24 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Thirty-three names are listed
-below**: twenty-three **run**, and ten (`blob.grant`, `client.register`, `authz.login`,
+An appended event whose name is not in this list MUST be rejected. **Thirty-five names are listed
+below**: twenty-five **run**, and ten (`blob.grant`, `client.register`, `authz.login`,
 `authz.redeem`, `authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse`
 and `authz.grant`) are **decided, not running** — `blob.grant` by F5, the other nine by the 0.3
 freeze for the container's authorization server (`authorization-server.md` §5, §9.3, §11.9 and §12;
 [0.3 · 29, 31, 33, 36], #140, #144), which contract v1.1 retires (below). `config.set` runs since
 `egzos config set` and `egzos link` (`container.md` §8; [0.3 · 40]); `identity.grant` and
-`identity.revoke` run with the grants they record (`identity.md` §4); and `rest.tally` and
-`authz.release` run with the REST door's throttle (`rest.md` §2 item 7, the Chief on #165). The
-typed vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it
-— carries **all thirty-three**, the ten included: `AuditEntry.event` is typed `Event`, and each
-emitter needs its member on the day it lands. So a validator written against `EVENTS` accepts an
-append under any of the ten today, and **nothing in this tree rejects one** — what is not running is
-the *emitter*: no code path mints a `BlobGrant`, serves an AS page, or registers a client, so no
-such entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted here
-because a count that disagrees with its own table, or with the constant beside it, is the kind of
-drift a reader resolves by guessing.
+`identity.revoke` run with the grants they record (`identity.md` §4); `rest.tally` and
+`authz.release` run with the REST door's throttle (`rest.md` §2 item 7, the Chief on #165); and
+`gate.pass.confirmed` and `item.copy` run with the REST door's confirm and copy (`rest.md` §4.2,
+v0.7 §V). The typed vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple
+derived from it — carries **all thirty-five**, the ten included: `AuditEntry.event` is typed
+`Event`, and each emitter needs its member on the day it lands. So a validator written against
+`EVENTS` accepts an append under any of the ten today, and **nothing in this tree rejects one** —
+what is not running is the *emitter*: no code path mints a `BlobGrant`, serves an AS page, or
+registers a client, so no such entry is ever produced. `ledger.py` imports this tuple rather than
+restating it. Counted here because a count that disagrees with its own table, or with the constant
+beside it, is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|
@@ -64,6 +65,8 @@ drift a reader resolves by guessing.
 | `rest.tally` | a window closes in which the REST door's throttle admitted a 401 or a refused redemption that names no caller (`rest.md` §2) | running |
 | `identity.grant` | a user grant or an agent registration is written, `kind: user · agent`, or a narrowing of the last admin grant is refused (`identity.md` §4) | running |
 | `identity.revoke` | a grant or registration is revoked, or the last admin grant's revoke is refused (`identity.md` §4) | running |
+| `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
+| `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.

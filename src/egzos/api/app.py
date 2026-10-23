@@ -9,9 +9,11 @@ Every request passes the door in one order: CORS preflight, the throttle (§2 it
 under the same three headers, and every refusal that turns on what exists or what the token may do
 is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSON string, and data.
 
-The routes gated by the confirm (move, copy, approve, deny, promote), the grant and credential
-routes (§4.3), upload (§4.4) and `BlobGrant` redemption (§6) land with their own code; until then
-those paths are undeclared and answer §3's refusal, like any other undeclared path.
+The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
+promote — answer in two legs on one route: the first issues a challenge and says who would newly
+see the item, the second spends it with a proof, and the act lands in the same transaction. The
+grant and credential routes (§4.3), upload (§4.4) and `BlobGrant` redemption (§6) land with their
+own code; until then those paths are undeclared and answer §3's refusal, like any other.
 """
 
 from __future__ import annotations
@@ -32,6 +34,7 @@ from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
+from egzos.trust import HumanOnly, TrustError
 
 #: §3: the four lines every answer of this door carries (Content-Type is the response's own).
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
@@ -414,6 +417,185 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, ref)
             return refusal()
         return _json(200, {"node": d.node(node)})
+
+    # -- the confirm (§4.2) ---------------------------------------------------------------------
+    def names(delta: list[dict[str, Any]]) -> list[str]:
+        """Who would newly see it: each grant's or registration's display name, a token's client."""
+        granted = {t.id: t for t in c.identity.audience_tokens()}
+        return [granted[m["token"]].name if m["token"] in granted else m["client"] for m in delta]
+
+    def first_leg(token: Token, *, act: str, subject: str, destination: str | None,
+                  delta: list[dict[str, Any]]) -> Response:
+        newly = names(delta)
+        # Showing who would newly see an item is a read of credential metadata (§4.2 item 2).
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, subject=subject, items=[], layers=[], withheld=0,
+                        confirm_for=act, newly=newly)
+        return _json(200, c.confirm.issue(token, act=act, subject=subject,
+                                          destination=destination,
+                                          delta=[m["token"] for m in delta], newly=newly))
+
+    def presented(body: dict[str, Any]) -> dict[str, Any] | None:
+        value = body.get("confirm")
+        if value is None:
+            return None
+        if (not isinstance(value, dict) or set(value) - {"challenge", "proof", "assertion"}
+                or not isinstance(value.get("challenge"), str)
+                or value.get("proof") not in ("biometric", "button")):
+            raise Invalid
+        return value
+
+    class Refused(Exception):
+        """The act the confirm was for cannot land: everything rolls back, the answer is §3's."""
+
+    async def move_or_copy(request: Request, item_id: str, act: str) -> Response:
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        body = await _object(request, {"to", "confirm"}, {"to"})
+        ref = _str(body["to"])
+        proof = presented(body)
+        item = c.store.get(item_id)
+        to = d.scope(token, ref)
+        if item is None or to is None:
+            d.probe(token, item_id)
+            return refusal()
+        try:
+            _frm, delta = c.trust.gate(item, to, token=token, act=act)
+        except TrustError:
+            d.probe(token, item_id)
+            return refusal()
+        if not delta or token.principal != "interactive":
+            # Nobody new would see it: the silent pass. Or a client principal, whose widening act
+            # parks for a person to decide, and whose `confirm` is ignored (§4.2 item 6).
+            r = (c.trust.move if act == "move" else c.trust.copy)(
+                item, to, token=token, actor=token.owner)
+            if r.get("gate") == "pending":
+                return _json(200, {"result": "pending", "proposal": r["proposal"]["id"]})
+            landed = c.store.get(item.id) if act == "move" else r["item"]
+            return _json(200, {"result": "moved" if act == "move" else "copied",
+                               "item": landed.to_dict()})
+        if proof is None:
+            return first_leg(token, act=act, subject=item.id, destination=to.id, delta=delta)
+        try:
+            with c.backend.atomic():
+                # Recomputed under the lock: the confirm binds the delta as it stands now.
+                _frm, delta = c.trust.gate(item, to, token=token, act=act)
+                landed = None
+                if not delta:
+                    # Nobody new would see it any more: the silent pass that is now due, with
+                    # nothing to confirm (a1r on #289).
+                    r = (c.trust.move if act == "move" else c.trust.copy)(
+                        item, to, token=token, actor=token.owner)
+                    landed = c.store.get(item.id) if act == "move" else r["item"]
+                else:
+                    reason = c.confirm.conclude(token, proof, act=act, subject=item.id,
+                                                destination=to.id,
+                                                delta=[m["token"] for m in delta])
+                    if reason is None:
+                        landed = c.trust.confirmed(item, to, token=token, actor=token.owner,
+                                                   act=act, delta=delta,
+                                                   step_up=c.confirm.last_step_up_seq())
+        except (TrustError, HumanOnly):
+            d.probe(token, item_id)
+            return refusal()
+        if landed is None:
+            return first_leg(token, act=act, subject=item.id, destination=to.id, delta=delta)
+        return _json(200, {"result": "moved" if act == "move" else "copied",
+                           "item": landed.to_dict()})
+
+    @app.post("/v1/items/{item_id}/move")
+    async def move(request: Request, item_id: str):
+        return await move_or_copy(request, item_id, "move")
+
+    @app.post("/v1/items/{item_id}/copy")
+    async def copy(request: Request, item_id: str):
+        return await move_or_copy(request, item_id, "copy")
+
+    async def optional_body(request: Request) -> dict[str, Any]:
+        if not await request.body():
+            return {}
+        return await _object(request, {"confirm"}, set())
+
+    async def decide(request: Request, proposal_id: str, act: str) -> Response:
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        proof = presented(await optional_body(request))
+        p = c.backend.get_proposal(proposal_id)
+        if (token.principal != "interactive" or p is None or p["status"] != "open"
+                or not c.trust.decides_over(token, p)):
+            d.probe(token, proposal_id)
+            return refusal()
+        # Approving a parked widening act shows who would newly see it, and the confirm binds that
+        # delta; a denial changes nobody's view (§4.2 item 1; a1r on #289).
+        widens = list(p.get("audience_delta") or []) if act == "approve" else []
+        if proof is None:
+            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
+        outcome: str | None = None
+        result: dict[str, Any] = {}
+        try:
+            with c.backend.atomic():
+                reason = c.confirm.conclude(token, proof, act=act, subject=proposal_id,
+                                            destination=None,
+                                            delta=[m["token"] for m in widens])
+                if reason is None:
+                    try:
+                        if act == "approve":
+                            result = c.trust.execute(proposal_id, token=token, actor=token.owner)
+                            outcome = "executed"
+                        else:
+                            c.trust.deny(proposal_id, token=token, actor=token.owner)
+                            outcome = "denied"
+                    except TrustError as e:
+                        current = c.backend.get_proposal(proposal_id)
+                        if current is None or current["status"] != "stale":
+                            raise Refused from e
+                        outcome = "stale"  # kept: the stale status and its event commit
+        except (Refused, HumanOnly):
+            d.probe(token, proposal_id)
+            return refusal()
+        if outcome is None:
+            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
+        if outcome == "executed":
+            # A move's item is where it went; a copy's is the new one, not its source.
+            made = result.get("copies") or p["items"]
+            landed = c.store.get(made[0])
+            return _json(200, {"result": "executed", "item": landed.to_dict() if landed else None})
+        return _json(200, {"result": outcome})
+
+    @app.post("/v1/pending/{proposal_id}/approve")
+    async def approve(request: Request, proposal_id: str):
+        return await decide(request, proposal_id, "approve")
+
+    @app.post("/v1/pending/{proposal_id}/deny")
+    async def deny(request: Request, proposal_id: str):
+        return await decide(request, proposal_id, "deny")
+
+    @app.post("/v1/items/{item_id}/promote")
+    async def promote(request: Request, item_id: str):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        proof = presented(await optional_body(request))
+        item = c.store.get(item_id)
+        node = c.backend.get_node(item.scope) if item else None
+        if (token.principal != "interactive" or item is None or node is None
+                or item.status != "unverified" or not c.trust.covers(token, node)):
+            d.probe(token, item_id)
+            return refusal()
+        if proof is None:
+            return first_leg(token, act="promote", subject=item.id, destination=None, delta=[])
+        promoted = None
+        try:
+            with c.backend.atomic():
+                reason = c.confirm.conclude(token, proof, act="promote", subject=item.id,
+                                            destination=None, delta=[])
+                if reason is None:
+                    promoted = c.trust.promote(item, token=token, actor=token.owner)
+        except (TrustError, HumanOnly):
+            d.probe(token, item_id)
+            return refusal()
+        if promoted is None:
+            return first_leg(token, act="promote", subject=item.id, destination=None, delta=[])
+        return _json(200, {"result": "promoted", "item": promoted.to_dict()})
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],

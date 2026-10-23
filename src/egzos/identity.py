@@ -47,7 +47,7 @@ JWKS_MAX_BYTES = 64 * 1024
 #: A bearer value longer than this is not a provider token, and is refused before any parsing.
 TOKEN_MAX_CHARS = 16 * 1024
 
-#: §2's keys this module reads, wire spelling. `confirm.allow_button` enters with the confirm.
+#: §2's keys this module reads, wire spelling.
 IDENTITY_KEYS = (
     "identity.issuer",
     "identity.client_id",
@@ -55,6 +55,9 @@ IDENTITY_KEYS = (
     "identity.algorithms",
     "identity.browser_origins",
 )
+#: The keys some code reads, so the only keys `config set` takes: §2's six (`confirm.allow_button`
+#: is the confirm's, `egzos.confirm`).
+SETTABLE_KEYS = (*IDENTITY_KEYS, "confirm.allow_button")
 
 _NO_CLAIM_CHECKS = {
     # PyJWT verifies the signature; the claims are checked below, in §3's order, by this module.
@@ -141,6 +144,12 @@ def validate(key: str, value: Any) -> Any:
         if not isinstance(value, str):
             raise ConfigError(f"{key}: origins, separated by spaces")
         return " ".join(dict.fromkeys(_origin(o, key=key) for o in value.split()))
+    if key == "confirm.allow_button":
+        if isinstance(value, bool):
+            return value
+        if value in ("true", "false"):
+            return value == "true"
+        raise ConfigError(f"{key}: true or false")
     raise ConfigError(f"{key}: not a key this container sets")
 
 
@@ -228,6 +237,8 @@ class GrantToken(Token):
     sub: str = ""
     client_id: str = ""
     acting_for: str | None = field(default=None, compare=False)
+    #: The grant's or registration's display name: untrusted display data (rest.md §4.3).
+    name: str = field(default="", compare=False)
 
 
 def _number(value: Any) -> bool:
@@ -354,6 +365,7 @@ class Identity:
             scopes=list(grant["scopes"]),
             sub=sub,
             client_id=client_id,
+            name=grant.get("name", ""),
         )
 
     def _agent(self, client_id: str, sub: str) -> GrantToken | None:
@@ -375,6 +387,7 @@ class Identity:
             sub=sub,
             client_id=client_id,
             acting_for=f"user:{sub}",
+            name=registration.get("name", ""),
         )
 
     def intersect(self, left: Iterable[str], right: Iterable[str]) -> list[str]:

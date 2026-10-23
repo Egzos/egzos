@@ -301,11 +301,11 @@ must say so explicitly, because scope-free `admin` makes every floor in this sec
 **The freeze's six are decided, not running**: nothing sets them, and each is a constant in
 `model.py`. F1 needs **two** configurable values, F2 and F5 one each, and R11 **two** more, so the
 freeze introduced **one object** rather than six ad-hoc settings, defined here. Contract v1.1 adds
-the provider's five (`identity.md` §2), and those **run**: `egzos config set` and `egzos link` set
-them, `config.set` records each change, and the identity code reads them on every request. That
-is **eleven keys**; the table below has eleven rows. (The counts are spelled out because a sentence
-here once outlived its table.) `confirm.allow_button` and `blobs.upload_max_bytes` join the table
-with the code that reads them. Only a key some code reads is settable: a key set but never read
+the provider's five and the confirm's one (`identity.md` §2), and those **run**: `egzos config
+set` and `egzos link` set them, `config.set` records each change, and the identity and confirm
+code reads them on every request. That is **twelve keys**; the table below has twelve rows. (The
+counts are spelled out because a sentence here once outlived its table.) `blobs.upload_max_bytes`
+joins the table with the code that reads it. Only a key some code reads is settable: a key set but never read
 would tell the owner something false.
 
 | key | default | applies at | may a deployment change it? |
@@ -321,6 +321,7 @@ would tell the owner something false.
 | `identity.audience` | `authenticated` | container | **yes** — the `aud` an access token must carry (`identity.md` §3) |
 | `identity.algorithms` | `ES256 RS256` | container | **yes** — asymmetric algorithms only; never `none`, never `HS*` |
 | `identity.browser_origins` | `https://egzos.io` | container | **yes** — the origins the REST door answers CORS for (`identity.md` §6) |
+| `confirm.allow_button` | `true` | container | **yes** — whether the confirm accepts the button; `false` requires Face ID / Touch ID (`identity.md` §5) |
 
 A deployment that omits the object gets the defaults, and the defaults are exactly what the skeleton
 runs as constants — so `between` + floor `project` + 64 KiB is both the shipped default and the

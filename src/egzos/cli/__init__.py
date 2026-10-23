@@ -703,7 +703,7 @@ def config_set(
     unset: bool = typer.Option(False, "--unset", help="Set the key to absent"),
 ):
     """Change one setting: an admin act, recorded as `config.set`. Only the keys this version
-    reads are settable (the identity.* keys); the others are still built-in constants."""
+    reads are settable (identity.*, confirm.allow_button); the others are built-in constants."""
     c = _container()
     token = _admin(c, "changing the config")
     if unset == (value is not None):
