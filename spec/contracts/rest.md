@@ -238,7 +238,7 @@ spec's job).
 | `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
 | `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
 | `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
-| `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener, or an admin | — (new) | `upload.discard` |
+| `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener; for an orphan, also the person an agent opener serves (v0.7 §AC); or an admin | — (new) | `upload.discard` |
 | `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
 | `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |

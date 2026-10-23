@@ -1,6 +1,7 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""Artifact upload at the REST door (rest.md §4.4): open, bytes, item, the orphan, its discard."""
+"""Artifact upload at the REST door (rest.md §4.4): open, bytes, item, the orphan, its discard, and
+what a person holds with every agent serving them (v0.7 §AC)."""
 
 from __future__ import annotations
 
@@ -8,11 +9,14 @@ import hashlib
 import threading
 import time
 
+import jwt
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
 from egzos.api.app import create_app
 from egzos.container import OWNER, Container
+from egzos.identity import Jwks
 from egzos.store.items import StoreError
 from egzos.store.uploads import MAX_HELD, UPLOAD_TTL_SECONDS
 
@@ -20,6 +24,7 @@ NOT_FOUND = b'{"error":"not_found"}'
 INVALID = b'{"error":"invalid_request"}'
 KW = {"actor": OWNER, "principal": "interactive"}
 DATA = b"a note, as a file\n"
+ISSUER = "https://project.supabase.co/auth/v1"
 
 
 class Clock:
@@ -48,8 +53,37 @@ def notes(c):
     return c.nodes.create("project", "notes", c.nodes.user_root(), token=c.owner, **KW)
 
 
+@pytest.fixture
+def sign(c):
+    """Provider sign-ins (identity.md §3): alice and bob granted here, two agents serving alice."""
+    key = ec.generate_private_key(ec.SECP256R1())
+    jwk = {**jwt.algorithms.ECAlgorithm.to_jwk(key.public_key(), as_dict=True), "kid": "k1",
+           "alg": "ES256"}
+    c.set_config("identity.issuer", ISSUER, token=c.owner)
+    c.set_config("identity.client_id", "box", token=c.owner)
+    jwks = Jwks("x", fetch=lambda url: {"keys": [jwk]})
+    c.identity._jwks_for = lambda url: jwks
+    for sub in ("alice", "bob"):
+        c.identity.grant_user(sub, name=sub, role="contributor", scopes=["*"], **KW)
+    for client_id in ("a1", "a2"):
+        c.backend.put_agent_registration({
+            "client_id": client_id, "sub": "alice", "name": client_id,
+            "capabilities": ["fetch", "remember"], "scopes": ["*"],
+            "created_at": "2026-10-23T00:00:00Z", "revoked": False})
+
+    def headers(sub, client_id="box"):
+        now = int(time.time())
+        claims = {"iss": ISSUER, "aud": "authenticated", "exp": now + 600, "iat": now,
+                  "sub": sub, "client_id": client_id}
+        value = jwt.encode(claims, key, algorithm="ES256", headers={"kid": "k1"})
+        return {"Authorization": f"Bearer {value}"}
+
+    return headers
+
+
 def _auth(token) -> dict[str, str]:
-    return {"Authorization": f"Bearer {token.secret}"}
+    """A container token's bearer header; a provider sign-in's headers pass through as they are."""
+    return token if isinstance(token, dict) else {"Authorization": f"Bearer {token.secret}"}
 
 
 def _agent(c, role="contributor", scopes=("*",)):
@@ -161,12 +195,18 @@ def test_an_open_where_the_caller_may_not_write_is_the_refusal(c, door, notes):
     assert len(_events(c, "context.fetch")) == before + 3
 
 
-def test_a_principal_holds_at_most_sixteen(c, door, notes):
+def test_each_container_token_holds_its_own_sixteen(c, door, notes, sign):
     ids = [_open(door, c.owner, notes.id).json()["upload"] for _ in range(MAX_HELD)]
     r = _open(door, c.owner, notes.id)
     assert (r.status_code, r.json()) == (429, {"error": "too_many_uploads"})
     assert r.headers["cache-control"] == "no-store"
-    # Another principal's count is its own.
+    # Another container token is a person of its own, even one naming a signed-in person as its
+    # owner, and that person's own sign-in counts apart from it.
+    tab = c.auth.mint(principal="interactive", owner="user:alice", client="tab",
+                      role="contributor", scopes=["*"], actor=OWNER, by_principal="interactive")
+    assert {_open(door, tab, notes.id).status_code for _ in range(MAX_HELD)} == {200}
+    assert _open(door, tab, notes.id).status_code == 429
+    assert _open(door, sign("alice"), notes.id).status_code == 200
     assert _open(door, _agent(c), notes.id).status_code == 200
     # An open upload with nothing staged lapses at the hour; discarding one frees it sooner.
     assert door.delete(f"/v1/uploads/{ids[0]}", headers=_auth(c.owner)).status_code == 200
@@ -183,6 +223,23 @@ def test_an_agents_staged_artifacts_hold_their_slots_until_a_person_decides(c, d
     assert _open(door, agent, notes.id).status_code == 429
     c.trust.promote(c.store.get(items[0]), token=c.owner, actor=OWNER)
     assert _open(door, agent, notes.id).status_code == 200
+
+
+def test_a_person_and_every_agent_serving_them_share_one_sixteen(c, door, notes, sign):
+    alice, a1, a2 = sign("alice"), sign("alice", "a1"), sign("alice", "a2")
+    opened = [_open(door, (alice, a1, a2)[n % 3], notes.id) for n in range(MAX_HELD)]
+    assert {r.status_code for r in opened} == {200}
+    for h in (alice, a1, a2):
+        r = _open(door, h, notes.id)
+        assert (r.status_code, r.content) == (429, b'{"error":"too_many_uploads"}')
+    # Another person, and a container token, count apart.
+    assert _open(door, sign("bob"), notes.id).status_code == 200
+    assert _open(door, c.owner, notes.id).status_code == 200
+    # A slot one agent of theirs frees, any of their principals may take.
+    held = opened[1].json()["upload"]  # a1's
+    assert door.delete(f"/v1/uploads/{held}", headers=a1).status_code == 200
+    assert _open(door, a2, notes.id).status_code == 200
+    assert _open(door, a1, notes.id).status_code == 429
 
 
 def test_two_concurrent_opens_never_both_take_the_last_slot(tmp_path):
@@ -310,6 +367,42 @@ def test_an_orphan_is_listed_to_its_opener_and_an_admin_and_discarded(c, door, n
     assert entry["details"]["opener"] == "user:bo"
     assert door.get("/v1/pending", headers=_auth(person)).json()["uploads"] == []
     assert door.delete(f"/v1/uploads/{uid}", headers=_auth(person)).content == NOT_FOUND
+
+
+def _refused_as_unknown(c, door, headers, uid):
+    """A `DELETE` of `uid` answers, and appends, what one of an id nobody holds does."""
+    reads = len(_events(c, "context.fetch"))
+    unknown = door.delete("/v1/uploads/nope", headers=headers)
+    r = door.delete(f"/v1/uploads/{uid}", headers=headers)
+    assert (r.status_code, r.content, r.headers) == (404, NOT_FOUND, unknown.headers)
+    nope, foreign = _events(c, "context.fetch")[reads:]
+    for entry in (nope, foreign):  # the same entry, but for the id it names and its chain place
+        for key in ("ts", "seq", "prev_hash", "hash"):
+            entry.pop(key)
+    assert (nope["details"].pop("ref"), foreign["details"].pop("ref")) == ("nope", uid)
+    assert foreign == nope and foreign["details"]["items"] == []
+
+
+def test_the_served_person_lists_and_discards_their_agents_orphan(c, door, notes, sign):
+    alice, a1, bob = sign("alice"), sign("alice", "a1"), sign("bob")
+    uid = _upload(door, a1, notes.id)
+    bobs = _upload(door, bob, notes.id, data=b"bob's own")
+    _refused_as_unknown(c, door, alice, uid)  # still open: only its opener's to discard (§4.4)
+    c.clock.now += UPLOAD_TTL_SECONDS
+
+    def listed(h):
+        return [u["upload"] for u in door.get("/v1/pending", headers=h).json()["uploads"]]
+
+    assert (listed(alice), listed(bob)) == ([uid], [bobs])
+    assert listed(_auth(c.owner)) == [uid, bobs]  # an admin over everything: every principal's
+    # Another person, or the person's other agent, gets what an id nobody holds gets, and its read.
+    for h in (bob, sign("alice", "a2")):
+        _refused_as_unknown(c, door, h, uid)
+    assert door.delete(f"/v1/uploads/{uid}", headers=alice).json() == {"result": "discarded"}
+    entry = _events(c, "upload.discard")[-1]
+    assert (entry["actor"], entry["details"]["opener"], entry["details"]["bytes_deleted"]) == (
+        "user:alice", "agent:a1", True)
+    assert (listed(alice), listed(bob)) == ([], [bobs])
 
 
 def test_a_discard_keeps_bytes_another_upload_still_holds(c, door, notes):

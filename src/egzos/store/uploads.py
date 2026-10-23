@@ -8,7 +8,9 @@ are staged, never `put`, so staging never answers whether the content already ex
 written `unverified` like every write. A person's bytes are promoted with the item, an agent's stay
 staged until a person promotes it. The bytes and the item are two spends of one id, each an atomic
 check-and-mark. Nothing staged is deleted on a timer (v0.7 §Z): an upload that expired with its
-bytes staged is an orphan, listed to its opener and to an admin until one of them discards it.
+bytes staged is an orphan, listed to its opener, an agent's to the person it serves, and to an admin
+until one of them discards it. What a person holds is capped once for them and every agent serving
+them (v0.7 §AC).
 """
 
 from __future__ import annotations
@@ -29,7 +31,8 @@ from egzos.store.items import Store
 
 #: §4.4 item 2: an upload's id is live for an hour after it is opened.
 UPLOAD_TTL_SECONDS = 3600
-#: §4.4 item 1: uploads a principal may hold open, orphaned, or written but still staged.
+#: §4.4 item 1: uploads a person may hold open, orphaned, or written but still staged, counting
+#: every agent serving them; a container `Token` is a person of its own.
 MAX_HELD = 16
 NAME_MAX = 255
 MIME_MAX = 127
@@ -40,7 +43,18 @@ _ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 
 class TooManyUploads(Exception):
-    """§4.4 item 1: the caller already holds `MAX_HELD` uploads. A fact about its own uploads."""
+    """§4.4 item 1: the caller's person already holds `MAX_HELD` uploads. A fact about their own."""
+
+
+def person_of(principal: str, actor: str) -> str:
+    """Whose upload it is (§4.4, v0.7 §AC), from the opener's `Token.id` and `owner`, both recorded
+    at open. An agent's principal is `agent:<client_id>:<sub>` and its owner `agent:<client_id>`
+    (identity.md §3a), so it serves `user:<sub>`: the owner is stripped as a prefix, never split on
+    a colon. Anything else is its own person: a person is `user:<sub>`, and a container `Token`'s id
+    is a ULID, whatever owner it names."""
+    if principal.startswith("agent:") and principal.startswith(actor + ":"):
+        return "user:" + principal[len(actor) + 1:]
+    return principal
 
 
 def valid_open(name: Any, mime: Any, size: Any, sha256: Any, *, limit: int) -> bool:
@@ -84,8 +98,8 @@ class Uploads:
         return item if item is not None and item.status != "verified" else None
 
     def holds(self, record: UploadRecord) -> bool:
-        """Whether `record` takes one of its principal's `MAX_HELD` slots: open, orphaned, or
-        written as an artifact whose bytes are still staged. A person's decision frees a slot."""
+        """Whether `record` takes one of its person's `MAX_HELD` slots: open, orphaned, or written
+        as an artifact whose bytes are still staged. A person's decision frees a slot."""
         if record["discarded"]:
             return False
         if record["item"] is None:
@@ -95,6 +109,17 @@ class Uploads:
     def orphan(self, record: UploadRecord) -> bool:
         return (not record["discarded"] and record["staged"] and record["item"] is None
                 and self.expired(record))
+
+    def opened(self, token: Token, record: UploadRecord) -> bool:
+        """Whether `token` opened `record`: the `Token.id` and `owner` recorded at open."""
+        return record["principal"] == token.id and record["actor"] == token.owner
+
+    def answers_to(self, token: Token, record: UploadRecord) -> bool:
+        """Whether `record` is listed to and discarded by `token` short of admin: its opener, and
+        once it is an orphan, the person an agent opener serves (§4.4: an open upload is its
+        opener's). Never another agent of that person."""
+        return self.opened(token, record) or (
+            self.orphan(record) and token.id == person_of(record["principal"], record["actor"]))
 
     # -- 1 · open -------------------------------------------------------------------------------
     def open(self, token: Token, *, scope: Node, name: str, mime: str, size: int,
@@ -117,9 +142,12 @@ class Uploads:
             "promoted": False,
             "discarded": False,
         }
+        mine = person_of(token.id, token.owner)
         with self.backend.atomic():
-            # Counted and written under one lock: two concurrent opens never both take slot 16.
-            held = [r for r in self.backend.list_uploads(token.id) if self.holds(r)]
+            # Counted for the person and written under one lock: two concurrent opens never both
+            # take slot 16, whichever of that person's principals make them.
+            held = [r for r in self.backend.list_uploads()
+                    if person_of(r["principal"], r["actor"]) == mine and self.holds(r)]
             if len(held) >= MAX_HELD:
                 raise TooManyUploads
             self.backend.put_upload(record)
@@ -128,7 +156,7 @@ class Uploads:
     def live(self, token: Token, upload_id: str) -> UploadRecord | None:
         """The caller's own upload, unexpired and not discarded; None for every other case."""
         record = self.backend.get_upload(upload_id)
-        if (record is None or record["principal"] != token.id or record["discarded"]
+        if (record is None or not self.opened(token, record) or record["discarded"]
                 or self.expired(record)):
             return None
         return record
@@ -187,13 +215,13 @@ class Uploads:
 
     # -- the orphan's discard -------------------------------------------------------------------
     def discard(self, token: Token, upload_id: str, *, admin: bool) -> bool:
-        """Discard an upload no item was written from — the caller's own, or as an admin anyone's —
-        with its staged bytes, unless another upload still holds the same bytes. False is §3's
-        refusal."""
+        """Discard an upload no item was written from — the caller's own, an orphan an agent serving
+        the caller opened, or as an admin anyone's — with its staged bytes, unless another upload
+        still holds the same bytes. False is §3's refusal."""
         with self.backend.atomic():
             record = self.backend.get_upload(upload_id)
             if (record is None or record["discarded"] or record["item"] is not None
-                    or (record["principal"] != token.id and not admin)):
+                    or not (admin or self.answers_to(token, record))):
                 return False
             delete = record["staged"] and not self._shared(record)
             self.backend.put_upload({**record, "discarded": True})
@@ -217,9 +245,10 @@ class Uploads:
 
     # -- what `GET /v1/pending` lists ------------------------------------------------------------
     def orphans(self, token: Token, *, admin: bool) -> list[UploadRecord]:
-        """The orphans the caller may see: its own, or as an admin every principal's."""
-        records = self.backend.list_uploads(None if admin else token.id)
-        return [r for r in records if self.orphan(r)]
+        """The orphans the caller may see: its own and its agents', or as an admin every
+        principal's."""
+        return [r for r in self.backend.list_uploads()
+                if self.orphan(r) and (admin or self.answers_to(token, r))]
 
     def staged_items(self) -> set[str]:
         """The ids of artifact items whose bytes are still staged."""

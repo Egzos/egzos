@@ -42,9 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bytes (`PUT /v1/uploads/{id}`, checked for length and sha256), then write the item (`POST
   /v1/items` with `kind: artifact`). A person's file is stored at once; an agent's stays staged and
   unreadable until a person promotes it. Nothing staged is deleted on a timer: an upload that
-  expired with its bytes sent is listed under `uploads` in `/v1/pending` until its opener or an
-  admin discards it (`DELETE /v1/uploads/{id}`), and an agent's file still waiting after
-  `blobs.staging_retention_days` is listed under `staged`. One caller holds at most 16 uploads
+  expired with its bytes sent is listed under `uploads` in `/v1/pending` until its opener, the
+  person an agent opener serves, or an admin discards it (`DELETE /v1/uploads/{id}`), and an agent's
+  file still waiting after `blobs.staging_retention_days` is listed under `staged`. A person and
+  every agent serving them share one cap, and each container token keeps its own: at most 16 uploads
   nobody has decided on; `blobs.upload_max_bytes` (100 MiB) caps each.
 - **Agents connect over the internet: MCP over Streamable HTTP at `/mcp`** (`identity.md` §7), on
   the door `egzos serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
