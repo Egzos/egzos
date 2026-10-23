@@ -73,9 +73,11 @@ only: the value `events.md` §2 writes when an append has no caller to name —
 split: `Principal` is the three words, `TokenPrincipal` the two a `Token`, an `AudienceMember` or an
 item's provenance may carry.
 
-- **Amended by `identity.md` (v1.1):** a provider session token without `client_id` is
-  `principal: interactive`, one with `client_id` is `principal: client` (`identity.md` §4); the AS
-  login below is retired.
+- **Amended by `identity.md` (v1.1):** a provider token is accepted only when it is bound to this
+  container (`identity.md` §3a, check 6): one issued to the container's own client is
+  `principal: interactive`, one issued to an agent client registered here is `principal: client`, and
+  a bare provider session, with no `client_id`, is refused (`identity.md` §3, §4). The AS login below is
+  retired.
 - `principal: interactive` — established, for browser sessions, by the login PKCE performs against
   the container. The flow is `authorization-server.md` §2; **where in it the principal is established
   is issue #61** (Part B, presence composition), as `container.md` §9 already says. In the skeleton

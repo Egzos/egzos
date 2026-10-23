@@ -50,8 +50,9 @@ under one path prefix, `/v1/`. **decided** (v0.7 §S; `identity.md` §1): there 
 server on the container; tokens come from the container's identity provider, or are the container's
 own.
 
-- **Clients:** any program holding a container `Token` or a provider access token, and browser
-  clients holding the user's provider session: egzos.io, or any fork's UI. The lifeboat is not a
+- **Clients:** any program holding a container `Token` or a provider access token bound to this
+  container (`identity.md` §3a), and browser clients holding such a token for the person: egzos.io, or
+  any fork's UI. A bare provider session is never accepted. The lifeboat is not a
   client of this door; it is in-process on its own host (`spec/design/lifeboat.md`).
 - **TLS.** Plain HTTP only when the listening socket is bound to loopback, decided from the socket and
   never from a forwarded header ([0.3 · 9], frozen for the retired AS and owned here now). A door that
@@ -66,9 +67,9 @@ own.
 2. **Two credentials are accepted** (`identity.md` §1): a live container `Token` (`capabilities.md`
    §3, §5), or a provider access token that passes `identity.md` §3, which maps it to a principal and
    a grant (§4 there). **decided** (v0.7 §S, §T).
-3. **No cookie is ever a credential here.** A browser client presents the user's provider access
-   token as the bearer (`identity.md` §6). A request carrying only a cookie is unauthenticated.
-   **decided.**
+3. **No cookie is ever a credential here.** A browser client presents, as the bearer, the token the
+   provider issued for this container's client (`identity.md` §3a, §6), never the user's session. A
+   request carrying only a cookie is unauthenticated. **decided.**
 4. **Liveness is checked on every request, at request time**: for a `Token`, revocation before the
    capability set (`capabilities.md` §5), then `expires_at`; for a provider token, every check of
    `identity.md` §3, the grant included. A token or grant revoked between two requests fails the

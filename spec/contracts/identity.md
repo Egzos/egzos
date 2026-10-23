@@ -82,7 +82,8 @@ egzos account out of someone else's container.
 
 ### 3a · Every token is bound to one container
 
-**a1p**, closing a1r's finding 1 on #282, and the reason for check 6. A provider session is valid at every
+**decided** (v0.7 §AA, which amends §S's mapping and §T's "the browser presents the session directly";
+recorded on a1r's and a6's review of #282), and the reason for check 6. A provider session is valid at every
 container that trusts the provider, and the shared audience (`authenticated`) does not tell containers
 apart; the provider issues no resource indicators. A container that received a person's session could
 therefore present it at another container the same person can reach. So no container accepts a bare
@@ -99,8 +100,10 @@ session. Each token is bound to one container through the provider's own OAuth 2
   resource (`/mcp` of one container, §7), and a container accepts only a `client_id` registered here.
 - **A token for one container is refused at every other**, at check 6, with the one `401`.
 
-**The audit entry may say which check failed; the response may not** (`capabilities.md` §6 clause 3).
-**carried.**
+**A failed check appends no entry of its own**: the request is unauthenticated (`rest.md` §2 clauses 5
+and 6), and the container appends no entry naming a caller it could not verify, whichever check failed.
+The `rest` throttle counts it and the window's `rest.tally` records it (`rest.md` §2 clause 7), so a
+sweep with forged, foreign, unbound or ungranted tokens leaves its trace there. **a1p.**
 
 ## 4 · Grants: who may do what here
 
@@ -110,7 +113,7 @@ never delegated (F3):
 
 ```
 UserGrant          { sub, capabilities, scopes, created_at, revoked }
-AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked }
+AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, revoked }
 ```
 
 - **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
@@ -132,6 +135,10 @@ AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked 
 - **Principal.** A token whose `client_id` is this container's own (`identity.client_id`) is a person:
   `principal: interactive`. A token whose `client_id` names a registered agent is that agent acting for
   the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
+- **An agent registration serves the one user who approved it.** It carries that user's `sub`, and a
+  token naming the registration's `client_id` with any other `sub` is refused at check 7: another user
+  who authorizes the same agent at the provider gets their own registration, approved by them, or
+  nothing. **a1p** (a1r on #282).
 - **What a request may do.** For a session: the user grant's capabilities and scopes. For an agent: the
   registration's, **intersected** with the user grant's — an agent never holds more than the user it acts
   for. Coverage is computed down the path at check time, as for a `Token` (`capabilities.md` §5).
@@ -159,8 +166,11 @@ AgentRegistration  { client_id, name, capabilities, scopes, created_at, revoked 
     spends once. Face ID, Touch ID and Windows Hello are this proof. **decided** (§U), **a1p** the
     binding.
   - `button` — an explicit confirm, for a device with no user-verifying authenticator. **decided** (§U).
-- **The button is a human act: it is refused to `principal: client`**, from either credential, always.
-  An agent driving a browser cannot confirm on the human's behalf. **decided** (§U, as amended on #281).
+- **The button is refused to `principal: client`**, from either credential, always: an agent's token
+  cannot confirm on the human's behalf. **decided** (§U, as amended on #281). That is all the refusal
+  achieves. Software that drives a person's own browser session holds an `interactive` token
+  (`capabilities.md` §4 records that gap) and can press a button; **the biometric proof is the real
+  backstop**, and an owner who wants it everywhere sets `confirm.allow_button` to `false`. **a1p.**
 - **The owner may require the stronger proof**: `confirm.allow_button` (§2) at `false` accepts only
   `biometric`. **a1p.**
 - **The window** is `step_up.window_seconds`, per ring pair and manifest shape, unchanged. **carried**
