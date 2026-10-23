@@ -391,8 +391,10 @@ external boundary (§5). **a1p**, the `bool`: the record fixes who sees the resu
 **decided, not running**: the skeleton returns `None`.
 
 **Deletion. [0.3 · 44]** v1.0 **never deletes promoted bytes** behind a tombstoned item: the audit
-chain keeps referring to the address. **Staged bytes are purged** after
-`blobs.staging_retention_days` (30 by default, `container.md` §8). An owner purge act for promoted
+chain keeps referring to the address. **Staged bytes are never purged on a timer** (v0.7 §Z, amending
+R11): past `blobs.staging_retention_days` (30 by default, `container.md` §8) they are surfaced to
+their owner, who promotes the item or tombstones it, and only a tombstone deletes staged bytes
+(`rest.md` §4.4). An owner purge act for promoted
 bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
 
 ## 5 · Silence-not-errors at the storage boundary
