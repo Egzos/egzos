@@ -365,11 +365,11 @@ AD. AMENDMENT — CONFIRM CREDENTIALS FOLLOW GITHUB'S SUDO MODEL (amends §U:
 ================================================================================
 AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
     WHILE egzos.io IS UNBOUGHT (amends identity.md §3a's egzos.io callback
-    for an interim; Egzos/egzos#NNN)
+    for an interim; Egzos/egzos#298)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
-          questions; recorded by the operator, enacted by #NNN's merge; the
+          questions; recorded by the operator, enacted by #298's merge; the
           Chief may veto by reverting.
 
 [DECIDED] THE APP LIVES ON THE HOMEPAGE'S ORIGIN, at /app; the live demo
