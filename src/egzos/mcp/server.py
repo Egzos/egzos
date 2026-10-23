@@ -189,7 +189,9 @@ def build_server(container: Container, token: Token):
         if token is None:
             return NOT_LIVE
         inbox = nodes.inbox()
-        if inbox is None or not container.trust.covers(token, inbox):
+        # Listing is reading: `fetch` AND coverage, as every read path gates — one silent answer
+        # whichever is missing.
+        if inbox is None or not token.has("fetch") or not container.trust.covers(token, inbox):
             _probe(token, "inbox")
             return json.dumps({"banner": DATA_BANNER, "items": []})  # silence-not-errors
         # Served, not shown: quarantined never, rules verified-only — the same policy as fetch.
