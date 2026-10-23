@@ -1,8 +1,8 @@
 # Contract · the REST door
 
 **Status: contract v1.1 — law from the Chief's merge of the commit that set this line** (2026-10-23,
-decisions v0.7; tracking #283). Opened as a draft at the Phase 2 boundary (#42) and reviewed through
-#282 and this PR by the Chief, a1r and a6-adversary; a builder now implements against it. Where it and
+decisions v0.7; tracking #283). Opened as a draft at the Phase 2 boundary (#42); from that merge a
+builder implements against it. Where it and
 another contract disagree, the disagreement is a finding against whichever is newer, raised before
 either is built.
 
@@ -236,12 +236,11 @@ spec's job).
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
 | `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls` | `context.fetch` |
 | `POST /v1/items` | write a text item; it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add` |
-| `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`, or `step_up` and `gate.pass.confirmed`, or `gate.propose` |
-| `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | `item.copy` with `gate.pass.silent`, or `step_up` and `gate.pass.confirmed`, or `gate.propose` |
-| `POST /v1/confirm/challenge` | a fresh WebAuthn challenge bound to one act (§4.2) | an `interactive` principal | — (new: `identity.md` §5) | none |
-| `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm | an `interactive` principal that decides over it | `egzos trust approve` | `step_up`, then `approval.execute` or `approval.stale` |
-| `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `step_up`, `approval.deny` |
-| `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `step_up`, `approval.promote` |
+| `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
+| `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
+| `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
+| `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
+| `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -309,10 +308,9 @@ the row does not name is `400` (§3).
 | `POST /v1/items` | `{"body", "kind"?, "scope"?, "key"?, "tags"?}` | `{"item": <item>}` |
 | `POST /v1/items/{id}/move` | `{"to", "confirm"?}` | `{"result": "moved", "item": <item>}`, `{"result": "confirm", …}` (§4.2) or `{"result": "pending", "proposal": <id>}` |
 | `POST /v1/items/{id}/copy` | `{"to", "confirm"?}` | `{"result": "copied", "item": <item>}` (the new copy), `{"result": "confirm", …}` or `{"result": "pending", "proposal": <id>}` |
-| `POST /v1/confirm/challenge` | `{"act", "subject", "to"?}` | `{"challenge": <id>, "webauthn": <PublicKeyCredentialRequestOptions> \| null, "expires_at"}` |
-| `POST /v1/pending/{proposal}/approve` | `{"confirm"}` | `{"result": "executed", "item": <item>}` or `{"result": "stale"}` |
-| `POST /v1/pending/{proposal}/deny` | `{"confirm"}` | `{"result": "denied"}` |
-| `POST /v1/items/{id}/promote` | `{"confirm"}` | `{"item": <item>}` |
+| `POST /v1/pending/{proposal}/approve` | `{"confirm"?}` | `{"result": "confirm", …}` (§4.2), then `{"result": "executed", "item": <item>}` or `{"result": "stale"}` |
+| `POST /v1/pending/{proposal}/deny` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "denied"}` |
+| `POST /v1/items/{id}/promote` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "promoted", "item": <item>}` |
 | `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
 | `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
 
@@ -372,7 +370,9 @@ the row does not name is `400` (§3).
    (`container.md` §4 invariant 2). `items` includes an unverified `rule`, as `egzos trust pending`
    and the lifeboat's queue show one today, because promotion is read from this queue: the queue is
    the one place an `interactive` principal reads one, and §3 refuses an unverified rule at every
-   other route. **a1p**, closing #187's `TODO(chief)` on the running behaviour.
+   other route. **decided** by the Chief's merge of this PR, closing #187's `TODO(chief)` on the
+   running behaviour: the one carve-out from "rules are served verified-only", and only to the person
+   who decides whether a rule becomes verified.
 
 10. **`POST /v1/items/{id}/copy`** answers as move does. `copied` carries the new item: a fresh id, the
    destination's scope, `trust.status` `unverified` (the copy is a new write), `provenance.derived_from`
@@ -381,38 +381,53 @@ the row does not name is `400` (§3).
 
 ### 4.2 · The confirm at this door
 
-The confirm (`identity.md` §5) is how a person says yes to something that widens who can see an item.
-**decided** (v0.7 §U); **a1p** the HTTP shape.
+The confirm (`identity.md` §5) is how a person says yes to something that widens who can see an item,
+and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
 
-1. **A move or copy whose audience delta is non-empty, asked by an `interactive` principal holding
-   `publish`, without a `confirm` field**, appends nothing and moves nothing. It answers
-   `{"result": "confirm", "newly": [<name>], "challenge": <id>, "webauthn": <options> | null,
-   "expires_at"}`: `newly` names who would newly see the item — each grant's or registration's display
-   name, the person's own words for them — and the challenge is issued for exactly this act
-   (`act`, `subject`, `to`). The person sees who, and confirms.
-2. **The same request again, with `"confirm": {"challenge": <id>, "proof": "biometric", "assertion":
-   <WebAuthn assertion>}`** — or `"proof": "button"` with no assertion, where `confirm.allow_button` is
-   `true` — completes it: the container verifies the proof (`identity.md` §5), recomputes the delta
-   (it must equal the one the challenge was issued for, or the answer is `confirm` again with the new
-   `newly`), and appends `step_up` (`details.proof`) then `gate.pass.confirmed` (`audience_delta`, the
-   `step_up`'s `seq`), then `item.move` or `item.copy`. A challenge is single use and lives
-   `step_up.window_seconds`, at least 60 seconds; a stale, spent or mismatched one is answered with
-   `confirm` and a fresh challenge, never a distinct error.
-3. **A `client` principal never gets `confirm`.** Its widening move or copy parks as a proposal
-   (`gate.propose`, `pending`) for a person to decide, as today; a `confirm` field from a `client`
-   principal is ignored, never honoured. **decided** (§U: the button is refused to `client`).
-4. **The human-only routes** (approve, deny, promote) take the same `confirm` field and are refused —
-   §3's refusal — to a `client` principal and to a missing, failed or mismatched proof; a
-   `POST /v1/confirm/challenge` for the act gets the challenge first. They append `step_up` before the
-   act's own event.
-5. **`webauthn` is `null`** when the person has registered no credential with this container: only the
-   button is then possible, and an owner who set `confirm.allow_button` to `false` must register one
-   (the registration route arrives with the next contract PR) before any widening act.
-6. **The refusal order holds.** `organize` and coverage are checked before the delta is computed, so a
-   token that may not move the item gets §3's refusal whatever the delta (`container.md` §6).
+1. **Two legs, one route.** A confirm-gated request — a move or copy whose audience delta is
+   non-empty, asked by an `interactive` principal holding `publish`; or approve, deny or promote —
+   sent **without** a `confirm` field moves and decides nothing. After the route's own checks pass
+   (coverage and capability first, `container.md` §6's order, so a token that may not do the act gets
+   §3's refusal whatever the delta), it answers `{"result": "confirm", "newly": [<name>],
+   "challenge": <id>, "webauthn": <options> | null, "expires_at"}`. `newly` names who would newly see
+   the item — each grant's or registration's display name — and is `[]` for approve, deny and promote
+   of an item already in place. The same request sent again **with** `confirm` completes it (item 3).
+   There is no separate challenge route: a challenge exists only as the first leg of the act it is for.
+2. **The first leg is a read, and is audited.** It appends one `context.fetch` with `items: []`,
+   `subject` the item or proposal, and `details: {"confirm_for": <act>, "newly": [<name>]}`: showing
+   who would newly see an item is a read of credential metadata (`events.md` §4 invariant 2). It is
+   served only to the `interactive` principal about to act — the same reader `GET /v1/pending` serves a
+   proposal's audience to.
+3. **The second leg** carries `"confirm": {"challenge": <id>, "proof": "biometric", "assertion":
+   <WebAuthn assertion>}`, or `"proof": "button"` with no assertion where `confirm.allow_button` is
+   `true`. The container then, as **one atomic step** — of two concurrent requests presenting one
+   challenge, at most one proceeds past it, as §6's grant spend:
+   - finds the challenge live, unspent and **bound to this request**: the same principal (the
+     `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
+     and the same audience delta, recomputed now;
+   - verifies the proof (`identity.md` §5);
+   - spends the challenge.
 
-`newly` is credential metadata, served only to the `interactive` principal about to widen the audience
-— the same reader `GET /v1/pending` serves the proposal's audience to. **a1p.**
+   Then it appends `step_up` (`outcome: confirmed`, `details.proof`), the act's gate or approval event
+   (`gate.pass.confirmed` with `audience_delta` and the `step_up`'s `seq`; or `approval.execute` /
+   `approval.stale`, `approval.deny`, `approval.promote`), and `item.move` or `item.copy` where one
+   moved.
+4. **Every proof that is presented and concludes is audited, success or failure.** A stale, spent,
+   foreign or mismatched challenge, a failed assertion, a button where buttons are off, and a delta
+   that changed since the challenge append `step_up` with `outcome: refused`, `details.proof` as
+   presented and `details.reason` (`stale`, `spent`, `foreign`, `mismatch`, `assertion`, `button_off`,
+   `delta_changed`), as `events.md` §1 requires of every concluded presence check. The answer to the
+   caller is the same whatever the reason: `{"result": "confirm", …}` with a fresh challenge (and the
+   new `newly`, where the delta changed). The ledger says which case it was; the response does not
+   (`capabilities.md` §6 clause 3).
+5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.**
+6. **A `client` principal never gets `confirm`.** Its widening move or copy parks as a proposal
+   (`gate.propose`, `pending`) for a person to decide, as today; approve, deny and promote are §3's
+   refusal to it; a `confirm` field from a `client` principal is ignored, never honoured, and appends
+   nothing beyond the route's own refusal or proposal. **decided** (§U).
+7. **`webauthn` is `null`** when the person has registered no credential with this container: only
+   the button is then possible, and an owner who set `confirm.allow_button` to `false` must register
+   one (the registration route arrives with the next contract PR) before any confirm-gated act.
 
 **Not in this door at v1.0:**
 
