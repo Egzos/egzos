@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answers only "Ignored the following versions that require a different python version").
   Homebrew users can install uv with `brew install uv`.
 
+### Removed
+
+- **The container's own authorization server** (`egzos.authz`'s login, consent, device-code, token,
+  revocation and metadata modules, their page templates and their sqlite tables). It was never
+  mounted, and v0.7 retires it: Supabase Auth signs people and agents in, and the container verifies
+  its tokens (`spec/contracts/identity.md`). The MVP step-up tap stays until the Face ID / Touch ID
+  confirm replaces it, and the REST door keeps its throttle counters.
+
 ## [0.1.2] — the CLI works from the home directory (2026-10-09)
 
 ### Fixed

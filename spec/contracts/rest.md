@@ -656,9 +656,9 @@ review:** a grant URL is redeemable by whoever holds it, so the grant is bounded
   no config key, no flag and no client parameter lengthens or shortens it.
 - A leaked `grant_url` is therefore dead after one pull, or after five minutes at most.
 - The spent record is kept until the grant's `expires_at`, keyed on the sha256 of the descriptor's
-  `sig` and never on the `sig` itself: with the other four fields, the `sig` is the credential, as
-  `storage.md` §3.1 keys the AS's single-use state on credential hashes. **a1p.** Where it is
-  persisted joins #165 item 4's batch, beside the grant key.
+  `sig` and never on the `sig` itself: with the other four fields, the `sig` is the credential, and
+  a credential is kept only as its hash, as `Token.secret_hash` is (`model.py`). **a1p.** Where it
+  is persisted joins #165 item 4's batch, beside the grant key.
 
 **The redemption checks, in this order. decided** for each check, **a1p** for the order:
 
@@ -711,8 +711,8 @@ Referrer-Policy: no-referrer
   trace. **decided** (the Chief on #165 item 2, option (b), 2026-10-09); **a1p**, the shape.
 
 **The key.** `TODO(a1p)`, #165 item 4: where the HMAC key is provisioned, stored and rotated.
-Rotation voids every outstanding grant. It is drafted in the #143 batch, with the login secret and
-the device-code key `storage.md` §3.1 names.
+Rotation voids every outstanding grant. It was drafted for the #143 batch beside the authorization
+server's own keys, which retired with it (`identity.md` §9).
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
