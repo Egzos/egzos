@@ -63,6 +63,9 @@ PROOFS = ("biometric", "button")
 #: rest.md §4.2 item 4's closed reasons.
 REASONS = ("stale", "spent", "foreign", "mismatch", "assertion", "button_off", "delta_changed")
 RP_NAME = "egzos"
+#: rest.md §4.3's closed reasons, from the confirm's own (`REASONS`): an add's, and a removal's.
+ADD_REASONS = {"button_off": "button_refused", "assertion": "no_proof"}
+REMOVE_REASONS = {"button_off": "button_refused", "assertion": "assertion"}
 CREDENTIAL_NAME_MAX = 64
 
 
@@ -103,12 +106,15 @@ class Confirm:
         *,
         window_seconds: Callable[[], int],
         clock: Callable[[], float] = time.time,
+        salt: Callable[[], str] = lambda: "",
     ):
         self.state = state
         self.ledger = ledger
         self.config = config
         self.window_seconds = window_seconds
         self.clock = clock
+        # Per container: what a person's WebAuthn user handle is derived with.
+        self.salt = salt
 
     # -- credentials ------------------------------------------------------------------------------
     def credentials(self, person: str, rp_id: str | None = None) -> list[ConfirmCredential]:
@@ -275,7 +281,9 @@ class Confirm:
             rp_id=rp_id,
             rp_name=RP_NAME,
             user_name=name,
-            user_id=hashlib.sha256(person.encode()).digest()[:32],
+            # Salted per container, so no two containers hand an authenticator the same handle
+            # for one person (a1r on #290).
+            user_id=hashlib.sha256(f"{self.salt()}|{person}".encode()).digest()[:32],
             user_display_name=name,
             challenge=challenge["id"].encode(),
             authenticator_selection=AuthenticatorSelectionCriteria(
@@ -292,13 +300,14 @@ class Confirm:
             "webauthn": json.loads(options_to_json(options)),
             "expires_at": challenge["expires_at"],
         }
-        if self.credentials(person):
-            agree = self._challenge(token, act="credential.add", subject=person,
-                                    destination=rp_id, delta=[])
-            out["confirm"] = {
-                "challenge": agree["id"],
-                "webauthn": self._request_options(person, rp_id, agree["id"]),
-            }
+        # The proof the second leg carries: an existing credential's biometric, whose options
+        # list the person's credentials, or for a first credential the button (`webauthn` null).
+        agree = self._challenge(token, act="credential.add", subject=person, destination=rp_id,
+                                delta=[])
+        out["confirm"] = {
+            "challenge": agree["id"],
+            "webauthn": self._request_options(person, rp_id, agree["id"]),
+        }
         return out
 
     def finish_registration(
@@ -346,25 +355,21 @@ class Confirm:
                    origin: str, fresh: bool, owner_surface: bool) -> str | None:
         """rest.md §4.3: a person with a credential adds another only with a biometric proof from
         an existing one; a first credential needs the button and a fresh sign-in, or, where
-        buttons are off, the owner's own surface."""
-        if self.credentials(person):
-            if not isinstance(presented, dict):
-                return "no_proof"
-            if presented.get("proof") != "biometric":
-                self.conclude(token, presented, act="credential.add", subject=person,
-                              destination=rp_id, delta=[], origin=origin, biometric_only=True)
-                return "button_refused"
-            if self.conclude(token, presented, act="credential.add", subject=person,
-                             destination=rp_id, delta=[], origin=origin):
-                return "no_proof"
-            return None
-        if not self.config("confirm.allow_button"):
-            return None if owner_surface else "button_refused"
-        if not isinstance(presented, dict) or presented.get("proof") != "button":
+        buttons are off, the owner's own surface (the lifeboat or the CLI with the owner `Token`;
+        never the REST door). Every proof presented is concluded, so it leaves its `step_up`."""
+        existing = bool(self.credentials(person))
+        if not existing and not self.config("confirm.allow_button") and owner_surface:
+            return None  # buttons off: the owner's own surface, which presents no proof
+        if not isinstance(presented, dict):
             return "no_proof"
-        if not fresh:
+        reason = self.conclude(token, presented, act="credential.add", subject=person,
+                               destination=rp_id, delta=[], origin=origin,
+                               biometric_only=existing)
+        if reason is not None:
+            return ADD_REASONS.get(reason, "stale")
+        if not existing and not (fresh or owner_surface):
             return "not_fresh"
-        return None  # the button, a fresh sign-in, and no credential yet: the first enrolment
+        return None
 
     def _attest(self, person: str, rp_id: str, origin: str, challenge_id: str, attestation: Any,
                 name: str) -> tuple[ConfirmCredential | None, str | None]:

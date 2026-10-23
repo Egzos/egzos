@@ -72,8 +72,14 @@ class Container:
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
         self.confirm = Confirm(
-            self.backend, self.ledger, self.config_value, window_seconds=_step_up_window
+            self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,
+            salt=self._salt,
         )
+
+    def _salt(self) -> str:
+        """Per container and fixed for its life: the personal root's id."""
+        root = self.nodes.user_root()
+        return root.id if root else ""
 
     def _refresh(self, token: Token) -> Token | None:
         """The caller as it stands now: a minted token re-read, a grant re-derived (§4)."""

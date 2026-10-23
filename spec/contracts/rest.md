@@ -458,7 +458,7 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
 | `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | as revoke | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
 | `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
 | `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
-| `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
+| `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only, from the caller's own credential: an admin's recovery uses the admin's (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
 
 - **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
   `{"client_id", "name", "sub", "capabilities", "scopes", "created_at", "last_seen"}`, `last_seen` read
@@ -505,13 +505,16 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   changed hands. **a1p** (a1r on #287).
 - **Credential registration has two legs.** The first answers `{"result": "register", "challenge",
   "webauthn": <PublicKeyCredentialCreationOptions>, "expires_at"}`, a challenge bound to the caller as
-  §4.2's are. For a person who already has a credential it also answers `"confirm": {"challenge",
-  "webauthn": <PublicKeyCredentialRequestOptions>}`: a second challenge, for the assertion the second
-  leg's `confirm` carries, issued and bound as §4.2's first leg issues one (the act `credential.add`).
-  That first leg lists the person's credentials to their authenticator, so it appends §4.2's first-leg
-  `context.fetch` (`details.read: credentials`); a first leg for a person with no credential appends
+  §4.2's are. It also answers `"confirm": {"challenge", "webauthn"}`: a second challenge, for the
+  proof the second leg's `confirm` carries, issued and bound as §4.2's first leg issues one (the act
+  `credential.add`). For a person who already has a credential, `webauthn` is the
+  `<PublicKeyCredentialRequestOptions>` for the assertion; for a person with none it is `null`, and
+  the challenge is the button's. A first leg whose options list the person's credentials to their
+  authenticator appends §4.2's first-leg `context.fetch` (`details.read: credentials`), the fresh
+  first leg answered after a refusal included; a first leg for a person with no credential appends
   nothing. The second leg carries `{"challenge", "attestation", "confirm"?}`; user verification is
-  required.
+  required. Every proof presented is concluded as §4.2's are, so the button's first enrolment leaves
+  its `step_up` too. **a1p** (a1r on #290).
   - **A person with a credential adds another only with a biometric proof from an existing one** in
     `confirm`. The button is refused on this route whatever `confirm.allow_button` says, so a stolen
     session cannot add the thief's authenticator.
@@ -526,7 +529,9 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
     CLI, holding the owner `Token`), which enrol the owner's own authenticator: **while buttons are
     off, a person other than the owner who has no credential cannot enrol one, and so cannot perform
     a confirm-gated act.** That is the cost of the stronger setting, taken on purpose: an owner turns
-    buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285).
+    buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285). **This
+    door is never the owner's own surface**, and a container `Token` carries no sign-in to be fresh:
+    over REST, only a provider sign-in enrols a first credential. **a1p** (a1r on #290).
   - **What stays open, on the record:** whoever holds a fresh session of a person who has no
     credential yet can enrol the first one. **Recovery:** an admin removes a person's credentials
     (`DELETE /v1/credentials/{id}?sub=`, with the admin's own confirm), and the owner can remove any

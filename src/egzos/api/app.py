@@ -28,7 +28,7 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from egzos.api.throttle import Throttle, throttle_key
-from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, person_of
+from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, REMOVE_REASONS, person_of
 from egzos.container import Container
 from egzos.identity import GrantToken, display_name
 from egzos.ledger import acting_for
@@ -666,27 +666,30 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         if "challenge" not in body:
             if "attestation" in body or "confirm" in body:
                 raise Invalid
-            out = c.confirm.begin_registration(token, origin=origin, name=name)
-            if "confirm" in out:
-                # The assertion's options list the person's credentials: a read (rest.md §4.3).
-                c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
-                                client=token.client, read="credentials", items=[], layers=[],
-                                withheld=0)
-            return _json(200, out)
+            return registration(token, origin, name)
         challenge = _str(body["challenge"])
         proof = presented(body)
+        # A fresh sign-in is a provider token's, from its `amr`: a container `Token` carries none,
+        # and this door is never the owner's own surface (rest.md §4.3; a1r on #290).
         auth_time = token.auth_time if isinstance(token, GrantToken) else None
-        fresh = not isinstance(token, GrantToken) or (
-            auth_time is not None and c.confirm.clock() - auth_time <= FRESH_SIGN_IN_SECONDS)
+        fresh = auth_time is not None and c.confirm.clock() - auth_time <= FRESH_SIGN_IN_SECONDS
         with c.backend.atomic():
             cred, reason = c.confirm.finish_registration(
                 token, origin=origin, challenge_id=challenge, attestation=body.get("attestation"),
-                presented=proof, name=name, fresh=fresh,
-                owner_surface=not isinstance(token, GrantToken))
+                presented=proof, name=name, fresh=fresh, owner_surface=False)
         if reason is not None:
-            out = c.confirm.begin_registration(token, origin=origin, name=name)
-            return _json(200, out)
+            return registration(token, origin, name)
         return _json(200, {"credential": wire(cred)})
+
+    def registration(token: Token, origin: str, name: str) -> Response:
+        """A registration's first leg, fresh after a refusal too. Where its assertion options list
+        the person's credentials, that is a read, and appends one (rest.md §4.3)."""
+        out = c.confirm.begin_registration(token, origin=origin, name=name)
+        if out["confirm"]["webauthn"] is not None:
+            c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                            client=token.client, read="credentials", items=[], layers=[],
+                            withheld=0)
+        return _json(200, out)
 
     async def optional_body_of(request: Request, allowed: set[str]) -> dict[str, Any]:
         if not await request.body():
@@ -720,9 +723,11 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 c.confirm.remove(token, cred)
                 removed = True
             else:
+                # §4.3's closed set for a removal: the confirm's own reasons, mapped onto it.
                 c.ledger.append("identity.credential", actor=token.owner,
                                 principal=token.principal, subject=cred["person"], op="remove",
-                                outcome="refused", reason=reason, credential=credential_id)
+                                outcome="refused", reason=REMOVE_REASONS.get(reason, "stale"),
+                                credential=credential_id)
         if not removed:
             return first_leg(
                 token, act="credential.remove", subject=credential_id, destination=None,
