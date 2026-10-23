@@ -50,6 +50,20 @@ def default_home() -> Path:
     return Path(os.environ.get("EGZOS_HOME", Path.home() / ".egzos"))
 
 
+#: A hosted container's database (v0.7 §S): a Postgres URL. Absent, the container is local and
+#: keeps its sqlite file in its home, as it always has.
+DATABASE_URL_ENV = "EGZOS_DATABASE_URL"
+
+
+def open_backend(home: Path):
+    url = os.environ.get(DATABASE_URL_ENV)
+    if url:
+        from egzos.backends.postgres import PostgresBackend
+
+        return PostgresBackend(url)
+    return SqliteBackend(home / "egzos.db")
+
+
 class Container:
     def __init__(self, home: Path | None = None):
         self.home = Path(home or default_home())
@@ -57,7 +71,7 @@ class Container:
         # 0700 (no window at the umask's mode), then pinned 0700 if it already existed.
         self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.home, 0o700)
-        self.backend = SqliteBackend(self.home / "egzos.db")
+        self.backend = open_backend(self.home)
         self.ledger = Ledger(self.backend)
         self.nodes = NodeService(self.backend, self.ledger)
         self.blobs = BlobStore(self.home / "blobs")

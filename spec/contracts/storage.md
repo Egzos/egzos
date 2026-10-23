@@ -50,8 +50,12 @@ part it could not honestly implement is no longer in the contract it implements.
 substrate is not delegating to one: a container's own postgres, run by the operator who runs the
 container, is not a "third-party store" in F3's sense. **Delegation to a third-party store stays
 forbidden** — mem0, zep, a hosted vector database, or any service whose operator is not the
-container's. The line is who operates the substrate, not which engine it is. **decided, not
-running** (postgres is Phase 5).
+container's. The line is who operates the substrate, not which engine it is. **running**:
+`EGZOS_DATABASE_URL` puts a container's `ContainerState` and `ItemStore` on Postgres
+(`backends/postgres.py`, psycopg 3), self-hosted or a managed Postgres in the operator's own
+account: v0.7 §S's hosted cloud runs on its Supabase project's. A managed Postgres the operator
+holds the account for is operated by the operator, as a self-hosted one is; a store someone else
+runs for their own purposes is still delegation. **a1p.**
 
 ## 2 · `ItemStore` — pluggable, delegable
 
@@ -138,8 +142,8 @@ audit_iter()                         -> Iterator[AuditEntry]
 audit_tail(n)                        -> list[AuditEntry]
 ```
 
-**running** (all fourteen, as methods of the skeleton's `Backend`). sqlite by default, postgres at
-Phase 5. **Never delegated to a third-party store.**
+**running** (all fourteen, as methods of the skeleton's `Backend`). sqlite by default; Postgres
+where `EGZOS_DATABASE_URL` names one (§1). **Never delegated to a third-party store.**
 
 `audit_append` receives an entry **without** `seq`: the ledger computes `hash` over the entry minus
 `hash` and minus `seq`, and the store assigns `seq` and returns the stored entry
@@ -418,8 +422,9 @@ policy, the gate and the container config object (`blobs.inline_max_bytes`) → 
 Capabilities, principals, tokens and `Trust.authorize_pull` → `capabilities.md`. The chain's hash
 rule, `canonical` and the event list → `events.md`.
 
-The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
-contract they must satisfy.
+The Postgres backend runs, method for method the sqlite one's, and is held to it by
+`tests/store/test_postgres_backend.py`. pgvector and the mem0/zep backends are Phase 5. This
+document fixes only the contract they must satisfy.
 
 §3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState`, §3.3's `ConfirmState`, §3.4's
 `UploadState` and §3.5's `GrantState` are contract v1.1, not part of the 0.3 freeze; their partition is decided on #173 (option (A), on the

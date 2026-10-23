@@ -31,7 +31,12 @@ dependencies = [
 embed = [
     "onnxruntime",
 ]
+# The hosted container's database (v0.7 §S): Postgres through psycopg 3.
+postgres = [
+    "psycopg[binary]>=3.2",
+]
 dev = [
+    "psycopg[binary]>=3.2",  # tests/store/test_postgres_backend.py, where a Postgres is installed
     "pytest>=8",
     "pyyaml>=6",  # tests/governance imports .github/scripts/check_ownership.py
     "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change

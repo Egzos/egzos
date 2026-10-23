@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
+- **A container can run on Postgres** (v0.7 §S): set `EGZOS_DATABASE_URL` (with
+  `pip install egzos[postgres]`) and its whole state, the audit chain included, lives in that
+  database instead of the sqlite file: the hosted cloud's Supabase Postgres, or your own. Locals
+  keep sqlite.
 - **MCP over HTTP at `/mcp`** (`identity.md` §7): an agent that is not on your machine connects
   to `egzos serve --http` with a sign-in from your provider, and gets the same three tools as
   stdio, acting for you and named on the chain as doing so. The container publishes
