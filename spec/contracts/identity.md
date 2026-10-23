@@ -27,7 +27,7 @@ retired). A request reaches it with one of two:
 2. **An access token signed by the container's identity provider**: Supabase Auth, the egzos project for
    a container egzos hosts, the owner's own for a self-hosted one (§S). A person's token, issued to this
    container's own client, and an agent's OAuth token are both this kind, and each is bound to this one
-   container (§3a). **decided** (§S, §T); **a1p** the binding.
+   container (§3a). **decided** (§S, §T, and §AA for the binding).
 
 A container with no identity provider configured (§2) accepts only the first, and is exactly the
 container that runs today. **a1p.**
@@ -90,20 +90,33 @@ therefore present it at another container the same person can reach. So no conta
 session. Each token is bound to one container through the provider's own OAuth 2.1 server:
 
 - **Each container is a public OAuth client of the provider** (`identity.client_id`), registered when the
-  container is linked to it, with egzos.io's callback and the container's own origin as its only
-  redirect URIs. PKCE is required, as for every public client.
+  container is linked to it. Its redirect URIs are exactly two full URIs, matched exactly — egzos.io's
+  callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`
+  — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
+  a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
 - **A person reaches a container with a token issued to that container's client.** egzos.io runs the
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
   no second password, no second login (§T). The token is presented only to the container it names.
-- **An agent's token is bound by its own registration.** MCP clients register with the provider per
-  resource (`/mcp` of one container, §7), and a container accepts only a `client_id` registered here.
+- **An agent's token is bound by its own registration, and a `client_id` is registered on one container
+  only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
+  binding cannot rest on clients behaving: every agent authorization passes through the consent page
+  egzos.io hosts, which records the container it registered a `client_id` on and refuses that
+  `client_id` for any other container, and a container registers a `client_id` only from that page's
+  request, under the confirm (§4). A self-hosted provider with its own consent page owes the same rule.
+  **a1p** (a1r on #282). A container accepts only a `client_id` registered here.
 - **A token for one container is refused at every other**, at check 6, with the one `401`.
 
 **A failed check appends no entry of its own**: the request is unauthenticated (`rest.md` §2 clauses 5
 and 6), and the container appends no entry naming a caller it could not verify, whichever check failed.
 The `rest` throttle counts it and the window's `rest.tally` records it (`rest.md` §2 clause 7), so a
-sweep with forged, foreign, unbound or ungranted tokens leaves its trace there. **a1p.**
+sweep with forged, foreign, unbound or ungranted tokens leaves its trace there. An unauthenticated
+request at `/mcp` (§7) counts under the same surface word, `rest`: one door, one throttle. **a1p.**
+
+**Attribution of a verified provider token** (`events.md` §2: every entry names its `actor`). A person:
+`actor` is `user:<sub>`. An agent: `actor` is `agent:<client_id>`, and `details.for` is `user:<sub>`,
+the user it acted for, so "who read this" names both. `principal` is `interactive` or `client` as §4
+maps it. A container `Token` keeps its owner as `actor`, as today. **a1p** (a1r on #282).
 
 ## 4 · Grants: who may do what here
 
@@ -128,7 +141,10 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   everything it covers, so it is gated like a move that widens an audience (§U), never a silent write.
   A role bundle is expanded at grant time, as it is at mint (`capabilities.md` §2). **a1p.**
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
-  server, the consent page egzos.io hosts shows the request in `token ls` vocabulary; approving it (with
+  server, the consent page egzos.io hosts — a security surface, whose anti-phishing shape (telling the
+  requesting client's real identity and scopes apart from a deceptively named registrant) the next
+  contract PR and A2's spec carry, for a6 to review — shows the request in `token ls` vocabulary;
+  approving it (with
   the confirm) writes the registration here before the provider is told to issue. Its route arrives with
   the next contract PR (`rest.md`). Without the registration the provider's token is refused at checks 6
   and 7. **a1p.**
@@ -221,6 +237,7 @@ are `storage.md`'s, in the contract version that carries §V. **a1p.**
   throttle and state no longer bind a builder. The document stays as the record of what was frozen at 0.3.
   Its code (`src/egzos/authz/**`, never mounted) and its tables (`storage.md` §3.1's `ASState`,
   `ASGateState`) are removed in the PR that lands §3. No deployment holds a token it issued.
-- **Double login is retired** (§T). A container trusts its provider's session directly.
+- **Double login is retired** (§T). One sign-in at egzos.io covers every container, through a token
+  bound to each (§3a); no container accepts a bare provider session.
 - **Not fixed here:** the REST routes and their shapes (`rest.md`), copy, upload and the agent reads
   (`rest.md`, next contract PR), places and push/pull (`storage.md`, the §V contract), billing (egzos-platform).

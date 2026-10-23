@@ -243,9 +243,9 @@ AA. AMENDMENT — EVERY TOKEN IS BOUND TO ONE CONTAINER (amends §S's mapping
     directly"; Egzos/egzos#282)
 ================================================================================
 
-[DECIDED] Recorded 2026-10-23 by the operator, under the Chief's standing
-          instruction to run the build, on a1r's and a6's review of #282;
-          the Chief may veto. Why: a provider session is valid at every
+[DECIDED] Decided by the Chief's merge of Egzos/egzos#282 (drafted by the
+          operator on a1r's and a6's review of it; the Chief may veto by
+          reverting). Why: a provider session is valid at every
           container that trusts the provider, so a container that received
           a person's session could present it at another container the
           same person can reach.
