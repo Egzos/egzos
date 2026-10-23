@@ -75,8 +75,13 @@ class Container:
         self.trust.refresh = self._refresh
         self.trust.promote_blob = lambda sha: _is_digest(sha) and self.blobs.promote(sha)
         # rest.md §6: the grant key, made at first need in the home, never a config key or a row;
-        # and what is shown.
+        # whom a grant names, as they stand now, an id no record holds any more as a revoked
+        # stand-in, so a refusal is still attributed to it; and what is shown.
         self.trust.grant_key = lambda: home_secret(self.home / GRANT_KEY_FILE, GRANT_KEY_BYTES)
+        self.trust.named = lambda tid: (
+            self.identity.named(tid) or self.backend.get_token(tid)
+            or Token(id=tid, principal="client", owner=tid, client="", capabilities=[],
+                     scopes=[], revoked=True))
         self.trust.shown = self.store.shown
         self.uploads = Uploads(self.backend, self.ledger, self.blobs, self.store)
         self.confirm = Confirm(

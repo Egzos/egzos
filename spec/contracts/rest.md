@@ -734,9 +734,10 @@ review:** a grant URL is redeemable by whoever holds it, so the grant is bounded
 3. `expires_at` has not passed.
 4. The grant has not been spent, and this redemption spends it (single use, above).
 5. The named token is live (revocation first) and still holds `fetch` over the item's scope, checked
-   now, not at mint.
+   now, not at mint. **a1p**: a person's grant or an agent's registration written since the mint is
+   not the one the descriptor named, so a caller revoked and granted again since is refused here.
 6. The item is still served to that token: not tombstoned, not quarantined, within the serving
-   policy.
+   policy. **a1p**: its bytes out of staging (issue, item 2).
 7. `<sha256>` in the path equals the descriptor's `sha256` and the item's `content.sha256`.
 8. `BlobStore.get(sha256)` returns bytes.
 

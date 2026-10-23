@@ -408,6 +408,7 @@ class Identity:
             client=client_id,
             capabilities=sorted(grant["capabilities"]),
             scopes=list(grant["scopes"]),
+            created_at=grant["created_at"],  # rest.md §6 check 5: a grant written since is new
             sub=sub,
             client_id=client_id,
             name=grant.get("name", ""),
@@ -429,6 +430,7 @@ class Identity:
             client=client_id,
             capabilities=capabilities,
             scopes=scopes,
+            created_at=max(grant["created_at"], registration["created_at"]),
             sub=sub,
             client_id=client_id,
             acting_for=f"user:{sub}",
@@ -458,6 +460,24 @@ class Identity:
         if token.principal == "client":
             return self._agent(token.client_id, token.sub)
         return self._person(token.sub, token.client_id)
+
+    def named(self, token_id: str) -> GrantToken | None:
+        """The person or agent a `GrantToken` id names, as the grants stand now (rest.md §6 check
+        5). Revoked since, a stand-in that is revoked and holds nothing, so a refusal is still
+        attributed to whom the grant named. None for an id that is not a grant's."""
+        own = self.config("identity.client_id") or ""
+        if token_id.startswith("user:"):
+            sub = token_id[len("user:"):]
+            return self._person(sub, own) or GrantToken(
+                id=token_id, principal="interactive", owner=token_id, client=own,
+                capabilities=[], scopes=[], revoked=True, sub=sub, client_id=own)
+        for r in self.state.list_agent_registrations() if token_id.startswith("agent:") else ():
+            if f"agent:{r['client_id']}:{r['sub']}" == token_id:
+                return self._agent(r["client_id"], r["sub"]) or GrantToken(
+                    id=token_id, principal="client", owner=f"agent:{r['client_id']}",
+                    client=r["client_id"], capabilities=[], scopes=[], revoked=True, sub=r["sub"],
+                    client_id=r["client_id"], acting_for=f"user:{r['sub']}")
+        return None
 
     def audience_tokens(self) -> list[GrantToken]:
         """Every live grant and registration, as the gate counts them (§4: audience is every

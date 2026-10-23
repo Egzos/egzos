@@ -312,8 +312,8 @@ would be Store deciding a Trust question inside a module that is about to move t
 
 The mint and the redemption are **two separate audit events**: `blob.grant` when Trust mints the
 descriptor, `blob.pull` when the bytes are actually served (`events.md`). One without the other is a
-finding, not a shortcut. **running**: the REST door's reads mint (`rest.md` §6); the redemption is
-**decided, not running**.
+finding, not a shortcut. **running**: the REST door's reads mint, and `GET /v1/blobs` redeems
+(`rest.md` §6).
 
 The descriptor is `{sha256, item, token, expires_at, sig}`; `sig` is an **HMAC over the descriptor
 with a container key** (`context-item.md` §3, [0.3 · 45]).

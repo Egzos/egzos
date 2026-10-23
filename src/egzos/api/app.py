@@ -12,9 +12,11 @@ is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSO
 The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
 promote — answer in two legs on one route: the first issues a challenge and says who would newly
 see the item, the second spends it with a proof, and the act lands in the same transaction. An
-artifact arrives through an upload (§4.4): open, bytes, item. An admin lists the grants, grants
-access with the confirm, and ends one (§4.3), with the confirm where it is someone else's. The agent
-routes (§4.3) and `BlobGrant` redemption (§6) land with their own code; until then those paths are
+artifact arrives through an upload (§4.4): open, bytes, item, and leaves through a `BlobGrant`
+(§6): `GET /v1/fetch` and `GET /v1/items/{id}` carry one beside an artifact whose bytes do not ride
+inline, and `GET /v1/blobs/{sha256}` redeems it, by the descriptor alone, never a bearer. An admin
+lists the grants, grants access with the confirm, and ends one (§4.3), with the confirm where it is
+someone else's. The agent routes (§4.3) land with their own code; until then those paths are
 undeclared and answer §3's refusal, like any other.
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
@@ -27,13 +29,15 @@ import asyncio
 import calendar
 import contextlib
 import json
+import re
 import time
 from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import FastAPI, Request
-from starlette.responses import Response
+from starlette.responses import Response, StreamingResponse
 
+from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of
 from egzos.container import Container
@@ -64,6 +68,8 @@ ORPHAN_KEYS = ("name", "size", "sha256", "scope", "opened_at")
 #: identity.md §7: MCP's endpoint, and where its protected-resource metadata (RFC 9728) lives.
 MCP_PATH = "/mcp"
 METADATA_PATH = "/.well-known/oauth-protected-resource"
+#: rest.md §6: the one route no bearer is read on, for GET only.
+PULL_PATH = re.compile(r"/v1/blobs/[^/]+")
 
 
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
@@ -279,11 +285,14 @@ def create_app(
             return out(resource_metadata() if request.method == "GET" else refusal())
         metadata = own + METADATA_PATH if path == MCP_PATH else None
         address = request.client.host if request.client else None
+        # §6: a redemption is the descriptor's alone, so no Authorization header is read on it.
+        # Decided on the path the router matches, so no other route is reached without a caller.
+        pull = request.method == "GET" and PULL_PATH.fullmatch(request.scope["path"]) is not None
         if d.throttle.holds(address):
             d.throttle.count(address, refused=True)
-            return out(unauthorized(metadata))
-        token = d.caller(request.headers.get("authorization"))
-        if token is None:
+            return out(refusal() if pull else unauthorized(metadata))
+        token = None if pull else d.caller(request.headers.get("authorization"))
+        if token is None and not pull:
             d.throttle.count(address, refused=False)
             return out(unauthorized(metadata))
         request.state.token = token
@@ -1018,6 +1027,15 @@ def create_app(
                 delta=[], origin=origin
             )
         return _json(200, {"result": "removed"})
+
+    # -- BlobGrant redemption (§6): the descriptor is the credential ------------------------------
+    @app.get("/v1/blobs/{sha256}")
+    async def pull(request: Request, sha256: str):
+        address = request.client.host if request.client else None
+        data = redeem(c, d.throttle, address, sha256, request.query_params)
+        # One chunk, read whole by `BlobStore.get`; streamed so that no Content-Length joins §6's
+        # six headers.
+        return refusal() if data is None else StreamingResponse(iter((data,)), headers=PULL_HEADERS)
 
     # -- MCP over Streamable HTTP (identity.md §7): stateless, so POST is all it declares ---------
     app.add_route(MCP_PATH, mcp, methods=["POST"], include_in_schema=False)

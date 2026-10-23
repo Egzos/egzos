@@ -66,9 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   One limit for now: the metadata names the origin `serve` binds, so behind a TLS-terminating
   proxy or on a wildcard address it is not the origin clients reach, and sign-in discovery there
   points the wrong way. No config key names the public origin yet.
-- **Grants on artifact reads** (`rest.md` §6): `/v1/fetch` and `/v1/items/{id}` carry a grant
-  beside an artifact whose bytes do not ride inline, signed with a key the container makes in its
-  home (`grant.key`) and never exports. Every grant is on the chain; nothing redeems one yet.
+- **Download artifacts at the door** (`rest.md` §6): `/v1/fetch` and `/v1/items/{id}` carry a
+  grant beside an artifact whose bytes do not ride inline, and `GET /v1/blobs/…` redeems it by the
+  grant alone, once, within five minutes, as a download that never renders. The grant is signed
+  with a key the container makes in its home (`grant.key`) and never exports. Every grant and
+  every download is on the chain, and a refused download is recorded or tallied.
 
 ### Fixed
 
