@@ -153,16 +153,18 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
 - **An agent registration serves the one user who approved it.** It carries that user's `sub`, and a
   token naming the registration's `client_id` with any other `sub` is refused at check 7: another user
-  who authorizes the same agent at the provider gets their own registration, approved by them, or
-  nothing. **a1p** (a1r on #282).
+  who authorizes the same agent at the provider gets nothing until a registration serving them exists.
+  **a1p** (a1r on #282). In v1.1 a registration serves the admin who approves it (`rest.md` §4.3);
+  an agent serving another granted person is later work.
 - **What a request may do.** For a session: the user grant's capabilities and scopes. For an agent: the
   registration's, **intersected** with the user grant's — an agent never holds more than the user it acts
   for. Coverage is computed down the path at check time, as for a `Token` (`capabilities.md` §5).
   **a1p.**
 - **Audience** (`capabilities.md` §5) is every live `Token`, user grant and agent registration whose
   coverage reaches a container. The gate computes its delta over all three. **a1p.**
-- **Revocation** is the owner revoking a grant or a registration here, effective on the next request
-  (check 7 runs every time). Signing the user out at the provider ends their tokens at `exp`.
+- **Revocation** is an admin revoking a grant or a registration here, or the person a registration
+  serves revoking it (narrowing is never gated), effective on the next request (check 7 runs every
+  time); the last grant holding `admin` over `["*"]` is never revoked. Signing the user out at the provider ends their tokens at `exp`.
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
   `capabilities` and `scopes`. They enter `events.md` §1 with the code that appends them. **a1p.**
 
