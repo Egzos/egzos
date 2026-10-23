@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The container verifies sign-ins from your identity provider** (Supabase Auth, or a self-hosted
   one): `spec/contracts/identity.md` §3's seven checks, in order, with PyJWT. A person signs in
   once, at egzos.io; the token is bound to this one container, and what it may do is the grant
-  written here. An agent's token is admitted only through a registration an admin made for it.
+  written here. An agent's token is admitted only through a registration the person it serves made.
 - **`egzos link --issuer … --client-id … --sub …`** links the container to the provider and grants
   your provider user everything here. The owner token keeps working, as the way back in.
 - **`egzos config get` / `config set`** for the provider keys (`identity.*`), each change recorded
@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   credential needs the first one's biometric, and removing one needs a biometric, never the button.
   A first credential needs the button and a sign-in under five minutes old. The owner's recovery
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
+- **Grants at the door** (`rest.md` §4.3): an admin signed in at the provider lists who may sign in
+  (`GET /v1/grants`) and ends a person's access (`DELETE /v1/grants/{sub}`). Ending someone
+  else's takes the confirm, which shows whose access ends and every agent it takes with it; ending
+  your own does not. With the button, it also needs a sign-in under five minutes old. Revoking a
+  grant, here or with `egzos grant rm`, also revokes every agent serving that person, each on the
+  record, so a later grant starts with no agents.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its

@@ -109,3 +109,15 @@ def test_the_token_list_is_an_admins_over_everything(home, capsys, monkeypatch):
     monkeypatch.setenv("EGZOS_TOKEN", narrow.secret)
     code, out = _json(capsys, ["token", "ls"])
     assert code == 1 and "over the whole container" in out["error"]
+
+
+def test_grant_rm_ends_the_agents_serving_that_person_on_the_record(home, capsys):
+    _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c-1", "--sub", "me"])
+    c = Container(home)
+    c.identity.grant_user("bob", name="bob", role="reader", scopes=["*"], actor="self",
+                          principal="interactive")
+    c.backend.put_agent_registration({**c.backend.get_user_grant("bob"), "client_id": "helper"})
+    assert _json(capsys, ["grant", "rm", "bob"])[0] == 0
+    ended = [e for e in Container(home).ledger.tail(5) if e["event"] == "identity.revoke"]
+    assert [(e["actor"], e["details"]["kind"]) for e in ended] == [("self", "user"),
+                                                                   ("self", "agent")]

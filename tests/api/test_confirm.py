@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from egzos.api.app import create_app
 from egzos.container import OWNER, Container
+from egzos.identity import GrantToken
 
 NOT_FOUND = b'{"error":"not_found"}'
 KW = {"actor": OWNER, "principal": "interactive"}
@@ -202,7 +203,8 @@ def test_two_racing_second_legs_land_one_move(tmp_path, widening, c):
 
 
 @pytest.mark.parametrize("confirm", [{"challenge": "x"}, {"challenge": 1, "proof": "button"},
-                                     {"challenge": "x", "proof": "wave"}, "yes"])
+                                     {"challenge": "x", "proof": "wave"}, "yes",
+                                     {"challenge": "", "proof": "button"}])
 def test_a_malformed_confirm_is_400(c, door, widening, confirm):
     note, _mine, ours = widening
     r = door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner),
@@ -360,3 +362,24 @@ def test_a_challenge_is_forgotten_a_day_after_it_expired(c, door, widening):
     now[0] += 2 * 86400
     _confirm(door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner), json={"to": ours.id}))
     assert c.backend.spend_challenge(first["challenge"]) is None
+
+
+# -- a fresh sign-in, where an act needs one (rest.md §4.3) -------------------------------------
+@pytest.mark.parametrize(("ago", "fresh"), [
+    (299, True), (301, False), (None, False), (-3600, False), ("owner token", False)])
+def test_where_an_act_needs_a_fresh_sign_in_the_button_needs_one(c, ago, fresh):
+    """At most 300 seconds old and never from the future; a container `Token` carries none."""
+    now = 1_800_000_000
+    c.confirm.clock = lambda: float(now)
+    token = c.owner if ago == "owner token" else GrantToken(
+        id="user:dave", principal="interactive", owner="user:dave", client="box",
+        capabilities=["fetch"], scopes=["*"], sub="dave",
+        auth_time=None if ago is None else now - ago)
+    leg = c.confirm.issue(token, act="grant.revoke", subject="bob", destination=None, delta=[],
+                          newly=[])
+    reason = c.confirm.conclude(token, {"challenge": leg["challenge"], "proof": "button"},
+                                act="grant.revoke", subject="bob", destination=None, delta=[],
+                                fresh_sign_in=True)
+    assert reason == (None if fresh else "not_fresh")
+    outcome = _events(c, "step_up")[-1]["details"]["outcome"]
+    assert outcome == ("confirmed" if fresh else "refused")

@@ -221,3 +221,26 @@ def test_a_grants_display_name_is_short_and_shows_what_it_says(name, tmp_path):
         c.identity.grant_user("bob", name=name, role="reader", scopes=["*"], actor=OWNER,
                               principal="interactive")
     assert c.backend.get_user_grant("bob") is None
+
+
+# -- the cascade (§4) ------------------------------------------------------------------------------
+def _agent(c, client_id, sub, revoked=False):
+    c.backend.put_agent_registration({
+        "client_id": client_id, "sub": sub, "name": client_id, "capabilities": ["fetch"],
+        "scopes": ["*"], "created_at": "2026-10-23T00:00:00Z", "revoked": revoked})
+
+
+def test_a_revoke_ends_every_agent_serving_that_person_and_a_new_grant_revives_none(box):
+    for sub in (ALICE, BOB):
+        box.identity.grant_user(sub, name=sub, role="admin", scopes=["*"], **KW)
+    for client_id, sub in (("a1", BOB), ("a2", BOB), ("a1", ALICE)):
+        _agent(box, client_id, sub)
+    _agent(box, "a0", BOB, revoked=True)  # ended before: nothing to end, nothing to record
+    assert box.identity.revoke_user(BOB, **KW)
+    ends = _events(box, "identity.revoke")
+    assert [(e["subject"], e["details"]["kind"], e["details"].get("for")) for e in ends] == [
+        (BOB, "user", None), ("a1", "agent", f"user:{BOB}"), ("a2", "agent", f"user:{BOB}")]
+    assert ends[1]["details"]["capabilities"] == ["fetch"] and ends[1]["actor"] == OWNER
+    assert [a["client_id"] for a in box.identity.serving(ALICE)] == ["a1"]
+    box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
+    assert box.identity.serving(BOB) == [] and box.identity._agent("a1", BOB) is None

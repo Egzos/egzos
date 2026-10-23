@@ -12,7 +12,8 @@ is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSO
 The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
 promote — answer in two legs on one route: the first issues a challenge and says who would newly
 see the item, the second spends it with a proof, and the act lands in the same transaction. An
-artifact arrives through an upload (§4.4): open, bytes, item. The grant routes (§4.3) and
+artifact arrives through an upload (§4.4): open, bytes, item. An admin lists the grants and ends
+one (§4.3), with the confirm where it is someone else's. Granting, the agent routes (§4.3) and
 `BlobGrant` redemption (§6) land with their own code; until then those paths are undeclared and
 answer §3's refusal, like any other.
 
@@ -34,9 +35,9 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from egzos.api.throttle import Throttle, throttle_key
-from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, REMOVE_REASONS, person_of
+from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of
 from egzos.container import Container
-from egzos.identity import GrantToken, display_name
+from egzos.identity import GrantToken, LastAdmin, display_name
 from egzos.ledger import acting_for
 from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
@@ -555,25 +556,25 @@ def create_app(
         return origin if origin in d.origins() else None
 
     def first_leg(token: Token, *, act: str, subject: str, destination: str | None,
-                  delta: list[dict[str, Any]], origin: str | None) -> Response:
+                  delta: list[dict[str, Any]], origin: str | None, **extra: Any) -> Response:
         newly = names(delta)
         # Showing who would newly see an item is a read of credential metadata (§4.2 item 2).
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, subject=subject, items=[], layers=[], withheld=0,
-                        confirm_for=act, newly=newly)
-        return _json(200, c.confirm.issue(token, act=act, subject=subject,
-                                          destination=destination,
-                                          delta=[m["token"] for m in delta], newly=newly,
-                                          origin=origin))
+                        confirm_for=act, newly=newly, **extra)
+        return _json(200, {**c.confirm.issue(token, act=act, subject=subject,
+                                             destination=destination,
+                                             delta=[m["token"] for m in delta], newly=newly,
+                                             origin=origin), **extra})
 
     def presented(body: dict[str, Any]) -> dict[str, Any] | None:
         value = body.get("confirm")
         if value is None:
             return None
         if (not isinstance(value, dict) or set(value) - {"challenge", "proof", "assertion"}
-                or not isinstance(value.get("challenge"), str)
                 or value.get("proof") not in ("biometric", "button")):
             raise Invalid
+        _str(value.get("challenge"), limit=128)  # a challenge id, never empty (§3: a 400)
         return value
 
     class Refused(Exception):
@@ -743,6 +744,77 @@ def create_app(
             )
         return _json(200, {"result": "promoted", "item": promoted.to_dict()})
 
+    # -- grants (§4.3) --------------------------------------------------------------------------
+    def grantor(token: Token | None) -> bool:
+        """A person signed in at the provider, with `admin` over the whole container. A container
+        `Token` names no `sub`; an agent is never served who else holds access."""
+        return (isinstance(token, GrantToken) and token.principal == "interactive"
+                and token.has("admin") and "*" in token.scopes)
+
+    @app.get("/v1/grants")
+    async def list_grants(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if not grantor(token):
+            d.probe(token, "grants")
+            return refusal()
+        keys = ("sub", "name", "capabilities", "scopes", "created_at")  # §4.3's <grant>
+        live = [{k: g[k] for k in keys} for g in c.backend.list_user_grants() if not g["revoked"]]
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read="grants", items=[], layers=[], withheld=0,
+                        grants=[g["sub"] for g in live])
+        return _json(200, {"grants": live})
+
+    @app.delete("/v1/grants/{sub}")
+    async def revoke_grant(request: Request, sub: str):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if not grantor(token):  # a caller who may not act here never makes the door read a body
+            d.probe(token, sub)
+            return refusal()
+        proof = presented(await optional_body(request))
+        grant = c.backend.get_user_grant(sub)
+        if grant is None or grant["revoked"]:
+            d.probe(token, sub)
+            return refusal()
+
+        def first() -> Response:  # whose access it ends, and every agent it takes with it
+            agents = [{"client_id": a["client_id"], "name": a["name"]}
+                      for a in c.identity.serving(sub)]
+            return first_leg(token, act="grant.revoke", subject=sub, destination=None, delta=[],
+                             origin=origin, revokes={"grant": {"sub": sub, "name": grant["name"]},
+                                                     "agents": agents})
+
+        # Narrowing your own access is never gated; ending someone else's is. `last_admin` is
+        # `revoke_user`'s, under the lock: your own revoke has no leg to come before, and another
+        # person's grant is never the last while the caller, re-read there, holds one.
+        gated = f"user:{sub}" != person_of(token)
+        if gated and proof is None:
+            return first()
+        revoked, reason = False, None
+        with c.backend.atomic():
+            # The caller as their grant stands now, as approve re-reads its decider (#118): a
+            # revoke or a narrowing since the door verified them counts. The token the door
+            # verified is the one that concludes, since only it carries the sign-in time.
+            if grantor(c.identity.refresh(token)):
+                if gated:
+                    reason = c.confirm.conclude(token, proof, act="grant.revoke", subject=sub,
+                                                destination=None, delta=[], origin=origin,
+                                                fresh_sign_in=True)
+                if reason is None:
+                    try:
+                        revoked = c.identity.revoke_user(sub, actor=token.owner,
+                                                         principal=token.principal)
+                    except LastAdmin:
+                        return _json(409, {"error": "last_admin"})  # its refusal commits
+        if reason is not None:
+            return first()
+        if not revoked:  # the caller's grant or the target's changed since the door
+            d.probe(token, sub)
+            return refusal()
+        return _json(200, {"result": "revoked"})
+
     # -- confirm credentials (§4.3) -------------------------------------------------------------
     def whose(token: Token, sub: str | None) -> str | None:
         """The person a credential route acts on: the caller, or with `sub` another person, which
@@ -793,8 +865,7 @@ def create_app(
         proof = presented(body)
         # A fresh sign-in is a provider token's, from its `amr`: a container `Token` carries none,
         # and this door is never the owner's own surface (rest.md §4.3; a1r on #290).
-        auth_time = token.auth_time if isinstance(token, GrantToken) else None
-        fresh = auth_time is not None and c.confirm.clock() - auth_time <= FRESH_SIGN_IN_SECONDS
+        fresh = c.confirm.fresh(token)
         with c.backend.atomic():
             cred, reason = c.confirm.finish_registration(
                 token, origin=origin, challenge_id=challenge, attestation=body.get("attestation"),
