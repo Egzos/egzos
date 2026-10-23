@@ -46,6 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admin discards it (`DELETE /v1/uploads/{id}`), and an agent's file still waiting after
   `blobs.staging_retention_days` is listed under `staged`. One caller holds at most 16 uploads
   nobody has decided on; `blobs.upload_max_bytes` (100 MiB) caps each.
+- **Agents connect over the internet: MCP over Streamable HTTP at `/mcp`** (`identity.md` §7), on
+  the door `egzos serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
+  verified: an agent's sign-in reaches only what both its registration and its user's grant
+  cover, and what it reads is on the chain under its name and the user's. The `401` names
+  `/.well-known/oauth-protected-resource`, which tells a client where to sign in. It is stateless
+  and holds no stream open, so there is no session for anyone else to pick up, and it shares the
+  door's throttle and body limit. Built on the MCP SDK's transport. MCP over stdio is unchanged.
+  One limit for now: the metadata names the origin `serve` binds, so behind a TLS-terminating
+  proxy or on a wildcard address it is not the origin clients reach, and sign-in discovery there
+  points the wrong way. No config key names the public origin yet.
 
 ### Fixed
 

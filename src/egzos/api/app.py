@@ -15,6 +15,9 @@ see the item, the second spends it with a proof, and the act lands in the same t
 artifact arrives through an upload (§4.4): open, bytes, item. The grant routes (§4.3) and
 `BlobGrant` redemption (§6) land with their own code; until then those paths are undeclared and
 answer §3's refusal, like any other.
+
+MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
+its `401` alone names the protected-resource metadata, which is served to anyone, unthrottled.
 """
 
 from __future__ import annotations
@@ -35,6 +38,7 @@ from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, REMOVE_REA
 from egzos.container import Container
 from egzos.identity import GrantToken, display_name
 from egzos.ledger import acting_for
+from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
@@ -55,6 +59,9 @@ CLOSE_EVERY_SECONDS = 15
 _CREATABLE = tuple(t for t in CONTAINER_TYPES if t not in ("inbox", "global", "uxo"))
 #: §4.4: what `GET /v1/pending` says of an orphaned upload, beside its id.
 ORPHAN_KEYS = ("name", "size", "sha256", "scope", "opened_at")
+#: identity.md §7: MCP's endpoint, and where its protected-resource metadata (RFC 9728) lives.
+MCP_PATH = "/mcp"
+METADATA_PATH = "/.well-known/oauth-protected-resource"
 
 
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
@@ -68,9 +75,11 @@ def refusal() -> Response:
     return _json(404, {"error": "not_found"})
 
 
-def unauthorized() -> Response:
-    """§2 item 5: every unauthenticated case, byte-identical."""
-    return _json(401, {"error": "unauthorized"}, {"WWW-Authenticate": "Bearer"})
+def unauthorized(metadata: str | None = None) -> Response:
+    """§2 item 5: every unauthenticated case, byte-identical. At `/mcp` the challenge names the
+    protected-resource metadata (identity.md §7); on `/v1/` it carries no parameter."""
+    challenge = f'Bearer resource_metadata="{metadata}"' if metadata else "Bearer"
+    return _json(401, {"error": "unauthorized"}, {"WWW-Authenticate": challenge})
 
 
 def invalid() -> Response:
@@ -204,9 +213,15 @@ class Door:
         )
 
 
-def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
+def create_app(
+    container: Container, *, door: Door | None = None, origin: str = "http://127.0.0.1:7426"
+) -> FastAPI:
+    """The door, served from `origin`: the door's own, as `serve` binds it (`bound_origin`). The
+    default is `serve`'s default bind; only tests rely on it."""
     d = door or Door(container)
     c = container
+    own = origin  # the middleware's `origin` is the request's header
+    mcp = StreamableHttp(container, max_body=BODY_MAX_BYTES)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -218,9 +233,16 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
 
         task = asyncio.create_task(closer())
         try:
-            yield
+            async with mcp.running():
+                yield
         finally:
             task.cancel()
+
+    def resource_metadata() -> Response:
+        """RFC 9728's document for `/mcp` (identity.md §7): this door's origin, and the provider
+        that issues its tokens. A container with no provider has none to name (§1)."""
+        issuer = c.config_value("identity.issuer")
+        return _json(200, {"resource": own, "authorization_servers": [issuer] if issuer else []})
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
@@ -237,6 +259,8 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             }
 
         def out(response: Response) -> Response:
+            for key, value in HEADERS.items():  # §4.1's headers on MCP's answers too
+                response.headers.setdefault(key, value)
             response.headers.update(cors)
             return response
 
@@ -247,14 +271,19 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             if cors and path.startswith("/v1/"):
                 return out(Response(status_code=204, headers=HEADERS))
             return refusal()
+        if path == METADATA_PATH:
+            # Public and the same for every caller, so it needs no credential and is never held:
+            # a client reads it to learn where to get one (identity.md §7).
+            return out(resource_metadata() if request.method == "GET" else refusal())
+        metadata = own + METADATA_PATH if path == MCP_PATH else None
         address = request.client.host if request.client else None
         if d.throttle.holds(address):
             d.throttle.count(address, refused=True)
-            return out(unauthorized())
+            return out(unauthorized(metadata))
         token = d.caller(request.headers.get("authorization"))
         if token is None:
             d.throttle.count(address, refused=False)
-            return out(unauthorized())
+            return out(unauthorized(metadata))
         request.state.token = token
         with acting_for(getattr(token, "acting_for", None)):
             try:
@@ -829,6 +858,9 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 delta=[], origin=origin
             )
         return _json(200, {"result": "removed"})
+
+    # -- MCP over Streamable HTTP (identity.md §7): stateless, so POST is all it declares ---------
+    app.add_route(MCP_PATH, mcp, methods=["POST"], include_in_schema=False)
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],
