@@ -12,6 +12,7 @@ never touch it; they receive their own client tokens.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import secrets
@@ -45,6 +46,29 @@ def token_id_of(value: str) -> str | None:
     rest = value[len(PREFIX):]
     tid, sep, _ = rest.partition("_")
     return tid if sep and len(tid) == 26 else None
+
+
+def home_secret(path: Path, size: int = 32) -> bytes:
+    """A per-container secret in the home (the throttle's, the grant key): what the file holds,
+    created at first need as `size` bytes from `secrets`, 0600. It is written whole to a private
+    file and linked into place, first writer wins, so no reader ever sees half a key."""
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        pass
+    tmp = path.with_name(f".{path.name}.{secrets.token_hex(8)}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(secrets.token_bytes(size))
+            fh.flush()
+            os.fsync(fh.fileno())
+        with contextlib.suppress(FileExistsError):
+            os.link(tmp, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+    return path.read_bytes()
 
 
 class Auth:

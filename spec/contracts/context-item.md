@@ -78,15 +78,15 @@ the client cannot use.** The grant is minted by Trust, never by Store/Vault (**F
 renders a grant into a URL and decides nothing. A stdio client receives the descriptor and redeems
 it at the REST door (Phase 2); how long a grant lives and how often it is redeemed is `rest.md`
 §6's (#165). The mint is one audit event (`blob.grant`) and the redemption
-another (`blob.pull`) — see `events.md`. **decided, not running** (the skeleton serves inline
-`text/*` at or below 64 KiB and has no grant).
+another (`blob.pull`) — see `events.md`. **running** at the REST door's reads (`rest.md` §6);
+`egzos_fetch` does not carry one yet, and the REST door does not redeem one yet.
 
 **`BlobGrant.sig` is an HMAC over `sha256`, `item`, `token` and `expires_at` under a
 container-held key. [0.3 · 45]** The key never leaves the container, and the grant id is not the
 bearer secret. Without the key a redeemer therefore cannot forge a descriptor, alter one, or rebind
 one to another item or token. The MAC algorithm and key rotation are not pinned at this layer. The
-descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **decided, not
-running.**
+descriptor's other fields are `{sha256, item, token, expires_at, sig}` (**F5**). **running**: the
+MAC is HMAC-SHA256, and its key and rotation are `rest.md` §6's.
 
 **The MAC MUST cover every descriptor field other than `sig`, and verification MUST compare `sig`
 in constant time.** A field outside the MAC can be altered by a redeemer without detection, and a

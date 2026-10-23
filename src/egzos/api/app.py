@@ -43,7 +43,8 @@ from egzos.container import Container
 from egzos.identity import GrantToken, LastAdmin, display_name
 from egzos.ledger import acting_for
 from egzos.mcp.http import StreamableHttp
-from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
+from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
+from egzos.store.blobs import grant_url
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
@@ -307,6 +308,16 @@ def create_app(
         return ambiguous(exc.paths)
 
     # -- reads ----------------------------------------------------------------------------------
+    def with_pull(token: Token, entry: dict[str, Any]) -> dict[str, Any]:
+        """§6: an artifact whose bytes do not ride inline carries Trust's grant and its URL beside
+        the item (§4.1), or nothing. Decided on the item as served: one small and `text/*` enough
+        to ride inline that does not (an agent's, promoted after its write) is asked about too."""
+        item = entry["item"]
+        if item["kind"] != "artifact" or "inline" in item["content"]:
+            return entry
+        grant = c.trust.authorize_pull(token, ContextItem.from_dict(item))
+        return {**entry, "grant": grant, "grant_url": grant_url(grant)} if grant else entry
+
     @app.get("/v1/fetch")
     async def fetch(request: Request):
         token: Token = request.state.token
@@ -330,7 +341,7 @@ def create_app(
             "scope": result["scope"],
             "chain": result["chain"],
             "items": [
-                {k: e[k] for k in ("item", "layer", "layer_type", "shadowed_by")}
+                with_pull(token, {k: e[k] for k in ("item", "layer", "layer_type", "shadowed_by")})
                 for e in result["items"]
             ],
         })
@@ -366,7 +377,7 @@ def create_app(
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         subject=found.id, scope=node.id, client=token.client,
                         items=[found.id], layers=[node.id], withheld=0)
-        return _json(200, d.entry(found.to_dict(), node))
+        return _json(200, with_pull(token, d.entry(found.to_dict(), node)))
 
     @app.get("/v1/inbox")
     async def inbox(request: Request):
