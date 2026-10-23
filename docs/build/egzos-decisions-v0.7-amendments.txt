@@ -1,0 +1,256 @@
+================================================================================
+EGZOS — DECISIONS LOG · v0.7 AMENDMENT SET
+Delta on top of the v0.4 log and the v0.5 and v0.6 amendment sets. Records
+the Chief's calls of 2026-10-22/23: buy, don't build; Supabase for the
+platform services; one login; the Face ID / Touch ID confirm; places and
+git-like sync; the egzosux experience; Stripe; the repository's visibility.
+Sections not mentioned carry forward unchanged. Compiled 2026-10-23.
+Read together with: egzos-decisions-log-v0.4.txt · egzos-decisions-v0.5-
+amendments.txt · egzos-decisions-v0.6-amendments.txt · egzos-handoff.txt ·
+egzos-build-plan-v1.2.txt
+================================================================================
+
+Status key:  [DECIDED] locked · [LEAN] stated preference, not locked ·
+             [LATER] decided in direction, not scheduled ·
+             [OPEN→CHIEF] explicitly awaiting the Chief's call
+
+
+================================================================================
+R. BUY, DON'T BUILD (new; binds every agent and the operator)
+================================================================================
+
+[DECIDED] IF A WIDELY USED SERVICE OR LIBRARY DOES THE JOB, WE USE IT. Login,
+          OAuth, sessions, passkeys, databases, file storage, payments,
+          hosting, DNS, email, queues, cloud-storage connectors and crypto
+          primitives are bought (a paid service, or a maintained open-source
+          project), never built. We build only what egzos IS: the node model
+          and resolver, the trust rules and the gate, the ledger, the
+          container contract, sync between places, and the experience.
+
+[DECIDED] BUILDING A COMMODITY PIECE NEEDS THE CHIEF'S EXPLICIT YES, recorded
+          in this log. An issue or PR that would build one says so in its
+          first line and names the service it passed over and why. A review
+          that finds commodity infrastructure built without that record
+          raises it as a finding.
+
+[DECIDED] Recorded as the reason for this rule: the container's own OAuth 2.1
+          authorization server (§K, v0.6) was built slice by slice for
+          weeks without the build-or-buy question being put to the Chief.
+          It is retired in §S.
+
+
+================================================================================
+S. PLATFORM SERVICES — SUPABASE (supersedes v0.6 §K's own-AS decision;
+   amends v0.5 §C and R3's "server-side stack chosen at Phase 6")
+================================================================================
+
+[DECIDED] SUPABASE IS THE ONE VENDOR for everything it covers:
+          - login (Supabase Auth);
+          - agent sign-in: Supabase's OAuth 2.1 server issues MCP clients
+            their tokens (PKCE, dynamic client registration); egzos.io hosts
+            the consent page it redirects to;
+          - the hosted database (Postgres);
+          - file storage (Supabase Storage: S3-compatible, signed URLs,
+            files up to 500 GB on paid plans);
+          - server-side glue such as payment webhooks (Edge Functions).
+          Self-hosters run the open-source Supabase for the same parts.
+
+[DECIDED] THE CONTAINER'S OWN AUTHORIZATION SERVER IS RETIRED. No further
+          slices. authorization-server.md leaves the contract set; the
+          unmounted code under src/egzos/authz/** is removed in the PR that
+          lands Supabase token verification. Device-code for the CLI is
+          retired with it: the CLI keeps its local token, and signs in to a
+          cloud through Supabase.
+
+[DECIDED] THE CONTAINER IS A RESOURCE SERVER. It verifies Supabase-issued
+          JWTs (issuer, signature against the project's published keys,
+          expiry) and maps them to a principal:
+          - a user session (no client) → principal: interactive, with the
+            role the container grants that user;
+          - an OAuth-issued agent token → principal: client, with the role
+            and scopes the container's agent registry grants that client.
+          Supabase does not bind tokens to a resource (no RFC 8707), so the
+          container also checks the client against its own registry; an
+          unregistered client is refused like any unknown token (silence-
+          not-errors holds).
+
+[DECIDED] LOCALS STAY LOCAL. A local container keeps SQLite, the blob store
+          on disk, its local token, MCP over stdio, and works offline. The
+          Supabase parts serve clouds and the sign-in to them.
+
+[DECIDED] STORAGE BACKENDS SIT BEHIND APACHE OpenDAL (one library for local
+          disk, S3 and Supabase Storage today, and Azure Blob, GCS and the
+          rest for §V's Cloud 2), not one adapter per provider.
+
+[LEAN]    HOSTING for the hosted container: a managed host (Fly.io), with
+          Cloudflare for DNS. Accounts and payment are the Chief's.
+
+
+================================================================================
+T. ONE LOGIN (supersedes R2 and v0.6 §K "two authorities")
+================================================================================
+
+[DECIDED] LOGGING IN TO egzos.io IS LOGGING IN TO YOUR CONTAINER. The
+          container trusts the egzos Supabase project as its identity
+          provider, and the browser presents the user's Supabase session to
+          the container directly. Double login is retired.
+
+[DECIDED] What stays: the browser talks to the container directly. egzos
+          servers never proxy, cache or store a user's container data, and
+          never call a user's container on their own authority. For a
+          bring-your-own container the data plane still never touches egzos
+          servers.
+
+
+================================================================================
+U. THE CONFIRM — FACE ID / TOUCH ID (amends R11's step-up and v0.6 §K's
+   presence LEAN; closes v0.6 open question 6)
+================================================================================
+
+[DECIDED] A MOVE OR COPY THAT CHANGES WHO CAN SEE SOMETHING ASKS RIGHT THERE,
+          inline: who will newly see it, then confirm. No separate page, no
+          localhost tap window.
+
+[DECIDED] THE CONFIRM IS THE DEVICE'S OWN BIOMETRIC: Face ID, Touch ID or
+          Windows Hello, through WebAuthn with user verification required.
+          Where the device has none, a plain confirm button. The audit event
+          records which proof was given (biometric or button), so the ledger
+          shows the weaker one for what it is.
+
+[DECIDED] BUILT ON ESTABLISHED PIECES (§R): the browser's WebAuthn API and a
+          maintained WebAuthn library to verify the assertion, or Supabase
+          Auth's own WebAuthn support where it covers re-verification. No
+          home-made challenge protocol.
+
+[LATER]   PASSKEY SIGN-IN as an opt-in (Supabase Auth passkeys, in beta
+          since May 2026).
+
+[DECIDED] The step-up window (R11, ≈5 minutes per ring pair) carries over to
+          the confirm unchanged.
+
+
+================================================================================
+V. PLACES AND SYNC (new; amends the storage contract at the next contract
+   version)
+================================================================================
+
+[DECIDED] A CONTAINER HAS PLACES: one hosted cloud and any number of locals
+          (a laptop, a desktop). Each project has a home place.
+
+[DECIDED] SYNC IS GIT-LIKE, NOT LIVE: a local pushes what it has and pulls
+          ("catches up") what it lacks, when asked; `status` says what is
+          ahead and behind. Each place keeps its own ledger, and a push is
+          verified on arrival (its hash chain) before it lands.
+
+[DECIDED] COPY JOINS MOVE as a verb. Both run the gate: a copy that widens
+          the audience is confirmed exactly like a move (§U).
+
+[DECIDED] ORDER: one hosted cloud plus locals that push and pull come first.
+
+[LATER]   CLOUD 2 — BRING YOUR OWN CLOUD: a user enters connection details
+          for their own Azure, AWS or other storage, and it appears as a
+          space they can upload into and import from, without an agent (the
+          Chief's work Azure environment is the first case). Cloud
+          containers become multi-backend. Built on OpenDAL (§S).
+
+[LATER]   THE RELAY AND LIVE SYNC as an opt-in for users who want continuous
+          sync. The idea is kept; it is not scheduled.
+
+
+================================================================================
+W. THE EXPERIENCE — egzosux (amends R3, R10 and §P of v0.6)
+================================================================================
+
+[DECIDED] THE egzosux PROTOTYPE (Egzos/egzosux) IS THE EXPERIENCE SPEC, SET
+          BY THE CHIEF. Binding as experience, not as final visuals:
+          - a 3D space; clouds and locals (locals as houses); the egzos orb,
+            the ether that content sinks into; agents as pyramids;
+          - navigation cloud → project → thread → artifacts;
+          - move or copy an artifact to another thread, another project, or
+            loose in a project;
+          - XR.
+          It supersedes the flagship's 2D screen specs as the flow; visual
+          direction stays open and keeps flowing through the tokens.
+
+[DECIDED] THE BUILT-IN CURATOR AGENT IS J4S (short for Jarvis), not "Chief".
+          "Chief" names the human gate only.
+
+[DECIDED] STACK (amends R3): TypeScript, three.js on its WebGL renderer
+          (WebGPU is not used), React for the panels, Vite 8, WebXR. Tailwind
+          and the tokens for the panels' chrome.
+
+[DECIDED] ALL FRONT-END WORK LIVES IN Egzos/egzos-platform. egzosux stays the
+          reference prototype; nothing is built on it in place. One component
+          set, one tokens file, consistent and standardized across screens.
+
+[DECIDED] The old demo site's look is not carried forward.
+
+
+================================================================================
+X. BILLING — STRIPE BEHIND A PROVIDER INTERFACE (amends v0.5 §C)
+================================================================================
+
+[DECIDED] STRIPE handles payments: Stripe Checkout to subscribe, the Stripe
+          customer portal to manage, webhooks into Supabase. egzos builds no
+          payment form or invoice screen that Stripe already hosts.
+
+[DECIDED] egzos code talks to a payments-provider interface, not to Stripe
+          directly, so a second provider can be added later without
+          rewriting billing.
+
+
+================================================================================
+Y. REPOSITORY VISIBILITY AND DISCLOSURE (amends v0.6 §L)
+================================================================================
+
+[DECIDED] Egzos/egzos IS PUBLIC AGAIN (the Chief, 2026-10-23), after a
+          private interval in October 2026. §L's disclosure mechanics apply
+          again: unfixed security findings are private GitHub Security
+          Advisories; the regression test enters adversarial/ only in the
+          fix PR. Egzos/egzos-platform stays private; its security findings
+          stay issues there (its CLAUDE.md).
+
+
+================================================================================
+Z. RETENTION — NO AUTOMATIC DELETION (amends R11's staged-blob retention)
+================================================================================
+
+[DECIDED] Nothing is deleted automatically when a retention period ends.
+          Staged bytes past retention are surfaced to their owner, who
+          keeps or purges them. R11's "30 days cold, then purge" becomes
+          "30 days, then ask."
+
+[LATER]   AUTO-FILING: egzos files incoming content for the user. Wanted as
+          an extension of the system; not built now.
+
+
+================================================================================
+SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
+================================================================================
+
+  Read in this order:
+  1. egzos-decisions-log-v0.4.txt        — base log
+  2. egzos-decisions-v0.5-amendments.txt
+  3. egzos-decisions-v0.6-amendments.txt
+  4. egzos-decisions-v0.7-amendments.txt — THIS: buy-don't-build, Supabase,
+     one login, the confirm, places and sync, the experience, Stripe,
+     visibility, retention
+  5. egzos-handoff.txt
+  6. egzos-build-plan-v1.2.txt
+
+  Open questions carried from v0.6, less number 6 (closed by §U):
+  1. uxo definition — the Chief's; non-blocking.
+  2. Same-scope key collisions: LWW now; CRDT later? (now also the merge
+     rule for §V's pull)
+  3. Tag taxonomy.
+  4. Federation peering protocol (post-v1).
+  5. Decay / relevance scoring ownership.
+  7. Uniform-ack blind-drop proposals (deferred).
+  8. Per-scope E2EE key design (post-v1).
+  9. Price points for BYOC vs hosted; relay pricing shape.
+
+  [OPEN→CHIEF]: none.
+
+================================================================================
+END OF v0.7 AMENDMENT SET
+================================================================================
