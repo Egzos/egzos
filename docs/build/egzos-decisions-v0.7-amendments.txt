@@ -189,7 +189,11 @@ W. THE EXPERIENCE — egzosux (amends R3, R10 and §P of v0.6)
           reference prototype; nothing is built on it in place. One component
           set, one tokens file, consistent and standardized across screens.
 
-[DECIDED] The old demo site's look is not carried forward.
+[DECIDED] THE egzos.io HOMEPAGE HOSTS THE EXPERIENCE AS A LIVE DEMO, on
+          sample data, that a visitor can use before signing up. The
+          homepage is decluttered and built on the same stack and the same
+          3D code as the app, so the demo and the product cannot drift. The
+          old demo site is replaced, not restyled.
 
 
 ================================================================================
