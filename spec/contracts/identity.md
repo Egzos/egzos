@@ -215,9 +215,10 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   agent acting with what they hold: no person newly sees anything, so it needs no `publish`, and its
   first leg names the agent instead (`rest.md` §4.3; **decided**, §AB); and, at the REST door, ending
   a grant or a registration that serves someone else (§4), which removes a person's access as surely
-  as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g). On a grant, a registration or a gated revoke,
-  the button also needs a fresh sign-in, as a first credential does (`rest.md` §4.3; **a1p**,
-  GHSA-c3gg-hwx9-473g).
+  as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g); and, at the REST door, tombstoning an item a
+  person promoted, which removes curated knowledge (`rest.md` §4; **a1p**, #296). On a grant, a
+  registration or a gated revoke, the button also needs a fresh sign-in, as a first credential does
+  (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public

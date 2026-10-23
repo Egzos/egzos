@@ -102,7 +102,7 @@ def test_absent_and_uncovered_are_byte_identical(c, door):
 
 
 def test_undeclared_paths_and_methods_are_the_refusal(c, door):
-    for method, path in [("GET", "/v1/nope"), ("PATCH", "/v1/fetch"), ("DELETE", "/v1/items/x"),
+    for method, path in [("GET", "/v1/nope"), ("PATCH", "/v1/fetch"), ("PUT", "/v1/items/x"),
                          ("GET", "/elsewhere"), ("POST", "/v1/items/x/archive")]:
         r = door.request(method, path, headers=_auth(c.owner))
         assert (r.status_code, r.content) == (404, NOT_FOUND), (method, path)

@@ -51,7 +51,7 @@ drift a reader resolves by guessing.
 | `step_up` | a presence check concludes, whatever its `outcome` (the MVP tap, ahead of Phase 2.2) | running |
 | `token.mint` | a token is minted | running |
 | `token.revoke` | a token is revoked | running |
-| `item.tombstone` | an item is tombstoned | running |
+| `item.tombstone` | an item is tombstoned: `kind`, its `status` as it stood, and `staged_deleted`, the `sha256` of staged bytes it released that nothing else holds, deleted if any remained (`rest.md` §4) | running |
 | `blob.grant` | Trust mints a `BlobGrant` (**F5**) | decided, not running |
 | `authz.login` | a login attempt at `/login` is evaluated (AS §12 row (a)) | decided, not running |
 | `authz.redeem` | a device-code redemption at `/device` is evaluated (row (b)) | decided, not running |

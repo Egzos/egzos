@@ -10,7 +10,8 @@ staged until a person promotes it. The bytes and the item are two spends of one 
 check-and-mark. Nothing staged is deleted on a timer (v0.7 §Z): an upload that expired with its
 bytes staged is an orphan, listed to its opener, an agent's to the person it serves, and to an admin
 until one of them discards it. What a person holds is capped once for them and every agent serving
-them (v0.7 §AC).
+them (v0.7 §AC). A person's tombstone of the item is the other decision: it frees the slot, and
+deletes the staged bytes no other upload or staged item, a copy included, still holds (rest.md §4).
 """
 
 from __future__ import annotations
@@ -217,13 +218,13 @@ class Uploads:
     def discard(self, token: Token, upload_id: str, *, admin: bool) -> bool:
         """Discard an upload no item was written from — the caller's own, an orphan an agent serving
         the caller opened, or as an admin anyone's — with its staged bytes, unless another upload
-        still holds the same bytes. False is §3's refusal."""
+        or staged item still holds them (`_shared`). False is §3's refusal."""
         with self.backend.atomic():
             record = self.backend.get_upload(upload_id)
             if (record is None or record["discarded"] or record["item"] is not None
                     or not (admin or self.answers_to(token, record))):
                 return False
-            delete = record["staged"] and not self._shared(record)
+            delete = record["staged"] and not self._shared(record["sha256"], upload=record["id"])
             self.backend.put_upload({**record, "discarded": True})
             self.ledger.append("upload.discard", actor=token.owner, principal=token.principal,
                                subject=upload_id, scope=record["scope"], size=record["size"],
@@ -233,15 +234,72 @@ class Uploads:
                 self.blobs.discard(record["sha256"])  # last: a failure before it keeps the bytes
         return True
 
-    def _shared(self, record: UploadRecord) -> bool:
-        """Whether another upload still needs the staged bytes at `record`'s address: staging is
-        content-addressed, so two uploads of the same bytes share one staged copy."""
-        for other in self.backend.list_uploads():
-            if (other["id"] != record["id"] and other["sha256"] == record["sha256"]
-                    and other["staged"] and not other["discarded"]
-                    and (other["item"] is None or self._staged_item(other) is not None)):
-                return True
-        return False
+    def _shared(self, sha: str, *, upload: str | None = None, item: str | None = None) -> bool:
+        """Whether anything but `upload` and `item` still needs the staged bytes at `sha`: an
+        upload staged and not yet written, or an item whose bytes are staged there (`_staged_at`).
+        Staging is content-addressed, so all of them share one staged copy."""
+        return any(r["id"] != upload and r["sha256"] == sha and r["staged"] and not r["discarded"]
+                   and r["item"] is None for r in self.backend.list_uploads()
+                   ) or bool(self._staged_at(sha) - {item})
+
+    def _staged_at(self, sha: str) -> set[str]:
+        """The live items whose bytes are staged at `sha`: an artifact written from an upload that
+        was never promoted, and every copy of one (a copy names its source's address,
+        `trust._do_copy`), until it, or an item it was copied through, is verified."""
+        records = {r["item"]: r for r in self.backend.list_uploads() if r["item"] is not None}
+        every = {i.id: i for i in self.backend.query(
+            [n.id for n in self.backend.list_nodes()], kinds=["artifact"], include_tombstoned=True)}
+
+        def staged(item: ContextItem | None) -> bool:
+            while item is not None and item.status != "verified":
+                if item.id in records:
+                    return not records[item.id]["promoted"]
+                item = every.get(item.provenance.get("derived_from") or "")
+            return False  # verified on the way, or written from a file: promoted bytes
+
+        return {i.id for i in every.values() if i.content.get("sha256") == sha
+                and not i.lifecycle.get("tombstoned") and staged(i)}
+
+    # -- a person's tombstone (rest.md §4) -------------------------------------------------------
+    @staticmethod
+    def promoted(item: ContextItem) -> bool:
+        """Whether a person promoted `item`: verified now, or approved once whatever its status is
+        now, since a move can lower the status but never the approval. Its tombstone takes the
+        confirm at the door, and the terminal never tombstones it (rest.md §4)."""
+        return item.status == "verified" or bool(item.provenance.get("approved_by"))
+
+    def tombstonable(self, token: Token, item: ContextItem | None) -> bool:
+        """Whether `token` may tombstone `item`: a person, never an agent, holding `organize`
+        where the item sits, and an item live and not quarantined. Anything else is §3's refusal."""
+        if (item is None or item.status == "quarantined" or token.principal != "interactive"
+                or not token.has("organize")):
+            return False
+        node = self.backend.get_node(item.scope)
+        return node is not None and self.store.covers is not None and self.store.covers(token, node)
+
+    def tombstone(self, token: Token, item_id: str) -> ContextItem | None:
+        """Tombstone the item as it stands under the lock, with its `item.tombstone`, in one step;
+        None, and nothing written, where `token` may not. An artifact whose bytes are still staged
+        releases them, deleted unless another upload or staged item holds them (`_shared`);
+        promoted bytes are never deleted ([0.3 · 44]). Its upload then frees its slot (`holds`).
+        The confirm a promoted item needs is the caller's."""
+        with self.backend.atomic():
+            item = self.backend.get(item_id)  # a tombstoned item reads as absent
+            if item is None or not self.tombstonable(token, item):
+                return None
+            sha = item.content.get("sha256") if item.kind == "artifact" else None
+            if not (isinstance(sha, str) and item.id in self._staged_at(sha)
+                    and not self._shared(sha, item=item.id)):
+                sha = None
+            self.backend.tombstone(item.id)
+            details: dict[str, Any] = {"kind": item.kind, "status": item.status}
+            if sha is not None:
+                details["staged_deleted"] = sha
+            self.ledger.append("item.tombstone", actor=token.owner, principal=token.principal,
+                               subject=item.id, scope=item.scope, **details)
+            if sha is not None:
+                self.blobs.discard(sha)  # last: a failure before it keeps the bytes
+        return item
 
     # -- what `GET /v1/pending` lists ------------------------------------------------------------
     def orphans(self, token: Token, *, admin: bool) -> list[UploadRecord]:
