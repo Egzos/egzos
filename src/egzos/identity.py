@@ -57,8 +57,13 @@ IDENTITY_KEYS = (
     "identity.browser_origins",
 )
 #: The keys some code reads, so the only keys `config set` takes: §2's six (`confirm.allow_button`
-#: is the confirm's, `egzos.confirm`).
-SETTABLE_KEYS = (*IDENTITY_KEYS, "confirm.allow_button")
+#: is the confirm's, `egzos.confirm`), and the two the upload reads (`rest.md` §4.4).
+SETTABLE_KEYS = (
+    *IDENTITY_KEYS, "confirm.allow_button", "blobs.upload_max_bytes",
+    "blobs.staging_retention_days",
+)
+#: The bounds of the two numeric keys: an upload of 1 byte to 1 TiB; 0 days to a century.
+_NUMBERS = {"blobs.upload_max_bytes": (1, 1 << 40), "blobs.staging_retention_days": (0, 36500)}
 
 _NO_CLAIM_CHECKS = {
     # PyJWT verifies the signature; the claims are checked below, in §3's order, by this module.
@@ -169,6 +174,13 @@ def validate(key: str, value: Any) -> Any:
         if value in ("true", "false"):
             return value == "true"
         raise ConfigError(f"{key}: true or false")
+    if key in _NUMBERS:
+        low, high = _NUMBERS[key]
+        if isinstance(value, str) and value.isdigit() and value.isascii():
+            value = int(value)
+        if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
+            raise ConfigError(f"{key}: a whole number from {low} to {high}")
+        return value
     raise ConfigError(f"{key}: not a key this container sets")
 
 

@@ -61,6 +61,8 @@ CONFIG_WIRE_ROWS = [
     ("identity.algorithms", "identity_algorithms"),
     ("identity.browser_origins", "identity_browser_origins"),
     ("confirm.allow_button", "confirm_allow_button"),
+    # rest.md §4.4, contract v1.1: the upload's limit, entering with the code that reads it.
+    ("blobs.upload_max_bytes", "blobs_upload_max_bytes"),
 ]
 
 # `model.BASELINE_CREATE` — what the default floor must reproduce (v0.3 §2).
@@ -148,6 +150,7 @@ def test_container_config_defaults_cover_every_key_and_are_the_skeletons_constan
         "identity_algorithms": "ES256 RS256",
         "identity_browser_origins": "https://egzos.io",
         "confirm_allow_button": True,
+        "blobs_upload_max_bytes": 104857600,
     }
 
 

@@ -88,6 +88,6 @@ def test_the_door_state_is_the_two_throttle_counters():
     assert methods == {"throttle_incr", "throttle_count", "throttle_buckets", "throttle_windows",
                        "throttle_forget"}
     assert t.DOOR_STATE_CONTRACTS == (
-        "ThrottleState", "IdentityState", "ConfigState", "ConfirmState"
+        "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState"
     )
     assert not hasattr(t, "ASState") and not hasattr(t, "ASGateState")

@@ -28,7 +28,9 @@ from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
 from egzos.store import BlobStore, NodeService, Store
+from egzos.store.blobs import _is_digest
 from egzos.store.find import shown
+from egzos.store.uploads import Uploads
 from egzos.trust import TrustEngine
 
 OWNER = "self"
@@ -71,6 +73,8 @@ class Container:
         )
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
+        self.trust.promote_blob = lambda sha: _is_digest(sha) and self.blobs.promote(sha)
+        self.uploads = Uploads(self.backend, self.ledger, self.blobs, self.store)
         self.confirm = Confirm(
             self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,
             salt=self._salt,

@@ -16,6 +16,7 @@ from egzos._types import (
     ConfirmChallenge,
     ConfirmCredential,
     ThrottleSurface,
+    UploadRecord,
     UserGrant,
 )
 from egzos.backends.base import ChainConflict
@@ -71,6 +72,11 @@ CREATE INDEX IF NOT EXISTS challenges_expiry ON challenges(expires_at);
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, person TEXT NOT NULL, doc TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS credentials_person ON credentials(person);
+-- UploadState (storage.md §3.4): rest.md §4.4's uploads, each step spent once.
+CREATE TABLE IF NOT EXISTS uploads (
+  id TEXT PRIMARY KEY, principal TEXT NOT NULL, bytes_spent INTEGER NOT NULL DEFAULT 0,
+  item_spent INTEGER NOT NULL DEFAULT 0, doc TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS uploads_principal ON uploads(principal);
 """
 
 
@@ -413,3 +419,36 @@ class SqliteBackend:
                 "SELECT doc FROM credentials WHERE person=? ORDER BY rowid", (person,)
             )
         return [json.loads(r[0]) for r in rows]
+
+    # -- UploadState (storage.md §3.4) -------------------------------------------------------
+    def put_upload(self, upload: UploadRecord) -> None:
+        cur = self.db.execute(
+            "UPDATE uploads SET doc=? WHERE id=?", (json.dumps(upload), upload["id"])
+        )
+        if cur.rowcount == 0:
+            self.db.execute(
+                "INSERT INTO uploads(id,principal,doc) VALUES(?,?,?)",
+                (upload["id"], upload["principal"], json.dumps(upload)),
+            )
+        self._commit()
+
+    def get_upload(self, upload_id: str) -> UploadRecord | None:
+        row = self.db.execute("SELECT doc FROM uploads WHERE id=?", (upload_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_uploads(self, principal: str | None = None) -> list[UploadRecord]:
+        if principal is None:
+            rows = self.db.execute("SELECT doc FROM uploads ORDER BY rowid")
+        else:
+            rows = self.db.execute(
+                "SELECT doc FROM uploads WHERE principal=? ORDER BY rowid", (principal,)
+            )
+        return [json.loads(r[0]) for r in rows]
+
+    def spend_upload(self, upload_id: str, step: str) -> bool:
+        column = {"bytes": "bytes_spent", "item": "item_spent"}[step]
+        cur = self.db.execute(
+            f"UPDATE uploads SET {column}=1 WHERE id=? AND {column}=0", (upload_id,)  # noqa: S608
+        )
+        self._commit()
+        return cur.rowcount == 1
