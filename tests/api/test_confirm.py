@@ -231,7 +231,8 @@ def test_approve_and_deny_take_the_confirm(c, door, widening):
     pid = door.post(f"/v1/items/{note.id}/move", headers=_h(agent),
                     json={"to": ours.id}).json()["proposal"]
     first = _confirm(door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner)))
-    assert first["newly"] == []
+    assert first["newly"] == ["Bob"]  # approving a parked widening shows who would newly see it
+    assert _events(c, "context.fetch")[-1]["details"]["newly"] == ["Bob"]
     r = door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner),
                   json={"confirm": {"challenge": first["challenge"], "proof": "button"}})
     assert r.json()["result"] == "executed" and r.json()["item"]["scope"] == ours.id
@@ -258,8 +259,104 @@ def test_a_copy_proposal_executes_as_a_copy(c, door, widening):
     pid = door.post(f"/v1/items/{note.id}/copy", headers=_h(agent),
                     json={"to": ours.id}).json()["proposal"]
     first = _confirm(door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner)))
-    door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner),
-              json={"confirm": {"challenge": first["challenge"], "proof": "button"}})
+    r = door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner),
+                  json={"confirm": {"challenge": first["challenge"], "proof": "button"}})
     assert c.store.get(note.id).scope == mine.id
     (made,) = _events(c, "item.copy")
     assert c.store.get(made["subject"]).scope == ours.id
+    assert r.json()["item"]["id"] == made["subject"]  # the copy, not its source
+
+
+def _parked(c, door, widening):
+    note, _mine, ours = widening
+    agent = c.auth.mint(principal="client", owner=OWNER, client="agent", role="curator",
+                        scopes=["*"], actor=OWNER, by_principal="interactive")
+    return door.post(f"/v1/items/{note.id}/move", headers=_h(agent),
+                     json={"to": ours.id}).json()["proposal"]
+
+
+def test_deny_takes_the_confirm_and_shows_nobody_new(c, door, widening):
+    note, mine, _ours = widening
+    pid = _parked(c, door, widening)
+    first = _confirm(door.post(f"/v1/pending/{pid}/deny", headers=_h(c.owner)))
+    assert first["newly"] == []
+    r = door.post(f"/v1/pending/{pid}/deny", headers=_h(c.owner),
+                  json={"confirm": {"challenge": first["challenge"], "proof": "button"}})
+    assert r.json() == {"result": "denied"}
+    assert [e["event"] for e in c.ledger.tail(2)] == ["step_up", "approval.deny"]
+    assert c.backend.get_proposal(pid)["status"] == "denied"
+    assert c.store.get(note.id).scope == mine.id
+
+
+def test_an_approval_gone_stale_answers_stale_and_keeps_its_record(c, door, widening):
+    note, mine, ours = widening
+    pid = _parked(c, door, widening)
+    first = _confirm(door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner)))
+    # The audience changes after the proposal was made: what was approved is not what would land.
+    c.identity.grant_user("carol", name="Carol", role="reader", scopes=[ours.id], **KW)
+    r = door.post(f"/v1/pending/{pid}/approve", headers=_h(c.owner),
+                  json={"confirm": {"challenge": first["challenge"], "proof": "button"}})
+    assert r.json() == {"result": "stale"}
+    assert c.backend.get_proposal(pid)["status"] == "stale"
+    assert _events(c, "approval.stale") and _events(c, "step_up")[-1]["details"]["outcome"] == (
+        "confirmed")
+    assert c.store.get(note.id).scope == mine.id
+
+
+def test_a_copy_or_promote_outside_the_callers_cover_is_the_refusal(c, door, widening):
+    note, _mine, ours = widening
+    narrow = c.auth.mint(principal="interactive", owner=OWNER, client="tab", role="admin",
+                         scopes=[ours.id], actor=OWNER, by_principal="interactive")
+    before = len(_events(c, "context.fetch"))
+    for path, body in [(f"/v1/items/{note.id}/copy", {"to": ours.id}),
+                       (f"/v1/items/{note.id}/move", {"to": ours.id}),
+                       (f"/v1/items/{note.id}/promote", {})]:
+        r = door.post(path, headers=_h(narrow), json=body)
+        assert (r.status_code, r.content) == (404, NOT_FOUND), path
+    assert len(_events(c, "context.fetch")) == before + 3
+    assert not _events(c, "step_up")
+
+
+def test_a_copy_needs_fetch_on_its_source(c, widening):
+    from egzos.model import Token
+    from egzos.trust import TrustError
+
+    note, _mine, ours = widening
+    blind = Token(id="blind", principal="interactive", owner=OWNER, client="tab",
+                  capabilities=["organize", "publish", "remember"], scopes=["*"])
+    with pytest.raises(TrustError):
+        c.trust.gate(note, ours, token=blind, act="copy")
+    c.trust.gate(note, ours, token=blind, act="move")  # a move reads nothing it did not hold
+
+
+def test_a_delta_gone_empty_by_the_second_leg_passes_silently(c, door, widening):
+    note, _mine, ours = widening
+    first = _confirm(door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner),
+                               json={"to": ours.id}))
+    c.identity.revoke_user("bob", **KW)
+    r = _second(door, c, note, ours, first["challenge"])
+    assert r.json()["result"] == "moved" and c.store.get(note.id).scope == ours.id
+    assert _events(c, "gate.pass.silent") and not _events(c, "step_up")
+
+
+def test_a_challenge_expires_on_the_second_it_says(c, door, widening):
+    note, _mine, ours = widening
+    now = [1_800_000_000.0]
+    c.confirm.clock = lambda: now[0]
+    first = _confirm(door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner),
+                               json={"to": ours.id}))
+    assert first["expires_at"] == "2027-01-15T08:05:00.000000Z"
+    now[0] += 300.3  # a third of a second past a whole-second expiry
+    _confirm(_second(door, c, note, ours, first["challenge"]))
+    assert _events(c, "step_up")[-1]["details"]["reason"] == "stale"
+
+
+def test_a_challenge_is_forgotten_a_day_after_it_expired(c, door, widening):
+    note, _mine, ours = widening
+    now = [1_800_000_000.0]
+    c.confirm.clock = lambda: now[0]
+    first = _confirm(door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner),
+                               json={"to": ours.id}))
+    now[0] += 2 * 86400
+    _confirm(door.post(f"/v1/items/{note.id}/move", headers=_h(c.owner), json={"to": ours.id}))
+    assert c.backend.spend_challenge(first["challenge"]) is None

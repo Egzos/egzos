@@ -32,13 +32,21 @@ from egzos.model import Token
 
 #: rest.md §4.2 item 5: a challenge lives `step_up.window_seconds`, never less than this.
 MIN_CHALLENGE_SECONDS = 60
+#: How long an expired challenge is kept, so a late second leg still reads `spent` or `stale`.
+CHALLENGE_KEEP_SECONDS = 86400
 PROOFS = ("biometric", "button")
 #: rest.md §4.2 item 4's closed reasons.
 REASONS = ("stale", "spent", "foreign", "mismatch", "assertion", "button_off", "delta_changed")
 
 
 def _iso(ts: float) -> str:
-    return datetime.fromtimestamp(ts, UTC).isoformat().replace("+00:00", "Z")
+    """Fixed width, microseconds always written, so two of these compare as the times they are
+    (a1r on #289: `isoformat` drops a zero fraction, and `Z` sorts after `.`)."""
+    return datetime.fromtimestamp(ts, UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def _epoch(text: str) -> float:
+    return datetime.fromisoformat(text).timestamp()
 
 
 class Confirm:
@@ -72,6 +80,8 @@ class Confirm:
         caller appends the first leg's `context.fetch`: showing `newly` is a read."""
         now = self.clock()
         lifetime = max(MIN_CHALLENGE_SECONDS, self.window_seconds())
+        # A day after it expired a challenge only answers `stale`; forget it (a1r on #289).
+        self.state.forget_challenges(_iso(self.clock() - CHALLENGE_KEEP_SECONDS))
         challenge: ConfirmChallenge = {
             "id": secrets.token_urlsafe(32),
             "principal": token.id,
@@ -126,7 +136,7 @@ class Confirm:
             return "stale"
         if record.get("spent"):
             return "spent"
-        if record["expires_at"] <= _iso(self.clock()):
+        if _epoch(record["expires_at"]) <= self.clock():
             return "stale"
         if record["principal"] != token.id:
             return "foreign"

@@ -776,6 +776,8 @@ class ConfirmState(Protocol):
     def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None: ...
     #: ^ marks it spent and returns it AS IT STOOD, atomically: of two concurrent spends of one
     #:   challenge, exactly one sees `spent` false. `None` for an id never issued.
+    def forget_challenges(self, expired_before: str) -> None: ...
+    #: ^ drops every challenge that expired before this time, spent or not
 
 
 #: storage.md §3.1–§3.3. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.

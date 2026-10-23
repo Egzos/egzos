@@ -59,7 +59,9 @@ CREATE TABLE IF NOT EXISTS agent_registrations (
 CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 -- ConfirmState (storage.md §3.3): the confirm's challenges, spent once.
 CREATE TABLE IF NOT EXISTS challenges (
-  id TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0, doc TEXT NOT NULL);
+  id TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL,
+  doc TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS challenges_expiry ON challenges(expires_at);
 """
 
 
@@ -361,9 +363,13 @@ class SqliteBackend:
     # -- ConfirmState (storage.md §3.3) ------------------------------------------------------
     def put_challenge(self, challenge: ConfirmChallenge) -> None:
         self.db.execute(
-            "INSERT INTO challenges(id,spent,doc) VALUES(?,0,?)",
-            (challenge["id"], json.dumps(challenge)),
+            "INSERT INTO challenges(id,spent,expires_at,doc) VALUES(?,0,?,?)",
+            (challenge["id"], challenge["expires_at"], json.dumps(challenge)),
         )
+        self._commit()
+
+    def forget_challenges(self, expired_before: str) -> None:
+        self.db.execute("DELETE FROM challenges WHERE expires_at < ?", (expired_before,))
         self._commit()
 
     def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None:

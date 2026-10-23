@@ -480,13 +480,21 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             with c.backend.atomic():
                 # Recomputed under the lock: the confirm binds the delta as it stands now.
                 _frm, delta = c.trust.gate(item, to, token=token, act=act)
-                reason = c.confirm.conclude(token, proof, act=act, subject=item.id,
-                                            destination=to.id,
-                                            delta=[m["token"] for m in delta])
                 landed = None
-                if reason is None:
-                    landed = c.trust.confirmed(item, to, token=token, actor=token.owner, act=act,
-                                               delta=delta, step_up=c.confirm.last_step_up_seq())
+                if not delta:
+                    # Nobody new would see it any more: the silent pass that is now due, with
+                    # nothing to confirm (a1r on #289).
+                    r = (c.trust.move if act == "move" else c.trust.copy)(
+                        item, to, token=token, actor=token.owner)
+                    landed = c.store.get(item.id) if act == "move" else r["item"]
+                else:
+                    reason = c.confirm.conclude(token, proof, act=act, subject=item.id,
+                                                destination=to.id,
+                                                delta=[m["token"] for m in delta])
+                    if reason is None:
+                        landed = c.trust.confirmed(item, to, token=token, actor=token.owner,
+                                                   act=act, delta=delta,
+                                                   step_up=c.confirm.last_step_up_seq())
         except (TrustError, HumanOnly):
             d.probe(token, item_id)
             return refusal()
@@ -517,17 +525,22 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 or not c.trust.decides_over(token, p)):
             d.probe(token, proposal_id)
             return refusal()
+        # Approving a parked widening act shows who would newly see it, and the confirm binds that
+        # delta; a denial changes nobody's view (§4.2 item 1; a1r on #289).
+        widens = list(p.get("audience_delta") or []) if act == "approve" else []
         if proof is None:
-            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=[])
+            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
         outcome: str | None = None
+        result: dict[str, Any] = {}
         try:
             with c.backend.atomic():
                 reason = c.confirm.conclude(token, proof, act=act, subject=proposal_id,
-                                            destination=None, delta=[])
+                                            destination=None,
+                                            delta=[m["token"] for m in widens])
                 if reason is None:
                     try:
                         if act == "approve":
-                            c.trust.execute(proposal_id, token=token, actor=token.owner)
+                            result = c.trust.execute(proposal_id, token=token, actor=token.owner)
                             outcome = "executed"
                         else:
                             c.trust.deny(proposal_id, token=token, actor=token.owner)
@@ -541,10 +554,12 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, proposal_id)
             return refusal()
         if outcome is None:
-            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=[])
+            return first_leg(token, act=act, subject=proposal_id, destination=None, delta=widens)
         if outcome == "executed":
-            moved = c.store.get(p["items"][0])
-            return _json(200, {"result": "executed", "item": moved.to_dict() if moved else None})
+            # A move's item is where it went; a copy's is the new one, not its source.
+            made = result.get("copies") or p["items"]
+            landed = c.store.get(made[0])
+            return _json(200, {"result": "executed", "item": landed.to_dict() if landed else None})
         return _json(200, {"result": outcome})
 
     @app.post("/v1/pending/{proposal_id}/approve")

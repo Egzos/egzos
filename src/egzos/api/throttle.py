@@ -54,7 +54,8 @@ def throttle_key(home: Path) -> bytes:
     created once. It is written whole to a private file and linked into place, first writer wins,
     so no reader ever sees a half-written key. A key file is never rewritten: a short one, left
     by a crash under earlier code, is passed over for the next name, which every process reaches
-    the same way, so every process reads the same key."""
+    the same way, so every process reads the same key. Should all `KEY_SLOTS` names be short, it
+    raises and the door does not start: it fails closed, never on an empty key."""
     for slot in range(KEY_SLOTS):
         path = Path(home) / (KEY_FILE if slot == 0 else f"{KEY_FILE}.{slot}")
         try:

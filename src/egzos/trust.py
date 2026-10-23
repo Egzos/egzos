@@ -332,6 +332,7 @@ class TrustEngine:
         # unchanged (approve-what-you-saw; a1r on #146 and #149). A racing decider waits on
         # BEGIN IMMEDIATE and then reads the outcome.
         stale_reason = None
+        copies: list[str] = []
         with self.backend.atomic():
             self._still_open(p["id"], token)
             to = self.backend.get_node(p["to"])
@@ -373,7 +374,7 @@ class TrustEngine:
                         continue
                     if p.get("kind") == "copy":
                         # A copy is a new write: it lands unverified whoever proposed it.
-                        self._do_copy(item, to, actor, token.principal)
+                        copies.append(self._do_copy(item, to, actor, token.principal).id)
                         continue
                     if self._reset_if_agent_run(item, proposer):
                         reset.append(item.id)
@@ -395,7 +396,8 @@ class TrustEngine:
         if stale_reason:
             # Raised after the transaction commits, so the stale status and its event stay.
             raise TrustError("manifest changed since the proposal was made — re-propose")
-        return p
+        # A copy's caller learns the new items, which the stored proposal does not name.
+        return {**p, "copies": copies} if copies else p
 
     def deny(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
         self._human_only(token, "gate.confirm")
