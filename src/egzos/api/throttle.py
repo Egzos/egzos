@@ -41,6 +41,8 @@ GLOBAL = "g"
 KEEP_WINDOWS = 12
 KEY_FILE = "throttle.key"
 KEY_BYTES = 32
+#: How many key names a container tries, `throttle.key` first, passing over short ones.
+KEY_SLOTS = 4
 
 _REFUSED = "!refused"
 _ADMITTED_401 = "!401"
@@ -49,33 +51,37 @@ _CLOSED = "!closed"
 
 def throttle_key(home: Path) -> bytes:
     """The per-container secret behind every `window_key` and source bucket: 32 bytes, 0600,
-    created once. It is written whole to a private file and linked into place, so no reader ever
-    sees a half-written key; a short file left by a crash is replaced the same way."""
-    path = Path(home) / KEY_FILE
-    for _ in range(3):
+    created once. It is written whole to a private file and linked into place, first writer wins,
+    so no reader ever sees a half-written key. A key file is never rewritten: a short one, left
+    by a crash under earlier code, is passed over for the next name, which every process reaches
+    the same way, so every process reads the same key."""
+    for slot in range(KEY_SLOTS):
+        path = Path(home) / (KEY_FILE if slot == 0 else f"{KEY_FILE}.{slot}")
         try:
-            data: bytes | None = path.read_bytes()
+            data = path.read_bytes()
         except FileNotFoundError:
-            data = None
-        if data is not None and len(data) == KEY_BYTES:
+            data = _create(path)
+        if len(data) == KEY_BYTES:
             return data
-        tmp = path.with_name(f".{KEY_FILE}.{secrets.token_hex(8)}")
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    raise RuntimeError("the throttle key cannot be read")
+
+
+def _create(path: Path) -> bytes:
+    """Link a whole new key at `path` unless another process got there first; either way, return
+    the key that is there now."""
+    tmp = path.with_name(f".{KEY_FILE}.{secrets.token_hex(8)}")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
         with os.fdopen(fd, "wb") as fh:
             fh.write(secrets.token_bytes(KEY_BYTES))
             fh.flush()
             os.fsync(fh.fileno())
-        try:
-            if data is None:
-                os.link(tmp, path)  # the first writer wins; a racing one reads the winner's
-            else:
-                os.replace(tmp, path)
-        except FileExistsError:
-            pass
-        finally:
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(tmp)
-    raise RuntimeError("the throttle key cannot be read")
+        with contextlib.suppress(FileExistsError):
+            os.link(tmp, path)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp)
+    return path.read_bytes()
 
 
 class Throttle:
