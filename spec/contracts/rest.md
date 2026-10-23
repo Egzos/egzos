@@ -473,17 +473,23 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   grant or registration exceeds the granter's own grant: wider capabilities or scopes are §3's refusal.
 - **Who registers an agent.** Only an admin, and the registration serves that admin (`identity.md` §4).
 - **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
-  §3a), so it does not read the provider's authorization itself. The consent page egzos.io hosts
-  reads it with egzos.io's own first-party session, refuses a `client_id` registered on another
-  container (`identity.md` §3a), and only then calls this route. What the container holds to is the
-  admin's confirm: the first leg's `newly` names the registration — its `name`, untrusted display
-  data, beside its `client_id` — and the challenge is bound to the body's `client_id`, its
+  §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
+  instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
+  first-party session, and calls this route only for one that is pending, was requested by the
+  person whose container token makes the call, is for the body's `client_id`, and asks for no scopes
+  beyond the body's; and it refuses a `client_id` registered on another container (`identity.md`
+  §3a). **a1p** (a1r and a6 on #285).
+- **What the container holds to is the admin's confirm.** The first leg answers `newly: []` and, in
+  its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
+  the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
+  (design-gap Egzos/egzos-platform#117). The challenge is bound to the body's `client_id`, its
   capabilities as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`.
   **a1p** (a6 on #285).
 - **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
   authorization, at most one registers, and every later request naming it is §3's refusal.
   `identity.grant` records it as `details.authorization_id`, so the consent page's record and the
-  container's join. Only after the registration is written does egzos.io tell the provider to issue.
+  container's join; it is **what the caller claimed**, which the container cannot check, never a
+  verified fact. Only after the registration is written does egzos.io tell the provider to issue.
 - **The agent log serves only what the reader may see now.** It lists the agent's entries for that
   person (`details.for`), and omits every entry that was a refusal — a probe's `context.fetch` with
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
@@ -547,10 +553,14 @@ storage (v0.7 §S).
    surface escapes; `size` above the container's upload limit is `400`. The limit is a new key,
    `blobs.upload_max_bytes` (default 104857600, 100 MiB; an `admin` may change it), which enters
    `container.md` §8 and `_types.py` with the code that reads it, as `identity.md` §2's keys do. A
-   principal holds at most 16 uploads that are open or orphaned (below); a 17th answers `429` with
-   `{"error":"too_many_uploads"}` and §3's headers — a fact about the caller's own uploads. A successful
-   open appends nothing: no bytes have moved. A refused open — a `scope` the token cannot write to —
-   follows §4's rule and appends `context.fetch` with `items: []`.
+   principal holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
+   item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it);
+   a 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a fact about the
+   caller's own uploads. So what a principal holds staged, and nobody has decided on, is bounded at 16
+   times `blobs.upload_max_bytes`, and a person's decision is what frees a slot (v0.7 §Z: asked about,
+   never purged). **a1p** (a6 on #285). A successful open appends nothing: no bytes have moved. A
+   refused open — a `scope` the token cannot write to — follows §4's rule and appends `context.fetch`
+   with `items: []`.
 2. **Bytes.** `PUT /v1/uploads/{id}` with the raw bytes. The id is bound to the principal that opened
    it and expires after one hour; the container reads at most `size` bytes, checks length and sha256, and
    **stages** them (`BlobStore.stage`) — never `put`, so staging never answers whether the content

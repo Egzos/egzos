@@ -104,8 +104,9 @@ session. Each token is bound to one container through the provider's own OAuth 2
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
   egzos.io hosts, which records the container it registered a `client_id` on and refuses that
   `client_id` for any other container, and a container registers a `client_id` only from that page's
-  request, under the confirm (§4). A self-hosted provider with its own consent page owes the same rule.
-  **a1p** (a1r on #282). A container accepts only a `client_id` registered here.
+  request, under the confirm (§4). A self-hosted provider with its own consent page owes the same
+  rule, and the checks `rest.md` §4.3 lists before it calls the container. **a1p** (a1r on #282). A
+  container accepts only a `client_id` registered here.
 - **A token for one container is refused at every other**, at check 6, with the one `401`.
 - **A container-bound token is not a provider session.** It is presented only to the container it
   names: never to the provider's authorization, consent or account endpoints, and a container never
