@@ -4,8 +4,9 @@
 The container as a resource server (spec/contracts/identity.md).
 
 A request may carry an access token signed by the container's identity provider (Supabase Auth):
-a person's, issued to this container's own OAuth client, or an agent's, issued to a client an admin
-registered here. `Identity.verify` runs §3's seven checks in order, on every request, and answers
+a person's, issued to this container's own OAuth client, or an agent's, issued to a client that the
+person it serves registered here (§4: each person registers their own, v0.7 §AB).
+`Identity.verify` runs §3's seven checks in order, on every request, and answers
 with the principal the token maps to, or `None`: every failure is the same answer, whichever check
 failed. The JWT work is PyJWT's (buy, don't build). What is here is what egzos is: the order, the
 binding to this one container, and the grants that decide what a verified caller may do (§4).
@@ -270,8 +271,8 @@ class GrantToken(Token):
     acting_for: str | None = field(default=None, compare=False)
     #: The grant's or registration's display name: untrusted display data (rest.md §4.3).
     name: str = field(default="", compare=False)
-    #: When the person last signed in at the provider (the newest `amr` timestamp): rest.md §4.3's
-    #: fresh sign-in for a first credential. None when the token says nothing.
+    #: When the person last signed in at the provider (the newest `amr` timestamp), for the acts
+    #: that need a fresh sign-in (rest.md §4.3). None when the token says nothing.
     auth_time: int | None = field(default=None, compare=False)
 
 
@@ -532,12 +533,16 @@ class Identity:
         raise LastAdmin(sub)
 
     def revoke_user(self, sub: str, *, actor: str, principal: str) -> bool:
-        """Revoke a person's grant. Narrowing is never gated (§4). `False` for no live grant; the
+        """Revoke a person's grant and every live registration serving them, each with its own
+        `identity.revoke`, so a later grant to that `sub` starts with no agents (§4). The caller
+        has judged the act: an admin narrowing their own access (never gated), an admin ending
+        someone else's under the confirm at the REST door, or the owner `Token` on the CLI or the
+        lifeboat, the recovery factor (§AD: no confirm, audited). `False` for no live grant; the
         last live grant holding `admin` over `["*"]` raises `LastAdmin` and appends a refusal.
 
-        The read, the last-admin check, the write and the entry are one transaction, so two
+        The read, the last-admin check, the writes and the entries are one transaction, so two
         concurrent revokes of the last two whole-container admins cannot both pass the check, and
-        a revoke never stands without its entry. The refusal is appended after it, not inside: a
+        a revoke never stands without its entries. The refusal is appended after it, not inside: a
         refusal rolled back with the act it refused would leave no trace."""
         with self.atomic():
             grant = self.state.get_user_grant(sub)
@@ -555,9 +560,22 @@ class Identity:
                     capabilities=grant["capabilities"],
                     scopes=grant["scopes"],
                 )
+                for agent in self.serving(sub):
+                    self.state.put_agent_registration({**agent, "revoked": True})
+                    self.ledger.append(
+                        "identity.revoke", actor=actor, principal=principal,
+                        subject=agent["client_id"], kind="agent", outcome="revoked",
+                        capabilities=agent["capabilities"], scopes=agent["scopes"],
+                        **{"for": f"user:{sub}"},
+                    )
                 return True
         self._refused("identity.revoke", sub, actor=actor, principal=principal)
         raise LastAdmin(sub)
+
+    def serving(self, sub: str) -> list[AgentRegistration]:
+        """Every live registration serving `sub`. storage.md §3.2 lists registrations by
+        `client_id` only, so this scans them all: a filter by `sub` would be a contract change."""
+        return [r for r in self.state.list_agent_registrations() if r["sub"] == sub and _live(r)]
 
     def _refused(self, event: str, sub: str, *, actor: str, principal: str) -> None:
         self.ledger.append(

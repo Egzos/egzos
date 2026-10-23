@@ -50,6 +50,7 @@ from webauthn.helpers.structs import (
 
 from egzos._ids import ulid
 from egzos._types import ConfirmChallenge, ConfirmCredential, ConfirmState
+from egzos.identity import SKEW_SECONDS
 from egzos.ledger import Ledger
 from egzos.model import Token, now_iso
 
@@ -57,11 +58,12 @@ from egzos.model import Token, now_iso
 MIN_CHALLENGE_SECONDS = 60
 #: How long an expired challenge is kept, so a late second leg still reads `spent` or `stale`.
 CHALLENGE_KEEP_SECONDS = 86400
-#: rest.md §4.3: a first credential needs a sign-in at most this old.
+#: rest.md §4.3: how old a sign-in may be where an act needs a fresh one.
 FRESH_SIGN_IN_SECONDS = 300
 PROOFS = ("biometric", "button")
 #: rest.md §4.2 item 4's closed reasons.
-REASONS = ("stale", "spent", "foreign", "mismatch", "assertion", "button_off", "delta_changed")
+REASONS = ("stale", "spent", "foreign", "mismatch", "assertion", "button_off", "delta_changed",
+           "not_fresh")
 RP_NAME = "egzos"
 #: rest.md §4.3's closed reasons, from the confirm's own (`REASONS`): an add's, and a removal's.
 ADD_REASONS = {"button_off": "button_refused", "assertion": "no_proof"}
@@ -190,10 +192,12 @@ class Confirm:
         delta: list[str],
         origin: str | None = None,
         biometric_only: bool = False,
+        fresh_sign_in: bool = False,
     ) -> str | None:
         """Spend the presented challenge and judge the proof. `None` is confirmed; otherwise the
         reason it was refused. Either way one `step_up` is appended. Run it inside the act's own
-        transaction, so a confirmed proof and the act it confirms land together."""
+        transaction, so a confirmed proof and the act it confirms land together. `fresh_sign_in`:
+        the button also needs a fresh sign-in (rest.md §4.3); a biometric never does."""
         if not isinstance(presented, dict) or presented.get("proof") not in PROOFS:
             raise ValueError("confirm needs a challenge and a proof")
         challenge_id = presented.get("challenge")
@@ -202,7 +206,7 @@ class Confirm:
         proof = presented["proof"]
         reason = self._judge(token, challenge_id, presented, act=act, subject=subject,
                              destination=destination, delta=delta, origin=origin,
-                             biometric_only=biometric_only)
+                             biometric_only=biometric_only, fresh_sign_in=fresh_sign_in)
         details: dict[str, Any] = {"via": "confirm", "act": act, "proof": proof,
                                    "outcome": "refused" if reason else "confirmed"}
         if reason:
@@ -213,7 +217,7 @@ class Confirm:
 
     def _judge(self, token: Token, challenge_id: str, presented: dict[str, Any], *, act: str,
                subject: str, destination: str | None, delta: list[str], origin: str | None,
-               biometric_only: bool) -> str | None:
+               biometric_only: bool, fresh_sign_in: bool) -> str | None:
         record = self.state.spend_challenge(challenge_id)  # spent now, whatever is decided below
         if record is None:
             return "stale"
@@ -235,8 +239,18 @@ class Confirm:
                 return "button_off"
             if self.credentials(person):
                 return "button_off"
+            if fresh_sign_in and not self.fresh(token):
+                return "not_fresh"
             return None
         return self._assert(person, presented.get("assertion"), challenge_id, origin)
+
+    def fresh(self, token: Token) -> bool:
+        """rest.md §4.3's fresh sign-in: the provider token's newest `amr` time at most
+        `FRESH_SIGN_IN_SECONDS` old, and not ahead of this clock by more than check 4's skew. A
+        container `Token` carries no sign-in, so it is never fresh (a1r on #290)."""
+        signed_in = getattr(token, "auth_time", None)
+        return signed_in is not None and (
+            -SKEW_SECONDS <= self.clock() - signed_in <= FRESH_SIGN_IN_SECONDS)
 
     def _assert(self, person: str, assertion: Any, challenge_id: str,
                 origin: str | None) -> str | None:
