@@ -438,6 +438,8 @@ class Identity:
             raise ValueError("a grant names the provider's user id")
         if (role is None) == (capabilities is None):
             raise ValueError("a grant names a role or capabilities, not both")
+        if role is not None and role not in ROLE_BUNDLES:
+            raise ValueError("unknown role")
         caps = sorted(ROLE_BUNDLES[role]) if role is not None else sorted(set(capabilities or ()))
         if not caps or any(c not in CAPABILITIES for c in caps):
             raise ValueError("unknown capability")

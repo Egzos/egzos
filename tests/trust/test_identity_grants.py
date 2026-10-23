@@ -101,6 +101,7 @@ def test_a_grant_is_recorded_with_what_it_covers(box):
         {"capabilities": ["fly"]},
         {"capabilities": []},
         {"role": "reader", "scopes": []},
+        {"role": "emperor"},
     ],
 )
 def test_a_grant_names_a_role_or_known_capabilities_and_a_scope(box, bad):

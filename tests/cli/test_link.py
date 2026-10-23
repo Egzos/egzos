@@ -91,3 +91,12 @@ def test_a_client_token_cannot_link(home, capsys, monkeypatch):
     code, _ = _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c", "--sub", "x"])
     assert code == 1
     assert Container(home).backend.list_user_grants() == []
+
+
+def test_the_grant_list_is_an_admins_over_everything(home, capsys, monkeypatch):
+    c = Container(home)
+    narrow = c.auth.mint(principal="interactive", owner="self", client="tab", role="admin",
+                         scopes=[c.nodes.user_root().id], actor="self", by_principal="interactive")
+    monkeypatch.setenv("EGZOS_TOKEN", narrow.secret)
+    code, out = _json(capsys, ["grant", "ls"])
+    assert code == 1 and "over the whole container" in out["error"]

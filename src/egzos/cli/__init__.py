@@ -747,9 +747,10 @@ def link(
 
 @grant_app.command("ls")
 def grant_ls():
-    """Who may sign in here, with what: user grants, and the agents registered for them."""
+    """Who may sign in here, with what: user grants, and the agents registered for them. An admin
+    over the whole container's view: who else holds access is not served to a narrower grant."""
     c = _container()
-    token = _owner(c, "the grant list")
+    token = _admin(c, "the grant list")
     grants = c.backend.list_user_grants()
     agents = c.backend.list_agent_registrations()
     c.ledger.append(
