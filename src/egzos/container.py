@@ -24,6 +24,7 @@ from egzos.identity import (
     node_ancestors,
     validate,
 )
+from egzos.keys import container_key
 from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
@@ -34,6 +35,9 @@ from egzos.store.uploads import Uploads
 from egzos.trust import TrustEngine
 
 OWNER = "self"
+#: rest.md §6: the key every `BlobGrant` is signed under, in the container's home. Deleting it
+#: rotates it, and voids every outstanding grant.
+GRANT_KEY_FILE = "blob.key"
 
 
 def _step_up_window() -> int:
@@ -74,7 +78,10 @@ class Container:
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
         self.trust.promote_blob = lambda sha: _is_digest(sha) and self.blobs.promote(sha)
+        self.trust.shown = lambda token, item, node: shown(self, token, item, node)
+        self.trust.grant_key = lambda: container_key(self.home, GRANT_KEY_FILE)
         self.uploads = Uploads(self.backend, self.ledger, self.blobs, self.store)
+        self.trust.staged = self.store.staged = self.uploads.is_staged
         self.confirm = Confirm(
             self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,
             salt=self._salt,

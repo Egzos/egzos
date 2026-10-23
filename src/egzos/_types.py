@@ -195,8 +195,8 @@ class ResolvedItem(TypedDict):
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
-    *Decided, not running.* `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]);
-    the grant id is not the bearer secret.
+    *Running* at the REST door (rest.md §6). `sig` is an HMAC-SHA256 over every other field with
+    the container's `blob.key` ([0.3 · 45]); the grant id is not the bearer secret.
     """
 
     sha256: str
@@ -848,9 +848,19 @@ class UploadState(Protocol):
     #:   caller writes the outcome (`staged`, `item`) with `put_upload` in the same transaction.
 
 
-#: storage.md §3.1–§3.4. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+class GrantState(Protocol):
+    """rest.md §6's spent `BlobGrant`s (storage.md §3.5), keyed on the sha256 of the grant's `sig`,
+    never on the `sig`: with the other four fields it is the credential, kept only as a hash."""
+
+    def spend_grant(self, sig_hash: str, expires_at: str) -> bool: ...
+    #: ^ True for the one call that first spends it: of two concurrent redemptions, one passes
+    def forget_grants(self, expired_before: str) -> None: ...
+    #: ^ drops the spent records of grants that expired before this time
+
+
+#: storage.md §3.1–§3.5. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
 DOOR_STATE_CONTRACTS: tuple[str, ...] = (
-    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState"
+    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState", "GrantState"
 )
 
 
@@ -910,6 +920,7 @@ __all__ = [
     "DeviceRedemptionCause",
     "Event",
     "GrantDecision",
+    "GrantState",
     "IdentityState",
     "ItemStore",
     "Kind",

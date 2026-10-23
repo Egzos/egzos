@@ -222,6 +222,12 @@ class Uploads:
         records = self.backend.list_uploads(None if admin else token.id)
         return [r for r in records if self.orphan(r)]
 
+    def is_staged(self, item_id: str) -> bool:
+        """Whether this artifact item's own bytes are still staged: undecided, so unaddressable,
+        even where another promotion has filled the same address (a1r on #291)."""
+        return any(r["item"] == item_id and self._staged_item(r) is not None
+                   for r in self.backend.list_uploads())
+
     def staged_items(self) -> set[str]:
         """The ids of artifact items whose bytes are still staged."""
         return {r["item"] for r in self.backend.list_uploads()

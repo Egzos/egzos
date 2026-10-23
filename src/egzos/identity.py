@@ -460,6 +460,17 @@ class Identity:
                     out.add(a)
         return sorted(out)
 
+    def by_id(self, token_id: str) -> GrantToken | None:
+        """The caller a `Token.id` names, as the grants stand now: `user:<sub>`, or
+        `agent:<client_id>:<sub>` matched whole against a live registration. A `BlobGrant` names
+        its token by id (rest.md §6 check 5)."""
+        if token_id.startswith("user:"):
+            return self._person(token_id[len("user:"):], self.config("identity.client_id") or "")
+        for registration in self.state.list_agent_registrations():
+            if f"agent:{registration['client_id']}:{registration['sub']}" == token_id:
+                return self._agent(registration["client_id"], registration["sub"])
+        return None
+
     def refresh(self, token: GrantToken) -> GrantToken | None:
         """The same caller as the grants stand now: a revoke since the request began counts."""
         if token.principal == "client":

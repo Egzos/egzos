@@ -13,9 +13,10 @@ import mimetypes
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from egzos._ids import ulid
-from egzos._types import CONTAINER_CONFIG_DEFAULTS, ContainerConfig, UploadRecord
+from egzos._types import CONTAINER_CONFIG_DEFAULTS, BlobGrant, ContainerConfig, UploadRecord
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import KINDS, ContextItem, Node, Token, now_iso
@@ -54,6 +55,8 @@ class Store:
         self.covers: Callable[[Token, Node], bool] | None = None
         # the serving predicate search uses (`find.shown`), wired by the container likewise
         self.shown: Callable[[Token, ContextItem, Node], bool] | None = None
+        # whether an artifact item's own bytes are still staged, wired by the container
+        self.staged: Callable[[str], bool] = lambda item_id: False
 
     # -- add ------------------------------------------------------------------------------
     def add(
@@ -208,6 +211,8 @@ class Store:
             return None
         if item.status == "quarantined" or item.lifecycle.get("tombstoned"):
             return None
+        if self.staged(item.id):
+            return None  # its own bytes are undecided, whatever the address holds (a1r on #291)
         if self.shown is None or not self.shown(token, item, node):
             return None
         sha = item.content.get("sha256")
@@ -225,3 +230,10 @@ class Store:
                 size=len(data),
             )
         return data
+
+    @staticmethod
+    def grant_url(grant: BlobGrant) -> str:
+        """Render a `BlobGrant` minted by Trust into its redemption URL (rest.md §6). Store decides
+        nothing here, and mints nothing on its own authority (F5)."""
+        query = {k: grant[k] for k in ("item", "token", "expires_at", "sig")}  # type: ignore[literal-required]
+        return f"/v1/blobs/{grant['sha256']}?{urlencode(query)}"

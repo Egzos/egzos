@@ -22,7 +22,9 @@ from __future__ import annotations
 import asyncio
 import calendar
 import contextlib
+import hashlib
 import json
+import re
 import time
 from collections.abc import AsyncIterator
 from typing import Any
@@ -47,7 +49,7 @@ from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
 from egzos.store.uploads import TooManyUploads, valid_open
-from egzos.trust import HumanOnly, TrustError
+from egzos.trust import GRANT_TIME, HumanOnly, TrustError, grant_expiry
 
 #: §3: the four lines every answer of this door carries (Content-Type is the response's own).
 HEADERS = {"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
@@ -60,6 +62,19 @@ BODY_MAX_BYTES = 256 * 1024
 CLOSE_EVERY_SECONDS = 15
 
 _CREATABLE = tuple(t for t in CONTAINER_TYPES if t not in ("inbox", "global", "uxo"))
+#: §6: where a `BlobGrant` is redeemed, and the headers the bytes go out under: never rendered on
+#: this origin.
+BLOBS = "/v1/blobs/"
+PULL_HEADERS = {
+    "Content-Disposition": "attachment",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "sandbox",
+    "Cache-Control": "no-store",
+    "Referrer-Policy": "no-referrer",
+}
+GRANT_FIELDS = ("item", "token", "expires_at", "sig")
+_SIG = re.compile(r"[A-Za-z0-9_-]{43}")
+_GRANT_TIME = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z")
 #: §4.3: the agent log's page, by default and at most.
 LOG_LIMIT, LOG_LIMIT_MAX = 50, 200
 #: §4.3's shapes.
@@ -229,6 +244,18 @@ class Door:
         return {"item": item, "layer": self.c.nodes.path(node), "layer_type": node.type,
                 "shadowed_by": shadowed_by}
 
+    def granted(self, token: Token, entry: dict[str, Any]) -> dict[str, Any]:
+        """§6: an artifact whose bytes are not inline carries a single-use grant and its URL,
+        beside `item` and never inside it, when Trust mints one for this token."""
+        content = entry["item"].get("content") or {}
+        if entry["item"].get("kind") != "artifact" or "inline" in content:
+            return entry
+        item = self.c.store.get(entry["item"]["id"])
+        grant = self.c.trust.authorize_pull(token, item) if item else None
+        if grant is None:
+            return entry
+        return {**entry, "grant": grant, "grant_url": self.c.store.grant_url(grant)}
+
     def readable(self, token: Token, item, node: Node) -> bool:
         """Whether `GET /v1/items/{id}` serves the item to this token (§3's list)."""
         if item.status == "quarantined":
@@ -284,9 +311,19 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 return out(Response(status_code=204, headers=HEADERS))
             return refusal()
         address = request.client.host if request.client else None
+        redemption = request.method == "GET" and path.startswith(BLOBS)
         if d.throttle.holds(address):
             d.throttle.count(address, refused=True)
-            return out(unauthorized())
+            # §6: at redemption the uniform failure is §3's refusal, a valid descriptor unspent.
+            return out(refusal() if redemption else unauthorized())
+        if redemption:
+            # §6: the descriptor is the whole credential; no `Authorization` is read or consulted.
+            request.state.address = address
+            try:
+                response = await call_next(request)
+            except Exception:  # noqa: BLE001 — never a stack, a path or an exception's text
+                response = _json(500, {"error": "internal"})
+            return out(response)
         token = d.caller(request.headers.get("authorization"))
         if token is None:
             d.throttle.count(address, refused=False)
@@ -333,7 +370,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             "scope": result["scope"],
             "chain": result["chain"],
             "items": [
-                {k: e[k] for k in ("item", "layer", "layer_type", "shadowed_by")}
+                d.granted(token, {k: e[k] for k in ("item", "layer", "layer_type", "shadowed_by")})
                 for e in result["items"]
             ],
         })
@@ -369,7 +406,7 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         subject=found.id, scope=node.id, client=token.client,
                         items=[found.id], layers=[node.id], withheld=0)
-        return _json(200, d.entry(found.to_dict(), node))
+        return _json(200, d.granted(token, d.entry(found.to_dict(), node)))
 
     @app.get("/v1/inbox")
     async def inbox(request: Request):
@@ -1117,6 +1154,78 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 lines.append({k: e[k] for k in LOG_KEYS})
         read(token, "agent_log")
         return _json(200, {"entries": lines[::-1][:limit]})
+
+    # -- BlobGrant redemption (§6) --------------------------------------------------------------
+    def named(caller: Token | None, token_id: str) -> tuple[str, str, str | None]:
+        """Who a verified descriptor names, for the record: its token as it stands, or, for a
+        grant since revoked, the person or agent its id spells (`identity.md` §3a)."""
+        if caller is not None:
+            return caller.owner, caller.principal, getattr(caller, "acting_for", None)
+        if token_id.startswith("agent:"):
+            client_id, _, sub = token_id[len("agent:"):].partition(":")
+            return f"agent:{client_id}", "client", f"user:{sub}"
+        return token_id, "interactive", None
+
+    @app.get("/v1/blobs/{sha256}")
+    async def redeem(request: Request, sha256: str):
+        address = request.state.address
+        params = request.query_params
+        # 1 · Every field present once and well-formed; 2 · the signature verifies. Either failing
+        # names no caller: it is counted as forged and tallied, and nothing is appended.
+        well_formed = (
+            set(params) == set(GRANT_FIELDS)
+            and all(len(params.getlist(k)) == 1 for k in GRANT_FIELDS)
+            and re.fullmatch(r"[0-9a-f]{64}", sha256) is not None
+            and 0 < len(params["item"]) <= 64 and 0 < len(params["token"]) <= 512
+            and _GRANT_TIME.fullmatch(params["expires_at"]) is not None
+            and _SIG.fullmatch(params["sig"]) is not None
+        )
+        # The path's digest is the descriptor's `sha256`: the MAC covers it, so a path naming any
+        # other digest fails here (and so check 7's first half).
+        fields = {"sha256": sha256, **{k: params[k] for k in GRANT_FIELDS}} if well_formed else {}
+        if not well_formed or not c.trust.verify_grant(fields):
+            d.throttle.count(address, refused=False, forged=True)
+            return refusal()
+        token_id = fields["token"]
+        if d.throttle.holds_token(token_id):
+            d.throttle.count_token(token_id, refused=True)
+            return refusal()  # counted, not evaluated: a valid descriptor stays unspent
+        caller = c.backend.get_token(token_id) or c.identity.by_id(token_id)
+
+        def refuse(check: int) -> Response:
+            # A verified descriptor names its caller: the refusal is a read under that token,
+            # and counts toward its own bucket only.
+            d.throttle.count_token(token_id, refused=False)
+            owner, principal, user = named(caller, token_id)
+            with acting_for(user):
+                c.ledger.append("context.fetch", actor=owner, principal=principal,
+                                client=caller.client if caller else None, ref=fields["item"],
+                                items=[], layers=[], withheld=0, pull="refused", check=check)
+            return refusal()
+
+        expires = grant_expiry(fields["expires_at"])
+        if expires is None or expires <= c.trust.clock():  # 3
+            return refuse(3)
+        sig_hash = hashlib.sha256(fields["sig"].encode()).hexdigest()
+        c.backend.forget_grants(time.strftime(GRANT_TIME, time.gmtime(c.trust.clock())))
+        if not c.backend.spend_grant(sig_hash, fields["expires_at"]):  # 4 · single use
+            return refuse(4)
+        if caller is None or not caller.live:  # 5 · live, and holds `fetch` over it now
+            return refuse(5)
+        item = c.store.get(fields["item"])
+        if not c.trust.serves_pull(caller, item):  # 5–6 · covered, and still served to it
+            return refuse(6)
+        assert item is not None
+        if item.content.get("sha256") != sha256:  # 7
+            return refuse(7)
+        data = c.blobs.get(sha256)
+        if data is None:  # 8
+            return refuse(8)
+        with acting_for(getattr(caller, "acting_for", None)):
+            c.ledger.append("blob.pull", actor=caller.owner, principal=caller.principal,
+                            subject=item.id, scope=item.scope, sha256=sha256, size=len(data))
+        return Response(data, status_code=200, media_type="application/octet-stream",
+                        headers=PULL_HEADERS)
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],

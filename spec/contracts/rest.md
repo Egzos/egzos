@@ -726,9 +726,16 @@ Referrer-Policy: no-referrer
   `forged` in the window's `rest.tally` (§2 item 7), so a flood of forged descriptors leaves a
   trace. **decided** (the Chief on #165 item 2, option (b), 2026-10-09); **a1p**, the shape.
 
-**The key.** `TODO(a1p)`, #165 item 4: where the HMAC key is provisioned, stored and rotated.
-Rotation voids every outstanding grant. It was drafted for the #143 batch beside the authorization
-server's own keys, which retired with it (`identity.md` §9).
+**The key.** HMAC-SHA256, under `blob.key` in the container's home (0600): created on first use,
+written whole and never rewritten, the container's alone, never exported or synced. Deleting it
+rotates it, and rotation voids every outstanding grant. The spent records are `storage.md` §3.5's
+`GrantState`. **a1p** (#165 item 4, closed by this text).
+
+**The per-token bucket's rate** is the per-source rate, 30 a window, until the Chief sets it on
+#141. **a1p.**
+
+**A refused redemption's read** carries `details.pull: refused` and `details.check`, the number of
+the check that failed (3 to 8). **a1p.**
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit

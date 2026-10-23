@@ -78,8 +78,7 @@ the client cannot use.** The grant is minted by Trust, never by Store/Vault (**F
 renders a grant into a URL and decides nothing. A stdio client receives the descriptor and redeems
 it at the REST door (Phase 2); how long a grant lives and how often it is redeemed is `rest.md`
 §6's (#165). The mint is one audit event (`blob.grant`) and the redemption
-another (`blob.pull`) — see `events.md`. **decided, not running** (the skeleton serves inline
-`text/*` at or below 64 KiB and has no grant).
+another (`blob.pull`) — see `events.md`. **running** at the REST door (`rest.md` §6).
 
 **`BlobGrant.sig` is an HMAC over `sha256`, `item`, `token` and `expires_at` under a
 container-held key. [0.3 · 45]** The key never leaves the container, and the grant id is not the

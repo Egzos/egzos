@@ -74,6 +74,9 @@ CREATE INDEX IF NOT EXISTS challenges_expiry ON challenges(expires_at);
 CREATE TABLE IF NOT EXISTS credentials (
   id TEXT PRIMARY KEY, person TEXT NOT NULL, doc TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS credentials_person ON credentials(person);
+-- GrantState (storage.md §3.5): spent BlobGrants, by the sha256 of their sig, until they expire.
+CREATE TABLE IF NOT EXISTS spent_grants (sig_hash TEXT PRIMARY KEY, expires_at TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS spent_grants_expiry ON spent_grants(expires_at);
 -- UploadState (storage.md §3.4): rest.md §4.4's uploads, each step spent once.
 CREATE TABLE IF NOT EXISTS uploads (
   id TEXT PRIMARY KEY, principal TEXT NOT NULL, bytes_spent INTEGER NOT NULL DEFAULT 0,
@@ -461,3 +464,16 @@ class SqliteBackend:
         )
         self._commit()
         return cur.rowcount == 1
+
+    # -- GrantState (storage.md §3.5) --------------------------------------------------------
+    def spend_grant(self, sig_hash: str, expires_at: str) -> bool:
+        cur = self.db.execute(
+            "INSERT OR IGNORE INTO spent_grants(sig_hash,expires_at) VALUES(?,?)",
+            (sig_hash, expires_at),
+        )
+        self._commit()
+        return cur.rowcount == 1
+
+    def forget_grants(self, expired_before: str) -> None:
+        self.db.execute("DELETE FROM spent_grants WHERE expires_at < ?", (expired_before,))
+        self._commit()

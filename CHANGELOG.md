@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
+- **Download artifacts too large to inline** (`rest.md` §6): a read of an artifact over
+  `blobs.inline_max_bytes` (or not text) carries a `grant` and a `grant_url` beside the item. The URL
+  redeems once, within five minutes, with no header, checking the token, the item and its bytes as
+  they stand at that moment; the bytes go out as a download, never rendered. Forged links are
+  tallied, a token's replays are bounded, and deleting `blob.key` voids every outstanding link.
 - **Grants and agents at the door** (`rest.md` §4.3): an admin lists, grants and revokes who may
   sign in (`/v1/grants`), with the confirm for a grant; registers an agent for themself from the
   consent page's flow (`POST /v1/agents`), confirmed, once per provider authorization; and anyone

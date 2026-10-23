@@ -14,11 +14,17 @@ No capability reaches them: a maximally granted client can only PROPOSE.
 
 from __future__ import annotations
 
+import base64
+import calendar
 import hashlib
+import hmac
+import re
+import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
 from egzos._ids import ulid
+from egzos._types import BLOB_GRANT_LIFETIME_SECONDS, BlobGrant
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import RING_RANK, ROLE_BUNDLES, ContextItem, Node, Token, canonical, now_iso
@@ -49,6 +55,14 @@ class TrustEngine:
         # Moves a staged artifact's bytes into the promoted store on promotion, True if any moved
         # (storage.md §4); the container wires in its blob store's `promote`.
         self.promote_blob: Callable[[str], bool] = lambda sha: False
+        # rest.md §6: the serving predicate a pull passes (search's own, `find.shown`), and the
+        # container key every `BlobGrant` is signed under; the container wires in both.
+        self.shown: Callable[[Token, ContextItem, Node], bool] = lambda t, i, n: False
+        self.grant_key: Callable[[], bytes] | None = None
+        # Whether an artifact item's own bytes are still staged (rest.md §4.4); the container
+        # wires in its uploads' answer.
+        self.staged: Callable[[str], bool] = lambda item_id: False
+        self.clock: Callable[[], float] = time.time
 
     # -- coverage & audience -----------------------------------------------------------------
     def covers(self, token: Token, node: Node) -> bool:
@@ -149,6 +163,53 @@ class TrustEngine:
                     mime=item.content.get("mime"),
                 )
         return item
+
+    # -- blob grants (rest.md §6) -------------------------------------------------------------
+    def serves_pull(self, token: Token, item: ContextItem | None) -> bool:
+        """Artifact download IS fetch: `fetch`, coverage of the item's scope, and the serving
+        check a read of the item passes, as they stand now. Never a tombstoned or quarantined
+        item."""
+        if item is None or item.kind != "artifact" or not token.has("fetch"):
+            return False
+        node = self.backend.get_node(item.scope)
+        if node is None or not self.covers(token, node):
+            return False
+        if item.status == "quarantined" or item.lifecycle.get("tombstoned"):
+            return False
+        if self.staged(item.id):
+            # Its own bytes are undecided: serving the address another promotion filled would
+            # answer whether someone else holds the same bytes (a1r on #291).
+            return False
+        return self.shown(token, item, node)
+
+    def authorize_pull(self, token: Token, item: ContextItem) -> BlobGrant | None:
+        """Mint a single-use `BlobGrant` for an artifact this token may read, and append
+        `blob.grant`; silence otherwise. It lives `BLOB_GRANT_LIFETIME_SECONDS` from now, fixed."""
+        sha = item.content.get("sha256")
+        if (self.grant_key is None or not isinstance(sha, str) or not _DIGEST.fullmatch(sha)
+                or not self.serves_pull(token, item)):
+            return None
+        expires = time.strftime(
+            GRANT_TIME, time.gmtime(int(self.clock()) + BLOB_GRANT_LIFETIME_SECONDS))
+        fields = {"sha256": sha, "item": item.id, "token": token.id, "expires_at": expires}
+        grant: BlobGrant = {**fields, "sig": self._sign(fields)}  # type: ignore[typeddict-item]
+        self.ledger.append("blob.grant", actor=token.owner, principal=token.principal,
+                           subject=item.id, scope=item.scope, sha256=sha, expires_at=expires)
+        return grant
+
+    def verify_grant(self, fields: dict[str, str]) -> bool:
+        """Whether `sig` is this container's MAC over every other descriptor field, compared in
+        constant time (context-item.md §3)."""
+        if self.grant_key is None:
+            return False
+        claimed = fields.get("sig", "")
+        return hmac.compare_digest(self._sign(fields).encode(), claimed.encode())
+
+    def _sign(self, fields: dict[str, str]) -> str:
+        assert self.grant_key is not None
+        body = canonical({k: v for k, v in fields.items() if k != "sig"}).encode()
+        mac = hmac.new(self.grant_key(), body, hashlib.sha256).digest()
+        return base64.urlsafe_b64encode(mac).rstrip(b"=").decode()
 
     def quarantine(self, item: ContextItem, *, token: Token, actor: str, reason: str) -> list[str]:
         node = self.backend.get_node(item.scope)
@@ -516,6 +577,19 @@ class TrustEngine:
     def _human_only(token: Token, act: str) -> None:
         if token.principal != "interactive":
             raise HumanOnly(f"{act} is a human-only act; a client principal can only propose")
+
+
+#: A `BlobGrant`'s `expires_at`: UTC to the second, fixed width.
+GRANT_TIME = "%Y-%m-%dT%H:%M:%SZ"
+_DIGEST = re.compile(r"[0-9a-f]{64}")
+
+
+def grant_expiry(text: str) -> float | None:
+    """A grant's `expires_at` as a time, or None when it is not one."""
+    try:
+        return float(calendar.timegm(time.strptime(text, GRANT_TIME)))
+    except (TypeError, ValueError):
+        return None
 
 
 def _role_name(capabilities: list[str]) -> str:
