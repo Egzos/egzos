@@ -179,7 +179,9 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   time); the last grant holding `admin` over `["*"]` is never revoked. Signing the user out at the
   provider ends their tokens at `exp`.
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
-  `capabilities` and `scopes`. They enter `events.md` §1 with the code that appends them. **a1p.**
+  `outcome`, `capabilities` and `scopes`; a refusal (`outcome: refused`, `reason: last_admin`,
+  `rest.md` §4.3) carries no `capabilities` or `scopes`, since nothing changed hands. They enter
+  `events.md` §1 with the code that appends them. **a1p.**
 
 ## 5 · The confirm — the presence backstop
 

@@ -353,7 +353,8 @@ the row does not name is `400` (§3).
    it): an artifact above the threshold carries neither `inline` nor `grant`, and a client reads it
    at `GET /v1/items/{id}`.
 5. **`GET /v1/scopes`** returns the child nodes of `under`, sorted by path. `under` absent is the
-   personal root, as `egzos_fetch`'s default.
+   token's start, as `egzos_fetch`'s default: the personal root for a token over everything, the
+   token's first scope for a narrower one. **a1p** (a1r on #288).
 6. **`POST /v1/items`** returns the item as written: `trust.status` is `unverified` (`container.md`
    §5). `kind` defaults to `memory`; `scope` absent is pure capture, a fresh auto-titled thread in
    the inbox (R11), as `egzos_remember`.
@@ -497,9 +498,11 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
   **today**. An omitted line leaves no marker and no count, so the log cannot tell a reader what exists
   outside their sight, or whether a probed target existed.
-- **Revoking the last admin grant** answers `409` with `{"error":"last_admin"}` and §3's headers, to the
-  admin who asked — a fact about their own container — and appends `identity.revoke` with `outcome:
-  refused`, `details.reason: last_admin`.
+- **Revoking the last admin grant, or re-granting it narrower,** answers `409` with
+  `{"error":"last_admin"}` and §3's headers, to the admin who asked — a fact about their own
+  container — and appends `identity.revoke` (a revoke) or `identity.grant` (a narrowing re-grant)
+  with `outcome: refused`, `details.reason: last_admin`, and no `capabilities` or `scopes`: nothing
+  changed hands. **a1p** (a1r on #287).
 - **Credential registration has two legs.** The first answers `{"result": "register", "challenge",
   "webauthn": <PublicKeyCredentialCreationOptions>, "expires_at"}`, a challenge bound to the caller as
   §4.2's are. For a person who already has a credential it also answers `"confirm": {"challenge",

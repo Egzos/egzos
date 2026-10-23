@@ -14,6 +14,9 @@ uniform page had.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 from egzos._types import EVENTS as CONTRACT_EVENTS
@@ -29,6 +32,21 @@ EVENTS: tuple[str, ...] = CONTRACT_EVENTS
 
 def _hash(prev_hash: str, body: dict[str, Any]) -> str:
     return hashlib.sha256((prev_hash + canonical(body)).encode("utf-8")).hexdigest()
+
+
+#: The user an agent acts for, while a request it made runs (identity.md §3a): every entry that
+#: request appends names both, the agent as `actor` and the user as `details.for`.
+_acting_for: ContextVar[str | None] = ContextVar("acting_for", default=None)
+
+
+@contextmanager
+def acting_for(user: str | None) -> Iterator[None]:
+    """Stamp `details.for` on every entry appended inside, wherever in the engine it is made."""
+    reset = _acting_for.set(user)
+    try:
+        yield
+    finally:
+        _acting_for.reset(reset)
 
 
 class Ledger:
@@ -53,6 +71,9 @@ class Ledger:
             raise ValueError(f"audit event {event!r} cannot be unattributed")
         if event in PRINCIPAL_NONE_EVENTS and principal != "none":
             raise ValueError(f"audit event {event!r} carries no caller")
+        user = _acting_for.get()
+        if user is not None and principal != "none":
+            details = {**details, "for": user}
         # Read the head, chain onto it, append. Two processes (the CLI and `serve --mcp`) can read
         # the same head; the backend accepts one successor per entry, and the loser re-chains.
         for _ in range(64):

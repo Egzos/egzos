@@ -85,6 +85,7 @@ def test_the_door_state_is_the_two_throttle_counters():
     methods = {
         n for n, _ in inspect.getmembers(t.ThrottleState, inspect.isfunction) if n[0] != "_"
     }
-    assert methods == {"throttle_incr", "throttle_count"}
+    assert methods == {"throttle_incr", "throttle_count", "throttle_buckets", "throttle_windows",
+                       "throttle_forget"}
     assert t.DOOR_STATE_CONTRACTS == ("ThrottleState", "IdentityState", "ConfigState")
     assert not hasattr(t, "ASState") and not hasattr(t, "ASGateState")

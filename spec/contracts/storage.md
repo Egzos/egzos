@@ -163,11 +163,18 @@ beside `ContainerState`, in `src/egzos/_types.py` like the other three:
 # ThrottleState — counters (rest.md §2 item 7); keys are the door's, opaque to the store
 throttle_incr(surface, bucket_key, window_key) -> int    # increments and returns the new count, atomically
 throttle_count(surface, bucket_key, window_key) -> int   # reads without incrementing; 0 for an unseen key
+throttle_buckets(surface, window_key) -> list           # every (bucket_key, count) of one window
+throttle_windows(surface) -> list                       # every window with a counter
+throttle_forget(surface, window_key) -> None            # drops a closed window's counters
 ```
 
 No rate and no window length live here: `_types.py`'s `AS_THROTTLE_RATES` and
 `AS_THROTTLE_WINDOW_SECONDS` carry them, and the door reads them. A network identifier may key a
-bucket and never enters the chain.
+bucket and never enters the chain. A closed window's counters are forgotten once its release and
+tally are appended and an hour has passed, so the table holds at most a recent hour of windows.
+The per-source and `window_key` digests are keyed by a per-container secret, `throttle.key` in the
+container's home (0600); it is the throttle's alone and does not travel with an export or a sync:
+a place makes its own. **a1p** (a1r on #288).
 
 **The partition: `ContainerState`-class. decided** (the Chief on #173, option (A), 2026-10-09). The
 counters are durable and never delegated: the backend that implements `ContainerState` implements

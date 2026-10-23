@@ -100,3 +100,12 @@ def test_the_grant_list_is_an_admins_over_everything(home, capsys, monkeypatch):
     monkeypatch.setenv("EGZOS_TOKEN", narrow.secret)
     code, out = _json(capsys, ["grant", "ls"])
     assert code == 1 and "over the whole container" in out["error"]
+
+
+def test_the_token_list_is_an_admins_over_everything(home, capsys, monkeypatch):
+    c = Container(home)
+    narrow = c.auth.mint(principal="interactive", owner="self", client="tab", role="admin",
+                         scopes=[c.nodes.user_root().id], actor="self", by_principal="interactive")
+    monkeypatch.setenv("EGZOS_TOKEN", narrow.secret)
+    code, out = _json(capsys, ["token", "ls"])
+    assert code == 1 and "over the whole container" in out["error"]
