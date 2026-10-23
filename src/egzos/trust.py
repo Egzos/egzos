@@ -171,23 +171,38 @@ class TrustEngine:
         ]
 
     # -- the gate ------------------------------------------------------------------------------
-    def move(self, item: ContextItem, to: Node, *, token: Token, actor: str) -> dict[str, Any]:
-        """cp/mv landing at a different audience halts at the gate (v0.3 §5). Inward = instant."""
+    def gate(
+        self, item: ContextItem, to: Node, *, token: Token, act: str = "move"
+    ) -> tuple[Node, list[dict[str, Any]]]:
+        """The gate's checks for a move or a copy, in `container.md` §6's order, and the audience
+        delta they reach: coverage, then quarantine, then the floor (`organize`, and `remember`
+        on the destination for a copy), and only then the delta, with `publish` needed to widen.
+        Raises `TrustError` with the floor's text for every refusal past coverage, so a token that
+        may not do the act never learns whether the destination's audience is wider."""
         frm = self.backend.get_node(item.scope)
         if frm is None or not self.covers(token, frm) or not self.covers(token, to):
             # Coverage lives here, not per surface: an item or target the token cannot see answers
             # exactly like one that does not exist (silence-not-errors).
             raise TrustError("not found")
+        if act == "copy" and not token.has("fetch"):
+            raise TrustError("not found")  # a copy reads its source: no `fetch`, no source
         if item.status == "quarantined":
             # A quarantined item does not move, silently or by proposal (step-up spec R5).
             raise TrustError("quarantined items do not move; lift the quarantine deliberately")
         # The floor is checked BEFORE the delta (container.md §6): a token that may not move the
         # item never learns from the refusal whether the destination's audience is wider.
-        if not token.has("organize"):
+        if not token.has("organize") or (act == "copy" and not token.has("remember")):
             raise TrustError(_MOVE_REFUSED)
         before = self.audience(frm)
         after = self.audience(to)
         delta = [a for a in after if a["token"] not in {b["token"] for b in before}]
+        if delta and not token.has("publish"):
+            raise TrustError(_MOVE_REFUSED)  # the floor's text: the branch is not disclosed
+        return frm, delta
+
+    def move(self, item: ContextItem, to: Node, *, token: Token, actor: str) -> dict[str, Any]:
+        """cp/mv landing at a different audience halts at the gate (v0.3 §5). Inward = instant."""
+        frm, delta = self.gate(item, to, token=token)
         outward = RING_RANK.get(to.type, -1) > RING_RANK.get(frm.type, -1)
 
         if not delta:
@@ -208,12 +223,60 @@ class TrustEngine:
                 )
             return {"moved": True, "gate": "silent", "audience_delta": []}
 
-        # Nonzero delta: this is a publish. Proposing it needs `publish` (freeze item 3). Park it —
-        # even for the interactive owner the gate shows the RESOLVED audience; the confirm is a
-        # separate human act (`trust approve`, behind the presence tap).
-        if not token.has("publish"):
-            raise TrustError(_MOVE_REFUSED)  # the floor's text: the branch is not disclosed
+        # Nonzero delta: this is a publish. Park it — even for the interactive owner the gate
+        # shows the RESOLVED audience; the confirm is a separate human act (`trust approve`
+        # behind the presence tap, or the REST door's inline confirm, `move_confirmed`).
         return self._park(item, frm, to, token, actor, delta, reason="audience widens")
+
+    def copy(self, item: ContextItem, to: Node, *, token: Token, actor: str) -> dict[str, Any]:
+        """A copy is a new item at the destination, derived from the source, through the same
+        gate as a move (v0.7 §V): silent when nobody new would see it, parked when they would."""
+        frm, delta = self.gate(item, to, token=token, act="copy")
+        if not delta:
+            with self.backend.atomic():
+                new = self._do_copy(item, to, actor, token.principal)
+                self.ledger.append(
+                    "gate.pass.silent",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=new.id,
+                    scope=to.id,
+                    audience_delta="none",
+                    from_=frm.id,
+                    copy_of=item.id,
+                )
+            return {"copied": True, "gate": "silent", "item": new, "audience_delta": []}
+        return self._park(item, frm, to, token, actor, delta, reason="audience widens",
+                          kind="copy")
+
+    def confirmed(
+        self,
+        item: ContextItem,
+        to: Node,
+        *,
+        token: Token,
+        actor: str,
+        act: str,
+        delta: list[dict[str, Any]],
+        step_up: int | None,
+    ) -> ContextItem:
+        """A widening move or copy the person confirmed inline (rest.md §4.2): the gate's own
+        entry, then the act's. The caller holds the transaction the confirm was spent in."""
+        self._human_only(token, "gate.confirm")
+        self.ledger.append(
+            "gate.pass.confirmed",
+            actor=actor,
+            principal=token.principal,
+            subject=item.id,
+            scope=to.id,
+            audience_delta=[d["token"] for d in delta],
+            step_up=step_up,
+            act=act,
+        )
+        if act == "copy":
+            return self._do_copy(item, to, actor, token.principal)
+        self._do_move(item, to, actor, token.principal)
+        return item
 
     def _park(
         self,
@@ -225,12 +288,13 @@ class TrustEngine:
         delta: list[dict[str, Any]],
         *,
         reason: str,
+        kind: str = "move",
     ) -> dict[str, Any]:
         audience = self.audience(to)
         proposal = {
             "id": ulid(),
             "status": "open",
-            "kind": "move",
+            "kind": kind,
             "items": [item.id],
             "from": frm.id,
             "to": to.id,
@@ -305,10 +369,15 @@ class TrustEngine:
                 # Every move, the status and the chain entry land together: a failure on item k
                 # rolls back items 1…k-1 too, so a failed approval has moved nothing.
                 for item in items:
-                    if item:
-                        if self._reset_if_agent_run(item, proposer):
-                            reset.append(item.id)
-                        self._do_move(item, to, actor, token.principal)
+                    if not item:
+                        continue
+                    if p.get("kind") == "copy":
+                        # A copy is a new write: it lands unverified whoever proposed it.
+                        self._do_copy(item, to, actor, token.principal)
+                        continue
+                    if self._reset_if_agent_run(item, proposer):
+                        reset.append(item.id)
+                    self._do_move(item, to, actor, token.principal)
                 p["status"] = "executed"
                 p["executed_at"] = now_iso()
                 p["approved_by"] = actor
@@ -385,6 +454,27 @@ class TrustEngine:
         self.ledger.append(
             "item.move", actor=actor, principal=principal, subject=item.id, scope=to.id, from_=frm
         )
+
+    def _do_copy(self, item: ContextItem, to: Node, actor: str, principal: str) -> ContextItem:
+        """A new item at `to`: a fresh id, unverified (a copy is a new write), derived from the
+        source, so quarantining the source reaches the copy too. An artifact's bytes are not
+        duplicated: the copy names the same `content.sha256` ([0.3 · 41]'s dedup)."""
+        now = now_iso()
+        new = ContextItem.from_dict(item.to_dict())
+        new.id = ulid()
+        new.scope = to.id
+        new.trust = {"status": "unverified"}
+        new.provenance = {k: v for k, v in item.provenance.items() if k != "approved_by"} | {
+            "derived_from": item.id
+        }
+        new.lifecycle = {"created_at": now, "updated_at": now, "version": 1}
+        new.visibility = {**item.visibility, "ring": to.type}
+        self.backend.put(new)
+        self.ledger.append(
+            "item.copy", actor=actor, principal=principal, subject=new.id, scope=to.id,
+            **{"from": item.id},
+        )
+        return new
 
     @staticmethod
     def _human_only(token: Token, act: str) -> None:

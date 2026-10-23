@@ -215,6 +215,23 @@ put_config(key, value)                           -> None
 - **The writes are the caller's to audit.** `identity.grant`, `identity.revoke` and `config.set` are
   appended by the code that decides the act, in the same transaction as the write.
 
+## 3.3 · The confirm's challenges — `ConfirmState`
+
+**Status of this section: contract v1.1** (`rest.md` §4.2). One Protocol beside `ContainerState`, on
+its substrate and never delegated (F3). **a1p.**
+
+```
+# ConfirmState — rest.md §4.2's challenges
+put_challenge(challenge)                         -> None
+spend_challenge(challenge_id)                    -> ConfirmChallenge | None   # marks it spent; returns it as it stood
+```
+
+- **A challenge is spent once, atomically.** Of two concurrent spends of one challenge, exactly one
+  sees it unspent; the other sees `spent` and is refused (`rest.md` §4.2 item 3). A spend that
+  concludes in a refusal spends it too (item 5).
+- **No column holds a credential.** A challenge is a random value bound to the request that asked
+  for it: the principal, the act, its subject and destination, and the audience delta.
+
 ## 4 · `BlobStore` — content-addressed, staged
 
 ```
@@ -346,8 +363,9 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-§3.1's `ThrottleState` and §3.2's `IdentityState` and `ConfigState` are contract v1.1, not part of
-the 0.3 freeze; their partition is decided on #173 (option (A), on the `ContainerState` substrate).
+§3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState` and §3.3's `ConfirmState` are
+contract v1.1, not part of the 0.3 freeze; their partition is decided on #173 (option (A), on the
+`ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases

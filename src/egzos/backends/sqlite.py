@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from egzos._types import AgentRegistration, ThrottleSurface, UserGrant
+from egzos._types import AgentRegistration, ConfirmChallenge, ThrottleSurface, UserGrant
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -57,6 +57,9 @@ CREATE TABLE IF NOT EXISTS user_grants (sub TEXT PRIMARY KEY, doc TEXT NOT NULL)
 CREATE TABLE IF NOT EXISTS agent_registrations (
   client_id TEXT NOT NULL, sub TEXT NOT NULL, doc TEXT NOT NULL, PRIMARY KEY (client_id, sub));
 CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- ConfirmState (storage.md §3.3): the confirm's challenges, spent once.
+CREATE TABLE IF NOT EXISTS challenges (
+  id TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0, doc TEXT NOT NULL);
 """
 
 
@@ -354,3 +357,22 @@ class SqliteBackend:
             "INSERT OR REPLACE INTO config(key,value) VALUES(?,?)", (key, json.dumps(value))
         )
         self._commit()
+
+    # -- ConfirmState (storage.md §3.3) ------------------------------------------------------
+    def put_challenge(self, challenge: ConfirmChallenge) -> None:
+        self.db.execute(
+            "INSERT INTO challenges(id,spent,doc) VALUES(?,0,?)",
+            (challenge["id"], json.dumps(challenge)),
+        )
+        self._commit()
+
+    def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None:
+        """Mark it spent and return it as it stood: of two concurrent spends, one sees it fresh."""
+        with self.atomic():
+            row = self.db.execute(
+                "SELECT spent, doc FROM challenges WHERE id=?", (challenge_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            self.db.execute("UPDATE challenges SET spent=1 WHERE id=?", (challenge_id,))
+        return {**json.loads(row[1]), "spent": bool(row[0])}

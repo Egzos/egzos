@@ -60,6 +60,7 @@ CONFIG_WIRE_ROWS = [
     ("identity.audience", "identity_audience"),
     ("identity.algorithms", "identity_algorithms"),
     ("identity.browser_origins", "identity_browser_origins"),
+    ("confirm.allow_button", "confirm_allow_button"),
 ]
 
 # `model.BASELINE_CREATE` — what the default floor must reproduce (v0.3 §2).
@@ -146,6 +147,7 @@ def test_container_config_defaults_cover_every_key_and_are_the_skeletons_constan
         "identity_audience": "authenticated",
         "identity_algorithms": "ES256 RS256",
         "identity_browser_origins": "https://egzos.io",
+        "confirm_allow_button": True,
     }
 
 

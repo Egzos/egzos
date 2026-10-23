@@ -283,7 +283,10 @@ def check_container_config(md: str) -> None:
         # The default cell is the value in ticks, sometimes with an unticked gloss after it —
         # `65536` (64 KiB), `300` (≈5 min). The ticked token is the value.
         written = codes(cell)[0]
-        parsed = int(written) if isinstance(typed, int) and written.isdigit() else written
+        if isinstance(typed, bool):  # before int: a bool is an int in Python
+            parsed: object = {"true": True, "false": False}.get(written, written)
+        else:
+            parsed = int(written) if isinstance(typed, int) and written.isdigit() else written
         assert parsed == typed, (
             f"{where}: `{wire_key}` defaults to {written!r} here and {typed!r} in "
             f"CONTAINER_CONFIG_DEFAULTS[{field!r}]"

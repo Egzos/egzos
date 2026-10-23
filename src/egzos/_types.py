@@ -248,6 +248,8 @@ Event = Literal[
     "rest.tally",
     "identity.grant",
     "identity.revoke",
+    "gate.pass.confirmed",
+    "item.copy",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -426,6 +428,8 @@ class ContainerConfig(TypedDict):
     identity_algorithms: str
     #: identity.md §2 — the origins the REST door answers CORS for (§6), space-separated.
     identity_browser_origins: str
+    #: identity.md §2, §5 — whether the confirm accepts the button proof; `false`: biometric only.
+    confirm_allow_button: bool
 
 
 CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
@@ -440,6 +444,7 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "identity_audience": "authenticated",
     "identity_algorithms": "ES256 RS256",
     "identity_browser_origins": "https://egzos.io",
+    "confirm_allow_button": True,
 }
 
 #: Wire key -> `ContainerConfig` field. **The dotted names are canonical** (container.md §8): they
@@ -467,6 +472,7 @@ CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
     "identity.audience": "identity_audience",
     "identity.algorithms": "identity_algorithms",
     "identity.browser_origins": "identity_browser_origins",
+    "confirm.allow_button": "confirm_allow_button",
 }
 
 
@@ -750,8 +756,32 @@ class ConfigState(Protocol):
     def put_config(self, key: str, value: Any) -> None: ...
 
 
-#: storage.md §3.1 and §3.2. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
-DOOR_STATE_CONTRACTS: tuple[str, ...] = ("ThrottleState", "IdentityState", "ConfigState")
+class ConfirmChallenge(TypedDict):
+    """rest.md §4.2: a challenge the confirm's first leg issued, bound to that one request."""
+
+    id: str
+    principal: str  # the `Token.id` the first leg answered (a grant's is `user:<sub>`, …)
+    act: str  # `move`, `copy`, `approve`, `deny`, `promote`
+    subject: str  # the item or proposal
+    destination: str | None  # the scope a move or copy lands in
+    delta: list[str]  # the audience members who would newly see it, sorted
+    expires_at: str
+    spent: NotRequired[bool]
+
+
+class ConfirmState(Protocol):
+    """rest.md §4.2's challenges, on the `ContainerState` substrate (storage.md §3.3)."""
+
+    def put_challenge(self, challenge: ConfirmChallenge) -> None: ...
+    def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None: ...
+    #: ^ marks it spent and returns it AS IT STOOD, atomically: of two concurrent spends of one
+    #:   challenge, exactly one sees `spent` false. `None` for an id never issued.
+
+
+#: storage.md §3.1–§3.3. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+DOOR_STATE_CONTRACTS: tuple[str, ...] = (
+    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState"
+)
 
 
 __all__ = [
@@ -800,6 +830,8 @@ __all__ = [
     "Capability",
     "ClientRegisterOp",
     "ConfigState",
+    "ConfirmChallenge",
+    "ConfirmState",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",

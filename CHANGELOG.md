@@ -25,8 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `POST /v1/scopes` to write. It accepts a container token or a provider sign-in. It answers CORS
   for egzos.io (`identity.browser_origins`). Every refusal is one `404`, every unauthenticated
   request one `401`, and a sweep is throttled and tallied on the chain. Plain HTTP only on
-  loopback; anywhere else, `--tls-cert` and `--tls-key`. Moves, copies and approvals with the
-  Face ID / Touch ID confirm, uploads, and agents over MCP come next.
+  loopback; anywhere else, `--tls-cert` and `--tls-key`.
+- **The confirm at the door** (`rest.md` §4.2): a move or copy that someone new would see, and
+  approve, deny and promote, ask first. The first answer shows who would newly see it and issues a
+  one-time challenge; the second spends it with a proof, and the act lands in the same transaction.
+  The button is the proof today (`confirm.allow_button`); Face ID and Touch ID come with credential
+  registration next. An agent's widening move or copy still parks for a person to decide.
+- **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
+  same gate.
 
 ### Fixed
 
