@@ -1,8 +1,8 @@
 # Contract · identity — the container as a resource server
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
-Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB
-and §AD) into the contract set, and **retires `authorization-server.md`** (§9). One login takes effect
+Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB,
+§AD and §AE) into the contract set, and **retires `authorization-server.md`** (§9). One login takes effect
 with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform` points here.
 
 **Derivation.** No running shape yet: the walking skeleton accepts only its own `Token` (the CLI,
@@ -46,7 +46,7 @@ requires.
 | `identity.client_id` | absent | this container's own OAuth client at the provider (§3a), registered when the container is linked to it |
 | `identity.audience` | `authenticated` | the `aud` value an access token must carry |
 | `identity.algorithms` | `ES256 RS256` | the signing algorithms accepted. Never `none`, never a symmetric `HS*` |
-| `identity.browser_origins` | `https://egzos.io` | origins the REST door answers CORS for (§6) |
+| `identity.browser_origins` | `https://egzos.io` | origins the REST door answers CORS for (§6). While §3a's stand-in holds (v0.7 §AE), it is set to the stand-in origin, never left at the default |
 | `confirm.allow_button` | `true` | whether the confirm accepts the button proof (§5); `false` requires `biometric` |
 
 **Symmetric signing is refused outright.** An `HS256` token can only be checked with the provider's
@@ -95,6 +95,10 @@ session. Each token is bound to one container through the provider's own OAuth 2
   callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`
   — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
   a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
+  Until egzos.io is bought, `https://egzos-site.vercel.app` stands in for it here and in
+  `identity.browser_origins`. No confirm credential (§5) is ever enrolled on the stand-in origin, and
+  on the switch to egzos.io the stand-in leaves every client's redirect URIs and every container's
+  `identity.browser_origins`. **decided** (v0.7 §AE).
 - **A person reaches a container with a token issued to that container's client.** egzos.io runs the
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
