@@ -42,7 +42,7 @@ CONTAINER_STATE = frozenset(
     }
 )
 
-BLOB_STORE = frozenset({"put", "stage", "promote", "get", "exists"})
+BLOB_STORE = frozenset({"put", "stage", "promote", "get", "exists", "discard"})
 
 
 def _methods(protocol: type) -> frozenset[str]:
@@ -87,7 +87,8 @@ def test_blob_store_exposes_no_read_path_into_staging():
     `get` and `exists` address `sha256/<hash>` only; the guard here is that no *additional* reader
     appears alongside them, since a `get_staged`/`list_staging` would make staging resolvable.
     """
-    readers = {name for name in _methods(t.BlobStore) if name not in {"put", "stage", "promote"}}
+    writers = {"put", "stage", "promote", "discard"}
+    readers = {name for name in _methods(t.BlobStore) if name not in writers}
     assert readers == {"get", "exists"}
 
 

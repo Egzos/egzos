@@ -38,13 +38,17 @@ class BlobStore:
         (self.root / "staging" / sha).write_bytes(data)
         return sha
 
-    def promote(self, sha: str) -> None:
+    def promote(self, sha: str) -> bool:
+        """approve → blob moves from staging to the real store (v0.3 §5). True if staged bytes
+        moved; False if nothing was staged there, missing and already promoted alike ([0.3 · 43]):
+        the internal caller's to know, never an external surface's."""
         _check(sha)
-        """approve → blob moves from staging to the real store (v0.3 §5)."""
         src = self.root / "staging" / sha
-        if src.exists():
-            (self.root / "sha256" / sha).write_bytes(src.read_bytes())
-            src.unlink()
+        if not src.exists():
+            return False
+        (self.root / "sha256" / sha).write_bytes(src.read_bytes())
+        src.unlink()
+        return True
 
     def get(self, sha: str) -> bytes | None:
         if not _is_digest(sha):
@@ -56,6 +60,16 @@ class BlobStore:
         if not _is_digest(sha):
             return False
         return (self.root / "sha256" / sha).exists()
+
+    def discard(self, sha: str) -> bool:
+        """Delete STAGED bytes, never promoted ones ([0.3 · 44]): an orphan's discard or a staged
+        item's tombstone (rest.md §4.4). True if there were staged bytes to delete."""
+        _check(sha)
+        path = self.root / "staging" / sha
+        if path.exists():
+            path.unlink()
+            return True
+        return False
 
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")

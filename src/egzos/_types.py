@@ -251,6 +251,8 @@ Event = Literal[
     "gate.pass.confirmed",
     "item.copy",
     "identity.credential",
+    "upload.put",
+    "upload.discard",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -431,6 +433,8 @@ class ContainerConfig(TypedDict):
     identity_browser_origins: str
     #: identity.md §2, §5 — whether the confirm accepts the button proof; `false`: biometric only.
     confirm_allow_button: bool
+    #: rest.md §4.4 — the largest artifact one upload may carry, in bytes.
+    blobs_upload_max_bytes: int
 
 
 CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
@@ -446,6 +450,7 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "identity_algorithms": "ES256 RS256",
     "identity_browser_origins": "https://egzos.io",
     "confirm_allow_button": True,
+    "blobs_upload_max_bytes": 100 * 1024 * 1024,
 }
 
 #: Wire key -> `ContainerConfig` field. **The dotted names are canonical** (container.md §8): they
@@ -474,6 +479,7 @@ CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
     "identity.algorithms": "identity_algorithms",
     "identity.browser_origins": "identity_browser_origins",
     "confirm.allow_button": "confirm_allow_button",
+    "blobs.upload_max_bytes": "blobs_upload_max_bytes",
 }
 
 
@@ -674,6 +680,9 @@ class BlobStore(Protocol):
     def get(self, sha: str) -> bytes | None: ...
     def exists(self, sha: str) -> bool: ...
     #: ^ an existence oracle over guessable addresses: never reachable from an external path.
+    def discard(self, sha: str) -> bool: ...
+    #: ^ deletes STAGED bytes only, never promoted ones ([0.3 · 44]); True if there were any.
+    #:   Internal: rest.md §4.4's discard of an orphan and a staged item's tombstone.
 
 
 #: The two contracts F3 split out of the skeleton's union, and the third seam that was already
@@ -805,9 +814,40 @@ class ConfirmState(Protocol):
     #:   included; the caller judges
 
 
-#: storage.md §3.1–§3.3. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+class UploadRecord(TypedDict):
+    """rest.md §4.4: one artifact upload, from its open to its item or its discard."""
+
+    id: str
+    principal: str  # the `Token.id` that opened it: its bytes and its item are that caller's alone
+    actor: str
+    scope: str
+    name: str  # untrusted display data
+    mime: str
+    size: int
+    sha256: str
+    opened_at: str
+    expires_at: str
+    staged: bool  # its bytes are staged (the `PUT` spent)
+    item: str | None  # the item written from it (the item step spent)
+    promoted: bool  # its item's bytes were promoted at once: a person's (§4.4 item 3)
+    discarded: bool
+
+
+class UploadState(Protocol):
+    """rest.md §4.4's uploads (storage.md §3.4)."""
+
+    def put_upload(self, upload: UploadRecord) -> None: ...
+    def get_upload(self, upload_id: str) -> UploadRecord | None: ...
+    def list_uploads(self, principal: str | None = None) -> list[UploadRecord]: ...
+    def spend_upload(self, upload_id: str, step: str) -> bool: ...
+    #: ^ `step` is `bytes` or `item`: marks it, atomically, and is True only for the call that
+    #:   found it unmarked, so of two concurrent spends of one step exactly one proceeds. The
+    #:   caller writes the outcome (`staged`, `item`) with `put_upload` in the same transaction.
+
+
+#: storage.md §3.1–§3.4. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
 DOOR_STATE_CONTRACTS: tuple[str, ...] = (
-    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState"
+    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState"
 )
 
 
@@ -892,5 +932,7 @@ __all__ = [
     "TokenPrincipal",
     "Trust",
     "TrustStatus",
+    "UploadRecord",
+    "UploadState",
     "UserGrant",
 ]

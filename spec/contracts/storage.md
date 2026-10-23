@@ -240,6 +240,26 @@ list_credentials(person=None)                    -> list[ConfirmCredential]   # 
   credential is a WebAuthn public key, which verifies an assertion and proves nothing alone; it is
   never served (`rest.md` §4.3's shape omits it). A removed credential is kept, marked `removed`.
 
+## 3.4 · Uploads — `UploadState`
+
+**Status of this section: contract v1.1** (`rest.md` §4.4). One Protocol beside `ContainerState`, on
+its substrate and never delegated (F3). **a1p.**
+
+```
+# UploadState — rest.md §4.4's uploads
+put_upload(upload)                               -> None                  # insert or replace, keyed on id
+get_upload(upload_id)                            -> UploadRecord | None
+list_uploads(principal=None)                     -> list[UploadRecord]    # discarded ones included
+spend_upload(upload_id, step)                    -> bool                  # step: bytes · item; True for the one call that marks it
+```
+
+- **Each step is spent once, atomically.** Of two concurrent spends of one step of one upload,
+  exactly one is `True` (`rest.md` §4.4 item 3); the caller writes the outcome with `put_upload` in
+  the same transaction, so a spend whose act fails rolls back with it.
+- **A discarded upload is kept, marked `discarded`**, and its history reads back. No method deletes
+  one. No column holds a secret: an upload names its principal, scope, display name, type, size
+  and digest.
+
 ## 4 · `BlobStore` — content-addressed, staged
 
 ```
@@ -248,6 +268,7 @@ stage(data)    -> sha256        # staging prefix, invisible to resolution
 promote(sha)   -> bool          # staging -> promoted, on approval
 get(sha)       -> bytes | None
 exists(sha)    -> bool
+discard(sha)   -> bool          # deletes staged bytes only; True if there were any
 ```
 
 Two prefixes under the blob root: `sha256/<hash>` for promoted bytes and `staging/<hash>` for staged
@@ -292,14 +313,17 @@ staged bytes moved to the promoted store and `False` when nothing was staged at 
 missing and already-promoted alike, so an approval that promoted nothing does not look like one
 that promoted something. The approval path is the only caller, and the result never crosses an
 external boundary (§5). **a1p**, the `bool`: the record fixes who sees the result, not its shape.
-**decided, not running**: the skeleton returns `None`.
+**running**: the approval path and `rest.md` §4.4's item step append `blob.put` only when it is
+`True`.
 
 **Deletion. [0.3 · 44]** v1.0 **never deletes promoted bytes** behind a tombstoned item: the audit
 chain keeps referring to the address. **Staged bytes are never purged on a timer** (v0.7 §Z, amending
 R11): past `blobs.staging_retention_days` (30 by default, `container.md` §8) they are surfaced to
-their owner, who promotes the item or tombstones it, and only a tombstone deletes staged bytes
-(`rest.md` §4.4). An owner purge act for promoted
-bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
+their owner, who promotes the item or tombstones it, and only a tombstone — or the discard of an
+orphaned upload — deletes staged bytes (`rest.md` §4.4), through `discard`, which never touches
+`sha256/`. Staging is content-addressed, so two uploads of the same bytes share one staged copy:
+the caller deletes it only when no other live upload or staged item holds that address. An owner
+purge act for promoted bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
 
 ## 5 · Silence-not-errors at the storage boundary
 
@@ -371,8 +395,8 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-§3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState` and §3.3's `ConfirmState` are
-contract v1.1, not part of the 0.3 freeze; their partition is decided on #173 (option (A), on the
+§3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState`, §3.3's `ConfirmState` and §3.4's
+`UploadState` are contract v1.1, not part of the 0.3 freeze; their partition is decided on #173 (option (A), on the
 `ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the

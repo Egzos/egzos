@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from egzos._ids import ulid
-from egzos._types import CONTAINER_CONFIG_DEFAULTS, ContainerConfig
+from egzos._types import CONTAINER_CONFIG_DEFAULTS, ContainerConfig, UploadRecord
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import KINDS, ContextItem, Node, Token, now_iso
@@ -61,6 +61,8 @@ class Store:
         *,
         body: str | None = None,
         file: Path | None = None,
+        upload: UploadRecord | None = None,
+        promote: bool = False,
         kind: str | None = None,
         scope: Node | None = None,
         key: str | None = None,
@@ -71,9 +73,9 @@ class Store:
     ) -> ContextItem:
         if not token.has("remember"):
             raise StoreError("token lacks `remember`")
-        if body is None and file is None:
+        if body is None and file is None and upload is None:
             raise StoreError("nothing to add")
-        kind = kind or ("artifact" if file else "memory")
+        kind = kind or ("artifact" if file or upload else "memory")
         if kind not in KINDS:
             raise StoreError(f"unknown kind {kind!r}")
 
@@ -107,6 +109,19 @@ class Store:
                 size=len(data),
                 mime=mime,
             )
+            title_body = content.get("inline")
+        elif upload is not None:
+            # rest.md §4.4 item 3: the bytes are staged already. A person's are promoted now; an
+            # agent's stay staged, unaddressable, until a person promotes the item (§4).
+            sha = upload["sha256"]
+            content.update(sha256=sha, mime=upload["mime"], size=upload["size"],
+                           filename=upload["name"])
+            if promote and self.blobs.promote(sha):
+                self.ledger.append("blob.put", actor=actor, principal=principal, subject=sha,
+                                   scope=scope.id, size=upload["size"], mime=upload["mime"])
+                if upload["size"] <= self.inline_blob_limit and upload["mime"].startswith("text/"):
+                    data = self.blobs.get(sha) or b""
+                    content["inline"] = data.decode("utf-8", errors="replace")
             title_body = content.get("inline")
         else:
             content["body"] = body

@@ -238,7 +238,7 @@ spec's job).
 | `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
 | `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
 | `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
-| `DELETE /v1/uploads/{id}` | discard an orphaned upload and its staged bytes (§4.4) | the opener, or an admin | — (new) | `upload.discard` |
+| `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener, or an admin | — (new) | `upload.discard` |
 | `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
 | `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
@@ -578,7 +578,9 @@ storage (v0.7 §S).
    already exists. Each `PUT` on a live id of the caller's own appends **`upload.put`** (`subject` the
    upload, `scope`, `size`, `sha256`, `outcome: staged` or `refused` with `details.reason`: `length`,
    `hash`, `already`). A `PUT` naming an unknown, expired or another principal's id is §3's refusal and
-   appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`.
+   appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`; a refused `PUT`
+   answers `400` (`invalid_request`), a fact about the caller's own bytes, and a later `PUT` of the
+   right bytes may still stage them.
 3. **Item.** `POST /v1/items` with `{"kind": "artifact", "upload": <id>, "scope"?, "key"?, "tags"?}`
    writes the item, `unverified` like every write. The id must be the caller's own, staged, and not yet
    itemised; `scope`, when given, must equal the upload's; otherwise §3's refusal. Bytes and item are two
@@ -594,8 +596,10 @@ storage (v0.7 §S).
 - **An orphan** is an upload whose bytes were staged but which expired before an item was written. It
   is listed to its opener — and to an admin — in `GET /v1/pending` under `"uploads": [{"upload",
   "name", "size", "sha256", "scope", "opened_at"}]`, counts toward the 16, and is removed only by
-  `DELETE /v1/uploads/{id}` (its opener or an admin), which deletes the staged bytes and appends
-  **`upload.discard`**.
+  `DELETE /v1/uploads/{id}` (its opener, or a person with `admin` over the whole container), which
+  deletes the staged bytes and appends **`upload.discard`** (`opener`, and `bytes_deleted`: false
+  when another live upload or staged item holds the same bytes, which then stay). Its opener may
+  discard an open upload the same way, to free its slot before the hour is up. **a1p.**
 - **A staged artifact item past `blobs.staging_retention_days`** appears in `GET /v1/pending` under
   `"staged": [<item>]` — to an interactive principal covering its scope, and **instead of** in `items`,
   never both — until a person promotes it or tombstones it; a tombstone deletes the **staged** bytes

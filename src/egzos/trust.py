@@ -46,6 +46,9 @@ class TrustEngine:
         # (identity.md §4), and how to re-read a caller under the lock, whichever kind it is.
         self.principals: Callable[[], Iterable[Token]] = list
         self.refresh: Callable[[Token], Token | None] = lambda t: self.backend.get_token(t.id)
+        # Moves a staged artifact's bytes into the promoted store on promotion, True if any moved
+        # (storage.md §4); the container wires in its blob store's `promote`.
+        self.promote_blob: Callable[[str], bool] = lambda sha: False
 
     # -- coverage & audience -----------------------------------------------------------------
     def covers(self, token: Token, node: Node) -> bool:
@@ -132,6 +135,19 @@ class TrustEngine:
                 manifest=manifest,
                 audience=[a["client"] for a in audience],
             )
+            # An agent's artifact waited staged for this (rest.md §4.4): its bytes move now, and
+            # only a promotion that moved bytes says so (storage.md §4, [0.3 · 43]).
+            sha = item.content.get("sha256") if item.kind == "artifact" else None
+            if isinstance(sha, str) and self.promote_blob(sha):
+                self.ledger.append(
+                    "blob.put",
+                    actor=actor,
+                    principal=token.principal,
+                    subject=sha,
+                    scope=item.scope,
+                    size=item.content.get("size"),
+                    mime=item.content.get("mime"),
+                )
         return item
 
     def quarantine(self, item: ContextItem, *, token: Token, actor: str, reason: str) -> list[str]:

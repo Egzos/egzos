@@ -179,7 +179,7 @@ def test_pending_is_the_interactive_principals(c, door):
     t = _client(c, role="admin")
     assert door.get("/v1/pending", headers=_auth(t)).content == NOT_FOUND
     body = door.get("/v1/pending", headers=_auth(c.owner)).json()
-    assert set(body) == {"items", "proposals"}
+    assert set(body) == {"items", "proposals", "uploads", "staged"}
 
 
 # -- §4: writes without a confirm ------------------------------------------------------------------

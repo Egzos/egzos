@@ -11,16 +11,19 @@ is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSO
 
 The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
 promote — answer in two legs on one route: the first issues a challenge and says who would newly
-see the item, the second spends it with a proof, and the act lands in the same transaction. The
-grant and credential routes (§4.3), upload (§4.4) and `BlobGrant` redemption (§6) land with their
-own code; until then those paths are undeclared and answer §3's refusal, like any other.
+see the item, the second spends it with a proof, and the act lands in the same transaction. An
+artifact arrives through an upload (§4.4): open, bytes, item. The grant routes (§4.3) and
+`BlobGrant` redemption (§6) land with their own code; until then those paths are undeclared and
+answer §3's refusal, like any other.
 """
 
 from __future__ import annotations
 
 import asyncio
+import calendar
 import contextlib
 import json
+import time
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -36,6 +39,7 @@ from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
+from egzos.store.uploads import TooManyUploads, valid_open
 from egzos.trust import HumanOnly, TrustError
 
 #: §3: the four lines every answer of this door carries (Content-Type is the response's own).
@@ -49,6 +53,8 @@ BODY_MAX_BYTES = 256 * 1024
 CLOSE_EVERY_SECONDS = 15
 
 _CREATABLE = tuple(t for t in CONTAINER_TYPES if t not in ("inbox", "global", "uxo"))
+#: §4.4: what `GET /v1/pending` says of an orphaned upload, beside its id.
+ORPHAN_KEYS = ("name", "size", "sha256", "scope", "opened_at")
 
 
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
@@ -98,6 +104,21 @@ async def _bounded(request: Request, limit: int) -> bytes:
             raise Invalid
         chunks.append(chunk)
     return b"".join(chunks)
+
+
+async def _exactly(request: Request, size: int) -> bytes | None:
+    """An upload's bytes (rest.md §4.4 item 2): exactly `size` of them, or None. The door reads at
+    most `size` bytes, and none at all when the declared length already says otherwise."""
+    declared = request.headers.get("content-length")
+    if declared is not None and (not declared.isdigit() or int(declared) != size):
+        return None
+    chunks, got = [], 0
+    async for chunk in request.stream():
+        got += len(chunk)
+        if got > size:
+            return None
+        chunks.append(chunk)
+    return b"".join(chunks) if got == size else None
 
 
 async def _object(request: Request, allowed: set[str], required: set[str]) -> dict[str, Any]:
@@ -353,17 +374,29 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             d.probe(token, "pending")
             return refusal()
         queue = c.trust.pending()
-        items = []
+        # §4.4: an artifact still staged past the retention days is asked about under `staged`,
+        # instead of under `items`, until a person promotes or tombstones it.
+        days = c.config_value("blobs.staging_retention_days")
+        cutoff = c.uploads.clock() - days * 86400
+        waiting = c.uploads.staged_items()
+        items, staged = [], []
         for i in queue["items"]:
             n = c.backend.get_node(i.scope)
             if n is not None and i.status == "unverified" and c.trust.covers(token, n):
-                items.append(i.to_dict())
+                created = calendar.timegm(time.strptime(i.lifecycle["created_at"],
+                                                        "%Y-%m-%dT%H:%M:%SZ"))
+                old = i.id in waiting and created <= cutoff
+                (staged if old else items).append(i.to_dict())
         proposals = [p for p in queue["proposals"] if c.trust.decides_over(token, p)]
         wire = [{("from" if k == "from_" else k): v for k, v in p.items()} for p in proposals]
+        orphans = c.uploads.orphans(token, admin=token.has("admin") and "*" in token.scopes)
+        uploads = [{"upload": r["id"], **{k: r[k] for k in ORPHAN_KEYS}} for r in orphans]
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, view="pending", items=[i["id"] for i in items],
+                        staged=[i["id"] for i in staged], uploads=[u["upload"] for u in uploads],
                         proposals=[p["id"] for p in proposals], layers=[], withheld=0)
-        return _json(200, {"items": items, "proposals": wire})
+        return _json(200, {"items": items, "proposals": wire, "uploads": uploads,
+                           "staged": staged})
 
     # -- writes without a confirm ---------------------------------------------------------------
     @app.post("/v1/items")
@@ -374,11 +407,14 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             # The capability first: a token that may not write never makes the door read a body.
             d.probe(token, None)
             return refusal()
-        body = await _object(request, {"body", "kind", "scope", "key", "tags"}, {"body"})
-        text = _str(body["body"], limit=1_000_000)
+        body = await _object(request, {"body", "kind", "scope", "key", "tags", "upload"}, set())
         kind = _str(body.get("kind"), optional=True, limit=32) or "memory"
-        if kind not in KINDS or kind == "artifact":
-            raise Invalid  # an artifact arrives through an upload (§4.4), which lands next
+        # Text in its body, or an artifact through an upload (§4.4): one or the other.
+        if kind not in KINDS or (kind == "artifact") != ("upload" in body) or (
+                ("body" in body) == ("upload" in body)):
+            raise Invalid
+        text = _str(body["body"], limit=BODY_MAX_BYTES) if "body" in body else None
+        upload = _str(body["upload"], limit=64) if "upload" in body else None
         ref = _str(body.get("scope"), optional=True)
         key = _str(body.get("key"), optional=True, limit=255)
         tags = body.get("tags") or []
@@ -391,12 +427,69 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 d.probe(token, ref)
                 return refusal()
         try:
-            written = c.store.add(body=text, kind=kind, scope=node, key=key, tags=tags,
-                                  token=token, actor=token.owner, principal=token.principal)
+            if upload is not None:
+                written = c.uploads.item(token, upload, scope=node, key=key, tags=tags)
+            else:
+                written = c.store.add(body=text, kind=kind, scope=node, key=key, tags=tags,
+                                      token=token, actor=token.owner, principal=token.principal)
         except StoreError:
-            d.probe(token, ref)
+            written = None
+        if written is None:
+            d.probe(token, upload or ref)
             return refusal()
         return _json(200, {"item": written.to_dict()})
+
+    # -- artifact upload (§4.4) -----------------------------------------------------------------
+    @app.post("/v1/uploads")
+    async def open_upload(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if not token.has("remember"):
+            d.probe(token, None)
+            return refusal()
+        fields = {"scope", "name", "mime", "size", "sha256"}
+        body = await _object(request, fields, fields)
+        ref = _str(body["scope"])
+        if not valid_open(body["name"], body["mime"], body["size"], body["sha256"],
+                          limit=c.config_value("blobs.upload_max_bytes")):
+            raise Invalid
+        node = d.scope(token, ref)
+        if node is None:
+            d.probe(token, ref)
+            return refusal()
+        try:
+            record = c.uploads.open(token, scope=node, name=body["name"], mime=body["mime"],
+                                    size=body["size"], sha256=body["sha256"])
+        except TooManyUploads:
+            return _json(429, {"error": "too_many_uploads"})
+        return _json(200, {"upload": record["id"], "expires_at": record["expires_at"]})
+
+    @app.put("/v1/uploads/{upload_id}")
+    async def upload_bytes(request: Request, upload_id: str):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        record = c.uploads.live(token, upload_id)
+        if record is None:
+            # Unknown, expired, discarded and another principal's alike; no byte is read.
+            d.probe(token, upload_id)
+            return refusal()
+        outcome = c.uploads.put(token, upload_id, await _exactly(request, record["size"]))
+        if outcome is None:
+            d.probe(token, upload_id)
+            return refusal()
+        if outcome != "staged":
+            return invalid()
+        return _json(200, {"upload": upload_id, "sha256": record["sha256"]})
+
+    @app.delete("/v1/uploads/{upload_id}")
+    async def discard_upload(request: Request, upload_id: str):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        admin = token.principal == "interactive" and token.has("admin") and "*" in token.scopes
+        if not c.uploads.discard(token, upload_id, admin=admin):
+            d.probe(token, upload_id)
+            return refusal()
+        return _json(200, {"result": "discarded"})
 
     @app.post("/v1/scopes")
     async def make(request: Request):

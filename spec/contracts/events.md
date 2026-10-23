@@ -11,8 +11,8 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Thirty-six names are listed
-below**: twenty-six **run**, and ten (`blob.grant`, `client.register`, `authz.login`,
+An appended event whose name is not in this list MUST be rejected. **Thirty-eight names are listed
+below**: twenty-eight **run**, and ten (`blob.grant`, `client.register`, `authz.login`,
 `authz.redeem`, `authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse`
 and `authz.grant`) are **decided, not running** — `blob.grant` by F5, the other nine by the 0.3
 freeze for the container's authorization server (`authorization-server.md` §5, §9.3, §11.9 and §12;
@@ -21,10 +21,11 @@ freeze for the container's authorization server (`authorization-server.md` §5, 
 `identity.revoke` run with the grants they record (`identity.md` §4); `rest.tally` and
 `authz.release` run with the REST door's throttle (`rest.md` §2 item 7, the Chief on #165);
 `gate.pass.confirmed` and `item.copy` run with the REST door's confirm and copy (`rest.md` §4.2,
-v0.7 §V); and `identity.credential` runs with the confirm's credentials (`rest.md` §4.3). The typed
+v0.7 §V); `identity.credential` runs with the confirm's credentials (`rest.md` §4.3); and
+`upload.put` and `upload.discard` run with the artifact upload (`rest.md` §4.4). The typed
 vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it —
-carries **all thirty-six**, the ten included: `AuditEntry.event` is typed `Event`, and each emitter
-needs its member on the day it lands. So a validator written against `EVENTS` accepts an append
+carries **all thirty-eight**, the ten included: `AuditEntry.event` is typed `Event`, and each
+emitter needs its member on the day it lands. So a validator written against `EVENTS` accepts an append
 under any of the ten today, and **nothing in this tree rejects one** — what is not running is the
 *emitter*: no code path mints a `BlobGrant`, serves an AS page, or registers a client, so no such
 entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted here
@@ -69,6 +70,8 @@ drift a reader resolves by guessing.
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 | `identity.credential` | a confirm credential is added or removed, or the attempt is refused: `op: add · remove`, `outcome`, `reason` (`rest.md` §4.3); never key material | running |
+| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already` (`rest.md` §4.4) | running |
+| `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
