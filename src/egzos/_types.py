@@ -689,6 +689,10 @@ class ThrottleState(Protocol):
     def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
     #: ^ increments and returns the new count, atomically
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
+    def throttle_buckets(
+        self, surface: ThrottleSurface, window_key: str
+    ) -> list[tuple[str, int]]: ...
+    #: ^ every bucket counted in one window, with its count: what a window's close reads
 
 
 # --- who may call the container, and its settings (storage.md §3.2) -------------------------

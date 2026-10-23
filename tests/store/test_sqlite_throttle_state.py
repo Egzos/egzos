@@ -23,7 +23,7 @@ from egzos.backends.sqlite import SqliteBackend
 
 #: `ThrottleState` is not `@runtime_checkable`, so conformance is checked as the method set and
 #: each method's own signature.
-THROTTLE_STATE = frozenset({"throttle_incr", "throttle_count"})
+THROTTLE_STATE = frozenset({"throttle_incr", "throttle_count", "throttle_buckets"})
 
 @pytest.fixture
 def backend(tmp_path):
@@ -119,3 +119,13 @@ def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
 
     assert sorted(results) == [1, 2]  # every return value distinct, no loss
     assert a.throttle_count("rest", "global", "w1") == 2
+
+
+def test_throttle_buckets_lists_one_window_and_one_surface(backend: SqliteBackend):
+    backend.throttle_incr("rest", "global", "w1")
+    backend.throttle_incr("rest", "global", "w1")
+    backend.throttle_incr("rest", "source:a", "w1")
+    backend.throttle_incr("rest", "global", "w2")
+    backend.throttle_incr("tap", "global", "w1")
+    assert backend.throttle_buckets("rest", "w1") == [("global", 2), ("source:a", 1)]
+    assert backend.throttle_buckets("rest", "w3") == []

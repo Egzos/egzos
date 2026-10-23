@@ -60,7 +60,7 @@ with the constant beside it, is the kind of drift a reader resolves by guessing.
 | `client.register` | the owner registers, amends or removes a client, `op: add · amend · remove` (AS §5) | decided, not running |
 | `config.set` | a container-config key is changed — an `admin` act (`container.md` §8) | running |
 | `rest.tally` | a window closes in which the REST door's throttle admitted a 401 or a refused redemption that names no caller (`rest.md` §2) | decided, not running |
-| `identity.grant` | a user grant or an agent registration is written, `kind: user · agent` (`identity.md` §4) | running |
+| `identity.grant` | a user grant or an agent registration is written, `kind: user · agent`, or a narrowing of the last admin grant is refused (`identity.md` §4) | running |
 | `identity.revoke` | a grant or registration is revoked, or the last admin grant's revoke is refused (`identity.md` §4) | running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an

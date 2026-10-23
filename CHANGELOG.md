@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the whole container cannot be revoked.
 - Granted people and agents count in an item's audience, so moving something where a granted
   person would newly see it stops at the gate, as it does for a minted token.
+- **The REST door, `egzos serve --http`** (`spec/contracts/rest.md`): `/v1/fetch`, `/v1/find`,
+  `/v1/items/{id}`, `/v1/inbox`, `/v1/scopes` and `/v1/pending` to read, and `POST /v1/items` and
+  `POST /v1/scopes` to write. It accepts a container token or a provider sign-in. It answers CORS
+  for egzos.io (`identity.browser_origins`). Every refusal is one `404`, every unauthenticated
+  request one `401`, and a sweep is throttled and tallied on the chain. Plain HTTP only on
+  loopback; anywhere else, `--tls-cert` and `--tls-key`. Moves, copies and approvals with the
+  Face ID / Touch ID confirm, uploads, and agents over MCP come next.
 
 ### Fixed
 

@@ -163,6 +163,7 @@ beside `ContainerState`, in `src/egzos/_types.py` like the other three:
 # ThrottleState — counters (rest.md §2 item 7); keys are the door's, opaque to the store
 throttle_incr(surface, bucket_key, window_key) -> int    # increments and returns the new count, atomically
 throttle_count(surface, bucket_key, window_key) -> int   # reads without incrementing; 0 for an unseen key
+throttle_buckets(surface, window_key) -> list           # every (bucket_key, count) of one window
 ```
 
 No rate and no window length live here: `_types.py`'s `AS_THROTTLE_RATES` and

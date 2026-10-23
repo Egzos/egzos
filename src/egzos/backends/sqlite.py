@@ -286,6 +286,14 @@ class SqliteBackend:
         ).fetchone()
         return row[0] if row else 0
 
+    def throttle_buckets(self, surface: ThrottleSurface, window_key: str) -> list[tuple[str, int]]:
+        rows = self.db.execute(
+            "SELECT bucket_key, count FROM throttle WHERE surface=? AND window_key=? "
+            "ORDER BY bucket_key",
+            (surface, window_key),
+        )
+        return [(k, n) for k, n in rows]
+
     # -- IdentityState (storage.md §3.2) -----------------------------------------------------
     def put_user_grant(self, grant: UserGrant) -> None:
         self.db.execute(

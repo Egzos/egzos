@@ -652,8 +652,10 @@ def token_revoke(
 
 @token_app.command("ls")
 def token_ls():
+    """Every token: who holds what. An admin over the whole container's view, as `grant ls` is:
+    who else holds access is not served to a narrower interactive grant."""
     c = _container()
-    owner = _owner(c, "the token list")
+    owner = _admin(c, "the token list")
     ts = c.backend.list_tokens()
     # An owner view like the others: every principal, its scopes and last use — a read on the chain.
     c.ledger.append("context.fetch", actor=OWNER, principal=owner.principal, client=owner.client,
@@ -835,14 +837,29 @@ def audit_verify():
 @app.command()
 def serve(
     mcp: bool = typer.Option(False, "--mcp", help="Speak MCP over stdio."),
+    http: bool = typer.Option(False, "--http", help="Serve the REST door at /v1/."),
+    host: str = typer.Option("127.0.0.1", "--host", help="The door's listening address."),
+    port: int = typer.Option(7426, "--port", help="The door's port."),
+    tls_cert: Path | None = typer.Option(None, "--tls-cert", help="TLS certificate (PEM)."),
+    tls_key: Path | None = typer.Option(None, "--tls-key", help="TLS private key (PEM)."),
     token: str | None = typer.Option(
         None, "--token", help="Client token value; default: $EGZOS_TOKEN"
     ),
 ):
-    """Open the door. Runs as the CLIENT principal it was started with — never as you."""
-    if not mcp:
-        _fail("only --mcp (stdio) exists in the skeleton; REST/TLS arrive in Phase 2/5")
+    """Open a door. `--mcp` speaks MCP over stdio as the CLIENT principal it was started with —
+    never as you. `--http` serves the REST door, where every request brings its own credential:
+    a container token, or a sign-in from the provider `egzos link` set (rest.md, identity.md)."""
+    if mcp == http:
+        _fail("choose one door: --mcp (stdio) or --http (the REST door)", 2)
     c = _container()
+    if http:
+        from egzos.api import serve_http
+
+        try:
+            serve_http(c, host=host, port=port, tls_cert=tls_cert, tls_key=tls_key)
+        except (PermissionError, ValueError) as e:
+            _fail(str(e), 2)
+        return
     tid = token or os.environ.get("EGZOS_TOKEN")
     if not tid:
         _fail(

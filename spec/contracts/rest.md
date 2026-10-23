@@ -497,9 +497,11 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
   **today**. An omitted line leaves no marker and no count, so the log cannot tell a reader what exists
   outside their sight, or whether a probed target existed.
-- **Revoking the last admin grant** answers `409` with `{"error":"last_admin"}` and §3's headers, to the
-  admin who asked — a fact about their own container — and appends `identity.revoke` with `outcome:
-  refused`, `details.reason: last_admin`.
+- **Revoking the last admin grant, or re-granting it narrower,** answers `409` with
+  `{"error":"last_admin"}` and §3's headers, to the admin who asked — a fact about their own
+  container — and appends `identity.revoke` (a revoke) or `identity.grant` (a narrowing re-grant)
+  with `outcome: refused`, `details.reason: last_admin`, and no `capabilities` or `scopes`: nothing
+  changed hands. **a1p** (a1r on #287).
 - **Credential registration has two legs.** The first answers `{"result": "register", "challenge",
   "webauthn": <PublicKeyCredentialCreationOptions>, "expires_at"}`, a challenge bound to the caller as
   §4.2's are. For a person who already has a credential it also answers `"confirm": {"challenge",
