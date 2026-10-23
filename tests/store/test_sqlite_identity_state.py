@@ -15,6 +15,7 @@ from egzos.backends.sqlite import SqliteBackend
 IDENTITY_STATE = frozenset({
     "put_user_grant", "get_user_grant", "list_user_grants",
     "put_agent_registration", "get_agent_registration", "list_agent_registrations",
+    "claim_authorization",
 })
 CONFIG_STATE = frozenset({"get_config", "put_config"})
 
@@ -76,3 +77,9 @@ def test_config_absence_is_absence_and_an_empty_value_is_a_value(backend):
 def test_the_records_survive_a_restart(tmp_path):
     SqliteBackend(tmp_path / "c.db").put_user_grant(_grant())
     assert SqliteBackend(tmp_path / "c.db").get_user_grant("alice")["sub"] == "alice"
+
+
+def test_an_authorization_is_claimed_once_ever(backend):
+    assert backend.claim_authorization("auth-1") is True
+    assert backend.claim_authorization("auth-1") is False
+    assert backend.claim_authorization("auth-2") is True

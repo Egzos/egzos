@@ -11,10 +11,10 @@ is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSO
 
 The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
 promote — answer in two legs on one route: the first issues a challenge and says who would newly
-see the item, the second spends it with a proof, and the act lands in the same transaction. An
-artifact arrives through an upload (§4.4): open, bytes, item. The grant routes (§4.3) and
-`BlobGrant` redemption (§6) land with their own code; until then those paths are undeclared and
-answer §3's refusal, like any other.
+see the item, the second spends it with a proof, and the act lands in the same transaction; a grant
+and an agent's registration (§4.3) are confirmed the same way. An artifact arrives through an
+upload (§4.4): open, bytes, item. `BlobGrant` redemption (§6) lands with its own code; until then
+its path is undeclared and answers §3's refusal, like any other.
 """
 
 from __future__ import annotations
@@ -33,7 +33,14 @@ from starlette.responses import Response
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, REMOVE_REASONS, person_of
 from egzos.container import Container
-from egzos.identity import GrantToken, display_name
+from egzos.identity import (
+    AGENT_NAME_MAX,
+    AuthorizationSpent,
+    GrantToken,
+    LastAdmin,
+    display_name,
+    expand,
+)
 from egzos.ledger import acting_for
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
@@ -53,6 +60,12 @@ BODY_MAX_BYTES = 256 * 1024
 CLOSE_EVERY_SECONDS = 15
 
 _CREATABLE = tuple(t for t in CONTAINER_TYPES if t not in ("inbox", "global", "uxo"))
+#: §4.3: the agent log's page, by default and at most.
+LOG_LIMIT, LOG_LIMIT_MAX = 50, 200
+#: §4.3's shapes.
+GRANT_KEYS = ("sub", "name", "capabilities", "scopes", "created_at")
+AGENT_KEYS = ("client_id", "name", "sub", "capabilities", "scopes", "created_at")
+LOG_KEYS = ("seq", "ts", "event", "subject", "scope")
 #: §4.4: what `GET /v1/pending` says of an orphaned upload, beside its id.
 ORPHAN_KEYS = ("name", "size", "sha256", "scope", "opened_at")
 
@@ -143,6 +156,24 @@ def _str(value: Any, *, optional: bool = False, limit: int = 1024) -> str | None
     if not isinstance(value, str) or not value or len(value) > limit:
         raise Invalid
     return value
+
+
+def _name(value: Any, limit: int) -> str:
+    """A display name from the caller (`identity.display_name`), or `400`."""
+    try:
+        return display_name(value, limit=limit)
+    except ValueError as e:
+        raise Invalid from e
+
+
+def _word(value: Any, *, limit: int = 255) -> str:
+    """An identifier from the caller — a provider user id, a client id, an authorization id: no
+    whitespace anywhere."""
+    text = _str(value, limit=limit)
+    assert text is not None
+    if any(ch.isspace() for ch in text):
+        raise Invalid
+    return text
 
 
 class Door:
@@ -755,11 +786,8 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         if token.principal != "interactive" or origin is None:
             d.probe(token, "credentials")
             return refusal()
-        raw = _str(body.get("name"), optional=True, limit=CREDENTIAL_NAME_MAX)
-        try:
-            name = display_name(raw, limit=CREDENTIAL_NAME_MAX) if raw else "this device"
-        except ValueError as e:
-            raise Invalid from e
+        raw = body.get("name")
+        name = _name(raw, CREDENTIAL_NAME_MAX) if raw is not None else "this device"
         if "challenge" not in body:
             if "attestation" in body or "confirm" in body:
                 raise Invalid
@@ -833,6 +861,262 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                 delta=[], origin=origin
             )
         return _json(200, {"result": "removed"})
+
+    # -- grants and agents (§4.3) ----------------------------------------------------------------
+    def admin(token: Token) -> bool:
+        """`admin` over `["*"]`, held by a person: the grants' and registrations' gate."""
+        return token.principal == "interactive" and token.has("admin") and "*" in token.scopes
+
+    def sub_of(token: Token) -> str | None:
+        return token.sub if isinstance(token, GrantToken) else None
+
+    def whose_sub(token: Token, sub: str | None) -> str | None:
+        """The person a registration route acts on: the caller, or with `sub` another person,
+        which only an admin may name. None is §3's refusal."""
+        if token.principal != "interactive":
+            return None
+        if sub is None or sub == sub_of(token):
+            return sub_of(token)
+        return sub if admin(token) else None
+
+    def read(token: Token, what: str) -> None:
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read=what, items=[], layers=[], withheld=0)
+
+    def terms(token: Token, body: dict[str, Any]) -> tuple[list[str], list[str]] | None:
+        """A grant's or registration's capabilities, expanded, and scopes; `Invalid` for the wrong
+        shape, None for terms wider than the granter's own (§3's refusal)."""
+        if "role" in body and "capabilities" in body:
+            raise Invalid
+        role = _str(body.get("role"), optional=True, limit=32)
+        wanted = body.get("capabilities")
+        if wanted is not None and not isinstance(wanted, list):
+            raise Invalid
+        scopes = body["scopes"]
+        if (not isinstance(scopes, list) or not scopes
+                or not all(isinstance(x, str) and 0 < len(x) <= 1024 for x in scopes)):
+            raise Invalid
+        try:
+            caps = expand(role, wanted)
+        except ValueError as e:
+            raise Invalid from e
+        if not set(caps) <= set(token.capabilities):
+            return None
+        for ref in scopes:
+            node = None if ref == "*" else c.backend.get_node(ref)
+            if ref != "*" and (node is None or not c.trust.covers(token, node)):
+                return None
+        return caps, sorted(set(scopes))
+
+    def binding(caps: list[str], scopes: list[str], name: str) -> str:
+        """What a grant's or registration's confirm is bound to, beside its subject: a second leg
+        naming any other terms is §4.2's `mismatch`."""
+        return json.dumps({"capabilities": caps, "scopes": scopes, "name": name}, sort_keys=True)
+
+    @app.get("/v1/grants")
+    async def grants(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if not admin(token):
+            d.probe(token, "grants")
+            return refusal()
+        live = [g for g in c.backend.list_user_grants() if not g["revoked"]]
+        read(token, "grants")
+        return _json(200, {"grants": [{k: g[k] for k in GRANT_KEYS} for g in live]})
+
+    @app.post("/v1/grants")
+    async def grant(request: Request):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if not admin(token):
+            d.probe(token, "grants")
+            return refusal()
+        body = await _object(request, {"sub", "name", "role", "capabilities", "scopes", "confirm"},
+                             {"sub", "name", "scopes"})
+        sub = _word(body["sub"])
+        name = _name(body["name"], AGENT_NAME_MAX)
+        proof = presented(body)
+        agreed = terms(token, body)
+        if agreed is None:
+            d.probe(token, "grants")
+            return refusal()
+        caps, scopes = agreed
+        bound = binding(caps, scopes, name)
+        if proof is None:
+            return first_leg(token, act="grant", subject=sub, destination=bound, delta=[],
+                             origin=origin)
+        written, last = None, False
+        with c.backend.atomic():
+            reason = c.confirm.conclude(token, proof, act="grant", subject=sub, destination=bound,
+                                        delta=[], origin=origin)
+            if reason is None:
+                try:
+                    written = c.identity.grant_user(sub, name=name, capabilities=caps,
+                                                    scopes=scopes, actor=token.owner,
+                                                    principal=token.principal)
+                except LastAdmin:
+                    last = True  # its refusal commits with the confirm that asked
+        if last:
+            return _json(409, {"error": "last_admin"})
+        if written is None:
+            return first_leg(token, act="grant", subject=sub, destination=bound, delta=[],
+                             origin=origin)
+        return _json(200, {"grant": {k: written[k] for k in GRANT_KEYS}})
+
+    @app.delete("/v1/grants/{sub}")
+    async def revoke_grant(request: Request, sub: str):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if not admin(token):
+            d.probe(token, sub)
+            return refusal()
+        try:
+            revoked = c.identity.revoke_user(sub, actor=token.owner, principal=token.principal)
+        except LastAdmin:
+            return _json(409, {"error": "last_admin"})
+        if not revoked:
+            d.probe(token, sub)
+            return refusal()
+        return _json(200, {"result": "revoked"})
+
+    def last_seen() -> dict[tuple[str, str], str]:
+        """When each agent last acted for each person: its newest entry's time."""
+        seen: dict[tuple[str, str], str] = {}
+        for e in c.backend.audit_iter():
+            user = e["details"].get("for")
+            if e["actor"].startswith("agent:") and isinstance(user, str) and user.startswith(
+                    "user:"):
+                seen[(e["actor"][len("agent:"):], user[len("user:"):])] = e["ts"]
+        return seen
+
+    @app.get("/v1/agents")
+    async def agents(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if token.principal != "interactive":
+            d.probe(token, "agents")
+            return refusal()
+        everyone = admin(token)
+        mine = [r for r in c.backend.list_agent_registrations()
+                if not r["revoked"] and (everyone or r["sub"] == sub_of(token))]
+        seen = last_seen()
+        read(token, "agents")
+        return _json(200, {"agents": [
+            {**{k: r[k] for k in AGENT_KEYS}, "last_seen": seen.get((r["client_id"], r["sub"]))}
+            for r in mine
+        ]})
+
+    @app.post("/v1/agents")
+    async def register_agent(request: Request):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if not admin(token) or sub_of(token) is None:
+            # Only an admin registers an agent, and it serves that admin: a provider user.
+            d.probe(token, "agents")
+            return refusal()
+        fields = {"authorization_id", "client_id", "name", "role", "capabilities", "scopes",
+                  "confirm"}
+        body = await _object(request, fields, {"authorization_id", "client_id", "name", "scopes"})
+        authorization = _word(body["authorization_id"])
+        client_id = _word(body["client_id"])
+        name = _name(body["name"], AGENT_NAME_MAX)
+        proof = presented(body)
+        agreed = terms(token, body)
+        if agreed is None:
+            d.probe(token, "agents")
+            return refusal()
+        caps, scopes = agreed
+        bound = binding(caps, scopes, name)
+        registers = {"client_id": client_id, "name": name}
+
+        def first() -> Response:
+            # The agent is not a person: nobody newly sees anything, and its name is its own
+            # claim, untrusted display data (§4.3). The read names what it showed.
+            c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                            client=token.client, subject=client_id, items=[], layers=[],
+                            withheld=0, confirm_for="agent.register", newly=[],
+                            registers=registers)
+            out = c.confirm.issue(token, act="agent.register", subject=client_id,
+                                  destination=bound, delta=[], newly=[], origin=origin)
+            return _json(200, {**out, "registers": registers})
+
+        if proof is None:
+            return first()
+        written, spent = None, False
+        with c.backend.atomic():
+            reason = c.confirm.conclude(token, proof, act="agent.register", subject=client_id,
+                                        destination=bound, delta=[], origin=origin)
+            if reason is None:
+                try:
+                    written = c.identity.register_agent(
+                        client_id, sub_of(token) or "", name=name, capabilities=caps,
+                        scopes=scopes, authorization_id=authorization, actor=token.owner,
+                        principal=token.principal)
+                except AuthorizationSpent:
+                    spent = True
+        if spent:
+            d.probe(token, "agents")
+            return refusal()
+        if written is None:
+            return first()
+        return _json(200, {"agent": {**{k: written[k] for k in AGENT_KEYS}, "last_seen": None}})
+
+    @app.delete("/v1/agents/{client_id}")
+    async def revoke_agent(request: Request, client_id: str):
+        token: Token = request.state.token
+        _only(request.query_params, {"sub"})
+        sub = whose_sub(token, request.query_params.get("sub"))
+        if sub is None or not c.identity.revoke_agent(client_id, sub, actor=token.owner,
+                                                     principal=token.principal):
+            d.probe(token, client_id)
+            return refusal()
+        return _json(200, {"result": "revoked"})
+
+    def visible(token: Token, entry: dict[str, Any]) -> bool:
+        """Whether the reader's grant covers, today, what an entry acted on: its subject's node
+        (an item's scope, or the node itself), else its scope. An entry naming something that
+        resolves to neither is not served."""
+        subject, scope = entry["subject"], entry["scope"]
+        node = None
+        if subject:
+            found = c.backend.get(subject)
+            node = c.backend.get_node(found.scope) if found else c.backend.get_node(subject)
+        if node is None and scope:
+            node = c.backend.get_node(scope)
+        if node is None:
+            return subject is None and scope is None
+        return c.trust.covers(token, node)
+
+    @app.get("/v1/agents/{client_id}/log")
+    async def agent_log(request: Request, client_id: str):
+        token: Token = request.state.token
+        params = request.query_params
+        _only(params, {"sub", "limit"})
+        raw = params.get("limit")
+        if raw is not None and (not raw.isdigit() or not 1 <= int(raw) <= LOG_LIMIT_MAX):
+            raise Invalid
+        limit = int(raw) if raw is not None else LOG_LIMIT
+        sub = whose_sub(token, params.get("sub"))
+        if sub is None or c.backend.get_agent_registration(client_id, sub) is None:
+            d.probe(token, client_id)
+            return refusal()
+        actor, user = f"agent:{client_id}", f"user:{sub}"
+        lines = []
+        for e in c.backend.audit_iter():
+            details = e["details"]
+            if e["actor"] != actor or details.get("for") != user:
+                continue
+            # A refusal is never served: a probe's read, a refused act. Nor is anything the reader
+            # does not cover now. An omitted line leaves no marker and no count.
+            if details.get("outcome") == "refused" or (
+                    e["event"] == "context.fetch" and details.get("items") == []):
+                continue
+            if visible(token, e):
+                lines.append({k: e[k] for k in LOG_KEYS})
+        read(token, "agent_log")
+        return _json(200, {"entries": lines[::-1][:limit]})
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],

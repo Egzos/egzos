@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
+- **Grants and agents at the door** (`rest.md` §4.3): an admin lists, grants and revokes who may
+  sign in (`/v1/grants`), with the confirm for a grant; registers an agent for themself from the
+  consent page's flow (`POST /v1/agents`), confirmed, once per provider authorization; and anyone
+  lists the agents serving them, revokes one, and reads what it did for them
+  (`/v1/agents/{client_id}/log`), only the entries they can still see.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its
   bytes (`PUT /v1/uploads/{id}`, checked for length and sha256), then write the item (`POST
   /v1/items` with `kind: artifact`). A person's file is stored at once; an agent's stays staged and

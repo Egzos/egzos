@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS user_grants (sub TEXT PRIMARY KEY, doc TEXT NOT NULL)
 CREATE TABLE IF NOT EXISTS agent_registrations (
   client_id TEXT NOT NULL, sub TEXT NOT NULL, doc TEXT NOT NULL, PRIMARY KEY (client_id, sub));
 CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+-- rest.md §4.3: each provider authorization registers an agent at most once, ever.
+CREATE TABLE IF NOT EXISTS authorizations (id TEXT PRIMARY KEY);
 -- ConfirmState (storage.md §3.3): the confirm's challenges, spent once.
 CREATE TABLE IF NOT EXISTS challenges (
   id TEXT PRIMARY KEY, spent INTEGER NOT NULL DEFAULT 0, expires_at TEXT NOT NULL,
@@ -364,6 +366,13 @@ class SqliteBackend:
                 "SELECT doc FROM agent_registrations WHERE client_id=? ORDER BY rowid", (client_id,)
             )
         return [json.loads(r[0]) for r in rows]
+
+    def claim_authorization(self, authorization_id: str) -> bool:
+        cur = self.db.execute(
+            "INSERT OR IGNORE INTO authorizations(id) VALUES(?)", (authorization_id,)
+        )
+        self._commit()
+        return cur.rowcount == 1
 
     # -- ConfigState (storage.md §3.2) -------------------------------------------------------
     def get_config(self) -> dict[str, Any]:

@@ -105,6 +105,14 @@ def display_name(value: Any, *, limit: int = DISPLAY_NAME_MAX) -> str:
     return value
 
 
+class AuthorizationSpent(Exception):
+    """rest.md §4.3: this provider authorization has registered an agent already."""
+
+
+#: rest.md §4.3: a registration's display name, the agent's own claim, at most this long.
+AGENT_NAME_MAX = DISPLAY_NAME_MAX
+
+
 # -- configuration (§2) --------------------------------------------------------------------------
 def _loopback(host: str | None) -> bool:
     if host is None:
@@ -494,13 +502,7 @@ class Identity:
         if not isinstance(sub, str) or not sub.strip() or len(sub) > 255:
             raise ValueError("a grant names the provider's user id")
         name = display_name(name)
-        if (role is None) == (capabilities is None):
-            raise ValueError("a grant names a role or capabilities, not both")
-        if role is not None and role not in ROLE_BUNDLES:
-            raise ValueError("unknown role")
-        caps = sorted(ROLE_BUNDLES[role]) if role is not None else sorted(set(capabilities or ()))
-        if not caps or any(c not in CAPABILITIES for c in caps):
-            raise ValueError("unknown capability")
+        caps = expand(role, capabilities)
         if not scopes:
             raise ValueError("a grant covers at least one scope")
         grant: UserGrant = {
@@ -559,6 +561,80 @@ class Identity:
         self._refused("identity.revoke", sub, actor=actor, principal=principal)
         raise LastAdmin(sub)
 
+    def register_agent(
+        self,
+        client_id: str,
+        sub: str,
+        *,
+        name: str,
+        role: str | None = None,
+        capabilities: Iterable[str] | None = None,
+        scopes: list[str],
+        authorization_id: str,
+        actor: str,
+        principal: str,
+    ) -> AgentRegistration:
+        """Register an agent's client for the one person it serves, and append `identity.grant`
+        (`kind: agent`). The provider authorization it came from registers once, ever: a second
+        request naming it raises `AuthorizationSpent` and writes nothing (rest.md §4.3)."""
+        if principal != "interactive":
+            raise PermissionError("registering an agent is a person's act")
+        for value in (client_id, sub, authorization_id):
+            if not isinstance(value, str) or not value or len(value) > 255 or (
+                    any(c.isspace() for c in value)):
+                raise ValueError("a registration names a client, a person and an authorization")
+        name = display_name(name, limit=AGENT_NAME_MAX)
+        caps = expand(role, capabilities)
+        if not scopes:
+            raise ValueError("a registration covers at least one scope")
+        registration: AgentRegistration = {
+            "client_id": client_id,
+            "sub": sub,
+            "name": name,
+            "capabilities": caps,
+            "scopes": list(scopes),
+            "created_at": now_iso(),
+            "revoked": False,
+        }
+        with self.atomic():
+            if not self.state.claim_authorization(authorization_id):
+                raise AuthorizationSpent(authorization_id)
+            self.state.put_agent_registration(registration)
+            self.ledger.append(
+                "identity.grant",
+                actor=actor,
+                principal=principal,
+                subject=client_id,
+                kind="agent",
+                sub=sub,
+                outcome="granted",
+                capabilities=caps,
+                scopes=list(scopes),
+                authorization_id=authorization_id,  # what the caller claimed, never verified
+            )
+        return registration
+
+    def revoke_agent(self, client_id: str, sub: str, *, actor: str, principal: str) -> bool:
+        """Revoke one registration, kept and marked; `False` when there is no live one."""
+        with self.atomic():
+            registration = self.state.get_agent_registration(client_id, sub)
+            if not _live(registration):
+                return False
+            assert registration is not None
+            self.state.put_agent_registration({**registration, "revoked": True})
+            self.ledger.append(
+                "identity.revoke",
+                actor=actor,
+                principal=principal,
+                subject=client_id,
+                kind="agent",
+                sub=sub,
+                outcome="revoked",
+                capabilities=registration["capabilities"],
+                scopes=registration["scopes"],
+            )
+        return True
+
     def _refused(self, event: str, sub: str, *, actor: str, principal: str) -> None:
         self.ledger.append(
             event,
@@ -577,6 +653,21 @@ class Identity:
         return bool(mine and _whole(mine)) and not any(
             _whole(g) for g in grants if g["sub"] != sub
         )
+
+
+def expand(role: str | None, capabilities: Iterable[str] | None) -> list[str]:
+    """A grant's capabilities: a role's bundle, expanded now (`capabilities.md` §2), or a list."""
+    if (role is None) == (capabilities is None):
+        raise ValueError("a grant names a role or capabilities, not both")
+    if role is not None and role not in ROLE_BUNDLES:
+        raise ValueError("unknown role")
+    if role is None and (isinstance(capabilities, str) or not all(
+            isinstance(c, str) for c in capabilities or ())):
+        raise ValueError("unknown capability")
+    caps = sorted(ROLE_BUNDLES[role]) if role is not None else sorted(set(capabilities or ()))
+    if not caps or any(c not in CAPABILITIES for c in caps):
+        raise ValueError("unknown capability")
+    return caps
 
 
 def _whole(grant: UserGrant) -> bool:

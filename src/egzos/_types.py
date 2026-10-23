@@ -756,6 +756,9 @@ class IdentityState(Protocol):
     #: ^ insert or replace, keyed on `(client_id, sub)`
     def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None: ...
     def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]: ...
+    def claim_authorization(self, authorization_id: str) -> bool: ...
+    #: ^ rest.md §4.3: True for the one call that first names this provider authorization, ever;
+    #:   atomic, so of two concurrent registrations naming it at most one proceeds
 
 
 class ConfigState(Protocol):

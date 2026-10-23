@@ -199,12 +199,16 @@ list_user_grants()                               -> list[UserGrant]
 put_agent_registration(registration)             -> None             # keyed on (client_id, sub)
 get_agent_registration(client_id, sub)           -> AgentRegistration | None
 list_agent_registrations(client_id=None)         -> list[AgentRegistration]
+claim_authorization(authorization_id)            -> bool             # True once per id, ever, atomically
 
 # ConfigState — container.md §8's object as set, wire key -> value
 get_config()                                     -> dict             # a key never set is absent
 put_config(key, value)                           -> None
 ```
 
+- **An authorization registers once.** `claim_authorization` is an atomic insert: of two
+  concurrent registrations naming one provider authorization, exactly one claims it, and every
+  later claim of it is `False`, whatever became of the registration (`rest.md` §4.3).
 - **A revoked record is kept, marked `revoked`.** The caller judges liveness on every request
   (`identity.md` §3 check 7), and the record's history reads back. No method deletes one.
 - **No column holds a credential.** A grant names a provider user id (`sub`) and a registration an
