@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from egzos._types import CONTAINER_CONFIG_DEFAULTS, CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
-from egzos.auth import Auth
+from egzos.auth import Auth, home_secret
 from egzos.backends import SqliteBackend
 from egzos.confirm import Confirm
 from egzos.identity import (
@@ -31,7 +31,7 @@ from egzos.store import BlobStore, NodeService, Store
 from egzos.store.blobs import _is_digest
 from egzos.store.find import shown
 from egzos.store.uploads import Uploads
-from egzos.trust import TrustEngine
+from egzos.trust import GRANT_KEY_BYTES, GRANT_KEY_FILE, TrustEngine
 
 OWNER = "self"
 
@@ -74,6 +74,10 @@ class Container:
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
         self.trust.promote_blob = lambda sha: _is_digest(sha) and self.blobs.promote(sha)
+        # rest.md §6: the grant key, made at first need in the home, never a config key or a row;
+        # and what is shown.
+        self.trust.grant_key = lambda: home_secret(self.home / GRANT_KEY_FILE, GRANT_KEY_BYTES)
+        self.trust.shown = self.store.shown
         self.uploads = Uploads(self.backend, self.ledger, self.blobs, self.store)
         self.confirm = Confirm(
             self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,

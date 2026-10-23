@@ -12,11 +12,12 @@ and `::test_reads_are_audited`.
 ## 1 · The vocabulary
 
 An appended event whose name is not in this list MUST be rejected. **Thirty-eight names are listed
-below**: twenty-eight **run**, and ten (`blob.grant`, `client.register`, `authz.login`,
-`authz.redeem`, `authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse`
-and `authz.grant`) are **decided, not running** — `blob.grant` by F5, the other nine by the 0.3
-freeze for the container's authorization server (`authorization-server.md` §5, §9.3, §11.9 and §12;
-[0.3 · 29, 31, 33, 36], #140, #144), which contract v1.1 retires (below). `config.set` runs since
+below**: twenty-nine **run**, and nine (`client.register`, `authz.login`, `authz.redeem`,
+`authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse` and
+`authz.grant`) are **decided, not running** — by the 0.3 freeze for the container's authorization
+server (`authorization-server.md` §5, §9.3, §11.9 and §12; [0.3 · 29, 31, 33, 36], #140, #144),
+which contract v1.1 retires (below). `blob.grant` runs with the REST door's grants (`rest.md` §6,
+F5); `config.set` runs since
 `egzos config set` and `egzos link` (`container.md` §8; [0.3 · 40]); `identity.grant` and
 `identity.revoke` run with the grants they record (`identity.md` §4); `rest.tally` and
 `authz.release` run with the REST door's throttle (`rest.md` §2 item 7, the Chief on #165);
@@ -24,11 +25,11 @@ freeze for the container's authorization server (`authorization-server.md` §5, 
 v0.7 §V); `identity.credential` runs with the confirm's credentials (`rest.md` §4.3); and
 `upload.put` and `upload.discard` run with the artifact upload (`rest.md` §4.4). The typed
 vocabulary in this repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it —
-carries **all thirty-eight**, the ten included: `AuditEntry.event` is typed `Event`, and each
+carries **all thirty-eight**, the nine included: `AuditEntry.event` is typed `Event`, and each
 emitter needs its member on the day it lands. So a validator written against `EVENTS` accepts an append
-under any of the ten today, and **nothing in this tree rejects one** — what is not running is the
-*emitter*: no code path mints a `BlobGrant`, serves an AS page, or registers a client, so no such
-entry is ever produced. `ledger.py` imports this tuple rather than restating it. Counted here
+under any of the nine today, and **nothing in this tree rejects one** — what is not running is the
+*emitter*: no code path serves an AS page or registers a client, so no such entry is ever
+produced. `ledger.py` imports this tuple rather than restating it. Counted here
 because a count that disagrees with its own table, or with the constant beside it, is the kind of
 drift a reader resolves by guessing.
 
@@ -52,7 +53,7 @@ drift a reader resolves by guessing.
 | `token.mint` | a token is minted | running |
 | `token.revoke` | a token is revoked | running |
 | `item.tombstone` | an item is tombstoned | running |
-| `blob.grant` | Trust mints a `BlobGrant` (**F5**) | decided, not running |
+| `blob.grant` | Trust mints a `BlobGrant` (**F5**; `rest.md` §6) | running |
 | `authz.login` | a login attempt at `/login` is evaluated (AS §12 row (a)) | decided, not running |
 | `authz.redeem` | a device-code redemption at `/device` is evaluated (row (b)) | decided, not running |
 | `authz.refuse` | `/authorize` answers with the pre-trust uniform failure (AS §5.3; row (d)) | decided, not running |
