@@ -80,10 +80,23 @@ def _only(params: Any, allowed: set[str]) -> None:
         raise Invalid
 
 
-async def _object(request: Request, allowed: set[str], required: set[str]) -> dict[str, Any]:
-    raw = await request.body()
-    if len(raw) > BODY_MAX_BYTES:
+async def _bounded(request: Request, limit: int) -> bytes:
+    """The request body, read only up to `limit` bytes: a declared or actual length beyond it is
+    refused before the rest is read, so no caller makes the door hold a body it will not take."""
+    declared = request.headers.get("content-length")
+    if declared is not None and (not declared.isdigit() or int(declared) > limit):
         raise Invalid
+    chunks, size = [], 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > limit:
+            raise Invalid
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+async def _object(request: Request, allowed: set[str], required: set[str]) -> dict[str, Any]:
+    raw = await _bounded(request, BODY_MAX_BYTES)
     try:
         body = json.loads(raw)
     except ValueError as e:
@@ -107,7 +120,8 @@ class Door:
     def __init__(self, container: Container, throttle: Throttle | None = None):
         self.c = container
         self.throttle = throttle or Throttle(
-            container.backend, container.ledger, throttle_key(container.home)
+            container.backend, container.ledger, throttle_key(container.home),
+            atomic=container.backend.atomic,
         )
 
     def origins(self) -> set[str]:
@@ -351,6 +365,10 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
     async def add(request: Request):
         token: Token = request.state.token
         _only(request.query_params, set())
+        if not token.has("remember"):
+            # The capability first: a token that may not write never makes the door read a body.
+            d.probe(token, None)
+            return refusal()
         body = await _object(request, {"body", "kind", "scope", "key", "tags"}, {"body"})
         text = _str(body["body"], limit=1_000_000)
         kind = _str(body.get("kind"), optional=True, limit=32) or "memory"

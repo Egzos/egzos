@@ -24,7 +24,9 @@ import os
 import secrets
 import time
 from collections.abc import Callable
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
+from typing import Any
 
 from egzos._types import AS_THROTTLE_RATES, AS_THROTTLE_WINDOW_SECONDS, ThrottleState
 from egzos.ledger import Ledger
@@ -62,11 +64,15 @@ class Throttle:
         key: bytes,
         *,
         clock: Callable[[], float] = time.time,
+        atomic: Callable[[], AbstractContextManager[Any]] = nullcontext,
     ):
         self.state = state
         self.ledger = ledger
         self._key = key
         self._clock = clock
+        # A window's claim and its entries are one transaction: an append that fails rolls the
+        # claim back, so the next pass closes the window again and its record is never lost.
+        self._atomic = atomic
 
     def _window(self) -> int:
         return int(self._clock() // WINDOW_SECONDS)
@@ -112,9 +118,10 @@ class Throttle:
                 continue
             if self.state.throttle_count(SURFACE, _CLOSED, key):
                 continue
-            if self.state.throttle_incr(SURFACE, _CLOSED, key) != 1:
-                continue  # another closer claimed it first
-            self._close(w)
+            with self._atomic():
+                if self.state.throttle_incr(SURFACE, _CLOSED, key) != 1:
+                    continue  # another closer claimed it first
+                self._close(w)
 
     def _close(self, w: int) -> None:
         counts = dict(self.state.throttle_buckets(SURFACE, str(w)))

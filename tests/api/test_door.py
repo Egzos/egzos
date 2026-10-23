@@ -352,3 +352,36 @@ def test_plain_http_is_for_a_loopback_socket_only(c):
         serve_http(c, host="0.0.0.0")
     with pytest.raises(ValueError):
         serve_http(c, host="0.0.0.0", tls_cert=c.home / "cert.pem")
+
+
+# -- a6 on #288 ---------------------------------------------------------------------------------
+def test_a_window_whose_entries_fail_is_closed_again_on_the_next_pass(c, monkeypatch):
+    clock = Clock()
+    throttle = Throttle(c.backend, c.ledger, b"k" * 32, clock=clock, atomic=c.backend.atomic)
+    client = TestClient(create_app(c, door=Door(c, throttle)))
+    client.get("/v1/fetch")
+    clock.now += WINDOW_SECONDS
+    real = c.ledger.append
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the chain cannot take an entry")
+
+    monkeypatch.setattr(c.ledger, "append", broken)
+    with pytest.raises(RuntimeError):
+        throttle.close()
+    monkeypatch.setattr(c.ledger, "append", real)
+    throttle.close()
+    assert len(_events(c, "rest.tally")) == 1
+
+
+def test_an_oversized_body_is_refused_before_it_is_read(c, door):
+    big = b'{"body":"' + b"x" * (300 * 1024) + b'"}'
+    r = door.post("/v1/items", headers={**_auth(c.owner), "Content-Type": "application/json"},
+                  content=big)
+    assert r.status_code == 400
+
+
+def test_a_token_that_may_not_write_never_sends_a_body(c, door):
+    reader = _client(c, role="reader")
+    r = door.post("/v1/items", headers=_auth(reader), json={"body": "x"})
+    assert r.content == NOT_FOUND

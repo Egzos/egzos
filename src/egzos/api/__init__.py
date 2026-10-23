@@ -8,6 +8,10 @@ and write the person's container.
 
 TLS (rest.md §1): plain HTTP only when the listening socket is bound to loopback, decided from the
 socket and never from a forwarded header. Anywhere else the door serves TLS, or does not start.
+Behind a TLS-terminating proxy on loopback every caller arrives from the proxy's address, so the
+throttle's per-source bucket (rest.md §2 item 7) counts the proxy as one source: the container-
+global bucket still bounds a sweep, and a proxy that throttles per client is the place to split
+callers apart. A forwarded header is never read to do it here.
 """
 
 from __future__ import annotations
