@@ -56,6 +56,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   file still waiting after `blobs.staging_retention_days` is listed under `staged`. A person and
   every agent serving them share one cap, and each container token keeps its own: at most 16 uploads
   nobody has decided on; `blobs.upload_max_bytes` (100 MiB) caps each.
+- **Tombstone an item** (`rest.md` §4): `DELETE /v1/items/{id}`, for a person holding `organize`
+  where the item sits, never an agent. An item nobody has promoted goes at once, so a person can
+  turn down an agent's file without promoting it: its staged bytes go with it, unless another
+  upload or staged item holds the same bytes, and its upload slot frees. An item a person promoted
+  takes the confirm first. Promoted bytes are never deleted, and the inbox thread a capture opened
+  keeps its name.
 - **Agents connect over the internet: MCP over Streamable HTTP at `/mcp`** (`identity.md` §7), on
   the door `egzos serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
   verified: an agent's sign-in reaches only what both its registration and its user's grant

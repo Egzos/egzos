@@ -19,6 +19,9 @@ undeclared and answer §3's refusal, like any other.
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
 its `401` alone names the protected-resource metadata, which is served to anyone, unthrottled.
+
+A person tombstones an item (§4): at once, or with the confirm where a person promoted it; never an
+agent.
 """
 
 from __future__ import annotations
@@ -722,6 +725,43 @@ def create_app(
     @app.post("/v1/pending/{proposal_id}/deny")
     async def deny(request: Request, proposal_id: str):
         return await decide(request, proposal_id, "deny")
+
+    # -- tombstone (§4): a person's, at once, or with the confirm where a person promoted it -----
+    def tombstone_leg(token: Token, item: Any, origin: str | None) -> Response:
+        """A promoted item's first leg: nobody newly sees anything, and it names what it removes,
+        a read audited as every first leg is (§4.2 item 2)."""
+        named = {"item": item.id, "kind": item.kind, "auto_title": item.content.get("auto_title")}
+        return first_leg(token, act="tombstone", subject=item.id, destination=None, delta=[],
+                         origin=origin, tombstones=named)
+
+    @app.delete("/v1/items/{item_id}")
+    async def tombstone(request: Request, item_id: str):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if token.principal != "interactive" or not token.has("organize"):
+            d.probe(token, item_id)  # one who may not act here never makes the door read a body
+            return refusal()
+        proof = presented(await optional_body(request))
+        leg, gone = None, None
+        with c.backend.atomic():
+            item = c.store.get(item_id)  # as it stands under the lock (a6 on #289)
+            # A verified item, or one a person promoted whatever its status now, takes the
+            # confirm. A refused proof's `step_up` commits; a fresh first leg follows (§4.2 item 4).
+            if (item is not None and c.uploads.tombstonable(token, item)
+                    and c.uploads.promoted(item)
+                    and (proof is None or c.confirm.conclude(
+                        token, proof, act="tombstone", subject=item.id, destination=None,
+                        delta=[], origin=origin) is not None)):
+                leg = item
+            else:  # never promoted, a `confirm` with it ignored; or confirmed
+                gone = c.uploads.tombstone(token, item_id)
+        if leg is not None:
+            return tombstone_leg(token, leg, origin)
+        if gone is None:
+            d.probe(token, item_id)
+            return refusal()
+        return _json(200, {"result": "tombstoned"})
 
     @app.post("/v1/items/{item_id}/promote")
     async def promote(request: Request, item_id: str):

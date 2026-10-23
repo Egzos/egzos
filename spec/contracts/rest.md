@@ -244,6 +244,7 @@ spec's job).
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
 | `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
 | `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
+| `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | — (new) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -272,6 +273,34 @@ agent:<client_id>` with `details.for: user:<sub>`. **decided.**
 
 **Artifacts arrive through an upload** (§4.4): the staging rule for an agent-proposed artifact
 (`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it.
+
+**A person tombstones an item; an agent never does** (#296). **a1p**, the `DELETE /v1/items/{id}`
+row and these bullets:
+
+- **Needs** an `interactive` principal holding `organize` where the item sits. `capabilities.md`
+  §1 gives `organize` the moving of items between containers, and a tombstone takes the item out
+  of every one, and so out of every audience: the furthest inward move, which `container.md` §6
+  floors on `organize` at the source, as it does every move. Six capabilities are the whole
+  vocabulary (§1), so none is added for it. A `client` principal gets §3's refusal: an agent's
+  write waits for a person (§4.4), and MCP has no tool for this. The inbox thread a pure capture
+  opened keeps the name the item's title gave it (`container.md` [0.3 · 2]).
+- **An item no person has promoted goes at once**, an unverified `rule` included (the route
+  serves nothing of it), answering `{"result": "tombstoned"}`: §4.4's release. An artifact whose
+  bytes are still staged releases them, deleted (`BlobStore.discard`) unless another upload or
+  staged item holds the same `sha256` (`storage.md` §4), a copy of a staged artifact included, and
+  its upload frees its slot. A `confirm` sent with it is ignored and concludes nothing.
+- **A verified item, or one a person has promoted (`provenance.approved_by`) whatever its status
+  now, takes the confirm** (§4.2): removing curated knowledge goes behind a re-authentication, by
+  analogy to v0.7 §AD's sudo model (a1p). The first leg answers `newly: []` and names what it
+  removes, `"tombstones": {"item", "kind", "auto_title"}`, the title untrusted display data; its
+  `context.fetch` carries the same as `details.tombstones`.
+- **One atomic step** holds a second leg's `step_up`, the tombstone and its `item.tombstone`
+  (`kind`, `status` as it stood, and `staged_deleted: <sha256>` only where it deleted staged bytes
+  nothing else holds). The bytes are deleted inside the same lock, before the entry, so the entry
+  claims only a deletion that happened (another item's promotion may have moved them already); a
+  failure rolls the tombstone back with it. Promoted bytes are never deleted ([0.3 · 44]).
+- **Absent, uncovered, already tombstoned, quarantined, or without `organize`**: §3's refusal and
+  §4's probe, the same for each.
 
 ### 4.1 · Success responses (#187)
 
@@ -316,6 +345,7 @@ the row does not name is `400` (§3).
 | `POST /v1/pending/{proposal}/approve` | `{"confirm"?}` | `{"result": "confirm", …}` (§4.2), then `{"result": "executed", "item": <item>}` or `{"result": "stale"}` |
 | `POST /v1/pending/{proposal}/deny` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "denied"}` |
 | `POST /v1/items/{id}/promote` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "promoted", "item": <item>}` |
+| `DELETE /v1/items/{id}` | `{"confirm"?}` | `{"result": "tombstoned"}`; a promoted item's: `{"result": "confirm", …, "tombstones"}` (§4.2) first |
 | `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
 | `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
 
@@ -392,8 +422,9 @@ The confirm (`identity.md` §5) is how a person says yes to something that widen
 and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
 
 1. **Two legs, one route.** A confirm-gated request — a move or copy whose audience delta is
-   non-empty, asked by an `interactive` principal holding `publish`; or approve, deny or promote —
-   sent **without** a `confirm` field moves and decides nothing. After the route's own checks pass
+   non-empty, asked by an `interactive` principal holding `publish`; or approve, deny or promote;
+   or, **a1p** (§4, #296), a tombstone of an item a person promoted — sent **without** a `confirm`
+   field moves and decides nothing. After the route's own checks pass
    (coverage and capability first, `container.md` §6's order, so a token that may not do the act gets
    §3's refusal whatever the delta), it answers `{"result": "confirm", "newly": [<name>],
    "challenge": <id>, "webauthn": <options> | null, "expires_at"}`. `newly` names who would newly see
@@ -645,9 +676,10 @@ storage (v0.7 §S).
   details.
 - **A staged artifact item past `blobs.staging_retention_days`** appears in `GET /v1/pending` under
   `"staged": [<item>]` — to an interactive principal covering its scope, and **instead of** in `items`,
-  never both — until a person promotes it or tombstones it; a tombstone deletes the **staged** bytes
-  (never promoted ones: [0.3 · 44] holds), and its `item.tombstone` entry carries
-  `details.staged_deleted: <sha256>` so the deletion is on the record. A promotion of such an item
+  never both — until a person promotes it or tombstones it (§4); a tombstone deletes the **staged**
+  bytes (never promoted ones: [0.3 · 44] holds) unless another upload or staged item still holds
+  them, and its `item.tombstone` entry then carries `details.staged_deleted: <sha256>` where bytes
+  were deleted, so the deletion is on the record. A promotion of such an item
   appends `blob.put` (§4's promote row). **decided** (§Z); **a1p** the two event details.
 
 **Not in this door at v1.0:**
