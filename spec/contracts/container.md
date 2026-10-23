@@ -309,7 +309,7 @@ count is spelled out because the table below has six rows and the sentence used 
 | `org.policy.sovereign_chain` | `allow` | org node | **yes** — forbids inversion in that subtree (§3) |
 | `node.policy.structure_floor` | `project` | node | **yes** — set on an org, inherited by its subtree (§7) |
 | `blobs.inline_max_bytes` | `65536` (64 KiB) | container | **yes** — F5 (`storage.md` §4) |
-| `blobs.staging_retention_days` | `30` | container | **yes** — R11: 30 days cold, then purge |
+| `blobs.staging_retention_days` | `30` | container | **yes** — R11, as amended by v0.7 §Z: 30 days, then ask (`rest.md` §4.4) |
 | `step_up.window_seconds` | `300` (≈5 min) | container, per source→destination **ring pair** | **yes, including `0`** — R11; `0` is *no grace period*, never *no check* |
 
 A deployment that omits the object gets the defaults, and the defaults are exactly what the skeleton
@@ -353,7 +353,8 @@ Four notes the table cannot carry:
   global window; `authorization-server.md` §10 states this at `yes.consume`, where the window is
   read. `step_up` runs (`events.md` §1: the MVP tap, ahead of Phase 2.2); the *key* is frozen.
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
-  written before this key existed: R11 ratifies 30 days cold, then purge. It covers **staged**
+  written before this key existed: R11 ratified 30 days cold, then purge, and v0.7 §Z amends it to
+  30 days, then ask — nothing is deleted on a timer (`rest.md` §4.4). It covers **staged**
   bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item; an owner purge act is
   `[v1.1]` ([0.3 · 44]; `storage.md` §4).
 

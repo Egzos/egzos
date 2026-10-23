@@ -235,12 +235,15 @@ spec's job).
 | `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
 | `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls` | `context.fetch` |
-| `POST /v1/items` | write a text item; it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add` |
+| `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
+| `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
+| `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
+| `DELETE /v1/uploads/{id}` | discard an orphaned upload and its staged bytes (§4.4) | the opener, or an admin | — (new) | `upload.discard` |
 | `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
 | `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
 | `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
-| `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote` |
+| `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -267,9 +270,8 @@ container `Token`: `actor` = its `owner`, `principal` its principal. For a provi
 `identity.md` §3a's attribution clause — a person is `actor: user:<sub>`; an agent is `actor:
 agent:<client_id>` with `details.for: user:<sub>`. **decided.**
 
-**`POST /v1/items` writes text only.** An artifact upload is `TODO(a1p)`, #42: the staging rule for
-an agent-proposed artifact (`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it, and no
-running door uploads over HTTP to derive the shape from.
+**Artifacts arrive through an upload** (§4.4): the staging rule for an agent-proposed artifact
+(`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it.
 
 ### 4.1 · Success responses (#187)
 
@@ -305,7 +307,10 @@ the row does not name is `400` (§3).
 | `GET /v1/items/{id}` | — | `<entry>` |
 | `GET /v1/inbox` | — | `{"items": [<entry>]}` |
 | `GET /v1/scopes` | — | `{"nodes": [<node>]}` |
-| `POST /v1/items` | `{"body", "kind"?, "scope"?, "key"?, "tags"?}` | `{"item": <item>}` |
+| `POST /v1/items` | `{"body", "kind"?, "scope"?, "key"?, "tags"?}`, or `{"kind": "artifact", "upload", "scope"?, "key"?, "tags"?}` (§4.4) | `{"item": <item>}` |
+| `POST /v1/uploads` | `{"scope", "name", "mime", "size", "sha256"}` | `{"upload": <id>, "expires_at"}` |
+| `PUT /v1/uploads/{id}` | the raw bytes | `{"upload": <id>, "sha256"}` |
+| `DELETE /v1/uploads/{id}` | — | `{"result": "discarded"}` |
 | `POST /v1/items/{id}/move` | `{"to", "confirm"?}` | `{"result": "moved", "item": <item>}`, `{"result": "confirm", …}` (§4.2) or `{"result": "pending", "proposal": <id>}` |
 | `POST /v1/items/{id}/copy` | `{"to", "confirm"?}` | `{"result": "copied", "item": <item>}` (the new copy), `{"result": "confirm", …}` or `{"result": "pending", "proposal": <id>}` |
 | `POST /v1/pending/{proposal}/approve` | `{"confirm"?}` | `{"result": "confirm", …}` (§4.2), then `{"result": "executed", "item": <item>}` or `{"result": "stale"}` |
@@ -362,7 +367,8 @@ the row does not name is `400` (§3).
    10]` defers. The flagship's *moved* and *pending* states read `result`.
 8. **`POST /v1/scopes`** returns the created node. `parent` absent is the personal root, as
    `egzos mk`.
-9. **`GET /v1/pending`** is two lists, as `Trust.pending` returns them: `items`, every `unverified`
+9. **`GET /v1/pending`** is two lists as `Trust.pending` returns them, plus §4.4's `staged` and
+   `uploads` where the reader has any: `items`, every `unverified`
    item in a scope the token covers, and `proposals`, every `open` proposal the token decides over
    (`Trust.decides_over`: it covers both ends). Both are viewer-scoped; the running CLI lists every
    pending item and proposal because its owner token covers `*`, and a narrower grant (`identity.md`
@@ -400,8 +406,9 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    proposal's audience to.
 3. **The second leg** carries `"confirm": {"challenge": <id>, "proof": "biometric", "assertion":
    <WebAuthn assertion>}`, or `"proof": "button"` with no assertion where `confirm.allow_button` is
-   `true`. The container then, as **one atomic step** — of two concurrent requests presenting one
-   challenge, at most one proceeds past it, as §6's grant spend:
+   `true` **and the person has no registered credential** — once they have one, the button is refused
+   for them (`identity.md` §5). The container then, as **one atomic step** — of two concurrent requests
+   presenting one challenge, at most one proceeds past it, as §6's grant spend:
    - finds the challenge live, unspent and **bound to this request**: the same principal (the
      `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
      and the same audience delta, recomputed now;
@@ -420,20 +427,172 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    caller is the same whatever the reason: `{"result": "confirm", …}` with a fresh challenge (and the
    new `newly`, where the delta changed). The ledger says which case it was; the response does not
    (`capabilities.md` §6 clause 3).
-5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.**
+5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.** A proof
+   that concludes spends its challenge whether it is confirmed or refused, as §6's grant is spent at
+   check 4 whatever the later checks decide (a6 on #284); a refused attempt always gets a fresh one.
 6. **A `client` principal never gets `confirm`.** Its widening move or copy parks as a proposal
    (`gate.propose`, `pending`) for a person to decide, as today; approve, deny and promote are §3's
    refusal to it; a `confirm` field from a `client` principal is ignored, never honoured, and appends
    nothing beyond the route's own refusal or proposal. **decided** (§U).
 7. **`webauthn` is `null`** when the person has registered no credential with this container: only
    the button is then possible, and an owner who set `confirm.allow_button` to `false` must register
-   one (the registration route arrives with the next contract PR) before any confirm-gated act.
+   one (§4.3) before any confirm-gated act.
+
+### 4.3 · Grants, agents and confirm credentials
+
+The routes behind `identity.md` §4–§5. **a1p**, every clause, binding those records onto HTTP. Every
+route here needs an **`interactive` principal**: a `client` principal gets §3's refusal on all of them,
+reads included, because who else holds access is credential metadata an agent is never served. Every
+list is viewer-scoped and complete (§4). Every read appends `context.fetch` with `items: []` and
+`details.read` naming what was read.
+
+| method · path | does | needs | `200` body | events |
+|---|---|---|---|---|
+| `GET /v1/grants` | the user grants | `admin` over `["*"]` | `{"grants": [<grant>]}` | `context.fetch` (`read: grants`) |
+| `POST /v1/grants` | grant a provider user access, with the confirm (§4.2) | `admin` over `["*"]` | `confirm`, then `{"grant": <grant>}` | first leg; `step_up`, `identity.grant` |
+| `DELETE /v1/grants/{sub}` | revoke a user grant | `admin` over `["*"]` | `{"result": "revoked"}` | `identity.revoke` |
+| `GET /v1/agents` | registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
+| `POST /v1/agents` | register an agent, from the consent page's flow, with the confirm | `admin` over `["*"]` | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
+| `DELETE /v1/agents/{client_id}?sub=` | revoke one registration | the person it serves, or an admin | `{"result": "revoked"}` | `identity.revoke` |
+| `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | as revoke | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
+| `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
+| `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
+| `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
+
+- **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
+  `{"client_id", "name", "sub", "capabilities", "scopes", "created_at", "last_seen"}`, `last_seen` read
+  from the ledger. `<credential>` is `{"id", "name", "created_at", "last_used"}` — never the public key
+  or the credential id's bytes. `<entry-line>` is `{"seq", "ts", "event", "subject", "scope"}`.
+- **`sub` in a query** names the person a registration or credential belongs to. Absent, it is the
+  caller; present and not the caller, the caller must be an admin. A `client_id` names one registration
+  per person, so the pair `(client_id, sub)` is what a revoke or a log read acts on.
+- **Request bodies.** `POST /v1/grants`: `{"sub", "name", "role"? | "capabilities"?, "scopes",
+  "confirm"?}`. `POST /v1/agents`: `{"authorization_id", "client_id", "name", "role"? |
+  "capabilities"?, "scopes", "confirm"?}`; the registration serves the caller; `name` is at most 128
+  characters, untrusted display data. A role bundle expands at grant time (`capabilities.md` §2). No
+  grant or registration exceeds the granter's own grant: wider capabilities or scopes are §3's refusal.
+- **Who registers an agent.** Only an admin, and the registration serves that admin (`identity.md` §4).
+- **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
+  §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
+  instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
+  first-party session, and calls this route only for one that is pending, was requested by the
+  person whose container token makes the call, is for the body's `client_id`, and asks for no scopes
+  beyond the body's; and it refuses a `client_id` registered on another container (`identity.md`
+  §3a). **a1p** (a1r and a6 on #285).
+- **What the container holds to is the admin's confirm.** The first leg answers `newly: []` and, in
+  its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
+  the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
+  (design-gap Egzos/egzos-platform#117). The challenge is bound to the body's `client_id`, its
+  capabilities as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`.
+  **a1p** (a6 on #285).
+- **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
+  authorization, at most one registers, and every later request naming it is §3's refusal.
+  `identity.grant` records it as `details.authorization_id`, so the consent page's record and the
+  container's join; it is **what the caller claimed**, which the container cannot check, never a
+  verified fact. Only after the registration is written does egzos.io tell the provider to issue.
+- **The agent log serves only what the reader may see now.** It lists the agent's entries for that
+  person (`details.for`), and omits every entry that was a refusal — a probe's `context.fetch` with
+  `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
+  **today**. An omitted line leaves no marker and no count, so the log cannot tell a reader what exists
+  outside their sight, or whether a probed target existed.
+- **Revoking the last admin grant** answers `409` with `{"error":"last_admin"}` and §3's headers, to the
+  admin who asked — a fact about their own container — and appends `identity.revoke` with `outcome:
+  refused`, `details.reason: last_admin`.
+- **Credential registration has two legs.** The first answers `{"result": "register", "challenge",
+  "webauthn": <PublicKeyCredentialCreationOptions>, "expires_at"}`, a challenge bound to the caller as
+  §4.2's are. For a person who already has a credential it also answers `"confirm": {"challenge",
+  "webauthn": <PublicKeyCredentialRequestOptions>}`: a second challenge, for the assertion the second
+  leg's `confirm` carries, issued and bound as §4.2's first leg issues one (the act `credential.add`).
+  That first leg lists the person's credentials to their authenticator, so it appends §4.2's first-leg
+  `context.fetch` (`details.read: credentials`); a first leg for a person with no credential appends
+  nothing. The second leg carries `{"challenge", "attestation", "confirm"?}`; user verification is
+  required.
+  - **A person with a credential adds another only with a biometric proof from an existing one** in
+    `confirm`. The button is refused on this route whatever `confirm.allow_button` says, so a stolen
+    session cannot add the thief's authenticator.
+  - **Removing a credential needs a biometric proof too, never the button** — the person's own, from
+    any of their credentials, or, for an admin's recovery of another person, the admin's own (an admin
+    with none registers one first). A stolen session can therefore neither remove a person's
+    credentials to fall back to the button, nor clear them to enrol a first one of its own.
+  - **The first credential** needs, in `confirm`, the button **and a fresh sign-in**: the provider
+    token's most recent authentication (its `amr` timestamp) within the last 300 seconds. A token
+    lifted from a session that signed in earlier cannot enrol one. Where `confirm.allow_button` is
+    `false`, the first credential is enrolled only from the owner's own surfaces (the lifeboat or the
+    CLI, holding the owner `Token`), which enrol the owner's own authenticator: **while buttons are
+    off, a person other than the owner who has no credential cannot enrol one, and so cannot perform
+    a confirm-gated act.** That is the cost of the stronger setting, taken on purpose: an owner turns
+    buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285).
+  - **What stays open, on the record:** whoever holds a fresh session of a person who has no
+    credential yet can enrol the first one. **Recovery:** an admin removes a person's credentials
+    (`DELETE /v1/credentials/{id}?sub=`, with the admin's own confirm), and the owner can remove any
+    from the CLI or the lifeboat with the owner `Token`; the person then enrols again.
+  - **Every second leg that concludes is audited**: `step_up` first where a `confirm` proof was
+    presented (as §4.2 item 4, refused ones included), then `identity.credential`. An add carries
+    `details.op: add` and `outcome: added`, or `refused` with `details.reason` (`attestation`, `stale`,
+    `no_proof`, `not_fresh`, `button_refused`); the caller's answer to a refusal is a fresh `register`,
+    whatever the reason. A removal carries `details.op: remove` and `outcome: removed`, or `refused`
+    with `details.reason` (`stale`, `no_proof`, `button_refused`, `assertion`); the answer to a refusal
+    is a fresh `confirm`. **Every removal appends it, on every surface**: the owner's removal from the
+    CLI or the lifeboat with the owner `Token` appends `identity.credential` (`op: remove`, `actor` the
+    owner) too, since a removal reopens the button for that person. A `sub` the admin does not cover is
+    §3's refusal before any leg, and follows §4's rule for a refusal.
+- **New events**: `identity.grant` and `identity.revoke` (`details.kind`: `user` or `agent`), as
+  `identity.md` §4 names them, and `identity.credential` (`details.op`: `add` or `remove`; never key
+  material). They enter `events.md` §1 with their code (§5).
+
+### 4.4 · Artifact upload
+
+`POST /v1/items` takes text in its body, or an artifact through an upload. **a1p**, the shape;
+**decided**, the staging rule and dedup ([0.3 · 41]; `storage.md` §4). The bytes travel to the
+container and nowhere else; the container keeps them in its `BlobStore`, which may sit on object
+storage (v0.7 §S).
+
+1. **Open.** `POST /v1/uploads` with `{"scope", "name", "mime", "size", "sha256"}` → `{"upload": <id>,
+   "expires_at"}`. Needs `remember` on `scope`; shape-validated before any lookup (§3): `name` is 1 to
+   255 characters, `mime` a `type/subtype` token of at most 127, both untrusted display data that every
+   surface escapes; `size` above the container's upload limit is `400`. The limit is a new key,
+   `blobs.upload_max_bytes` (default 104857600, 100 MiB; an `admin` may change it), which enters
+   `container.md` §8 and `_types.py` with the code that reads it, as `identity.md` §2's keys do. A
+   principal holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
+   item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it);
+   a 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a fact about the
+   caller's own uploads. So what a principal holds staged, and nobody has decided on, is bounded at 16
+   times `blobs.upload_max_bytes`, and a person's decision is what frees a slot (v0.7 §Z: asked about,
+   never purged). **a1p** (a6 on #285). A successful open appends nothing: no bytes have moved. A
+   refused open — a `scope` the token cannot write to — follows §4's rule and appends `context.fetch`
+   with `items: []`.
+2. **Bytes.** `PUT /v1/uploads/{id}` with the raw bytes. The id is bound to the principal that opened
+   it and expires after one hour; the container reads at most `size` bytes, checks length and sha256, and
+   **stages** them (`BlobStore.stage`) — never `put`, so staging never answers whether the content
+   already exists. Each `PUT` on a live id of the caller's own appends **`upload.put`** (`subject` the
+   upload, `scope`, `size`, `sha256`, `outcome: staged` or `refused` with `details.reason`: `length`,
+   `hash`, `already`). A `PUT` naming an unknown, expired or another principal's id is §3's refusal and
+   appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`.
+3. **Item.** `POST /v1/items` with `{"kind": "artifact", "upload": <id>, "scope"?, "key"?, "tags"?}`
+   writes the item, `unverified` like every write. The id must be the caller's own, staged, and not yet
+   itemised; `scope`, when given, must equal the upload's; otherwise §3's refusal. Bytes and item are two
+   separate spends of one id, **each an atomic check-and-mark**: of two concurrent `PUT`s, or two
+   concurrent item writes, naming one id, at most one proceeds, and the other is refused as spent. A
+   person's artifact is promoted at once (`BlobStore.promote`, `blob.put`); an agent's stays staged until
+   a person promotes the item (`storage.md` §4's staging rule for agent-proposed artifacts). Events:
+   `item.add`, and `blob.put` where promoted.
+
+**Nothing staged is deleted on a timer, and nothing staged goes untracked** (v0.7 §Z, amending R11's
+"30 days cold, then purge"):
+
+- **An orphan** is an upload whose bytes were staged but which expired before an item was written. It
+  is listed to its opener — and to an admin — in `GET /v1/pending` under `"uploads": [{"upload",
+  "name", "size", "sha256", "scope", "opened_at"}]`, counts toward the 16, and is removed only by
+  `DELETE /v1/uploads/{id}` (its opener or an admin), which deletes the staged bytes and appends
+  **`upload.discard`**.
+- **A staged artifact item past `blobs.staging_retention_days`** appears in `GET /v1/pending` under
+  `"staged": [<item>]` — to an interactive principal covering its scope, and **instead of** in `items`,
+  never both — until a person promotes it or tombstones it; a tombstone deletes the **staged** bytes
+  (never promoted ones: [0.3 · 44] holds), and its `item.tombstone` entry carries
+  `details.staged_deleted: <sha256>` so the deletion is on the record. A promotion of such an item
+  appends `blob.put` (§4's promote row). **decided** (§Z); **a1p** the two event details.
 
 **Not in this door at v1.0:**
-
-- **Grants, agent registrations, the agent reads and WebAuthn credential registration**
-  (`identity.md` §4–§5) and **artifact upload** arrive with the next contract PR (#283). A container
-  `Token` is still revoked with `token rm`.
 - **Quarantine and config.** No flagship screen #137 cites needs either at v1.0. They stay on the CLI.
 - **`[v1.1 · #137 1–7, 9–12]`**: a revision on reads (1); window state and its events (2, 3);
   `return_to` (4); writability per scope (5); a nonzero-delta move inside a window (6); pending
@@ -444,16 +603,19 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
 
 `events.md` §4 invariant 2 binds this door without exception: every read, grant mint and blob pull
 is an event, and a door that produces an effect without one is non-conforming. **decided.** The
-table in §4, with §2 item 7's `rest.tally` and `authz.release`, is the whole list of what the door
-appends. A test per row asserts the event.
+whole list is given below, under **The whole list**. A test per row asserts the event.
 
 The two invariant-2 exceptions (the owner's read inside an AS session; refresh rotation) are the
 AS's, and neither reaches this door: §2 accepts no session. **decided.**
 
-**New events.** `item.copy` (a copy is made; `subject` the new item, `details.from` the source) and
+**The whole list** of what the door appends is the tables of §4 and §4.3, §4.2's and §4.4's clauses,
+and §2 item 7's `rest.tally` and `authz.release`.
+
+**New events.** `item.copy` (a copy is made; `subject` the new item, `details.from` the source),
 `gate.pass.confirmed` (a widening move or copy confirmed inline; `audience_delta` and the `step_up`'s
-`seq`) are this door's. Like `identity.md`'s, they enter `events.md` §1 and `_types.py` with the code
-that appends them, because the conformance tests pin that table to running code. **a1p.**
+`seq`), §4.3's `identity.grant`, `identity.revoke` and `identity.credential`, and §4.4's `upload.put`
+and `upload.discard` are this door's. Like `identity.md`'s, they enter `events.md` §1 and `_types.py`
+with the code that appends them, because the conformance tests pin that table to running code. **a1p.**
 
 ## 6 · `BlobGrant` — issue and redemption
 
@@ -565,6 +727,6 @@ other four questions were the retired authorization server's and close with it.
 ## 8 · What this document does not fix
 
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
-`identity.md`. Copy, upload, the agent reads and the human-only routes → the next contract PR. The
-lifeboat → `spec/design/lifeboat.md`. Where the grant key persists → #165 item 4. The look of any
-client → its design spec.
+`identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
+§4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. Where the grant key persists → #165 item 4.
+The look of any client → its design spec.
