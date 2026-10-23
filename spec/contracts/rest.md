@@ -514,7 +514,7 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   first leg answered after a refusal included; a first leg for a person with no credential appends
   nothing. The second leg carries `{"challenge", "attestation", "confirm"?}`; user verification is
   required. Every proof presented is concluded as §4.2's are, so the button's first enrolment leaves
-  its `step_up` too. **a1p** (a1r on #290).
+  its `step_up` too. **#290, for the Chief to ratify by its merge** (a1r on #290).
   - **A person with a credential adds another only with a biometric proof from an existing one** in
     `confirm`. The button is refused on this route whatever `confirm.allow_button` says, so a stolen
     session cannot add the thief's authenticator.
@@ -531,7 +531,8 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
     a confirm-gated act.** That is the cost of the stronger setting, taken on purpose: an owner turns
     buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285). **This
     door is never the owner's own surface**, and a container `Token` carries no sign-in to be fresh:
-    over REST, only a provider sign-in enrols a first credential. **a1p** (a1r on #290).
+    over REST, only a provider sign-in enrols a first credential. **#290, for the Chief to ratify
+    by its merge** (a1r on #290).
   - **What stays open, on the record:** whoever holds a fresh session of a person who has no
     credential yet can enrol the first one. **Recovery:** an admin removes a person's credentials
     (`DELETE /v1/credentials/{id}?sub=`, with the admin's own confirm), and the owner can remove any

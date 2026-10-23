@@ -284,3 +284,15 @@ def test_the_owners_cli_removal_is_on_the_record(c, door, sign, monkeypatch, cap
     assert json.loads(capsys.readouterr().out)
     removed = _events(Container(c.home), "identity.credential")[-1]
     assert (removed["actor"], removed["details"]["op"]) == (OWNER, "remove")
+
+
+def test_the_owners_cli_list_is_a_read_on_the_record(c, door, sign, monkeypatch, capsys):
+    _enrol(door, sign(), SoftAuthenticator(EGZOS))
+    monkeypatch.setenv("EGZOS_HOME", str(c.home))
+    monkeypatch.delenv("EGZOS_TOKEN", raising=False)
+    capsys.readouterr()
+    assert main(["--json", "credential", "ls"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert "public_key" not in json.dumps(listed)
+    read = _events(Container(c.home), "context.fetch")[-1]
+    assert (read["actor"], read["details"]["read"]) == (OWNER, "credentials")

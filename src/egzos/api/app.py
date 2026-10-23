@@ -719,8 +719,10 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             reason = c.confirm.conclude(token, proof, act="credential.remove",
                                         subject=credential_id, destination=None, delta=[],
                                         origin=origin, biometric_only=True)
-            if reason is None:
-                c.confirm.remove(token, cred)
+            # Removed as it stands under the lock, never a snapshot read before it (a6 on #290).
+            current = c.backend.get_credential(credential_id)
+            if reason is None and current is not None and not current["removed"]:
+                c.confirm.remove(token, current)
                 removed = True
             else:
                 # §4.3's closed set for a removal: the confirm's own reasons, mapped onto it.

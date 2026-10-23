@@ -77,9 +77,12 @@ class Container:
         )
 
     def _salt(self) -> str:
-        """Per container and fixed for its life: the personal root's id."""
+        """Per container and fixed for its life: the personal root's id. With no root there is
+        no salt, and no handle is handed out (a1r on #290)."""
         root = self.nodes.user_root()
-        return root.id if root else ""
+        if root is None:
+            raise RuntimeError("this container is not initialised")
+        return root.id
 
     def _refresh(self, token: Token) -> Token | None:
         """The caller as it stands now: a minted token re-read, a grant re-derived (§4)."""
