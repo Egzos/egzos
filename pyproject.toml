@@ -14,7 +14,8 @@ authors = [
 ]
 dependencies = [
     "typer>=0.27.2",
-    "mcp>=2.2",
+    # identity.md §7: /mcp needs 2.3's `subscriptions=False` and its body limit
+    "mcp>=2.3",
     # the lifeboat (spec/design/lifeboat.md §0): FastAPI + Jinja + htmx, in-process
     "fastapi>=0.115",
     "jinja2>=3.1",
@@ -36,6 +37,7 @@ dev = [
     "pyyaml>=6",  # tests/governance imports .github/scripts/check_ownership.py
     "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change
     "httpx>=0.27",  # FastAPI's TestClient drives the lifeboat in tests
+    "httpx2>=2.10",  # the MCP SDK's own client drives /mcp in process, in tests
 ]
 
 [project.scripts]

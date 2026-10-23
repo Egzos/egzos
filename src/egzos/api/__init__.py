@@ -12,6 +12,11 @@ Behind a TLS-terminating proxy on loopback every caller arrives from the proxy's
 throttle's per-source bucket (rest.md §2 item 7) counts the proxy as one source: the container-
 global bucket still bounds a sweep, and a proxy that throttles per client is the place to split
 callers apart. A forwarded header is never read to do it here.
+
+The door's own origin, which `/mcp`'s protected-resource metadata names (identity.md §7), is the
+one `serve` binds: the socket's scheme, host and port, never a request's `Host` or a forwarded
+header, so the document is the same for every caller. Behind a proxy, or on a wildcard address,
+that is not the origin clients reach; no contract key names that origin yet.
 """
 
 from __future__ import annotations
@@ -33,6 +38,14 @@ def loopback(host: str) -> bool:
         return False
 
 
+def bound_origin(host: str, port: int, *, tls: bool) -> str:
+    """The origin a door bound to `host:port` serves: `https` when it holds TLS, a default port
+    left out, an IPv6 address in brackets."""
+    scheme = "https" if tls else "http"
+    name = f"[{host}]" if ":" in host else host
+    return f"{scheme}://{name}" if port == (443 if tls else 80) else f"{scheme}://{name}:{port}"
+
+
 def serve_http(
     container: Container,
     *,
@@ -52,10 +65,10 @@ def serve_http(
             "plain HTTP is for a loopback socket only (rest.md §1): give --tls-cert and --tls-key, "
             "or bind 127.0.0.1 behind a TLS-terminating proxy"
         )
-    scheme = "https" if tls_cert else "http"
-    print(f"egzos REST door on {scheme}://{host}:{port}/v1/ — Ctrl-C to stop.", flush=True)
+    origin = bound_origin(host, port, tls=tls_cert is not None)
+    print(f"egzos REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
     uvicorn.run(
-        create_app(container),
+        create_app(container, origin=origin),
         host=host,
         port=port,
         log_level="warning",
