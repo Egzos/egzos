@@ -476,32 +476,55 @@ class Identity:
         return out
 
     # -- grants (§4) ----------------------------------------------------------------------------
+    @staticmethod
+    def expand(role: Any, capabilities: Any) -> list[str]:
+        """A grant's capabilities, sorted: a role's bundle expanded at grant time, as at mint
+        (capabilities.md §2), or the capabilities named. It takes a request body's values as they
+        came, so anything else is a `ValueError`: both or neither, an unknown role, or other than
+        a non-empty list of known capabilities."""
+        if (role is None) == (capabilities is None):
+            raise ValueError("a grant names a role or capabilities, not both")
+        if role is not None:
+            if not isinstance(role, str) or role not in ROLE_BUNDLES:
+                raise ValueError("unknown role")
+            return sorted(ROLE_BUNDLES[role])
+        if not isinstance(capabilities, list) or not capabilities or any(
+            c not in CAPABILITIES for c in capabilities
+        ):
+            raise ValueError("unknown capability")
+        return sorted(set(capabilities))
+
+    @staticmethod
+    def user_id(value: Any) -> str:
+        """The provider's user id a grant names, as given, or `ValueError`: 1 to 255 characters,
+        with no whitespace and, as in a display name, no control or formatting character, so it
+        reads as what it is wherever a grant is listed. A provider's user id is a UUID."""
+        if not isinstance(value, str) or not value or len(value) > 255 or any(
+            ch.isspace() or unicodedata.category(ch) in _HIDDEN for ch in value
+        ):
+            raise ValueError("a grant names the provider's user id")
+        return value
+
     def grant_user(
         self,
         sub: str,
         *,
         name: str,
         role: str | None = None,
-        capabilities: Iterable[str] | None = None,
+        capabilities: list[str] | None = None,
         scopes: list[str],
         actor: str,
         principal: str,
     ) -> UserGrant:
         """Write (or replace) a person's grant and append `identity.grant`. Whoever calls this has
         already checked that the act is theirs: the owner `Token` at `link`, or an admin under
-        the confirm at the door (§4)."""
+        the confirm at the door (§4). `capabilities` is the names, which `expand` checks: a list,
+        never a lone string."""
         if principal != "interactive":
             raise PermissionError("granting access is a person's act")
-        if not isinstance(sub, str) or not sub.strip() or len(sub) > 255:
-            raise ValueError("a grant names the provider's user id")
+        sub = self.user_id(sub)
         name = display_name(name)
-        if (role is None) == (capabilities is None):
-            raise ValueError("a grant names a role or capabilities, not both")
-        if role is not None and role not in ROLE_BUNDLES:
-            raise ValueError("unknown role")
-        caps = sorted(ROLE_BUNDLES[role]) if role is not None else sorted(set(capabilities or ()))
-        if not caps or any(c not in CAPABILITIES for c in caps):
-            raise ValueError("unknown capability")
+        caps = self.expand(role, capabilities)
         if not scopes:
             raise ValueError("a grant covers at least one scope")
         grant: UserGrant = {
@@ -513,10 +536,7 @@ class Identity:
             "revoked": False,
         }
         with self.atomic():
-            # Re-granting the last whole-container admin something narrower removes the last
-            # admin as surely as revoking it does (§4), so it is refused the same way.
-            narrows = not _whole(grant) and self._last_admin(sub)
-            if not narrows:
+            if not self._narrows(sub, caps, grant["scopes"]):
                 self.state.put_user_grant(grant)
                 self.ledger.append(
                     "identity.grant",
@@ -576,6 +596,62 @@ class Identity:
         """Every live registration serving `sub`. storage.md §3.2 lists registrations by
         `client_id` only, so this scans them all: a filter by `sub` would be a contract change."""
         return [r for r in self.state.list_agent_registrations() if r["sub"] == sub and _live(r)]
+
+    def exceeds(self, caller: Token, capabilities: list[str], scopes: list[str]) -> bool:
+        """Whether a grant of these goes beyond `caller`'s own (rest.md §4.3): a capability the
+        caller lacks, or a scope their coverage does not reach. `*` is the whole container, which
+        only a caller holding `*` reaches."""
+        return not set(capabilities) <= set(caller.capabilities) or self._wider(
+            caller.scopes, scopes
+        )
+
+    def opens(
+        self, sub: str, name: str, capabilities: list[str], scopes: list[str]
+    ) -> list[tuple[str, str]]:
+        """Whom granting `sub` these would newly let see something, as sorted `(member, display
+        name)` pairs: rest.md §4.2's audience delta for a grant. The person, unless their live
+        grant already reaches all of it (a revoked one reaches nothing), and each agent serving
+        them whose reach, its registration intersected with the grant (§4), the grant widens."""
+        old = self.state.get_user_grant(sub)
+        had_caps, had_scopes = (old["capabilities"], old["scopes"]) if _live(old) else ([], [])
+        out = [(f"user:{sub}", name)] if self._wider(had_scopes, scopes) else []
+        for agent in self.serving(sub):
+            before = self._reach(agent, had_caps, had_scopes)
+            if self._wider(before, self._reach(agent, capabilities, scopes)):
+                out.append((f"agent:{agent['client_id']}:{sub}", agent["name"]))
+        return sorted(out)
+
+    def _reach(
+        self, agent: AgentRegistration, capabilities: list[str], scopes: list[str]
+    ) -> list[str]:
+        """What an agent covers under a grant of these, as at check time (`_agent`): nothing
+        without a capability in common, else its scopes intersected with the grant's."""
+        if not set(agent["capabilities"]) & set(capabilities):
+            return []
+        return self.intersect(agent["scopes"], scopes)
+
+    def _wider(self, before: list[str], after: list[str]) -> bool:
+        """Whether `after` reaches a node `before` does not. Coverage runs down the path, only
+        `*` reaches the whole container, and an absent node counts as one `before` misses."""
+        if "*" in before:
+            return False
+        return "*" in after or any(not set(before) & set(self.ancestors(s) or ()) for s in after)
+
+    def refuse_narrowing(
+        self, sub: str, capabilities: list[str], scopes: list[str], *, actor: str, principal: str
+    ) -> bool:
+        """rest.md §4.3's check before any leg of the confirm: where granting `sub` these would
+        narrow the last live grant holding `admin` over `["*"]`, append `identity.grant`'s
+        refusal and answer True. `grant_user` checks again under its lock."""
+        if not self._narrows(sub, capabilities, scopes):
+            return False
+        self._refused("identity.grant", sub, actor=actor, principal=principal)
+        return True
+
+    def _narrows(self, sub: str, capabilities: list[str], scopes: list[str]) -> bool:
+        """Whether granting `sub` anything short of `admin` over `["*"]` takes it from the last
+        grant holding it: that removes the last admin as surely as revoking it does (§4)."""
+        return not ("admin" in capabilities and "*" in scopes) and self._last_admin(sub)
 
     def _refused(self, event: str, sub: str, *, actor: str, principal: str) -> None:
         self.ledger.append(

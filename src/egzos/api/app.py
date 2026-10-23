@@ -12,10 +12,10 @@ is §3's one `404`, byte for byte. Nothing here renders an item: a body is a JSO
 The acts the confirm gates (§4.2) — a move or copy that widens an audience, and approve, deny and
 promote — answer in two legs on one route: the first issues a challenge and says who would newly
 see the item, the second spends it with a proof, and the act lands in the same transaction. An
-artifact arrives through an upload (§4.4): open, bytes, item. An admin lists the grants and ends
-one (§4.3), with the confirm where it is someone else's. Granting, the agent routes (§4.3) and
-`BlobGrant` redemption (§6) land with their own code; until then those paths are undeclared and
-answer §3's refusal, like any other.
+artifact arrives through an upload (§4.4): open, bytes, item. An admin lists the grants, grants
+access with the confirm, and ends one (§4.3), with the confirm where it is someone else's. The agent
+routes (§4.3) and `BlobGrant` redemption (§6) land with their own code; until then those paths are
+undeclared and answer §3's refusal, like any other.
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
 its `401` alone names the protected-resource metadata, which is served to anyone, unthrottled.
@@ -751,6 +751,25 @@ def create_app(
         return (isinstance(token, GrantToken) and token.principal == "interactive"
                 and token.has("admin") and "*" in token.scopes)
 
+    def granted(g: dict[str, Any]) -> dict[str, Any]:
+        """§4.3's `<grant>`."""
+        return {k: g[k] for k in ("sub", "name", "capabilities", "scopes", "created_at")}
+
+    scopes_max = 64  # the most scope refs a grant names: each is a lookup, made before any leg
+
+    def ask(token: Token, *, subject: str, destination: str, opens: list[tuple[str, str]],
+            origin: str | None) -> Response:
+        """§4.2's first leg for a grant: as `first_leg`, but naming whom it opens to as
+        `Identity.opens` does, since a person not yet granted is in no audience to name."""
+        newly = [name for _, name in opens]
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, subject=subject, items=[], layers=[], withheld=0,
+                        confirm_for="grant.add", newly=newly)
+        return _json(200, c.confirm.issue(token, act="grant.add", subject=subject,
+                                          destination=destination,
+                                          delta=[member for member, _ in opens], newly=newly,
+                                          origin=origin))
+
     @app.get("/v1/grants")
     async def list_grants(request: Request):
         token: Token = request.state.token
@@ -758,12 +777,71 @@ def create_app(
         if not grantor(token):
             d.probe(token, "grants")
             return refusal()
-        keys = ("sub", "name", "capabilities", "scopes", "created_at")  # §4.3's <grant>
-        live = [{k: g[k] for k in keys} for g in c.backend.list_user_grants() if not g["revoked"]]
+        live = [granted(g) for g in c.backend.list_user_grants() if not g["revoked"]]
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, read="grants", items=[], layers=[], withheld=0,
                         grants=[g["sub"] for g in live])
         return _json(200, {"grants": live})
+
+    @app.post("/v1/grants")
+    async def add_grant(request: Request):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if not grantor(token):  # as on DELETE, the door never reads this caller's body
+            d.probe(token, "grants")
+            return refusal()
+        body = await _object(request, {"sub", "name", "role", "capabilities", "scopes", "confirm"},
+                             {"sub", "name", "scopes"})
+        proof = presented(body)
+        refs = body["scopes"]
+        try:  # as `grant_user` checks them, so it never refuses one under the lock
+            sub = c.identity.user_id(body["sub"])
+            name = display_name(body["name"])
+            caps = c.identity.expand(body.get("role"), body.get("capabilities"))
+        except ValueError as e:
+            raise Invalid from e
+        if not isinstance(refs, list) or not 0 < len(refs) <= scopes_max:
+            raise Invalid
+        refs = [_str(r) for r in refs]
+        # The lookups, after every shape check (§3): a ref resolves as §3's do (an ambiguous tail
+        # is its 409), and the grant holds the node ids, never the refs.
+        nodes = [d.scope(token, r) for r in refs if r != "*"]
+        scopes = ["*"] if "*" in refs else sorted({n.id for n in nodes if n is not None})
+        # No grant exceeds the caller's own: wider capabilities or scopes are §3's refusal.
+        if None in nodes or c.identity.exceeds(token, caps, scopes):
+            d.probe(token, sub)
+            return refusal()
+        kw = {"actor": token.owner, "principal": token.principal}
+        if c.identity.refuse_narrowing(sub, caps, scopes, **kw):  # before any leg (§4.3)
+            return _json(409, {"error": "last_admin"})
+        # The challenge binds the grant as it would land, beside its `sub` (the subject).
+        terms = json.dumps({"name": name, "capabilities": caps, "scopes": scopes}, sort_keys=True)
+        if proof is None:
+            return ask(token, subject=sub, destination=terms,
+                       opens=c.identity.opens(sub, name, caps, scopes), origin=origin)
+        made, reason, opens = None, None, []
+        with c.backend.atomic():
+            # As on DELETE: the caller as their grant stands now, so a revoke or a narrowing since
+            # the door counts; the door's token concludes, as only it carries the sign-in time.
+            now = c.identity.refresh(token)
+            if grantor(now) and not c.identity.exceeds(now, caps, scopes):
+                opens = c.identity.opens(sub, name, caps, scopes)  # the delta as it stands now
+                reason = c.confirm.conclude(token, proof, act="grant.add", subject=sub,
+                                            destination=terms, delta=[m for m, _ in opens],
+                                            origin=origin, fresh_sign_in=True)
+                if reason is None:
+                    try:
+                        made = c.identity.grant_user(sub, name=name, capabilities=caps,
+                                                     scopes=scopes, **kw)
+                    except LastAdmin:
+                        return _json(409, {"error": "last_admin"})  # its refusal commits
+        if reason is not None:
+            return ask(token, subject=sub, destination=terms, opens=opens, origin=origin)
+        if made is None:  # the caller's own grant changed since the door
+            d.probe(token, sub)
+            return refusal()
+        return _json(200, {"grant": granted(made)})
 
     @app.delete("/v1/grants/{sub}")
     async def revoke_grant(request: Request, sub: str):
