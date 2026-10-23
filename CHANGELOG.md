@@ -38,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
+- **MCP over HTTP at `/mcp`** (`identity.md` §7): an agent that is not on your machine connects
+  to `egzos serve --http` with a sign-in from your provider, and gets the same three tools as
+  stdio, acting for you and named on the chain as doing so. The container publishes
+  `/.well-known/oauth-protected-resource` so MCP clients find your provider on their own.
 - **Download artifacts too large to inline** (`rest.md` §6): a read of an artifact over
   `blobs.inline_max_bytes` (or not text) carries a `grant` and a `grant_url` beside the item. The URL
   redeems once, within five minutes, with no header, checking the token, the item and its bytes as

@@ -252,6 +252,11 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
   URL>"`, identical for every unauthenticated case (§3).
 - The agent registers with and signs in through the provider's OAuth server, then presents its token
   here; §3 and §4 decide the rest. MCP over stdio is unchanged.
+- **running** (`egzos serve --http`): `/mcp` is stateless, each request standing alone under the
+  caller it proves, re-read as it stands on every tool call. The tools are stdio's three
+  (`egzos_fetch`, `egzos_remember`, `egzos_inbox`); an agent's entries carry `details.for`. The
+  metadata's `resource` is the origin the request reached, which the socket's scheme and the asked
+  host decide, never a forwarded header (`rest.md` §1). **a1p.**
 
 ## 8 · Places
 

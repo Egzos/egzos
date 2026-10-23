@@ -30,7 +30,10 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from fastapi import FastAPI, Request
+from mcp.server.streamable_http_manager import StreamableHTTPASGIApp
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.responses import Response
+from starlette.routing import Route
 
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.confirm import CREDENTIAL_NAME_MAX, FRESH_SIGN_IN_SECONDS, REMOVE_REASONS, person_of
@@ -44,6 +47,7 @@ from egzos.identity import (
     expand,
 )
 from egzos.ledger import acting_for
+from egzos.mcp.server import build_server, http_caller, serving
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, Node, Token
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
@@ -62,6 +66,9 @@ BODY_MAX_BYTES = 256 * 1024
 CLOSE_EVERY_SECONDS = 15
 
 _CREATABLE = tuple(t for t in CONTAINER_TYPES if t not in ("inbox", "global", "uxo"))
+#: identity.md §7: MCP over HTTP, and its protected-resource metadata (RFC 9728).
+MCP_PATH = "/mcp"
+RESOURCE_METADATA = "/.well-known/oauth-protected-resource"
 #: §6: where a `BlobGrant` is redeemed, and the headers the bytes go out under: never rendered on
 #: this origin.
 BLOBS = "/v1/blobs/"
@@ -85,6 +92,12 @@ LOG_KEYS = ("seq", "ts", "event", "subject", "scope")
 ORPHAN_KEYS = ("name", "size", "sha256", "scope", "opened_at")
 
 
+def origin(request: Request) -> str:
+    """This container's origin as the request reached it: the scheme the socket speaks (TLS on
+    the socket, never a forwarded header) and the host it was asked for."""
+    return str(request.base_url).rstrip("/")
+
+
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
     body = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode()
     return Response(body, status_code=status, media_type="application/json",
@@ -96,9 +109,9 @@ def refusal() -> Response:
     return _json(404, {"error": "not_found"})
 
 
-def unauthorized() -> Response:
+def unauthorized(challenge: str = "Bearer") -> Response:
     """§2 item 5: every unauthenticated case, byte-identical."""
-    return _json(401, {"error": "unauthorized"}, {"WWW-Authenticate": "Bearer"})
+    return _json(401, {"error": "unauthorized"}, {"WWW-Authenticate": challenge})
 
 
 def invalid() -> Response:
@@ -271,6 +284,16 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
     d = door or Door(container)
     c = container
 
+    # identity.md §7: MCP's Streamable HTTP transport at `/mcp`, behind this door's own credential
+    # check and throttle. Stateless: every request stands alone under the caller it proves.
+    mcp = build_server(container, http_caller(container))
+    mcp.streamable_http_app(
+        streamable_http_path=MCP_PATH, stateless_http=True, json_response=True,
+        max_request_body_size=BODY_MAX_BYTES,
+        # A bearer token is no ambient credential, so a rebound DNS name gains a page nothing.
+        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+    )
+
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         async def closer() -> None:
@@ -281,7 +304,8 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
 
         task = asyncio.create_task(closer())
         try:
-            yield
+            async with mcp.session_manager.run():
+                yield
         finally:
             task.cancel()
 
@@ -312,11 +336,12 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
             return refusal()
         address = request.client.host if request.client else None
         redemption = request.method == "GET" and path.startswith(BLOBS)
+        metadata = request.method == "GET" and path == RESOURCE_METADATA
         if d.throttle.holds(address):
             d.throttle.count(address, refused=True)
             # §6: at redemption the uniform failure is §3's refusal, a valid descriptor unspent.
-            return out(refusal() if redemption else unauthorized())
-        if redemption:
+            return out(refusal() if redemption or metadata else unauthorized(challenge(request)))
+        if redemption or metadata:
             # §6: the descriptor is the whole credential; no `Authorization` is read or consulted.
             request.state.address = address
             try:
@@ -327,14 +352,22 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
         token = d.caller(request.headers.get("authorization"))
         if token is None:
             d.throttle.count(address, refused=False)
-            return out(unauthorized())
+            return out(unauthorized(challenge(request)))
         request.state.token = token
-        with acting_for(getattr(token, "acting_for", None)):
+        with acting_for(getattr(token, "acting_for", None)), serving(token):
             try:
                 response = await call_next(request)
             except Exception:  # noqa: BLE001 — never a stack, a path or an exception's text
                 response = _json(500, {"error": "internal"})
         return out(response)
+
+    def challenge(request: Request) -> str:
+        """`WWW-Authenticate` for a `401`: at `/mcp` it names the resource metadata's URL
+        (identity.md §7, RFC 9728), the same for every unauthenticated case; elsewhere plain
+        `Bearer`."""
+        if request.url.path != MCP_PATH:
+            return "Bearer"
+        return f'Bearer resource_metadata="{origin(request)}{RESOURCE_METADATA}"'
 
     @app.exception_handler(Invalid)
     async def on_invalid(request: Request, exc: Invalid):
@@ -1226,6 +1259,18 @@ def create_app(container: Container, *, door: Door | None = None) -> FastAPI:
                             subject=item.id, scope=item.scope, sha256=sha256, size=len(data))
         return Response(data, status_code=200, media_type="application/octet-stream",
                         headers=PULL_HEADERS)
+
+    # -- MCP over HTTP (identity.md §7) ---------------------------------------------------------
+    @app.get(RESOURCE_METADATA)
+    async def resource_metadata(request: Request):
+        """RFC 9728: this container is the resource, the provider its authorization server.
+        Nothing here is secret or varies by caller."""
+        issuer = c.config_value("identity.issuer")
+        return _json(200, {"resource": origin(request),
+                           "authorization_servers": [issuer] if issuer else [],
+                           "bearer_methods_supported": ["header"]})
+
+    app.router.routes.append(Route(MCP_PATH, endpoint=StreamableHTTPASGIApp(mcp.session_manager)))
 
     # -- everything else ------------------------------------------------------------------------
     @app.api_route("/{rest:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD"],

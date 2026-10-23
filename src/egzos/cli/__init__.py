@@ -869,7 +869,7 @@ def audit_verify():
 @app.command()
 def serve(
     mcp: bool = typer.Option(False, "--mcp", help="Speak MCP over stdio."),
-    http: bool = typer.Option(False, "--http", help="Serve the REST door at /v1/."),
+    http: bool = typer.Option(False, "--http", help="Serve the REST door at /v1/ and MCP at /mcp."),
     host: str = typer.Option("127.0.0.1", "--host", help="The door's listening address."),
     port: int = typer.Option(7426, "--port", help="The door's port."),
     tls_cert: Path | None = typer.Option(None, "--tls-cert", help="TLS certificate (PEM)."),
@@ -879,8 +879,9 @@ def serve(
     ),
 ):
     """Open a door. `--mcp` speaks MCP over stdio as the CLIENT principal it was started with —
-    never as you. `--http` serves the REST door, where every request brings its own credential:
-    a container token, or a sign-in from the provider `egzos link` set (rest.md, identity.md)."""
+    never as you. `--http` serves the REST door and MCP over HTTP at `/mcp`, where every request
+    brings its own credential: a container token, or a sign-in from the provider `egzos link` set
+    (rest.md, identity.md §7)."""
     if mcp == http:
         _fail("choose one door: --mcp (stdio) or --http (the REST door)", 2)
     c = _container()
