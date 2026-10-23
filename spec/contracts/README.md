@@ -16,8 +16,14 @@ decisions written in at 0.3 (#109). Each document's own status line reads the sa
 | [`events.md`](events.md) | the event taxonomy, approvals included; the entry shape and the hash chain | frozen at 0.3 |
 | [`storage.md`](storage.md) | the backend contract, split by F3 into `ItemStore`, `ContainerState` and `BlobStore` | frozen at 0.3 |
 | [`container.md`](container.md) | containers, addressing, the chain, serving policy, trust statuses, the gate, the config object | frozen at 0.3 |
-| [`authorization-server.md`](authorization-server.md) | the container's OAuth 2.1 AS: auth-code + PKCE, device-code, MCP clients, client registration and the redirect allowlist (`egzos.io`, loopback), AS metadata | frozen at 0.3 |
+| [`identity.md`](identity.md) | the container as a resource server: the two credentials, provider-token verification, grants and agent registrations, the confirm, CORS, MCP over HTTP | **v1.1**, law from its merge (decisions v0.7) |
+| [`authorization-server.md`](authorization-server.md) | the container's own OAuth 2.1 AS, as frozen at 0.3 | **retired** (v0.7 §S): replaced by `identity.md`; kept as the record |
 | [`rest.md`](rest.md) | the REST door: bearer authentication against the AS's tokens, the one not-found refusal, the v1.0 resource endpoints, `BlobGrant` redemption (F5) | **draft** (Phase 2 boundary, #42); not frozen, not law |
+
+**Contract v1.1 (2026-10-23)** carries the Chief's v0.7 decisions (`docs/build/egzos-decisions-v0.7-amendments.txt`):
+`identity.md` is new and law, and `authorization-server.md` is retired. Where a frozen document below says
+otherwise about tokens, principals or presence, `identity.md` governs, and each such clause carries a
+pointer to it.
 
 **`rest.md` is the one exception to the status line above.** It is a Phase 2 draft, opened as a
 `contract-change` at the Phase 2 boundary (#42), and no builder implements against it until the

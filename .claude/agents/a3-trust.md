@@ -53,13 +53,13 @@ to zero (R11).
 not extend `src/egzos/authz/**`. Supabase Auth signs users in and its OAuth 2.1 server issues MCP clients
 their tokens; the container is the resource server. Verify issuer, signature (the project's published
 keys, against a fixed algorithm allowlist), audience and expiry with a maintained JWT library, then
-map the token to a principal: a user session to
-`principal: interactive` with the role the container grants that user; an agent token to
-`principal: client` with the role and scopes the container's agent registry grants that client. Supabase
-does not bind tokens to a resource, so check the client against the registry too, and refuse an unknown
-one exactly like an unknown token. Every account in the egzos project holds a validly signed session, so
-refuse a session whose user the container has not granted exactly like an unknown token too. One login (§T): the browser presents the user's Supabase session to the
-container directly.
+map the token to a principal by its binding (`spec/contracts/identity.md` §3a, v0.7 §AA): a token
+issued to this container's own client is `principal: interactive`, with the role the container grants
+that user; a token issued to an agent client registered here is `principal: client`, with that
+registration's role and scopes intersected with the user's. Refuse a bare provider session (no
+`client_id`) and a token bound to another container, an unregistered client, and a user the container
+has not granted — each exactly like an unknown token. One login (§T): one sign-in at egzos.io covers
+every container, through a token bound to each.
 
 Trust also owns the check other modules call: **signed-URL issuance passes Trust's capability check** —
 artifact download IS fetch, so Store/Vault never mints a URL on its own authority. Expose that check

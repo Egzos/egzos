@@ -237,6 +237,35 @@ Z. RETENTION — NO AUTOMATIC DELETION (amends R11's staged-blob retention)
 
 
 ================================================================================
+AA. AMENDMENT — EVERY TOKEN IS BOUND TO ONE CONTAINER (amends §S's mapping
+    "a user session (no client) → principal: interactive" and §T's "the
+    browser presents the user's Supabase session to the container
+    directly"; Egzos/egzos#282)
+================================================================================
+
+[DECIDED] Decided by the Chief's merge of Egzos/egzos#282 (drafted by the
+          operator on a1r's and a6's review of it; the Chief may veto by
+          reverting). Why: a provider session is valid at every
+          container that trusts the provider, so a container that received
+          a person's session could present it at another container the
+          same person can reach.
+
+[DECIDED] No container accepts a bare provider session. Each container is
+          a public OAuth client of the provider; a person reaches it with a
+          token the provider's OAuth 2.1 server issued to that container's
+          client (PKCE), and an agent with a token issued to a client
+          registered on that container. A token bound to one container is
+          refused at every other.
+
+[DECIDED] What does not change: one sign-in covers every container — no
+          second password, no second login (§T). egzos.io obtains each
+          container's token for the person through the provider; the
+          consent page approves a person's own containers without asking
+          again. Principal: the container's own client → interactive; a
+          registered agent client → client. Contract: identity.md §3a.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 

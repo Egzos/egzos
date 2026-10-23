@@ -378,8 +378,9 @@ later is added only if its value is not a secret. **a1p**, the binding of [0.3 �
 The item's own shape, `visibility.ring` and `content` → `context-item.md`. Capabilities, role
 bundles, principals, tokens, coverage and human-only acts → `capabilities.md`. The event list, the
 entry shape and the hash chain → `events.md`. How nodes, tokens and proposals are **persisted**, and
-`BlobGrant`'s rendering → `storage.md`. **The authorization-server surface — auth-code + PKCE,
-device-code, MCP clients, client registration and the redirect allowlist, AS metadata — is
-`authorization-server.md`** (issue #29); nothing above constrains it beyond §5's human-only clause.
-Presence, the localhost step-up tap and the consent pages are Phase 2.2 and A2's spec (issue #61);
-only `step_up.window_seconds` and the `step_up` event (running since the MVP tap) are frozen now.
+`BlobGrant`'s rendering → `storage.md`. **Who may call the container, and the confirm, are `identity.md`** (v1.1; the
+retired `authorization-server.md` is the 0.3 record); nothing above constrains them beyond §5's
+human-only clause.
+Presence is the confirm (`identity.md` §5, v1.1), which retires the localhost step-up tap; the agent
+consent page is egzos.io's. `step_up.window_seconds` and the `step_up` event (running since the MVP
+tap) stay frozen.

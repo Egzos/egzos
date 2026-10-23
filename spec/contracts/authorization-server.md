@@ -1,8 +1,10 @@
 # Contract · the container's authorization server
 
-**Status: frozen at 0.3 (Chief, 2026-10-08).** Law: a change is a `contract-change` escalation to
-a1p-planner, batched at a phase boundary (`spec/contracts/README.md`). The freeze is the Chief's merge of
-the commit that set this line, dated by that merge; a1p-planner prepared the text and did not declare it.
+**Status: retired (the Chief, 2026-10-23; decisions v0.7 §S).** **No clause below binds a builder.**
+The container's own authorization server is replaced by Supabase Auth and its OAuth 2.1 server, and the
+container verifies their tokens as a resource server: `identity.md`. This document stays as the record of
+what was frozen at 0.3 (Chief, 2026-10-08) and of the decisions it carried; a clause another contract
+still cites is that contract's to restate.
 
 **Derivation — read this before any clause below.** Every other document in `spec/contracts/` was
 drafted from a running shape: the walking skeleton executes it and the clause records what it does.

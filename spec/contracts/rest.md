@@ -6,6 +6,12 @@ implements against it. Until that review, no issue that builds against this text
 dispatch. Where this draft and a frozen document disagree, the frozen document governs, and the
 disagreement is a finding against this draft.
 
+**Amended for contract v1.1 (2026-10-23).** The container's own authorization server is retired
+(decisions v0.7 §S). This door accepts the container's own `Token` and access tokens signed by the
+container's identity provider, as `identity.md` defines; §1, §2, §7 and §8 below say so. Clauses that
+still cite `authorization-server.md` for a rule this door keeps (the TLS rule, the throttle's
+mechanics) now own that rule here; the retired document is only its record.
+
 **Derivation — read this before any clause below.** Like `authorization-server.md`, this document
 has **no running shape**. The walking skeleton has no REST surface: its doors are the CLI, MCP over
 stdio and the lifeboat. Every clause is derived from what is already decided, and from nothing else:
@@ -39,41 +45,42 @@ Clauses carry one of five markings:
 
 ## 1 · What the door is
 
-**An HTTP resource server, in-process with the container, served from the container's own origin**
-(the `issuer` of `authorization-server.md` §6). **a1p**, from §K's one AS on the container (#42): the
-door accepts the AS's tokens, so it sits where the AS's issuer is.
+**An HTTP resource server, in-process with the container, served from the container's own origin**,
+under one path prefix, `/v1/`. **decided** (v0.7 §S; `identity.md` §1): there is no authorization
+server on the container; tokens come from the container's identity provider, or are the container's
+own.
 
-- **It is not the AS.** `/authorize`, the token, device-authorization and revocation endpoints, the
-  metadata document and §11's pages are `authorization-server.md`'s. This document adds no AS
-  endpoint, changes none, and sits beside them under one path prefix, `/v1/`. **a1p.**
-- **Clients:** any program holding a token, and browser clients that obtained one through
-  `authorization-server.md` §2: the flagship, or any fork's UI. The lifeboat is not a client of this
-  door; it is in-process on its own host (`spec/design/lifeboat.md`).
-- **TLS.** `authorization-server.md` §2's TLS clause and its loopback exemption ([0.3 · 9]) govern
-  this door's listener exactly as they govern the AS's: plain HTTP only when the listening socket is
-  bound to loopback, decided from the socket and never from a forwarded header. **a1p**: one
-  listener serves both, and a door that relaxed the rule would expose the AS's tokens on the hop the
-  rule protects. `serve --tls` enforces it (a3-doorman).
+- **Clients:** any program holding a container `Token` or a provider access token bound to this
+  container (`identity.md` §3a), and browser clients holding such a token for the person: egzos.io, or
+  any fork's UI. A bare provider session is never accepted. The lifeboat is not a
+  client of this door; it is in-process on its own host (`spec/design/lifeboat.md`).
+- **TLS.** Plain HTTP only when the listening socket is bound to loopback, decided from the socket and
+  never from a forwarded header ([0.3 · 9], frozen for the retired AS and owned here now). A door that
+  relaxed it would expose bearer tokens on the hop the rule protects. `serve --tls` enforces it
+  (a3-doorman).
 
 ## 2 · Authentication
 
 1. **One credential position: `Authorization: Bearer <token value>`.** A token value in a query
    string, a form body, a cookie or any other header is never read. **a1p**: a value in a URL lands
    in logs and referrers.
-2. **Any live `Token` is accepted**, from `token mint` or issued by the AS, with principal
-   `interactive` or `client` (`capabilities.md` §3, §5). **decided.**
-3. **An interactive session is never a credential here** (`authorization-server.md` §10.1: *"never
-   accepted at the REST surface"*). A request carrying only a session cookie is unauthenticated.
-   **decided.**
-4. **Liveness is checked on every request, at request time**: revocation before the capability set
-   (`capabilities.md` §5), then `expires_at`. A token revoked between two requests fails the second.
-   **decided**; the running MCP door does the same (`_live`).
+2. **Two credentials are accepted** (`identity.md` §1): a live container `Token` (`capabilities.md`
+   §3, §5), or a provider access token that passes `identity.md` §3, which maps it to a principal and
+   a grant (§4 there). **decided** (v0.7 §S, §T).
+3. **No cookie is ever a credential here.** A browser client presents, as the bearer, the token the
+   provider issued for this container's client (`identity.md` §3a, §6), never the user's session. A
+   request carrying only a cookie is unauthenticated. **decided.**
+4. **Liveness is checked on every request, at request time**: for a `Token`, revocation before the
+   capability set (`capabilities.md` §5), then `expires_at`; for a provider token, every check of
+   `identity.md` §3, the grant included. A token or grant revoked between two requests fails the
+   second. **decided**; the running MCP door does the same for a `Token` (`_live`).
 5. **The unauthenticated answer is one answer.** No header, a malformed value, an unknown value, a
-   revoked token and an expired token all get status `401`, the body `{"error":"unauthorized"}`, and
-   `WWW-Authenticate: Bearer` with no parameters, byte-identical across the five. **a1p**, applying
-   `authorization-server.md` §9.2's silence rule: an answer that varied would test a token value
-   without holding one. RFC 9728's `resource_metadata` parameter is the MCP surface, `[v1.1]` by
-   `authorization-server.md` §4, and is not sent.
+   revoked token, an expired token, and every failure of `identity.md` §3 get status `401`, the body
+   `{"error":"unauthorized"}`, and `WWW-Authenticate: Bearer` with no parameters, byte-identical
+   across all of them. **a1p**, applying
+   `capabilities.md` §6 clause 1: an answer that varied would test a token value without holding one.
+   RFC 9728's `resource_metadata` parameter belongs to the MCP surface at `/mcp` (`identity.md` §7)
+   and is not sent on `/v1/`.
 6. **An unauthenticated request appends no entry of its own.** It read nothing, and it has no caller
    to name. **a1p.** Item 7's throttle counts it, and the window's `rest.tally` records it.
 7. **The door is throttled on its own `surface` word, `rest`. decided** (the Chief on #165 item 3,
@@ -251,13 +258,11 @@ running door uploads over HTTP to derive the shape from.
 
 **Not in this door at v1.0:**
 
-- **Human-only acts**: promote, approve, deny, `gate.confirm`, `yes.consume`. Each requires
-  `capabilities.md` §4's presence backstop, which is Phase 2.2 and decided-not-running, and the step-up
-  tap's endpoints are Phase 2.2's (`authorization-server.md` §13). No REST route performs one until
-  then. A `client` principal is refused one in every phase.
-- **Token management.** Revocation is `authorization-server.md` §9.2's: the RFC 7009 endpoint, or
-  the owner's pages. A token list needs a read event for credential metadata that `events.md` does
-  not have: `[v1.1 · #137 10]`.
+- **Human-only acts**: promote, approve, deny, `gate.confirm`, `yes.consume`. Each requires the
+  confirm (`identity.md` §5); their routes arrive with the next contract PR, beside copy, upload and
+  the agent reads. A `client` principal is refused one in every phase.
+- **Grants and agent registrations** (`identity.md` §4) and their routes arrive with the same PR. A
+  container `Token` is still revoked with `token rm`.
 - **Quarantine and config.** No flagship screen #137 cites needs either at v1.0. They stay on the CLI.
 - **`[v1.1 · #137 1–7, 9–12]`**: a revision on reads (1); window state and its events (2, 3);
   `return_to` (4); writability per scope (5); a nonzero-delta move inside a window (6); pending
@@ -375,30 +380,15 @@ the device-code key `storage.md` §3.1 names.
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
 #138 asks for is `container.md`'s, open on #138.
 
-## 7 · Browser clients: the questions open on #153
+## 7 · Browser clients
 
-A browser client reaches this door with a token from `authorization-server.md` §2. #153 records five
-questions such a client meets. **All five are the Chief's. This document decides none of them**, and
-carries each so the review reads them in one place:
-
-- **`[open · #153 q1]`, where the authorization code is returned.** An AS question. No clause here
-  depends on it.
-- **`[open · #153 q2]`, CORS.** #153 asks it of the token and revocation endpoints. The flagship
-  calls this door cross-origin too, so the answer reaches here. **Until the Chief answers, this door
-  sends no `Access-Control-*` header and answers no preflight.** That is the absence of a decision,
-  not one. A builder may not implement CORS on this door against this draft.
-- **`[open · #153 q3]`, the flagship's `client_id`.** An AS question. No clause here depends on it.
-- **`[open · #153 q4]`, what the flagship's request carries as `scope`.** An AS question. This door
-  enforces whatever grant the minted token carries (`authorization-server.md` §7), so it depends on
-  no answer.
-- **`[open · #153 q5]`, RFC 9207's `iss` on the authorization response.** An AS question, and §6's
-  ten-field document. No clause here depends on it.
+**CORS is decided: `identity.md` §6.** The door answers CORS for `identity.browser_origins` exactly,
+with headers that do not vary with the outcome, and a preflight that does not map the routes. #153's
+other four questions were the retired authorization server's and close with it.
 
 ## 8 · What this document does not fix
 
-The AS's endpoints, pages, tokens and their events → `authorization-server.md`. The MCP HTTP
-transport, protected-resource metadata and the `resource` parameter → contract v1.1 at Phase 5
-(`authorization-server.md` §4). The step-up tap and every human-only act over HTTP → Phase 2.2. The
-lifeboat → `spec/design/lifeboat.md`. Where the AS's state and the grant key persist →
-`authorization-server.md` §13's `TODO(a1p)` and #165 item 4. The look of any client → its design
-spec.
+Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
+`identity.md`. Copy, upload, the agent reads and the human-only routes → the next contract PR. The
+lifeboat → `spec/design/lifeboat.md`. Where the grant key persists → #165 item 4. The look of any
+client → its design spec.
