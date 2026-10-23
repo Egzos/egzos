@@ -96,7 +96,7 @@ class Uploads:
         if record["item"] is None or record["promoted"]:
             return None
         item = self.backend.get(record["item"])  # a tombstoned item reads as absent
-        return item if item is not None and item.status != "verified" else None
+        return item if item is not None and not self.promoted(item) else None
 
     def holds(self, record: UploadRecord) -> bool:
         """Whether `record` takes one of its person's `MAX_HELD` slots: open, orphaned, or written
@@ -245,17 +245,18 @@ class Uploads:
     def _staged_at(self, sha: str) -> set[str]:
         """The live items whose bytes are staged at `sha`: an artifact written from an upload that
         was never promoted, and every copy of one (a copy names its source's address,
-        `trust._do_copy`), until it, or an item it was copied through, is verified."""
+        `trust._do_copy`), until it, or an item it was copied through, is promoted: a move that
+        lowers a promoted item's status never puts its bytes back in staging."""
         records = {r["item"]: r for r in self.backend.list_uploads() if r["item"] is not None}
         every = {i.id: i for i in self.backend.query(
             [n.id for n in self.backend.list_nodes()], kinds=["artifact"], include_tombstoned=True)}
 
         def staged(item: ContextItem | None) -> bool:
-            while item is not None and item.status != "verified":
+            while item is not None and not self.promoted(item):
                 if item.id in records:
                     return not records[item.id]["promoted"]
                 item = every.get(item.provenance.get("derived_from") or "")
-            return False  # verified on the way, or written from a file: promoted bytes
+            return False  # promoted on the way, or written from a file: promoted bytes
 
         return {i.id for i in every.values() if i.content.get("sha256") == sha
                 and not i.lifecycle.get("tombstoned") and staged(i)}

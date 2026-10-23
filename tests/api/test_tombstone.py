@@ -206,6 +206,24 @@ def test_an_item_a_person_promoted_takes_the_confirm_whatever_its_status_now(c, 
     assert _events(c, "item.tombstone")[-1]["details"] == {"kind": "memory", "status": "unverified"}
 
 
+def test_a_promoted_artifact_a_move_lowered_holds_no_slot_and_releases_nothing(c, door, notes):
+    """A person promoted it, so its bytes left staging: a move that lowers its status takes no
+    upload slot back, and its tombstone records no staged bytes it never deleted."""
+    agent = _agent(c)
+    item = _artifact(door, agent, notes.id)
+    other = c.nodes.create("project", "other", c.nodes.user_root(), token=c.owner, **KW)
+    c.trust.promote(c.store.get(item), token=c.owner, actor=OWNER)
+    c.trust.move(c.store.get(item), other, token=agent, actor=OWNER)
+    assert c.store.get(item).status == "unverified" and not _staged(c)
+    record = next(r for r in c.backend.list_uploads() if r["item"] == item)
+    assert not c.uploads.holds(record)
+    first = _rm(door, c.owner, item).json()
+    assert first["result"] == "confirm"
+    r = _rm(door, c.owner, item, confirm={"challenge": first["challenge"], "proof": "button"})
+    assert r.json() == {"result": "tombstoned"}
+    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+
+
 def test_a_failure_rolls_the_whole_act_back(c, door, notes, monkeypatch):
     item = _artifact(door, _agent(c), notes.id)
     note = c.store.add(body="curated", scope=notes, token=c.owner, **KW)
