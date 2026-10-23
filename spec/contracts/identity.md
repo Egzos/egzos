@@ -136,18 +136,17 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   the owner signs in as. **a1p.**
 - **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
   revoked; the owner `Token` from `init` stays the way back in. **a1p.**
-- **Every other grant and registration is the owner's act**, under `admin`, from an interactive
+- **Every other grant and registration is an admin's act**, under `admin`, from an interactive
   principal, **and it requires the confirm** (§5): a grant or a registration widens who can see
   everything it covers, so it is gated like a move that widens an audience (§U), never a silent write.
   A role bundle is expanded at grant time, as it is at mint (`capabilities.md` §2). **a1p.**
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
   server, the consent page egzos.io hosts — a security surface, whose anti-phishing shape (telling the
-  requesting client's real identity and scopes apart from a deceptively named registrant) the next
-  contract PR and A2's spec carry, for a6 to review — shows the request in `token ls` vocabulary;
-  approving it (with
-  the confirm) writes the registration here before the provider is told to issue. Its route arrives with
-  the next contract PR (`rest.md`). Without the registration the provider's token is refused at checks 6
-  and 7. **a1p.**
+  requesting client's real identity and scopes apart from a deceptively named registrant) is A2's to
+  design and a6's to review (`design-gap` Egzos/egzos-platform#117) — shows the request in `token ls`
+  vocabulary; approving it (with the confirm) writes the registration here before the provider is told
+  to issue. Its route is `rest.md` §4.3. Without the registration the provider's token is refused at
+  checks 6 and 7. **a1p.**
 - **Principal.** A token whose `client_id` is this container's own (`identity.client_id`) is a person:
   `principal: interactive`. A token whose `client_id` names a registered agent is that agent acting for
   the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
@@ -184,6 +183,11 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
     spends once. Face ID, Touch ID and Windows Hello are this proof. **decided** (§U), **a1p** the
     binding.
   - `button` — an explicit confirm, for a device with no user-verifying authenticator. **decided** (§U).
+    **Only for a person with no registered credential**: once a person has registered one, every
+    confirm of theirs needs the biometric proof, and the button is refused for them. Otherwise a
+    stolen session would skip the biometric by pressing the button. On a device with no authenticator
+    such a person confirms from another device of theirs, through WebAuthn's cross-device flow (a phone
+    scanning the code the browser shows). **a1p** (a6 on #285).
 - **The button is refused to `principal: client`**, from either credential, always: an agent's token
   cannot confirm on the human's behalf. **decided** (§U, as amended on #281). That is all the refusal
   achieves. Software that drives a person's own browser session holds an `interactive` token
@@ -241,5 +245,5 @@ are `storage.md`'s, in the contract version that carries §V. **a1p.**
   `ASGateState`) are removed in the PR that lands §3. No deployment holds a token it issued.
 - **Double login is retired** (§T). One sign-in at egzos.io covers every container, through a token
   bound to each (§3a); no container accepts a bare provider session.
-- **Not fixed here:** the REST routes and their shapes (`rest.md`), copy, upload and the agent reads
-  (`rest.md`, next contract PR), places and push/pull (`storage.md`, the §V contract), billing (egzos-platform).
+- **Not fixed here:** the REST routes and their shapes, copy, upload and the agent reads (`rest.md`
+  §4–§4.4), places and push/pull (`storage.md`, the §V contract), billing (egzos-platform).
