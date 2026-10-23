@@ -19,6 +19,7 @@ decisions written in at 0.3 (#109). Each document's own status line reads the sa
 | [`identity.md`](identity.md) | the container as a resource server: the two credentials, provider-token verification, grants and agent registrations, the confirm, CORS, MCP over HTTP | **v1.1**, law from its merge (decisions v0.7) |
 | [`authorization-server.md`](authorization-server.md) | the container's own OAuth 2.1 AS, as frozen at 0.3 | **retired** (v0.7 §S): replaced by `identity.md`; kept as the record |
 | [`rest.md`](rest.md) | the REST door: bearer authentication (`identity.md`), the one not-found refusal, the endpoints and their success shapes, copy, the confirm at the door, `BlobGrant` redemption (F5) | **v1.1**, law from its merge (#283) |
+| [`places.md`](places.md) | places and sync: push, pull, status, what travels, the merge rule (v0.7 §V) | **v1.1 draft**, law from the Chief's merge |
 
 **Contract v1.1 (2026-10-23)** carries the Chief's v0.7 decisions (`docs/build/egzos-decisions-v0.7-amendments.txt`):
 `identity.md` is new and law, and `authorization-server.md` is retired. Where a frozen document below says

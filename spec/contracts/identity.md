@@ -262,7 +262,7 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
 
 A local (a laptop, a desktop) with no provider keeps working offline on its own `Token`. To push to or
 pull from its cloud (§V), its owner signs in through the cloud's provider like any client. Push and pull
-are `storage.md`'s, in the contract version that carries §V. **a1p.**
+are `places.md`'s. **a1p.**
 
 ## 9 · What this retires, and what it does not fix
 
