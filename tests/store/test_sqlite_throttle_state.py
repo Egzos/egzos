@@ -23,7 +23,8 @@ from egzos.backends.sqlite import SqliteBackend
 
 #: `ThrottleState` is not `@runtime_checkable`, so conformance is checked as the method set and
 #: each method's own signature.
-THROTTLE_STATE = frozenset({"throttle_incr", "throttle_count", "throttle_buckets"})
+THROTTLE_STATE = frozenset({"throttle_incr", "throttle_count", "throttle_buckets",
+                            "throttle_windows", "throttle_forget"})
 
 @pytest.fixture
 def backend(tmp_path):

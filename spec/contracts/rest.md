@@ -353,7 +353,8 @@ the row does not name is `400` (§3).
    it): an artifact above the threshold carries neither `inline` nor `grant`, and a client reads it
    at `GET /v1/items/{id}`.
 5. **`GET /v1/scopes`** returns the child nodes of `under`, sorted by path. `under` absent is the
-   personal root, as `egzos_fetch`'s default.
+   token's start, as `egzos_fetch`'s default: the personal root for a token over everything, the
+   token's first scope for a narrower one. **a1p** (a1r on #288).
 6. **`POST /v1/items`** returns the item as written: `trust.status` is `unverified` (`container.md`
    §5). `kind` defaults to `memory`; `scope` absent is pure capture, a fresh auto-titled thread in
    the inbox (R11), as `egzos_remember`.

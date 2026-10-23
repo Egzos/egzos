@@ -693,6 +693,10 @@ class ThrottleState(Protocol):
         self, surface: ThrottleSurface, window_key: str
     ) -> list[tuple[str, int]]: ...
     #: ^ every bucket counted in one window, with its count: what a window's close reads
+    def throttle_windows(self, surface: ThrottleSurface) -> list[str]: ...
+    #: ^ every window with a counter on this surface
+    def throttle_forget(self, surface: ThrottleSurface, window_key: str) -> None: ...
+    #: ^ drops one window's counters: a closed window's, once its release and tally are appended
 
 
 # --- who may call the container, and its settings (storage.md §3.2) -------------------------

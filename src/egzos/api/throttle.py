@@ -18,6 +18,7 @@ and never discloses the bucket's key — a source address never reaches the chai
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import os
@@ -35,9 +36,11 @@ SURFACE = "rest"
 RATE = AS_THROTTLE_RATES[SURFACE]
 WINDOW_SECONDS = AS_THROTTLE_WINDOW_SECONDS
 GLOBAL = "g"
-#: How many closed windows a close looks back over: a door down for longer than this loses the
-#: release of a window that closed while it was down. An hour.
-LOOKBACK_WINDOWS = 12
+#: How long a closed window's counters are kept after it closes: an hour. Older rows are forgotten,
+#: so a sweep from many addresses cannot grow the table without bound.
+KEEP_WINDOWS = 12
+KEY_FILE = "throttle.key"
+KEY_BYTES = 32
 
 _REFUSED = "!refused"
 _ADMITTED_401 = "!401"
@@ -45,15 +48,34 @@ _CLOSED = "!closed"
 
 
 def throttle_key(home: Path) -> bytes:
-    """The per-container secret behind every `window_key` and source bucket: created once, 0600."""
-    path = Path(home) / "throttle.key"
-    try:
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    except FileExistsError:
-        return path.read_bytes()
-    with os.fdopen(fd, "wb") as fh:
-        fh.write(secrets.token_bytes(32))
-    return path.read_bytes()
+    """The per-container secret behind every `window_key` and source bucket: 32 bytes, 0600,
+    created once. It is written whole to a private file and linked into place, so no reader ever
+    sees a half-written key; a short file left by a crash is replaced the same way."""
+    path = Path(home) / KEY_FILE
+    for _ in range(3):
+        try:
+            data: bytes | None = path.read_bytes()
+        except FileNotFoundError:
+            data = None
+        if data is not None and len(data) == KEY_BYTES:
+            return data
+        tmp = path.with_name(f".{KEY_FILE}.{secrets.token_hex(8)}")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(secrets.token_bytes(KEY_BYTES))
+            fh.flush()
+            os.fsync(fh.fileno())
+        try:
+            if data is None:
+                os.link(tmp, path)  # the first writer wins; a racing one reads the winner's
+            else:
+                os.replace(tmp, path)
+        except FileExistsError:
+            pass
+        finally:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(tmp)
+    raise RuntimeError("the throttle key cannot be read")
 
 
 class Throttle:
@@ -109,19 +131,25 @@ class Throttle:
 
     # -- per window -------------------------------------------------------------------------------
     def close(self) -> None:
-        """Append the releases and the tally of every recently closed window not yet closed. Safe
-        to call from any process at any time: one claim per window, so each appends once."""
+        """Append the releases and the tally of every closed window not yet closed, however long
+        ago it closed, then forget the counters of windows closed more than `KEEP_WINDOWS` ago.
+        Safe from any process at any time: one claim per window, so each appends once."""
         current = self._window()
-        for w in range(current - LOOKBACK_WINDOWS, current):
-            key = str(w)
-            if self.state.throttle_count(SURFACE, GLOBAL, key) == 0:
+        for key in self.state.throttle_windows(SURFACE):
+            try:
+                w = int(key)
+            except ValueError:
                 continue
-            if self.state.throttle_count(SURFACE, _CLOSED, key):
+            if w >= current:
                 continue
-            with self._atomic():
-                if self.state.throttle_incr(SURFACE, _CLOSED, key) != 1:
-                    continue  # another closer claimed it first
-                self._close(w)
+            if not self.state.throttle_count(SURFACE, _CLOSED, key):
+                with self._atomic():
+                    # The claim and the entries land together: a failed append rolls the claim
+                    # back, and the next pass closes the window again (a6 on #288).
+                    if self.state.throttle_incr(SURFACE, _CLOSED, key) == 1:
+                        self._close(w)
+            if w < current - KEEP_WINDOWS:
+                self.state.throttle_forget(SURFACE, key)
 
     def _close(self, w: int) -> None:
         counts = dict(self.state.throttle_buckets(SURFACE, str(w)))

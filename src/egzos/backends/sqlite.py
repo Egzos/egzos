@@ -294,6 +294,19 @@ class SqliteBackend:
         )
         return [(k, n) for k, n in rows]
 
+    def throttle_windows(self, surface: ThrottleSurface) -> list[str]:
+        rows = self.db.execute(
+            "SELECT DISTINCT window_key FROM throttle WHERE surface=? ORDER BY window_key",
+            (surface,),
+        )
+        return [r[0] for r in rows]
+
+    def throttle_forget(self, surface: ThrottleSurface, window_key: str) -> None:
+        self.db.execute(
+            "DELETE FROM throttle WHERE surface=? AND window_key=?", (surface, window_key)
+        )
+        self._commit()
+
     # -- IdentityState (storage.md §3.2) -----------------------------------------------------
     def put_user_grant(self, grant: UserGrant) -> None:
         self.db.execute(
