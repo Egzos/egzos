@@ -221,10 +221,13 @@ put_config(key, value)                           -> None
 its substrate and never delegated (F3). **a1p.**
 
 ```
-# ConfirmState — rest.md §4.2's challenges
+# ConfirmState — rest.md §4.2's challenges and §4.3's credentials
 put_challenge(challenge)                         -> None
 spend_challenge(challenge_id)                    -> ConfirmChallenge | None   # marks it spent; returns it as it stood
 forget_challenges(expired_before)                -> None                      # drops challenges expired before then
+put_credential(credential)                       -> None                      # insert or replace, keyed on id
+get_credential(credential_id)                    -> ConfirmCredential | None
+list_credentials(person=None)                    -> list[ConfirmCredential]   # removed ones included
 ```
 
 - **A challenge is spent once, atomically.** Of two concurrent spends of one challenge, exactly one
@@ -232,8 +235,10 @@ forget_challenges(expired_before)                -> None                      # 
   concludes in a refusal spends it too (item 5). A challenge is kept a day past its expiry, so a
   late second leg still reads as `spent` or `stale`, and is then forgotten; one never issued and one
   forgotten are both `stale`.
-- **No column holds a credential.** A challenge is a random value bound to the request that asked
-  for it: the principal, the act, its subject and destination, and the audience delta.
+- **No column holds a secret.** A challenge is a random value bound to the request that asked for
+  it: the principal, the act, its subject and destination, and the audience delta. A confirm
+  credential is a WebAuthn public key, which verifies an assertion and proves nothing alone; it is
+  never served (`rest.md` §4.3's shape omits it). A removed credential is kept, marked `removed`.
 
 ## 4 · `BlobStore` — content-addressed, staged
 

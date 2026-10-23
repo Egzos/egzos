@@ -111,13 +111,17 @@ class TrustEngine:
             raise TrustError("not found")
         if item.status == "quarantined":
             raise TrustError("quarantined items are not promoted; lift the quarantine deliberately")
-        audience = self.audience(node) if node else []
-        manifest = self.manifest_hash([item.id], item.scope, audience)
-        item.trust = {"status": "verified", "promoted_at": now_iso(), "manifest": manifest}
-        item.provenance["approved_by"] = actor
-        item.lifecycle["updated_at"] = now_iso()
-        item.lifecycle["version"] = int(item.lifecycle.get("version", 1)) + 1
         with self.backend.atomic():
+            # Promoted as it stands under the lock: a quarantine or a move since it was read is
+            # observed, never written over (a6 on #289).
+            item = self._fresh(item, refusal="quarantined items are not promoted; lift the "
+                               "quarantine deliberately")
+            audience = self.audience(node)
+            manifest = self.manifest_hash([item.id], item.scope, audience)
+            item.trust = {"status": "verified", "promoted_at": now_iso(), "manifest": manifest}
+            item.provenance["approved_by"] = actor
+            item.lifecycle["updated_at"] = now_iso()
+            item.lifecycle["version"] = int(item.lifecycle.get("version", 1)) + 1
             self.backend.put(item)
             self.ledger.append(
                 "approval.promote",
@@ -207,8 +211,9 @@ class TrustEngine:
 
         if not delta:
             # Zero audience delta (true solo — counting agents) → instant, silently logged.
-            reset = self._reset_if_agent_run(item, token.principal)
             with self.backend.atomic():  # the move and its gate entry, together
+                item = self._fresh(item)
+                reset = self._reset_if_agent_run(item, token.principal)
                 self._do_move(item, to, actor, token.principal)
                 self.ledger.append(
                     "gate.pass.silent",
@@ -234,7 +239,7 @@ class TrustEngine:
         frm, delta = self.gate(item, to, token=token, act="copy")
         if not delta:
             with self.backend.atomic():
-                new = self._do_copy(item, to, actor, token.principal)
+                new = self._do_copy(self._fresh(item), to, actor, token.principal)
                 self.ledger.append(
                     "gate.pass.silent",
                     actor=actor,
@@ -263,6 +268,7 @@ class TrustEngine:
         """A widening move or copy the person confirmed inline (rest.md §4.2): the gate's own
         entry, then the act's. The caller holds the transaction the confirm was spent in."""
         self._human_only(token, "gate.confirm")
+        item = self._fresh(item)
         self.ledger.append(
             "gate.pass.confirmed",
             actor=actor,
@@ -277,6 +283,18 @@ class TrustEngine:
             return self._do_copy(item, to, actor, token.principal)
         self._do_move(item, to, actor, token.principal)
         return item
+
+    def _fresh(self, item: ContextItem, *, refusal: str = "") -> ContextItem:
+        """The item as it stands now, read under the caller's write lock: what the gate checked
+        before the lock is checked again, so a quarantine or a move that landed in between is
+        observed rather than written over by a stale copy (a6 on #289)."""
+        current = self.backend.get(item.id)
+        if current is None or current.scope != item.scope:
+            raise TrustError("not found")
+        if current.status == "quarantined":
+            raise TrustError(refusal or "quarantined items do not move; lift the quarantine "
+                             "deliberately")
+        return current
 
     def _park(
         self,

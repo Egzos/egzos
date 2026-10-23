@@ -72,8 +72,17 @@ class Container:
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
         self.confirm = Confirm(
-            self.backend, self.ledger, self.config_value, window_seconds=_step_up_window
+            self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,
+            salt=self._salt,
         )
+
+    def _salt(self) -> str:
+        """Per container and fixed for its life: the personal root's id. With no root there is
+        no salt, and no handle is handed out (a1r on #290)."""
+        root = self.nodes.user_root()
+        if root is None:
+            raise RuntimeError("this container is not initialised")
+        return root.id
 
     def _refresh(self, token: Token) -> Token | None:
         """The caller as it stands now: a minted token re-read, a grant re-derived (§4)."""

@@ -21,6 +21,8 @@ dependencies = [
     "uvicorn>=0.30",
     # identity.md §3: the provider's tokens are checked with a maintained JWT library (v0.7 §R)
     "pyjwt[crypto]>=2.10",
+    # identity.md §5: the biometric confirm is verified with a maintained WebAuthn library (§R)
+    "webauthn>=3.0",
 ]
 
 [project.optional-dependencies]

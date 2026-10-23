@@ -203,7 +203,13 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
     confirm of theirs needs the biometric proof, and the button is refused for them. Otherwise a
     stolen session would skip the biometric by pressing the button. On a device with no authenticator
     such a person confirms from another device of theirs, through WebAuthn's cross-device flow (a phone
-    scanning the code the browser shows). **a1p** (a6 on #285).
+    scanning the code the browser shows). **a1p** (a6 on #285). **A credential belongs to the origin
+    it was made on** (its relying party, one of `identity.browser_origins`), and an assertion verifies
+    only there. A person with a credential on one origin and none on another is refused the button
+    on that other origin and cannot assert there either; they enrol there through recovery (`rest.md`
+    §4.3), or confirm on the origin that holds their credential. Taken on purpose: the alternative is
+    a button the thief of a session on the second origin could press. **#290, for the Chief to
+    ratify by its merge** (a1r on #290).
 - **The button is refused to `principal: client`**, from either credential, always: an agent's token
   cannot confirm on the human's behalf. **decided** (§U, as amended on #281). That is all the refusal
   achieves. Software that drives a person's own browser session holds an `interactive` token

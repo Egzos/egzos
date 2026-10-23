@@ -39,7 +39,7 @@ REST_EVENTS = ("rest.tally",)
 IDENTITY_EVENTS = ("identity.grant", "identity.revoke")
 
 # rest.md §4.2's confirmed pass and v0.7 §V's copy (contract v1.1), entering with their code.
-CONFIRM_EVENTS = ("gate.pass.confirmed", "item.copy")
+CONFIRM_EVENTS = ("gate.pass.confirmed", "item.copy", "identity.credential")
 
 # The nineteen names events.md §1 carried before this PR, unchanged and in place.
 PRIOR_EVENTS = (
@@ -70,7 +70,7 @@ def test_event_is_the_prior_nineteen_then_authz_owner_state_rest_identity_and_co
         PRIOR_EVENTS + AUTHZ_EVENTS + OWNER_STATE_EVENTS + REST_EVENTS + IDENTITY_EVENTS
         + CONFIRM_EVENTS
     )
-    assert len(t.EVENTS) == len(set(t.EVENTS)) == 35
+    assert len(t.EVENTS) == len(set(t.EVENTS)) == 36
 
 
 def test_authz_family_is_exactly_the_nine():

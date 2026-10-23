@@ -250,6 +250,7 @@ Event = Literal[
     "identity.revoke",
     "gate.pass.confirmed",
     "item.copy",
+    "identity.credential",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -769,8 +770,26 @@ class ConfirmChallenge(TypedDict):
     spent: NotRequired[bool]
 
 
+class ConfirmCredential(TypedDict):
+    """identity.md §5: a WebAuthn credential a person registered for the confirm. Public: the key
+    verifies an assertion and proves nothing by itself. Never served (rest.md §4.3's shape omits
+    the key and the credential id)."""
+
+    id: str  # this container's id for it
+    person: str  # the interactive principal's owner: `user:<sub>`, or the owner token's
+    credential_id: str  # base64url, as the authenticator names it
+    public_key: str  # base64url COSE key
+    sign_count: int
+    rp_id: str  # the relying party it was created for: the browser origin's host
+    name: str  # display data the person chose
+    created_at: str
+    last_used: str | None
+    removed: bool
+
+
 class ConfirmState(Protocol):
-    """rest.md §4.2's challenges, on the `ContainerState` substrate (storage.md §3.3)."""
+    """rest.md §4.2's challenges and §4.3's credentials, on the `ContainerState` substrate
+    (storage.md §3.3)."""
 
     def put_challenge(self, challenge: ConfirmChallenge) -> None: ...
     def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None: ...
@@ -778,6 +797,12 @@ class ConfirmState(Protocol):
     #:   challenge, exactly one sees `spent` false. `None` for an id never issued.
     def forget_challenges(self, expired_before: str) -> None: ...
     #: ^ drops every challenge that expired before this time, spent or not
+    def put_credential(self, credential: ConfirmCredential) -> None: ...
+    #: ^ insert or replace, keyed on `id`
+    def get_credential(self, credential_id: str) -> ConfirmCredential | None: ...
+    def list_credentials(self, person: str | None = None) -> list[ConfirmCredential]: ...
+    #: ^ every credential the person registered (everyone's, with no person), removed ones
+    #:   included; the caller judges
 
 
 #: storage.md §3.1–§3.3. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
@@ -833,6 +858,7 @@ __all__ = [
     "ClientRegisterOp",
     "ConfigState",
     "ConfirmChallenge",
+    "ConfirmCredential",
     "ConfirmState",
     "ContainerConfig",
     "ContainerState",

@@ -21,6 +21,7 @@ import ipaddress
 import json
 import threading
 import time
+import unicodedata
 import urllib.request
 from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager, nullcontext
@@ -79,6 +80,24 @@ class ConfigError(ValueError):
 
 class LastAdmin(Exception):
     """§4: the last live grant holding `admin` over `["*"]` is never revoked."""
+
+
+#: A name shown to a person deciding something — who would newly see an item, an agent's own
+#: claim, a device — is at most this long.
+DISPLAY_NAME_MAX = 128
+#: Characters a display name never holds: controls, and the formatting characters (bidi
+#: overrides among them) that make text read other than it is (a6 on #289).
+_HIDDEN = frozenset({"Cc", "Cf", "Zl", "Zp"})
+
+
+def display_name(value: Any, *, limit: int = DISPLAY_NAME_MAX) -> str:
+    """A display name as given, or `ValueError`. Untrusted display data every surface escapes;
+    this keeps it short and free of characters that hide what it says."""
+    if not isinstance(value, str) or not value.strip() or len(value) > limit:
+        raise ValueError(f"a name of 1 to {limit} characters")
+    if any(unicodedata.category(ch) in _HIDDEN for ch in value):
+        raise ValueError("a name holds no control or formatting characters")
+    return value
 
 
 # -- configuration (§2) --------------------------------------------------------------------------
@@ -239,10 +258,22 @@ class GrantToken(Token):
     acting_for: str | None = field(default=None, compare=False)
     #: The grant's or registration's display name: untrusted display data (rest.md §4.3).
     name: str = field(default="", compare=False)
+    #: When the person last signed in at the provider (the newest `amr` timestamp): rest.md §4.3's
+    #: fresh sign-in for a first credential. None when the token says nothing.
+    auth_time: int | None = field(default=None, compare=False)
 
 
 def _number(value: Any) -> bool:
     return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _auth_time(amr: Any) -> int | None:
+    """The newest authentication time in Supabase's `amr` claim: `[{method, timestamp}, …]`."""
+    times = [
+        int(entry["timestamp"]) for entry in amr or ()
+        if isinstance(entry, dict) and _number(entry.get("timestamp"))
+    ] if isinstance(amr, list) else []
+    return max(times) if times else None
 
 
 def _live(record: UserGrant | AgentRegistration | None) -> bool:
@@ -347,9 +378,10 @@ class Identity:
         ):
             return None
         # 7 · Grant: a live user grant, and for an agent a live registration serving this `sub`.
-        if person:
-            return self._person(sub, client_id)
-        return self._agent(client_id, sub)
+        who = self._person(sub, client_id) if person else self._agent(client_id, sub)
+        if who is not None:
+            who.auth_time = _auth_time(claims.get("amr"))
+        return who
 
     # -- §4: what a verified caller may do ------------------------------------------------------
     def _person(self, sub: str, client_id: str) -> GrantToken | None:
@@ -449,6 +481,7 @@ class Identity:
             raise PermissionError("granting access is a person's act")
         if not isinstance(sub, str) or not sub.strip() or len(sub) > 255:
             raise ValueError("a grant names the provider's user id")
+        name = display_name(name)
         if (role is None) == (capabilities is None):
             raise ValueError("a grant names a role or capabilities, not both")
         if role is not None and role not in ROLE_BUNDLES:
