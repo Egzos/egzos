@@ -268,11 +268,11 @@ AA. AMENDMENT — EVERY TOKEN IS BOUND TO ONE CONTAINER (amends §S's mapping
 ================================================================================
 AB. AMENDMENT — AGENTS: EACH PERSON REGISTERS THEIR OWN (amends §S's agent
     registry; replaces contract v1.1's rule that only an admin registers an
-    agent, to serve that admin)
+    agent, to serve that admin; Egzos/egzos#292)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
-          questions; recorded by the operator, enacted by this PR's merge;
+          questions; recorded by the operator, enacted by #292's merge;
           the Chief may veto by reverting. Why, in the operator's words: an
           agent acts for one person, on that person's grant, so that person
           is the one who consents to it; the admin-only rule left every
@@ -294,11 +294,11 @@ AB. AMENDMENT — AGENTS: EACH PERSON REGISTERS THEIR OWN (amends §S's agent
 
 ================================================================================
 AC. AMENDMENT — UPLOADS NEVER WRITTEN AS ITEMS ARE KEPT AND SHOWN (applies
-    §Z to uploads)
+    §Z to uploads; Egzos/egzos#292)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
-          questions; recorded by the operator, enacted by this PR's merge;
+          questions; recorded by the operator, enacted by #292's merge;
           the Chief may veto by reverting. Why: §Z, nothing is deleted
           automatically, holds for bytes that arrived but never became an
           item, as it does for staged bytes past retention.
@@ -316,13 +316,14 @@ AC. AMENDMENT — UPLOADS NEVER WRITTEN AS ITEMS ARE KEPT AND SHOWN (applies
 
 ================================================================================
 AD. AMENDMENT — CONFIRM CREDENTIALS FOLLOW GITHUB'S SUDO MODEL (amends §U:
-    how the credential behind the biometric confirm is added and removed)
+    how the credential behind the biometric confirm is added and removed;
+    Egzos/egzos#292)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
           questions with "how does GitHub handle this dilemma? follow
           that"; the rules below are the operator's reading of GitHub's
-          model; recorded by the operator, enacted by this PR's merge; the
+          model; recorded by the operator, enacted by #292's merge; the
           Chief may veto by reverting. Why: GitHub gates a change to an
           account's sign-in factors behind a recent re-authentication
           (sudo mode), lists and records every change, and recovers a lost
