@@ -363,6 +363,37 @@ AD. AMENDMENT — CONFIRM CREDENTIALS FOLLOW GITHUB'S SUDO MODEL (amends §U:
 
 
 ================================================================================
+AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
+    WHILE egzos.io IS UNBOUGHT (amends identity.md §3a's egzos.io callback
+    for an interim; Egzos/egzos#NNN)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
+          questions; recorded by the operator, enacted by #NNN's merge; the
+          Chief may veto by reverting.
+
+[DECIDED] THE APP LIVES ON THE HOMEPAGE'S ORIGIN, at /app; the live demo
+          stays at /. One origin carries the sign-in callback (identity.md
+          §3a), the origins the door answers CORS for (§6) and the Face ID
+          credentials (§AD). Egzos/egzos-platform's 2D apps/ui-flagship is
+          parked.
+
+[DECIDED] SIGN-IN: an email one-time code and GitHub, both through
+          Supabase Auth (§T). Google, Apple and passkeys come later.
+
+[DECIDED] UNTIL egzos.io IS BOUGHT, https://egzos-site.vercel.app stands in
+          for https://egzos.io: a container's client registers
+          https://egzos-site.vercel.app/oauth/callback in place of
+          https://egzos.io/oauth/callback (identity.md §3a), and its
+          identity.browser_origins names that origin. The Chief buys
+          egzos.io before the Face ID screens ship, so no person's
+          credential is made on the stand-in origin. On the switch, each
+          container's client is registered again with the egzos.io
+          callback, and identity.client_id and identity.browser_origins
+          are set to match.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -373,7 +404,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   4. egzos-decisions-v0.7-amendments.txt — THIS: buy-don't-build, Supabase,
      one login, the confirm, places and sync, the experience, Stripe,
      visibility, retention, token binding, own agents, kept uploads,
-     confirm credentials
+     confirm credentials, where the app lives
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 

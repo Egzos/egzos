@@ -95,6 +95,8 @@ session. Each token is bound to one container through the provider's own OAuth 2
   callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`
   — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
   a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
+  Until egzos.io is bought, `https://egzos-site.vercel.app` stands in for it here and in
+  `identity.browser_origins`. **decided** (v0.7 §AE).
 - **A person reaches a container with a token issued to that container's client.** egzos.io runs the
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
