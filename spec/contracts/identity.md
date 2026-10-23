@@ -206,12 +206,14 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
 
 - **When.** Every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`); every move or copy
   whose audience delta is non-empty: the person is shown, inline, who will newly see the item, and
-  confirms (**decided**, §U, §V); every user grant and agent registration (§4), which widen an
-  audience the same way (**a1p**, a1r's finding 2 on #282; **decided** for a registration, §AB); and,
-  at the REST door, ending a grant or a registration that serves someone else (§4), which removes a
-  person's access as surely as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g). On a grant, a
-  registration or a gated revoke, the button also needs a fresh sign-in, as a first credential does
-  (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
+  confirms (**decided**, §U, §V); every user grant (§4), which widens an audience the same way
+  (**a1p**, a1r's finding 2 on #282); every agent registration (§4), as the person's consent to an
+  agent acting with what they hold: no person newly sees anything, so it needs no `publish`, and its
+  first leg names the agent instead (`rest.md` §4.3; **decided**, §AB); and, at the REST door, ending
+  a grant or a registration that serves someone else (§4), which removes a person's access as surely
+  as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g). On a grant, a registration or a gated revoke,
+  the button also needs a fresh sign-in, as a first credential does (`rest.md` §4.3; **a1p**,
+  GHSA-c3gg-hwx9-473g).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public

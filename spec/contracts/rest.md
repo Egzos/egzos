@@ -458,7 +458,7 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
 | `GET /v1/agents` | registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
 | `POST /v1/agents` | register an agent to serve the caller, from the consent page's flow, with the confirm | any grant; the registration within it | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
 | `DELETE /v1/agents/{client_id}?sub=` | revoke one registration; one serving someone else with the confirm (below) | the person it serves, or an admin | `{"result": "revoked"}`; someone else's: `confirm` first | `identity.revoke`; someone else's: first leg; `step_up`, `identity.revoke` |
-| `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | as revoke | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
+| `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | the person it serves, or an admin | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
 | `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
 | `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
 | `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only, from the caller's own credential: an admin's recovery uses the admin's (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
@@ -604,7 +604,8 @@ storage (v0.7 §S).
    person holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
    item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it),
    counting the uploads of every agent serving them (`identity.md` §4); a container `Token` counts as
-   a person of its own. A 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a
+   a person of its own, so each `Token` the owner mints holds its own 16, as before (only the owner
+   mints one). A 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a
    fact about what the caller's own person holds. So what a person holds staged, and nobody has
    decided on, is capped at 16 times `blobs.upload_max_bytes`, and a person's decision is what frees a
    slot (v0.7 §Z: asked about, never purged). **decided**, the per-person cap on staged bytes (v0.7
