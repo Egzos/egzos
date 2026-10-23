@@ -28,8 +28,8 @@ from egzos.keys import container_key
 from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
-from egzos.store import BlobStore, NodeService, Store
-from egzos.store.blobs import _is_digest
+from egzos.store import NodeService, Store
+from egzos.store.blobs import _is_digest, open_blobs
 from egzos.store.find import shown
 from egzos.store.uploads import Uploads
 from egzos.trust import TrustEngine
@@ -74,7 +74,7 @@ class Container:
         self.backend = open_backend(self.home)
         self.ledger = Ledger(self.backend)
         self.nodes = NodeService(self.backend, self.ledger)
-        self.blobs = BlobStore(self.home / "blobs")
+        self.blobs = open_blobs(self.home)
         self.store = Store(self.backend, self.ledger, self.nodes, self.blobs)
         self.auth = Auth(self.home, self.backend, self.ledger)
         self.trust = TrustEngine(self.backend, self.ledger, self.nodes)

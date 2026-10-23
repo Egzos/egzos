@@ -302,7 +302,12 @@ discard(sha)   -> bool          # deletes staged bytes only; True if there were 
 
 Two prefixes under the blob root: `sha256/<hash>` for promoted bytes and `staging/<hash>` for staged
 bytes. `put` is idempotent — an identical write of existing content is a no-op returning the same
-address. **running.**
+address. **running.** The root sits behind Apache OpenDAL (v0.7 §S): a local container's is the
+filesystem under its home (`blobs/`), a cloud's the object store `EGZOS_BLOBS_URL` names (S3, and
+Supabase Storage through its S3 endpoint), with the store's credentials in its environment, never
+the URL. `promote` moves the bytes by the best the store offers — a rename, else a copy, else a read
+and a write — and deletes the staged copy last, so a failure leaves them in both places, never in
+neither. **a1p.**
 
 **Dedup is unobservable. [0.3 · 41]** `put` and `stage` are internal to the storage boundary: no
 external surface calls either or sees its result beyond the content address of the bytes the caller

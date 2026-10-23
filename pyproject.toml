@@ -23,6 +23,8 @@ dependencies = [
     "pyjwt[crypto]>=2.10",
     # identity.md §5: the biometric confirm is verified with a maintained WebAuthn library (§R)
     "webauthn>=3.0",
+    # storage.md §4: the blob store sits behind Apache OpenDAL, disk and object stores alike (§S)
+    "opendal>=0.45",
 ]
 
 [project.optional-dependencies]
