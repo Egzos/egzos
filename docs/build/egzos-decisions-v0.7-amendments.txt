@@ -95,6 +95,12 @@ T. ONE LOGIN (supersedes R2 and v0.6 §K "two authorities")
           provider, and the browser presents the user's Supabase session to
           the container directly. Double login is retired.
 
+[DECIDED] Accepted tradeoff, on record: the egzos Supabase project can now
+          sign a session the user's container accepts, so egzos's identity
+          provider is in the trust path of every container that uses it. A
+          container owner can point the container at a different identity
+          provider (a self-hoster's own Supabase); egzos's is the default.
+
 [DECIDED] What stays: the browser talks to the container directly. egzos
           servers never proxy, cache or store a user's container data, and
           never call a user's container on their own authority. For a
