@@ -482,9 +482,11 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
 - **What the container holds to is the admin's confirm.** The first leg answers `newly: []` and, in
   its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
   the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
-  (design-gap Egzos/egzos-platform#117). The challenge is bound to the body's `client_id`, its
-  capabilities as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`.
-  **a1p** (a6 on #285).
+  (design-gap Egzos/egzos-platform#117). The first leg's `context.fetch` carries the same
+  `details.registers` (the `name` as escaped display data), so a first leg the admin walks away from
+  still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
+  as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. **a1p** (a6
+  and a1r on #285).
 - **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
   authorization, at most one registers, and every later request naming it is §3's refusal.
   `identity.grant` records it as `details.authorization_id`, so the consent page's record and the

@@ -23,7 +23,9 @@ from typing import Any
 import typer
 
 from egzos._term import safe
+from egzos._types import CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
 from egzos.container import OWNER, Container
+from egzos.identity import ConfigError, LastAdmin
 from egzos.model import Node
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
@@ -35,9 +37,13 @@ app = typer.Typer(
 trust_app = typer.Typer(help="Trust: pending queue, promotion, quarantine.")
 audit_app = typer.Typer(help="Audit: the hash-chained ledger.")
 token_app = typer.Typer(help="Tokens: client principals and their capabilities.")
+config_app = typer.Typer(help="Config: the container's settings (container.md §8).")
+grant_app = typer.Typer(help="Grants: people who sign in at your provider and may use this.")
 app.add_typer(trust_app, name="trust")
 app.add_typer(audit_app, name="audit")
 app.add_typer(token_app, name="token")
+app.add_typer(config_app, name="config")
+app.add_typer(grant_app, name="grant")
 
 _state: dict[str, Any] = {"json": False}
 
@@ -661,6 +667,122 @@ def token_ls():
             for t in ts
         ),
     )
+
+
+# -- config and identity (container.md §8, identity.md) ----------------------------------------
+def _admin(c: Container, what: str):
+    """An owner act over the whole container: the interactive principal with `admin` over `*`."""
+    token = _owner(c, what)
+    if not token.has("admin") or "*" not in token.scopes:
+        _fail(f"{what} needs `admin` over the whole container")
+    return token
+
+
+@config_app.command("get")
+def config_get(key: str | None = typer.Argument(None, help="One key; default: all of them")):
+    """The container's settings as they stand, defaults included. None of them is a secret."""
+    c = _container()
+    token = _owner(c, "the container's config")
+    if key is not None and key not in CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY:
+        _fail(f"{key}: not a config key")
+    keys = [key] if key else list(CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY)
+    values = {k: c.config_value(k) for k in keys}
+    c.ledger.append(
+        "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
+        view="config get", items=[], layers=[], withheld=0, keys=keys,
+    )
+    _out(values, "\n".join(f"{k} = {'(absent)' if v is None else v}" for k, v in values.items()))
+
+
+@config_app.command("set")
+def config_set(
+    key: str = typer.Argument(..., help="A wire key, e.g. identity.issuer"),
+    value: str | None = typer.Argument(None, help="The new value"),
+    unset: bool = typer.Option(False, "--unset", help="Set the key to absent"),
+):
+    """Change one setting: an admin act, recorded as `config.set`. Only the keys this version
+    reads are settable (the identity.* keys); the others are still built-in constants."""
+    c = _container()
+    token = _admin(c, "changing the config")
+    if unset == (value is not None):
+        _fail("give a value, or --unset")
+    try:
+        stored = c.set_config(key, None if unset else value, token=token)
+    except (ConfigError, PermissionError) as e:
+        _fail(str(e))
+    _out({key: stored}, f"{key} = {'(absent)' if stored is None else stored}")
+
+
+@app.command()
+def link(
+    issuer: str = typer.Option(
+        ..., "--issuer", help="The provider's issuer, e.g. https://<project>.supabase.co/auth/v1"
+    ),
+    client_id: str = typer.Option(
+        ..., "--client-id", help="This container's own OAuth client at the provider"
+    ),
+    sub: str = typer.Option(..., "--sub", help="Your user id at the provider"),
+    name: str = typer.Option("owner", "--name", help="A display name for your grant"),
+):
+    """Link this container to an identity provider (identity.md §4): set its issuer and its own
+    client, and grant your provider user everything here. After this, egzos.io can reach the
+    container as you, with one sign-in. The owner token keeps working, as the way back in."""
+    c = _container()
+    token = _admin(c, "linking the container")
+    try:
+        with c.backend.atomic():
+            c.set_config("identity.issuer", issuer, token=token)
+            c.set_config("identity.client_id", client_id, token=token)
+            grant = c.identity.grant_user(
+                sub, name=name, role="admin", scopes=["*"], actor=token.owner,
+                principal=token.principal,
+            )
+    except (ConfigError, PermissionError, ValueError) as e:
+        _fail(str(e))
+    _out(
+        {"issuer": issuer, "client_id": client_id, "grant": grant},
+        f"linked to {issuer}\n  client {client_id}\n  {sub} may do everything here (admin over *)",
+    )
+
+
+@grant_app.command("ls")
+def grant_ls():
+    """Who may sign in here, with what: user grants, and the agents registered for them."""
+    c = _container()
+    token = _owner(c, "the grant list")
+    grants = c.backend.list_user_grants()
+    agents = c.backend.list_agent_registrations()
+    c.ledger.append(
+        "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
+        view="grant ls", items=[], layers=[], withheld=0,
+        grants=[g["sub"] for g in grants], agents=[a["client_id"] for a in agents],
+    )
+    rows = [
+        f"{g['sub']}  {g['name']:<14} {','.join(g['capabilities']):<45} "
+        f"scopes={','.join(_p(c, s) if s != '*' else '*' for s in g['scopes'])}"
+        f"{'  REVOKED' if g['revoked'] else ''}"
+        for g in grants
+    ] + [
+        f"agent {a['client_id']} for {a['sub']}  {a['name']:<14} {','.join(a['capabilities'])}"
+        f"{'  REVOKED' if a['revoked'] else ''}"
+        for a in agents
+    ]
+    _out({"grants": grants, "agents": agents}, "\n".join(rows) or "(no grants)")
+
+
+@grant_app.command("rm")
+def grant_rm(sub: str = typer.Argument(..., help="The provider user id to revoke")):
+    """Revoke a person's grant: it stops working on their next request. The last grant holding
+    admin over the whole container stays."""
+    c = _container()
+    token = _admin(c, "revoking a grant")
+    try:
+        revoked = c.identity.revoke_user(sub, actor=token.owner, principal=token.principal)
+    except LastAdmin:
+        _fail("that is the last admin grant over the whole container; it stays")
+    if not revoked:
+        _fail("no live grant for that user")
+    _out({"sub": sub, "revoked": True}, f"revoked {sub}")
 
 
 # -- audit ------------------------------------------------------------------------------------

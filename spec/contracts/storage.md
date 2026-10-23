@@ -178,6 +178,36 @@ process keeps one counter, not one per process. The sqlite implementation is in
 every throttled request, and the transport-address digests that key the per-source buckets
 persisted on disk.
 
+## 3.2 · Who may call, and the settings — `IdentityState` and `ConfigState`
+
+**Status of this section: contract v1.1** (`identity.md` §4, `container.md` §8). Two Protocols beside
+`ContainerState`, in `src/egzos/_types.py`, implemented by the backend that implements it, on the
+same substrate and never delegated (F3), as §3.1's counters are. **a1p.**
+
+```
+# IdentityState — identity.md §4's two records; the getters return revoked records too
+put_user_grant(grant)                            -> None             # insert or replace, keyed on sub
+get_user_grant(sub)                              -> UserGrant | None
+list_user_grants()                               -> list[UserGrant]
+put_agent_registration(registration)             -> None             # keyed on (client_id, sub)
+get_agent_registration(client_id, sub)           -> AgentRegistration | None
+list_agent_registrations(client_id=None)         -> list[AgentRegistration]
+
+# ConfigState — container.md §8's object as set, wire key -> value
+get_config()                                     -> dict             # a key never set is absent
+put_config(key, value)                           -> None
+```
+
+- **A revoked record is kept, marked `revoked`.** The caller judges liveness on every request
+  (`identity.md` §3 check 7), and the record's history reads back. No method deletes one.
+- **No column holds a credential.** A grant names a provider user id (`sub`) and a registration an
+  OAuth `client_id`; neither is a secret, and no token value or hash is stored here.
+- **A config key never set is absent**, and the reader serves `CONTAINER_CONFIG_DEFAULTS` for it.
+  Absence is tested by absence, never by truthiness (`container.md` §8): an empty string set is a
+  value.
+- **The writes are the caller's to audit.** `identity.grant`, `identity.revoke` and `config.set` are
+  appended by the code that decides the act, in the same transaction as the write.
+
 ## 4 · `BlobStore` — content-addressed, staged
 
 ```
@@ -309,8 +339,8 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-§3.1's `ThrottleState` is contract v1.1, not part of the 0.3 freeze; its partition is decided on
-#173 (option (A), on the `ContainerState` substrate).
+§3.1's `ThrottleState` and §3.2's `IdentityState` and `ConfigState` are contract v1.1, not part of
+the 0.3 freeze; their partition is decided on #173 (option (A), on the `ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases

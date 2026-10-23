@@ -271,9 +271,18 @@ def check_container_config(md: str) -> None:
 
     for wire_key, field in mapping.items():
         typed = t.CONTAINER_CONFIG_DEFAULTS[field]
+        cell = documented[wire_key][1]
+        if typed is None:
+            # A key with no default reads `absent`, unticked: there is no value to tick (v1.1's
+            # `identity.issuer`, `identity.client_id`). A ticked value there would be a default.
+            assert not codes(cell) and plain(cell).strip() == "absent", (
+                f"{where}: `{wire_key}` has no default in CONTAINER_CONFIG_DEFAULTS; the cell "
+                f"must read `absent`, not {cell!r}"
+            )
+            continue
         # The default cell is the value in ticks, sometimes with an unticked gloss after it —
         # `65536` (64 KiB), `300` (≈5 min). The ticked token is the value.
-        written = codes(documented[wire_key][1])[0]
+        written = codes(cell)[0]
         parsed = int(written) if isinstance(typed, int) and written.isdigit() else written
         assert parsed == typed, (
             f"{where}: `{wire_key}` defaults to {written!r} here and {typed!r} in "

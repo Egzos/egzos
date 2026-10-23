@@ -95,13 +95,14 @@ agents:
       - "tests/vault/**"
     exclusive: []
 
-  # Trust engine: statuses, policies, OAuth 2.1 AS, tokens, presence.
+  # Trust engine: statuses, policies, tokens, presence, and verifying the provider's tokens.
   a3-trust:
     paths:
       - "src/egzos/trust/**"
       - "src/egzos/authz/**"
       - "src/egzos/trust.py"
       - "src/egzos/auth.py"
+      - "src/egzos/identity.py"
       - "tests/trust/**"
       - "tests/authz/**"
     exclusive: []
