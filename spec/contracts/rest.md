@@ -1,10 +1,10 @@
 # Contract · the REST door
 
-**Status: draft (Phase 2 boundary, #42).** **Not frozen, and not law.** Opened as a
-`contract-change` at the Phase 2 boundary. The Chief and a6-adversary review it before any builder
-implements against it. Until that review, no issue that builds against this text is labeled for
-dispatch. Where this draft and a frozen document disagree, the frozen document governs, and the
-disagreement is a finding against this draft.
+**Status: contract v1.1 — law from the Chief's merge of the commit that set this line** (2026-10-23,
+decisions v0.7; tracking #283). Opened as a draft at the Phase 2 boundary (#42); from that merge a
+builder implements against it. Where it and
+another contract disagree, the disagreement is a finding against whichever is newer, raised before
+either is built.
 
 **Amended for contract v1.1 (2026-10-23).** The container's own authorization server is retired
 (decisions v0.7 §S). This door accepts the container's own `Token` and access tokens signed by the
@@ -212,6 +212,15 @@ headers. **a1p**, by `authorization-server.md` §7.1's split between `invalid_sc
 `access_denied`. Validation of the request's shape runs **before any lookup**, so a `400` never
 depends on an id the request names.
 
+**An ambiguous path tail gets the third answer.** A scope parameter or body field accepts a node id
+or a path tail, as `resolve_ref` does (`container.md` §2). A tail that matches more than one node the
+token covers is refused and nothing is picked ([0.3 · 1]): status `409`, the same four headers, and
+`{"error":"ambiguous","matches":[<path>, …]}`, the paths sorted. **decided**, that the refusal names
+the matches; **a1p**, the bytes (#187). The candidates are only the nodes the token covers, so the
+answer names nothing the token could not list at `GET /v1/scopes`; a tail whose only matches are
+uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the running MCP door's
+`_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`).
+
 ## 4 · The v1.0 endpoints
 
 Every response body is JSON. An item is serialised per `context-item.md` §1, unknown fields
@@ -227,7 +236,11 @@ spec's job).
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
 | `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls` | `context.fetch` |
 | `POST /v1/items` | write a text item; it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add` |
-| `POST /v1/items/{id}/move` | move an item; the gate decides | `organize`; `publish` to propose a widening | `egzos mv` | `item.move` and `gate.pass.silent`, or `gate.propose` |
+| `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
+| `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
+| `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
+| `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
+| `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -249,20 +262,178 @@ entry, as the running doors write it. Cursor pages are `[v1.1 · #137 7, 10]`.
 `context.fetch` with `items: []`, identical for every case. **a1p**, following the running MCP door
 (`_probe`: *"a probe is a read too"*). The case may be recorded in `details` (§3).
 
-**Attribution.** Every entry this door appends carries `actor` = the token's `owner`, `principal` =
-the token's principal and `client` = the token's `client`. Never `none` (`events.md` §2). **decided.**
+**Attribution.** Every entry this door appends names its caller, never `none` (`events.md` §2). For a
+container `Token`: `actor` = its `owner`, `principal` its principal. For a provider token: as
+`identity.md` §3a's attribution clause — a person is `actor: user:<sub>`; an agent is `actor:
+agent:<client_id>` with `details.for: user:<sub>`. **decided.**
 
 **`POST /v1/items` writes text only.** An artifact upload is `TODO(a1p)`, #42: the staging rule for
 an agent-proposed artifact (`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it, and no
 running door uploads over HTTP to derive the shape from.
 
+### 4.1 · Success responses (#187)
+
+**a1p**, every clause of this subsection unless it cites otherwise: the bodies below bind the running
+shapes each row mirrors onto HTTP (`Resolver.resolve`, `store.find`, `Trust.move`, `Trust.pending`,
+`NodeService.create`). A field not named here is not on the wire, and a builder adds none.
+
+**One status, the same headers.** Every success is `200 OK` with the three header lines of §3's
+refusal (`Content-Type: application/json`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`) and
+no `ETag`, `Last-Modified` or `Location`. A write answers `200` too: the body says what happened, and
+a create, a silent move and a parked proposal never differ by status code. A cached success beside an
+uncached refusal would make the two distinguishable in a shared cache, and a body is user data that
+no intermediary keeps. §6's redemption is the one exception: it streams bytes under its own headers.
+
+**Every body is a JSON object, never a bare array.** Each list sits under a key that names its
+members, so a v1.1 key (`[v1.1 · #137 7, 10]`'s cursors) is an addition, not a break. A client
+ignores a top-level key it does not know. No body carries `withheld`, a count, or any other trace of
+what the token was not served (§4's lists rule): the count is the ledger's, as the running doors
+write it. This also closes `container.md` §4's `TODO(a1p)` for this door, since no shape here
+differs between a silent refusal and an empty result.
+
+**No framing.** The MCP door's `banner` and per-response `fence` exist for a model reading the result
+as prompt text. This door returns JSON values, and §4's "data" rule is its framing: a body carries
+neither.
+
+**Request bodies** are JSON objects. A missing required field, a field of the wrong type, or a field
+the row does not name is `400` (§3).
+
+| route | request | `200` body |
+|---|---|---|
+| `GET /v1/fetch` | — | `{"scope": <path>, "chain": [<layer>], "items": [<entry>]}` |
+| `GET /v1/find` | — | `{"items": [<entry>]}` |
+| `GET /v1/items/{id}` | — | `<entry>` |
+| `GET /v1/inbox` | — | `{"items": [<entry>]}` |
+| `GET /v1/scopes` | — | `{"nodes": [<node>]}` |
+| `POST /v1/items` | `{"body", "kind"?, "scope"?, "key"?, "tags"?}` | `{"item": <item>}` |
+| `POST /v1/items/{id}/move` | `{"to", "confirm"?}` | `{"result": "moved", "item": <item>}`, `{"result": "confirm", …}` (§4.2) or `{"result": "pending", "proposal": <id>}` |
+| `POST /v1/items/{id}/copy` | `{"to", "confirm"?}` | `{"result": "copied", "item": <item>}` (the new copy), `{"result": "confirm", …}` or `{"result": "pending", "proposal": <id>}` |
+| `POST /v1/pending/{proposal}/approve` | `{"confirm"?}` | `{"result": "confirm", …}` (§4.2), then `{"result": "executed", "item": <item>}` or `{"result": "stale"}` |
+| `POST /v1/pending/{proposal}/deny` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "denied"}` |
+| `POST /v1/items/{id}/promote` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "promoted", "item": <item>}` |
+| `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
+| `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
+
+- **`<item>`** is a `ContextItem` per `context-item.md` §1, unknown fields included, returned as
+  stored. Nothing in this subsection is ever added inside it.
+- **`<entry>`** is `{"item": <item>, "layer": <path>, "layer_type": <type>, "shadowed_by": <id> |
+  null}`, `container.md` §4's `ResolvedItem` with its `trust` key removed as that clause decides,
+  plus, when §6 minted a grant for this read, `"grant": <BlobGrant>` and `"grant_url": <string>`.
+  The two grant keys are absent otherwise, never `null`. **They sit beside `item`, never inside it
+  or its `content`**: a grant is a fact of this read and this token, as `shadowed_by` is a fact of
+  this resolution, and a client that wrote an item back would otherwise persist a credential into
+  it. §6 item 4 is read this way.
+- **`<layer>`** is `{"node": <id>, "path": <path>, "type": <type>, "policy": "serve-unverified" |
+  "verified-only"}`, the running resolver's layer. `chain` lists only the layers the token covers,
+  innermost first (`container.md` §3, §4 invariant 3).
+- **`<node>`** is `{"id", "type", "name", "parent", "created_at", "path"}`: `container.md` §2's
+  persisted node plus its computed path, unknown fields included.
+- **`<proposal>`** is `container.md` §6's parked proposal, `_types.Proposal` with the wire key
+  `from` (`PROPOSAL_WIRE_KEY_FROM`).
+- **`<path>`** is a path as `NodeService.path` renders it (`container.md` §2).
+
+**Per route:**
+
+1. **`GET /v1/fetch`** carries the layering, not a flat list: `scope` is the resolved scope's path,
+   `chain` the covered layers, and `items` every served item in layer order, innermost first,
+   shadowed items included with `shadowed_by` set (`container.md` §4, most-specific-wins). Within a
+   layer the order is newest first by `lifecycle.created_at`, the sqlite backend's running order,
+   with ties broken by `id` descending, which the backend does not yet do.
+2. **`GET /v1/find`** returns its hits newest first by `lifecycle.updated_at`, then by `id`
+   descending, as `store.find` does. `layer` is the hit's own node's path and `shadowed_by` is
+   always `null`: a search resolves no chain.
+3. **`GET /v1/items/{id}`** returns one `<entry>`, `layer` its own node, `shadowed_by` `null`.
+4. **`GET /v1/inbox`** returns the inbox's served items as entries whose `layer` is each item's
+   thread (`egzos_inbox`'s `thread`). This row mints no grant (§4's table has no `blob.grant` on
+   it): an artifact above the threshold carries neither `inline` nor `grant`, and a client reads it
+   at `GET /v1/items/{id}`.
+5. **`GET /v1/scopes`** returns the child nodes of `under`, sorted by path. `under` absent is the
+   personal root, as `egzos_fetch`'s default.
+6. **`POST /v1/items`** returns the item as written: `trust.status` is `unverified` (`container.md`
+   §5). `kind` defaults to `memory`; `scope` absent is pure capture, a fresh auto-titled thread in
+   the inbox (R11), as `egzos_remember`.
+7. **`POST /v1/items/{id}/move`** tells the gate's outcomes apart by `result` alone. `moved`
+   is the silent pass (`gate.pass.silent`), or the confirmed one (`gate.pass.confirmed`, §4.2), and
+   carries the item at its new scope, unverified again where the mover is a client
+   (`_reset_if_agent_run`). `confirm` asks the human (§4.2). `pending` is the parked proposal
+   (`gate.propose`) and carries **its id and nothing else**. The proposal's `audience` names other
+   tokens' owners and clients: credential metadata, which this door serves only to the interactive
+   principal at `GET /v1/pending`, since a client-facing token read needs the event `[v1.1 · #137
+   10]` defers. The flagship's *moved* and *pending* states read `result`.
+8. **`POST /v1/scopes`** returns the created node. `parent` absent is the personal root, as
+   `egzos mk`.
+9. **`GET /v1/pending`** is two lists, as `Trust.pending` returns them: `items`, every `unverified`
+   item in a scope the token covers, and `proposals`, every `open` proposal the token decides over
+   (`Trust.decides_over`: it covers both ends). Both are viewer-scoped; the running CLI lists every
+   pending item and proposal because its owner token covers `*`, and a narrower grant (`identity.md`
+   §4) sees only its own. Quarantined items are never in `items`
+   (`container.md` §4 invariant 2). `items` includes an unverified `rule`, as `egzos trust pending`
+   and the lifeboat's queue show one today, because promotion is read from this queue: the queue is
+   the one place an `interactive` principal reads one, and §3 refuses an unverified rule at every
+   other route. **decided** by the Chief's merge of this PR, closing #187's `TODO(chief)` on the
+   running behaviour: the one carve-out from "rules are served verified-only", and only to the person
+   who decides whether a rule becomes verified.
+
+10. **`POST /v1/items/{id}/copy`** answers as move does. `copied` carries the new item: a fresh id, the
+   destination's scope, `trust.status` `unverified` (the copy is a new write), `provenance.derived_from`
+   the source's id; the source is unchanged. Bytes are not duplicated: an artifact copy names the same
+   `content.sha256` ([0.3 · 41]'s dedup).
+
+### 4.2 · The confirm at this door
+
+The confirm (`identity.md` §5) is how a person says yes to something that widens who can see an item,
+and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
+
+1. **Two legs, one route.** A confirm-gated request — a move or copy whose audience delta is
+   non-empty, asked by an `interactive` principal holding `publish`; or approve, deny or promote —
+   sent **without** a `confirm` field moves and decides nothing. After the route's own checks pass
+   (coverage and capability first, `container.md` §6's order, so a token that may not do the act gets
+   §3's refusal whatever the delta), it answers `{"result": "confirm", "newly": [<name>],
+   "challenge": <id>, "webauthn": <options> | null, "expires_at"}`. `newly` names who would newly see
+   the item — each grant's or registration's display name — and is `[]` for approve, deny and promote
+   of an item already in place. The same request sent again **with** `confirm` completes it (item 3).
+   There is no separate challenge route: a challenge exists only as the first leg of the act it is for.
+2. **The first leg is a read, and is audited.** It appends one `context.fetch` with `items: []`,
+   `subject` the item or proposal, and `details: {"confirm_for": <act>, "newly": [<name>]}`: showing
+   who would newly see an item is a read of credential metadata (`events.md` §4 invariant 2). It is
+   served only to the `interactive` principal about to act — the same reader `GET /v1/pending` serves a
+   proposal's audience to.
+3. **The second leg** carries `"confirm": {"challenge": <id>, "proof": "biometric", "assertion":
+   <WebAuthn assertion>}`, or `"proof": "button"` with no assertion where `confirm.allow_button` is
+   `true`. The container then, as **one atomic step** — of two concurrent requests presenting one
+   challenge, at most one proceeds past it, as §6's grant spend:
+   - finds the challenge live, unspent and **bound to this request**: the same principal (the
+     `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
+     and the same audience delta, recomputed now;
+   - verifies the proof (`identity.md` §5);
+   - spends the challenge.
+
+   Then it appends `step_up` (`outcome: confirmed`, `details.proof`), the act's gate or approval event
+   (`gate.pass.confirmed` with `audience_delta` and the `step_up`'s `seq`; or `approval.execute` /
+   `approval.stale`, `approval.deny`, `approval.promote`), and `item.move` or `item.copy` where one
+   moved.
+4. **Every proof that is presented and concludes is audited, success or failure.** A stale, spent,
+   foreign or mismatched challenge, a failed assertion, a button where buttons are off, and a delta
+   that changed since the challenge append `step_up` with `outcome: refused`, `details.proof` as
+   presented and `details.reason` (`stale`, `spent`, `foreign`, `mismatch`, `assertion`, `button_off`,
+   `delta_changed`), as `events.md` §1 requires of every concluded presence check. The answer to the
+   caller is the same whatever the reason: `{"result": "confirm", …}` with a fresh challenge (and the
+   new `newly`, where the delta changed). The ledger says which case it was; the response does not
+   (`capabilities.md` §6 clause 3).
+5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.**
+6. **A `client` principal never gets `confirm`.** Its widening move or copy parks as a proposal
+   (`gate.propose`, `pending`) for a person to decide, as today; approve, deny and promote are §3's
+   refusal to it; a `confirm` field from a `client` principal is ignored, never honoured, and appends
+   nothing beyond the route's own refusal or proposal. **decided** (§U).
+7. **`webauthn` is `null`** when the person has registered no credential with this container: only
+   the button is then possible, and an owner who set `confirm.allow_button` to `false` must register
+   one (the registration route arrives with the next contract PR) before any confirm-gated act.
+
 **Not in this door at v1.0:**
 
-- **Human-only acts**: promote, approve, deny, `gate.confirm`, `yes.consume`. Each requires the
-  confirm (`identity.md` §5); their routes arrive with the next contract PR, beside copy, upload and
-  the agent reads. A `client` principal is refused one in every phase.
-- **Grants and agent registrations** (`identity.md` §4) and their routes arrive with the same PR. A
-  container `Token` is still revoked with `token rm`.
+- **Grants, agent registrations, the agent reads and WebAuthn credential registration**
+  (`identity.md` §4–§5) and **artifact upload** arrive with the next contract PR (#283). A container
+  `Token` is still revoked with `token rm`.
 - **Quarantine and config.** No flagship screen #137 cites needs either at v1.0. They stay on the CLI.
 - **`[v1.1 · #137 1–7, 9–12]`**: a revision on reads (1); window state and its events (2, 3);
   `return_to` (4); writability per scope (5); a nonzero-delta move inside a window (6); pending
@@ -278,6 +449,11 @@ appends. A test per row asserts the event.
 
 The two invariant-2 exceptions (the owner's read inside an AS session; refresh rotation) are the
 AS's, and neither reaches this door: §2 accepts no session. **decided.**
+
+**New events.** `item.copy` (a copy is made; `subject` the new item, `details.from` the source) and
+`gate.pass.confirmed` (a widening move or copy confirmed inline; `audience_delta` and the `step_up`'s
+`seq`) are this door's. Like `identity.md`'s, they enter `events.md` §1 and `_types.py` with the code
+that appends them, because the conformance tests pin that table to running code. **a1p.**
 
 ## 6 · `BlobGrant` — issue and redemption
 
