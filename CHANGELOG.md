@@ -61,8 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   turn down an agent's file without promoting it: its staged bytes go with it, unless another
   upload or staged item holds the same bytes, and its upload slot frees. An item a person promoted
   takes the confirm first. Promoted bytes are never deleted, and the inbox thread a capture opened
-  keeps its name. `egzos rm <id>` does the same with the owner token for an item nobody promoted;
-  a promoted item goes only at the door, with the confirm.
+  keeps its name.
 - **Agents connect over the internet: MCP over Streamable HTTP at `/mcp`** (`identity.md` §7), on
   the door `egzos serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
   verified: an agent's sign-in reaches only what both its registration and its user's grant

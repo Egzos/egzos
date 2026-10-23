@@ -281,9 +281,10 @@ class Uploads:
     def tombstone(self, token: Token, item_id: str) -> ContextItem | None:
         """Tombstone the item as it stands under the lock, with its `item.tombstone`, in one step;
         None, and nothing written, where `token` may not. An artifact whose bytes are still staged
-        releases them, deleted unless another upload or staged item holds them (`_shared`);
-        promoted bytes are never deleted ([0.3 · 44]). Its upload then frees its slot (`holds`).
-        The confirm a promoted item needs is the caller's."""
+        releases them, deleted unless another upload or staged item holds them (`_shared`), and
+        `staged_deleted` records only bytes deleted in fact: another item's promotion may have
+        moved them already. Promoted bytes are never deleted ([0.3 · 44]). Its upload then frees
+        its slot (`holds`). The confirm a promoted item needs is the caller's."""
         with self.backend.atomic():
             item = self.backend.get(item_id)  # a tombstoned item reads as absent
             if item is None or not self.tombstonable(token, item):
@@ -293,13 +294,14 @@ class Uploads:
                     and not self._shared(sha, item=item.id)):
                 sha = None
             self.backend.tombstone(item.id)
+            # Before the entry, inside the lock, so the entry claims only a deletion that happened;
+            # a failure from here on rolls the tombstone back with it.
+            released = sha is not None and self.blobs.discard(sha)
             details: dict[str, Any] = {"kind": item.kind, "status": item.status}
-            if sha is not None:
+            if released:
                 details["staged_deleted"] = sha
             self.ledger.append("item.tombstone", actor=token.owner, principal=token.principal,
                                subject=item.id, scope=item.scope, **details)
-            if sha is not None:
-                self.blobs.discard(sha)  # last: a failure before it keeps the bytes
         return item
 
     # -- what `GET /v1/pending` lists ------------------------------------------------------------

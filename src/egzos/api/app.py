@@ -720,12 +720,8 @@ def create_app(
         """A promoted item's first leg: nobody newly sees anything, and it names what it removes,
         a read audited as every first leg is (§4.2 item 2)."""
         named = {"item": item.id, "kind": item.kind, "auto_title": item.content.get("auto_title")}
-        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
-                        client=token.client, subject=item.id, items=[], layers=[], withheld=0,
-                        confirm_for="tombstone", newly=[], tombstones=named)
-        return _json(200, {**c.confirm.issue(token, act="tombstone", subject=item.id,
-                                             destination=None, delta=[], newly=[],
-                                             origin=origin), "tombstones": named})
+        return first_leg(token, act="tombstone", subject=item.id, destination=None, delta=[],
+                         origin=origin, tombstones=named)
 
     @app.delete("/v1/items/{item_id}")
     async def tombstone(request: Request, item_id: str):

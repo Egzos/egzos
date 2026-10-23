@@ -155,6 +155,29 @@ def test_a_copy_keeps_the_staged_bytes_it_shares_until_its_own_tombstone(c, door
         b"other").hexdigest()
 
 
+def test_staged_deleted_records_only_bytes_deleted_in_fact(c, door, notes):
+    """Staging is shared by address, so another item's promotion can move the bytes first. The
+    entry then claims no deletion (a1r on #303): two uploads of one file, a promoted copy, and a
+    person writing the same bytes."""
+    agent = _agent(c)
+    one, two = _artifact(door, agent, notes.id), _artifact(door, agent, notes.id)
+    c.trust.promote(c.store.get(one), token=c.owner, actor=OWNER)
+    assert not _staged(c) and _rm(door, c.owner, two).status_code == 200
+    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    data = b"copied"
+    source = _artifact(door, agent, notes.id, data=data)
+    r = door.post(f"/v1/items/{source}/copy", headers=_auth(agent), json={"to": notes.id})
+    c.trust.promote(c.store.get(r.json()["item"]["id"]), token=c.owner, actor=OWNER)
+    assert not _staged(c, data) and _rm(door, c.owner, source).status_code == 200
+    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    data = b"written twice"
+    theirs = _artifact(door, agent, notes.id, data=data)
+    _artifact(door, c.owner, notes.id, data=data)  # a person's write promotes the bytes at once
+    assert not _staged(c, data) and _rm(door, c.owner, theirs).status_code == 200
+    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    assert c.blobs.get(SHA) == DATA and c.blobs.get(hashlib.sha256(data).hexdigest()) == data
+
+
 def test_promoted_bytes_are_never_deleted(c, door, notes):
     mine = _artifact(door, c.owner, notes.id)  # a person's: promoted at once, still unverified
     theirs = _artifact(door, _agent(c), notes.id)  # the same bytes, staged apart (storage.md §4)

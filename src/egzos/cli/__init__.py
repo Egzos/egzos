@@ -430,23 +430,6 @@ def mv(
         )
 
 
-@app.command()
-def rm(item: str = typer.Argument(..., help="Item id or %n")):
-    """Tombstone an item no person has promoted, so no read serves it again (an inbox thread a
-    capture opened keeps its name). An agent's file still staged goes with it, unless another upload
-    or staged item holds the same bytes. A promoted item is tombstoned only at the door, where the
-    confirm asks the person: any process that can run this terminal could run `rm` (rest.md §4)."""
-    c = _container()
-    token = _admin(c, "tombstoning an item")
-    target = _item_ref(c, item)
-    if c.uploads.promoted(target):
-        _fail("a promoted item is tombstoned at the door, where the confirm asks you")
-    gone = c.uploads.tombstone(token, target.id)
-    if gone is None:
-        _fail("not found")  # quarantined, or gone since: as absent (silence-not-errors)
-    _out({"id": gone.id, "tombstoned": True}, f"tombstoned {gone.id}")
-
-
 # -- trust ------------------------------------------------------------------------------------
 @trust_app.command("pending")
 def trust_pending():
