@@ -374,7 +374,7 @@ AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
 
 [DECIDED] THE APP LIVES ON THE HOMEPAGE'S ORIGIN, at /app; the live demo
           stays at /. One origin carries the sign-in callback (identity.md
-          §3a), the origins the door answers CORS for (§6) and the Face ID
+          §3a), the origins the door answers CORS for (identity.md §6) and the Face ID
           credentials (§AD). Egzos/egzos-platform's 2D apps/ui-flagship is
           parked.
 
@@ -387,10 +387,12 @@ AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
           https://egzos.io/oauth/callback (identity.md §3a), and its
           identity.browser_origins names that origin. The Chief buys
           egzos.io before the Face ID screens ship, so no person's
-          credential is made on the stand-in origin. On the switch, each
-          container's client is registered again with the egzos.io
-          callback, and identity.client_id and identity.browser_origins
-          are set to match.
+          credential is made on the stand-in origin: the app offers no
+          credential enrolment there. On the switch, each container's
+          client is registered again with the egzos.io callback, the
+          stand-in callback and origin leave every client's redirect URIs
+          and every container's identity.browser_origins, and
+          identity.client_id is set to match.
 
 
 ================================================================================
