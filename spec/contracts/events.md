@@ -72,6 +72,12 @@ unaudited move; it is an audited move that does not interrupt anyone.
 post-trust, and `revoke_refuse` is the owner's revoke page** — three refusals, each under its own
 event, so an `audit` query never has to tell them apart by `details`.
 
+**Retired with the authorization server** (`identity.md` §9, contract v1.1): `authz.login`,
+`authz.redeem`, `authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse`,
+`authz.grant` and `client.register` have no surface left, and no code appends them. Their rows and
+`_types.py`'s `Event` members stay, as the record of what was frozen. **`authz.release` is not
+retired**: the REST door's throttle releases under it (`rest.md` §2 item 7). **a1p.**
+
 **A consent decision is none of the three: it is `authz.grant`** (`authorization-server.md` §9.3,
 [0.3 · 29]). One row, `details` `{client_id, decision, scopes, capabilities}`, with `decision`
 closed to `granted` · `denied` (`_types.py`'s `AS_GRANT_DECISIONS`) and `scopes`/`capabilities`

@@ -149,192 +149,34 @@ Node and chain semantics — container types, ring ranks, the chain walk, the se
 gate and the container config object — are `container.md`'s, not this document's. This document
 fixes only how those shapes are **persisted**.
 
-## 3.1 · The authorization server's state — `ASState` and `ASGateState`
+## 3.1 · The door's throttle state — `ThrottleState`
 
-**Status of this section: draft binding (a1p), not frozen.** Added at the Phase 2 boundary on
-`contract-change` **#173** (filed by a3-trust from #166). The rest of this document is frozen at 0.3
-and this section changes none of it: §1's table, §3's fourteen methods and `ContainerState` itself
-are untouched. Where this section and a frozen clause disagree, the frozen clause governs and the
-disagreement is a finding against this section. **decided, not running** throughout: the skeleton has
-no authorization server.
+**Status of this section: contract v1.1** (`identity.md` §9). It replaced the draft binding #173 added
+for the authorization server, `ASState` and `ASGateState`, when that server was retired: its clients,
+codes, device authorizations, refresh chains, decided requests and interactive sessions went with
+its code. The rest of this document is frozen at 0.3 and this section changes none of it.
 
-`authorization-server.md` requires seven kinds of durable state that §3 named no method group for.
-They are declared as **two Protocols beside `ContainerState`**, in `src/egzos/_types.py` like the
-other three. The partition between them is decided (below); the two Protocols stay separate:
-
-| Protocol | groups | source clause in `authorization-server.md` |
-|---|---|---|
-| `ASState` | clients · codes · device authorizations · refresh chains · decided requests | §5, §2, §3, §9.2, §11.4 |
-| `ASGateState` | interactive sessions · throttle counters | §10.1, §11.0 / §12 |
-
-`ASGateState` is the two objects that gate a request **before** evaluation (§11.0's substeps); that is
-the line the partition question fell on, and the only reason for the second Protocol.
+What stays is the throttle the REST door runs on (`rest.md` §2 item 7), declared as one Protocol
+beside `ContainerState`, in `src/egzos/_types.py` like the other three:
 
 ```
-# ASState — clients (§5; registration is an owner act and writes client.register)
-put_client(registration)                  -> None    # add and amend
-get_client(client_id)                     -> ClientRegistration | None
-remove_client(client_id)                  -> bool    # internal
-# codes (§2)
-put_code(record)                          -> None
-consume_code(code_hash)                   -> AuthorizationCodeRecord | None
-# device authorizations (§3, §11.8)
-put_device(record)                        -> None    # insert-only
-poll_device(device_code_hash, at)         -> DeviceAuthorizationRecord | None
-get_device_by_user_code(user_code_hash)   -> DeviceAuthorizationRecord | None
-decide_device(device_code_hash, grant)    -> bool    # internal; grant None = denied
-consume_device(device_code_hash)          -> DeviceAuthorizationRecord | None
-# refresh chains (§9.2)
-put_refresh(record)                       -> None
-redeem_refresh(refresh_hash)              -> RefreshRecord | None
-family_of_token(token_id)                 -> str | None
-revoke_family(family_id)                  -> list[str]   # internal
-# decided requests (§11.4)
-put_decided(record)                       -> None
-get_decided(request_key)                  -> DecidedRequestRecord | None
-claim_resubmission(session_hash, request_key) -> bool    # internal
-
-# ASGateState — interactive sessions (§10.1)
-put_session(record)                       -> None
-get_session(session_hash)                 -> SessionRecord | None
-touch_session(session_hash, at)           -> bool    # internal
-end_session(session_hash)                 -> bool    # internal
-# throttle counters (§11.0, §12)
-throttle_incr(surface, bucket_key, window_key)  -> int
-throttle_count(surface, bucket_key, window_key) -> int
+# ThrottleState — counters (rest.md §2 item 7); keys are the door's, opaque to the store
+throttle_incr(surface, bucket_key, window_key) -> int    # increments and returns the new count, atomically
+throttle_count(surface, bucket_key, window_key) -> int   # reads without incrementing; 0 for an unseen key
 ```
 
-**Never delegated.** Both Protocols are `ContainerState`-class by F3's own reason: this is state that,
-edited around Trust, forges presence (a session), un-decides an authorization (a decided-request
-record), lifts §12's only bound on the chain (a throttle counter) or widens the redirect allowlist (a
-client entry). No method here is offered to an `ItemStore` backend. Operating the substrate is still
-not delegating it ([0.3 · 5], §1).
+No rate and no window length live here: `_types.py`'s `AS_THROTTLE_RATES` and
+`AS_THROTTLE_WINDOW_SECONDS` carry them, and the door reads them. A network identifier may key a
+bucket and never enters the chain.
 
-**Credential values are stored as hashes, never the value.** The authorization code, the
-`device_code`, the refresh-token value and the session identifier each reach the store only as the
-lowercase hex sha256 of the whole value, as `auth.py` already does for `Token.secret_hash`. Each
-carries §9.1's entropy floor, so an unkeyed hash of it is not reversible.
-
-The `user_code` is the exception. It has 20⁸ ≈ 2³⁴·⁶ values (§11.8, [0.3 · 20]), so an unkeyed
-sha256 of it can be inverted by enumeration from a store leak, a backup or a replica. The `/device`
-throttle bounds only online guessing. So **`user_code_hash` is the lowercase hex HMAC-SHA256 of the
-normalized `user_code` under a container-held key** (the *device-code key*), never a bare sha256. A
-store read alone then yields no live `user_code`. The key MUST NOT be held in the store beside the
-hashes it keys, since a key that leaks with the store protects nothing. TODO(a1p) #143 / #165 item 4: how the device-code key is provisioned at `init`,
-where it is held and how it rotates is not decided here. It joins the login secret (#143) and the
-grant key (#165 item 4) in the same batch. Rotating it orphans every pending device authorization,
-which expires within §3's lifetime anyway.
-
-**No method takes a credential value.** Every key parameter that names one is a `*_hash`, and no
-record carries a field that holds one. A backend cannot store a code or a refresh token in the clear,
-because it is never handed one.
-
-**Single use is the store's, atomically.** Each of these is one indivisible step against concurrent
-callers on the same key — of two concurrent calls, exactly one observes the state before the change:
-
-1. `consume_code` returns the record and invalidates it in the same step; every later call returns
-   `None`. It does **not** judge expiry or the §2 bindings — Trust re-checks `client_id`,
-   `redirect_uri`, `code_challenge` and `expires_at` on what it returns — so the code is spent on the
-   first redemption attempt, successful or not (§2).
-2. `consume_device` is the same step for a decided device authorization at the token endpoint. It
-   returns `None` while the authorization is still pending, so a poll before the decision spends
-   nothing. `decide_device` moves a record from pending exactly once and returns `False` if it was
-   not pending (§3 mitigation 3: one approval, one request).
-   **The record is never rewritten whole.** `put_device` is insert-only: a put on a
-   `device_code_hash` that already exists changes nothing. After the insert, the record changes only
-   through three atomic methods, and each touches only its own fields. `poll_device` sets
-   `last_polled_at` to `at`. `decide_device` sets `decision` and `grant`. `consume_device` spends the
-   record. `poll_device` is the poll's read, and it returns the record **as it stood before the
-   call**, so Trust compares the prior `last_polled_at` with `at` for §3 mitigation 1's
-   `slow_down`. A poll can therefore never write back a stale `pending` copy over a concurrent
-   `decide_device`, so one authorization cannot be decided twice.
-   **The request is stored at insert, so `/device` can show it.** `put_device` writes two fields
-   that no later method touches. `requested` holds the `capabilities` and `scopes` that §7 expanded
-   from the device client's `scope` at the device authorization endpoint. That is what §3 mitigation 2's
-   screen renders, and §3 mitigation 3 lets an approval grant only that. `decide_device`'s `grant`
-   carries the same capabilities and scopes, adding only the principal (§10.3) and the clamped expiry
-   (§11.5), per §11.2 consequence 1. An unparseable `scope` is refused at the endpoint (§11.2
-   consequence 2), so no record holds one. `requester_hint` is §11.8's client-supplied device or
-   host name, **unverified**. It is truncated to `AS_REQUESTER_HINT_MAX_CHARS` (64, **a1p**, draft)
-   before the insert and never refused for its length, since a refusal would branch on it. It is no
-   lookup key, enters no `request_key`, and no record or event field that reads as verified ever
-   carries it.
-3. `redeem_refresh` marks the record redeemed and returns it **as it stood before the call**. A
-   returned record with a non-null `redeemed_at` is reuse, and Trust then calls `revoke_family`
-   (§9.2 rotation clause 2). The store detects nothing; it reports the prior state truthfully.
-4. `revoke_family` revokes every refresh record in the family **and** every `Token` those records
-   name, in one step on one substrate, and returns the revoked `Token.id`s to its internal caller for
-   `token.revoke` ([0.3 · 30]). A family half-revoked by a crash is the failure rotation exists to
-   prevent. This couples the two Protocols: **the `ASState` implementer MUST be the `ContainerState`
-   implementer, on one substrate**. No backend may split them, because `revoke_family` writes
-   `ContainerState`'s `Token` records. Whether revoking one access token by `Token.id` revokes its
-   family is not decided here; `family_of_token` only makes the family id available to the entry.
-5. `claim_resubmission` returns `True` exactly once per `(session_hash, request_key)` that
-   `put_decided` recorded, and `False` otherwise — §11.0 substep 1's "first re-submission on the
-   deciding session". `get_decided` is the request-keyed read after the counter (§11.4).
-6. `throttle_incr` increments and returns the new count. It names no rate and no window length:
-   those are Trust's (`authorization-server.md` §11.0, #141). `window_key` is an opaque value Trust
-   derives, and so is `bucket_key` — the constant container-global bucket, a digest of the transport
-   source address (§11.0, [0.3 · 24]), or, on the `rest` surface only, the `Token.id` a verified
-   descriptor names (`rest.md` §2 item 7). Trust prefixes each `bucket_key` with its kind
-   (global, source, token), so no `Token.id` can share a counter with the container-global
-   constant or a source digest; the store compares keys as opaque values. **a1p** (a6 on #184).
-   A network identifier reaches the store only as Trust chooses to key it and never enters the
-   chain.
-
-**Silence-not-errors (§5) applies unchanged, to the plain getters and to what reaches an external
-caller.** The plain getters (`get_client`, `get_device_by_user_code`, `get_decided`, `get_session`,
-`family_of_token`) return `None` for absent, expired, spent and revoked alike. The consumers do not
-judge, so they return more than that, and all of it stays inside Trust. `consume_code` returns the
-record without judging its expiry or its §2 bindings (rule 1). `redeem_refresh` and `poll_device`
-return the record as it stood before the call (rules 2 and 3), so a non-null `redeemed_at` stays
-visible and reuse stays detectable. An implementation that collapses an already-redeemed refresh
-record to `None` silences §9.2's reuse detection, and that is a finding. What Trust then sends an
-external caller is §5's single shape for absent, expired, spent and revoked. Every `bool` and
-`revoke_family`'s list are internal to this boundary as well, and MUST NOT be reflected to an
-external caller. `get_client` is §11.1's one keyed read, and
-there is **no client listing method** (§11.1, §7.1). TODO(a1p): an owner's `client ls` at the CLI is
-not in any contract; if a3-doorman needs one, it is a `contract-change`, not a method added here.
-
-**Client registrations live here, not in `ContainerConfig`. a1p**, answering #173 question 4.
-`authorization-server.md` §5's "container config" is read as the container's own owner-written state,
-not the `ContainerConfig` object: a registry loaded from a config file would let an allowlist change
-land without `client.register`, which [0.3 · 31] makes an audit event. `ContainerConfig` gains no
-`clients` key.
-
-**Record shapes** (`AuthorizationCodeRecord`, `DeviceAuthorizationRecord`, `RefreshRecord`,
-`DecidedRequestRecord`, `SessionRecord`, the `ASGrant` they carry and the `DeviceRequest` a device
-record carries) are typed in `_types.py`, each
-field cited there to the clause that requires it. They are **a1p**'s, drafted from those clauses; a
-field a3-trust finds missing is an escalation on #173's thread, not a field added in a builder's PR.
-
-**Implementations.** The sqlite implementation of `ASState` and of `ASGateState` is in
-`backends/sqlite.py`, on the file that holds `ContainerState` (the partition, below). The sqlite
-implementation is a3-store's (§6) and moves to Vault at Phase 5 with the rest of the backends.
-a3-trust consumes the Protocols and adds no table itself. **a1p**, answering #173 question 5.
-
-**The partition: all of the authorization server's state is `ContainerState`-class. decided**
-(the Chief on #173, option (A), 2026-10-09). Under F3 it is durable and never delegated to a
-pluggable backend: client registrations, codes, device authorizations, refresh chains,
-decided-request records, interactive sessions and throttle counters alike. **`ASGateState` is
-implemented on the same substrate as `ASState`**, the sqlite backend, and never in process memory.
-The backend that implements `ContainerState` implements both Protocols.
-
-- **A restart lifts nothing.** A throttle that holds still holds after a restart, its window's
-  release entry still appends (§12.1 rule 5), and a container served by more than one process keeps
-  one counter, not one per process. A live session survives a restart; the owner signs out by
-  ending it, not by restarting.
-- **The costs, accepted with the decision:** a store write on every throttled request and on every
-  page view that extends a session (`touch_session`), on the same sqlite file as the chain; and the
-  transport-address digests that key the per-source buckets, and the session hashes, persisted on
-  disk. Neither is a credential value (the hash rule above), and neither enters the chain.
-
-TODO(a1p), #173: **no bulk sweep on `ASGateState`.** `end_session` and the throttle counters are per
-key. Nothing ends every session, or clears every throttle bucket, tied to one principal or one client
-in a single step, as `revoke_family` does for a refresh chain, so a principal or client found
-compromised has no sweep on this half of the state. With the partition decided, a restart is no
-longer a crude sweep either. Whether a sweep primitive is needed, and its shape, is for a later
-contract batch; it is not added here.
+**The partition: `ContainerState`-class. decided** (the Chief on #173, option (A), 2026-10-09). The
+counters are durable and never delegated: the backend that implements `ContainerState` implements
+`ThrottleState`, on the same substrate, never in process memory. A throttle that holds still holds
+after a restart, its window's release entry still appends, and a container served by more than one
+process keeps one counter, not one per process. The sqlite implementation is in
+`backends/sqlite.py` and is a3-store's (§6). The cost, accepted with the decision: a store write on
+every throttled request, and the transport-address digests that key the per-source buckets
+persisted on disk.
 
 ## 4 · `BlobStore` — content-addressed, staged
 
@@ -467,8 +309,8 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-§3.1's `ASState` and `ASGateState` are a draft binding on #173, not part of the 0.3 freeze; their
-partition is decided there (option (A), both on the `ContainerState` substrate).
+§3.1's `ThrottleState` is contract v1.1, not part of the 0.3 freeze; its partition is decided on
+#173 (option (A), on the `ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases

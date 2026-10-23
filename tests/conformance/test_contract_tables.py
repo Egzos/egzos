@@ -19,7 +19,7 @@ is renamed is worse than no check, because the green tick keeps being reported. 
 tests at the bottom hold that property by feeding the helpers a broken document.
 
 Covered: `container.md` §8 (F6), `events.md` §1–§2 (F8), `context-item.md` §1–§5 (F13),
-`authorization-server.md` §11.1, §12, §12.1 (F25), `storage.md` §1–§4.
+`authorization-server.md` §12, §12.1 (F25), `storage.md` §1–§4.
 """
 
 from __future__ import annotations
@@ -423,48 +423,7 @@ def test_trust_statuses_and_their_additional_fields() -> None:
     assert set(t.Trust.__annotations__) - additional == {"status"}
 
 
-# --- authorization-server.md §11.1 and §12 · the AS vocabularies (F25) -------------------------
-def test_client_registry_read_fields_match_the_pinned_set() -> None:
-    where = "authorization-server.md §11.1"
-    body = section(doc("authorization-server.md"), "11.1", where=where)
-    documented = frozenset(brace_list(body, where=where, anchor="read one client entry"))
-    assert documented == t.AS_CLIENT_REGISTRY_READ_FIELDS, f"{where}: vs the pinned read set"
-    assert documented == frozenset(t.ClientRegistration.__annotations__), f"{where}: vs the entry"
-
-
-def test_client_type_to_consent_kind_mapping() -> None:
-    """§11.1's table against `CONSENT_KIND_FROM_CLIENT_TYPE` — F25's mapping, once prose-only.
-
-    Two of the three rows are identities, which is why the mapping needed a name: a reader who
-    checks the easy rows renders the third from the literal and emits a copy key that does not
-    exist. The copy key is checked against the rendered word, not against a spelling written here.
-    """
-    where = "authorization-server.md §11.1"
-    body = section(doc("authorization-server.md"), "11.1", where=where)
-    rows = table(body, columns=("client_type", "rendered kind"), where=where)
-
-    documented, copy_keys = {}, {}
-    for row in rows:
-        client_type = one_code(row[0], where=where)
-        rendered = codes(row[1])
-        assert len(rendered) == 2, f"{where}: row {row} is not `kind` · `copy key`"
-        documented[client_type] = rendered[0]
-        copy_keys[client_type] = rendered[1]
-
-    assert set(documented) == set(t.AS_CLIENT_TYPES), f"{where}: the table's left column drifted"
-    assert set(documented.values()) == set(t.CONSENT_KINDS), f"{where}: the rendered words drifted"
-    assert documented == t.CONSENT_KIND_FROM_CLIENT_TYPE, f"{where}: vs the pinned mapping"
-    namespaces = set()
-    for client_type, key in copy_keys.items():
-        namespace, _, leaf = key.rpartition(".")
-        assert leaf == documented[client_type], (
-            f"{where}: `{client_type}` renders as `{documented[client_type]}` but its copy key is "
-            f"`{key}` — the key must name the rendered word, not the AS literal"
-        )
-        namespaces.add(namespace)
-    assert len(namespaces) == 1, f"{where}: the copy keys span several namespaces: {namespaces}"
-
-
+# --- authorization-server.md §12 · the vocabularies events.md still cites (F25) -------------
 def test_pre_authorization_cause_vocabularies_match_the_as_tuples() -> None:
     """§12's table against the four `AS_*_CAUSES` tuples.
 

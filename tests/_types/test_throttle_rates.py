@@ -75,3 +75,16 @@ def test_no_rate_is_a_config_key():
         # Whole words only: `generate_*` or `moderate_*` is not a rate.
         words = set(re.split(r"[^a-z0-9]+", name.lower()))
         assert not words & {"throttle", "throttles", "rate", "rates"}, name
+
+
+def test_the_door_state_is_the_two_throttle_counters():
+    """storage.md §3.1: the retired AS's `ASState` and `ASGateState` leave only the counters the
+    REST door runs on (identity.md §9, rest.md §2 item 7)."""
+    import inspect
+
+    methods = {
+        n for n, _ in inspect.getmembers(t.ThrottleState, inspect.isfunction) if n[0] != "_"
+    }
+    assert methods == {"throttle_incr", "throttle_count"}
+    assert t.DOOR_STATE_CONTRACTS == ("ThrottleState",)
+    assert not hasattr(t, "ASState") and not hasattr(t, "ASGateState")

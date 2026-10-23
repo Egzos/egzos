@@ -1,79 +1,32 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The AS's own issued values (authorization-server.md §9.1, §11.8).
-
-Authorization codes, `device_code`s, refresh tokens and interactive session identifiers (§10.1)
-carry 256 bits from the platform CSPRNG (`secrets`), twice §9.1's 128-bit floor, and nothing
-derived from a counter, a clock, a client id or an owner. The `user_code` is the one exception,
-bounded by the attempt limit and expiry rather than by entropy ([0.3 · 20]): 8 characters of
-RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX`, matched case-insensitively with the hyphen
-ignored.
-
-Access tokens are not minted here. A token the AS issues IS a `Token` (§7, `capabilities.md` §5),
-so its bearer value is `egz_<id>_<256 bits>` from `egzos.auth`, the same path as `token mint`,
-and is resolved by `token_id_of` like any other; a second format would be a second token kind.
+The two value helpers the container's own credentials share: `digest`, the one hash behind
+`Token.secret_hash`, and `same`, the one constant-time comparison. They outlived the retired
+authorization server (`identity.md` §9), whose issued values and user codes went with it.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
-import secrets
-
-from egzos._types import AS_USER_CODE_ALPHABET, AS_USER_CODE_LENGTH
-
-#: Bytes of CSPRNG output behind every `new_value()`. §9.1's floor is 16.
-VALUE_BYTES = 32
-
-
-def new_value() -> str:
-    """An opaque, unguessable value for an authorization code, a `device_code`, a refresh token
-    or an interactive session (§10.1; a session is not a `Token`).
-
-    Never an access token's bearer value: that is `egzos.auth`'s, through the `Token` mint."""
-    return secrets.token_urlsafe(VALUE_BYTES)
 
 
 def digest(value: str) -> str:
-    """What the store keys a `new_value()` on: the lowercase hex sha256 of the whole value
-    (storage.md §3.1). It is also the one hash behind `Token.secret_hash`: `auth.py` imports it
-    rather than keeping a copy, so the two lookups cannot drift apart. Never for a `user_code`,
-    which is low-entropy and keyed by HMAC instead."""
+    """The lowercase hex sha256 of the whole value: the one hash behind `Token.secret_hash`.
+    `auth.py` imports it rather than keeping a copy, so no second lookup can drift from it."""
     # `surrogatepass`: a lone surrogate from a JSON body hashes like any other string, never raises
     return hashlib.sha256(value.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def same(given: object, stored: object) -> bool:
-    """Constant-time equality for the AS's stored strings: a `client_id`, a digest, a hash.
+    """Constant-time equality for stored strings: a digest, the tap's path value.
     Anything but two `str`s is unequal. `hmac.compare_digest` raises on a non-ASCII `str` and
     `encode` on a lone surrogate, and a raise would be a second answer shape beside the refusal,
-    so both sides compare as bytes. The one helper every comparison in `authz` goes through."""
+    so both sides compare as bytes. The one helper every such comparison goes through."""
     if not isinstance(given, str) or not isinstance(stored, str):
         return False
     return hmac.compare_digest(
         given.encode("utf-8", "surrogatepass"), stored.encode("utf-8", "surrogatepass")
     )
 
-
-def new_user_code() -> str:
-    """A fresh `user_code`, in its canonical (undisplayed) form: 8 characters, no hyphen."""
-    return "".join(secrets.choice(AS_USER_CODE_ALPHABET) for _ in range(AS_USER_CODE_LENGTH))
-
-
-def display_user_code(code: str) -> str:
-    half = AS_USER_CODE_LENGTH // 2
-    return f"{code[:half]}-{code[half:]}"
-
-
-def normalize_user_code(typed: str | None) -> str | None:
-    """What a human typed, as a canonical `user_code`, or None when it cannot be one (row (b)
-    cause `malformed`). Case and hyphens are ignored, and nothing else is: a space, a digit or a
-    vowel is not silently dropped into a different code."""
-    # ASCII first: `"ſ".upper()` is `"S"`, and a code is not reachable through case folding.
-    if not isinstance(typed, str) or not typed.isascii() or len(typed) > 4 * AS_USER_CODE_LENGTH:
-        return None
-    code = typed.replace("-", "").upper()
-    if len(code) != AS_USER_CODE_LENGTH or any(c not in AS_USER_CODE_ALPHABET for c in code):
-        return None
-    return code

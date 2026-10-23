@@ -446,97 +446,29 @@ CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
 }
 
 
-# --- the authorization server (spec/contracts/authorization-server.md) ----------------------
+# --- what the retired authorization server left (authorization-server.md, identity.md §9) -------
 #
-# The one contract with NO running shape: the skeleton mints the owner token at `init` and has no
-# login, device-code or consent screen. Prose-derived — core mechanics from #67 (Part A, with #73
-# and #78), the consent, login and device-code half from #61 (Part B), both covered as of this
-# module.
-
-ASClientType = Literal["browser", "cli", "mcp"]
-#: The entire client vocabulary in v1.0 (§1). All three are public and hold no secret — there is no
-#: confidential type, which is why no registration below carries a `client_secret`.
-AS_CLIENT_TYPES: tuple[ASClientType, ...] = get_args(ASClientType)
-
-ConsentKind = Literal["browser", "device", "mcp"]
-#: The kind words the consent page renders (`spec/design/consent.md` §14 item 1, R4's client block,
-#: the `kind.*` copy keys). Three words, and they are NOT `AS_CLIENT_TYPES`.
-CONSENT_KINDS: tuple[ConsentKind, ...] = get_args(ConsentKind)
-
-#: `ASClientType` -> the kind word rendered beside the client name (authorization-server.md §11.1).
-#: The AS literal and the rendered word differ for exactly ONE type: `cli` renders as `device`,
-#: because the design names that client by its flow (device-code) rather than by its category,
-#: while this document's type predates Part B. A page renders the copy key `kind.device`, never
-#: `kind.cli`, which does not exist.
-#:
-#: Named here for the same reason as `CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY`: the mapping was
-#: prose-only (#10 F25), and a mapping that lives only in prose is one each surface re-derives. The
-#: AS-internal literal does not change; only its display name does, at the one place a display name
-#: is rendered.
-CONSENT_KIND_FROM_CLIENT_TYPE: dict[ASClientType, ConsentKind] = {
-    "browser": "browser",
-    "cli": "device",
-    "mcp": "mcp",
-}
-
-
-class ClientRegistration(TypedDict):
-    """A client entry in container config (§5); registration is an owner act.
-
-    `redirect_uris` compare by EXACT STRING match — no prefixes, no wildcards, at any position —
-    with one bounded relaxation: for a literal loopback host (`127.0.0.1`, `[::1]`) the port is
-    ignored. A `localhost` host is refused at registration in any case spelling, with or without a
-    port ([0.3 · 22], §5.2); a dev client registers `http://127.0.0.1/...` or `http://[::1]/...`.
-
-    `registered_at` is §11.1's addition to §5's four: the consent screen renders it, and §5 named no
-    timestamp. It is the seventh `*_at: str` timestamp in this module, and the first naming a
-    *registration* rather than a mint, an update, or an expiry — deliberately not spelled
-    `created_at`: `created_at` is generic across every other TypedDict here, but
-    `Token.created_at` (a mint) and this registration's timestamp (an owner act at §5, not a
-    mint) are two different events that can appear on the same consent screen at once (§11.1's
-    client entry beside §11.3's existing-tokens read), and one screen showing two `created_at`
-    values for two different things would be the confusion the domain word avoids. `client_name`
-    is owner-supplied DATA — the AS never verifies it and nothing in the AS may branch on it; a
-    name that imitates the product is a registration the owner made, and the page's defence is
-    showing the origin and the kind beside it.
-    """
-
-    client_id: str
-    client_name: str
-    client_type: ASClientType
-    redirect_uris: list[str]
-    registered_at: str
-
-
-#: §11.1 — what the consent screen may read about a client: ONE entry, keyed by the request's
-#: `client_id`. There is no listing endpoint, page or parameter, and an unregistered `client_id`
-#: produces §5.3's uniform failure and no read at all — §7's enumeration rule, at the registry.
-#:
-#: Written out rather than derived from `ClientRegistration`. Deriving it would make the pin a
-#: tautology: a field added to the registration would reach the consent screen the moment this
-#: module imported, with no test failing. Written, a new registration field has to be added HERE
-#: too — a deliberate act, against a §11.1 clause — before any page may read it.
-AS_CLIENT_REGISTRY_READ_FIELDS: frozenset[str] = frozenset(
-    {"client_id", "client_name", "client_type", "redirect_uris", "registered_at"}
-)
+# The AS is retired and its code removed (identity.md §9). What stays is what a living contract
+# still names: the throttle vocabulary and rates the REST door runs on (rest.md §2 item 7), and the
+# closed cause and decision vocabularies `events.md` §1 cites for its `authz.*` rows. The AS-only
+# shapes (client registrations, metadata, codes, sessions, user codes, lifetimes) went with it.
 
 #: §12.1 rule 5 — the closed `surface` vocabulary a throttle-release entry carries, and (§12.2)
 #: a1p's reading of what `actor` carries on every pre-authorization append, as a `Literal` alias
-#: read back with `get_args`, matching the pattern `Capability`/`CAPABILITIES`,
-#: `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES` already use above: a typo at a
-#: call site that writes `details.surface` is a type error, not a string `str` would accept
-#: silently. `tap` is the step-up tap's page, throttled unconditionally by `consent.md`'s D-C6
-#: rather than by this contract; if §10.5's `[LEAN]` is not taken the tap rides a channel of its
-#: own instead of these AS endpoints, but the word is still used there — D-C6's release entry is
-#: `consent.md` §14.8 (e), the same event this vocabulary pins, and the tap spec §14.5 binds to it
-#: by citing the decision rather than restating it in an entry of its own — never unused, only
-#: ridden elsewhere. `revoke` is §11.9's page (decided at §9.2), the fifth word
-#: ([0.3 · 11]). `rest` is the REST door's, the sixth: one surface covering the sweep at its 401 and
-#: descriptor redemption (rest.md §2, the Chief on #165 item 3). The caller's network identifier
-#: is NEVER the actor ([0.3 · 34]): a network identifier may key a throttle bucket (§11.0,
-#: [0.3 · 24]) and never enters the chain.
-#: The event NAMES these entries append under are `Event`'s `authz.*` members (§12, [0.3 · 33]),
-#: and `rest.tally` for the REST door's per-window tally.
+#: read back with `get_args`, matching the pattern `Capability`/`CAPABILITIES` and
+#: `Principal`/`PRINCIPALS` already use above: a typo at a call site that writes `details.surface`
+#: is a type error, not a string `str` would accept silently. `tap` is the step-up tap's page,
+#: throttled unconditionally by `consent.md`'s D-C6 rather than by this contract; if §10.5's
+#: `[LEAN]` is not taken the tap rides a channel of its own instead of these AS endpoints, but the
+#: word is still used there — D-C6's release entry is `consent.md` §14.8 (e), the same event this
+#: vocabulary pins, and the tap spec §14.5 binds to it by citing the decision rather than restating
+#: it in an entry of its own — never unused, only ridden elsewhere. `revoke` is §11.9's page
+#: (decided at §9.2), the fifth word ([0.3 · 11]). `rest` is the REST door's, the sixth: one surface
+#: covering the sweep at its 401 and descriptor redemption (rest.md §2, the Chief on #165 item 3).
+#: The caller's network identifier is NEVER the actor ([0.3 · 34]): a network identifier may key a
+#: throttle bucket (§11.0, [0.3 · 24]) and never enters the chain. The event NAMES these entries
+#: append under are `Event`'s `authz.*` members (§12, [0.3 · 33]), and `rest.tally` for the REST
+#: door's per-window tally.
 ThrottleSurface = Literal["login", "device", "authorize", "tap", "revoke", "rest"]
 AS_THROTTLE_SURFACES: tuple[ThrottleSurface, ...] = get_args(ThrottleSurface)
 
@@ -569,14 +501,14 @@ AS_THROTTLE_RATES: Mapping[ThrottleSurface, ThrottleRate] = MappingProxyType(
 
 #: §12's table, rows (a), (b), (d) and (f) — the closed `details.cause` vocabulary each pre-token
 #: effect appends under, as `Literal` aliases read back with `get_args`, matching the pattern
-#: `Capability`/`CAPABILITIES`, `Principal`/`PRINCIPALS` and `ASClientType`/`AS_CLIENT_TYPES`
-#: already use above: a typo at a call site that writes `details.cause` is a type error, not a
-#: string `str` would accept silently. Row (d)'s `token_presented` is this Part's own addition over
-#: `consent.md` §14.8 (d)'s six — named as the addition it is at row (d) itself, not silently
-#: absorbed into the tuple. Row (f)'s two, not three: `expiry` is not a cause here, because §11.5
-#: clamps an over-long expiry rather than ever rejecting it for that reason alone (row (f)'s own
-#: paragraph). These four are closed; the event *names* these causes travel under are §12's
-#: ([0.3 · 33]): `authz.login`, `authz.redeem`, `authz.refuse` and `authz.reject` in `Event`.
+#: `Capability`/`CAPABILITIES` and `Principal`/`PRINCIPALS` already use above: a typo at a call site
+#: that writes `details.cause` is a type error, not a string `str` would accept silently. Row (d)'s
+#: `token_presented` is this Part's own addition over `consent.md` §14.8 (d)'s six — named as the
+#: addition it is at row (d) itself, not silently absorbed into the tuple. Row (f)'s two, not three:
+#: `expiry` is not a cause here, because §11.5 clamps an over-long expiry rather than ever rejecting
+#: it for that reason alone (row (f)'s own paragraph). These four are closed; the event *names*
+#: these causes travel under are §12's ([0.3 · 33]): `authz.login`, `authz.redeem`, `authz.refuse`
+#: and `authz.reject` in `Event`.
 LoginCause = Literal["wrong", "unknown", "throttled"]
 AS_LOGIN_CAUSES: tuple[LoginCause, ...] = get_args(LoginCause)
 
@@ -616,115 +548,6 @@ AS_GRANT_DECISIONS: tuple[GrantDecision, ...] = get_args(GrantDecision)
 #: allowlist AFTER the change, empty on `remove`.
 ClientRegisterOp = Literal["add", "amend", "remove"]
 AS_CLIENT_REGISTER_OPS: tuple[ClientRegisterOp, ...] = get_args(ClientRegisterOp)
-
-#: §11.6 — a standard error redirect from `/authorize` carries exactly these two keys and nothing
-#: else. `error_description` and `error_uri` are MUST NOT, with any value, under any cause — removed
-#: rather than constrained, because a uniform constant description would satisfy §7's convergence
-#: while leaving a field every implementation eventually fills with the cause it already computed.
-#: Written out, not derived, the same reason `AS_CLIENT_REGISTRY_READ_FIELDS` is: a field added here
-#: reaches the redirect the moment this module imports, with no test failing, unless a new member is
-#: a deliberate act against this set.
-AS_AUTHORIZE_ERROR_REDIRECT_FIELDS: frozenset[str] = frozenset({"error", "state"})
-
-#: The two names §11.6 forbids outright — never emitted, not even empty or constant — so a test can
-#: assert their absence as directly as it asserts the two permitted keys' presence.
-AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS: frozenset[str] = frozenset(
-    {"error_description", "error_uri"}
-)
-
-
-class DeviceAuthorization(TypedDict):
-    """RFC 8628's device-authorization response (§3) — CLI and headless only; browsers are retired.
-
-    `verification_uri_complete` is NOT issued ([0.3 · 21]) — the key is absent from the response
-    entirely, not optional and not null, and `/device` ignores a `user_code` query parameter. The
-    typing step IS the mitigation: a code in a URL is a code a user can be asked to forward.
-    """
-
-    device_code: str
-    user_code: str
-    verification_uri: str
-    expires_in: int
-    interval: int
-
-
-#: RFC 8414's location, at the container's own origin, unauthenticated (§6).
-AS_METADATA_ENDPOINT: str = "/.well-known/oauth-authorization-server"
-
-#: The metadata document IS the interoperability surface: a container MUST NOT advertise what it
-#: does not implement, or implement what it does not advertise. This is the whole field vocabulary
-#: of TEN, and every row is unconditional: omitting one is non-conforming, and advertising a field
-#: that is not here is too. `registration_endpoint` is ABSENT, not present-and-null — [0.3 · 10]
-#: decided there is no open dynamic client registration, and RFC 8414 omits an unsupported optional
-#: field rather than nulling it. `revocation_endpoint` is here unconditionally — [0.3 · 11] decided
-#: the RFC 7009 endpoint exists. The predecessor `AS_METADATA_CONDITIONAL_FIELDS` is gone with them:
-#: an empty constant is a place for a later field to be quietly added.
-AS_METADATA_FIELDS: tuple[str, ...] = (
-    "issuer",
-    "authorization_endpoint",
-    "token_endpoint",
-    "device_authorization_endpoint",
-    "revocation_endpoint",
-    "response_types_supported",
-    "grant_types_supported",
-    "code_challenge_methods_supported",
-    "token_endpoint_auth_methods_supported",
-    "scopes_supported",
-)
-
-#: §2 — an authorization code expires 60 seconds after issuance ([0.3 · 16]). A contract value, not
-#: a default: there is no config key that raises it and a deployment may not add one.
-AS_CODE_LIFETIME_SECONDS: int = 60
-
-#: §9.3 — an AS-issued access token ALWAYS carries a non-null `expires_at`, 1 hour by default
-#: ([0.3 · 17]). `capabilities.md` §5's `expires_at: null` stays reachable through `token mint`
-#: ONLY, where the owner chooses it deliberately; no AS path, parameter or config key yields a
-#: non-expiring token.
-AS_ACCESS_TOKEN_LIFETIME_SECONDS: int = 3600
-
-#: §11.5 — grant expiry: 30 d default, 90 d max; longer is CLAMPED, never refused ([0.3 · 18]).
-AS_GRANT_LIFETIME_DEFAULT_SECONDS: int = 30 * 24 * 3600
-AS_GRANT_LIFETIME_MAX_SECONDS: int = 90 * 24 * 3600
-
-#: §10.2 — the interactive session ends at 30 min idle or 8 h absolute ([0.3 · 13]).
-AS_SESSION_IDLE_SECONDS: int = 30 * 60
-AS_SESSION_ABSOLUTE_SECONDS: int = 8 * 3600
-
-#: §11.8 — a `user_code` is 8 of RFC 8628 §6.1's 20 consonants, shown `XXXX-XXXX` ([0.3 · 20]).
-AS_USER_CODE_ALPHABET: str = "BCDFGHJKLMNPQRSTVWXZ"
-AS_USER_CODE_LENGTH: int = 8
-
-#: §11.7 — `continue` is at most 2048 bytes, still percent-encoded, as received ([0.3 · 25]).
-AS_CONTINUE_MAX_BYTES: int = 2048
-
-#: §7 — the grant is six capabilities and node ids, NOTHING else. An OAuth `scope` value is a
-#: space-delimited set drawn from exactly two forms: a bare name from `CAPABILITIES`, or
-#: `node:<node-id>`, which is how a `Token.scopes` entry is SPELLED in a `scope` value and not the
-#: entry itself — the AS strips the prefix, so `node:*` requests the whole container and lands on
-#: the token as `capabilities.md` §5's `["*"]`, the owner's grant (authorization-server.md §7,
-#: consequence 3).
-#: There is no third form, and no constant here for one. Role bundle NAMES are not scope strings: a
-#: bundle is expanded at mint time and the token carries capabilities, so a bundle in a grant would
-#: be a second vocabulary that can drift. The two vocabularies collide on exactly one word — `admin`
-#: is a capability AND the all-six bundle — and in a `scope` value it is always the capability.
-#: Pinned in `tests/_types/test_as_shapes.py`, including the collision being that one word only.
-AS_SCOPE_NODE_PREFIX: str = "node:"
-AS_SCOPE_ALL_NODES: str = "node:*"
-
-#: Closed values (§2, §6). `code` is the only response type, ever; `plain` is never advertised and
-#: MUST be rejected; every client is public, so `none` is the only auth method. `scopes_supported`
-#: is absent from this map because its value is container-independent but not literal: it is the six
-#: capability names, i.e. `CAPABILITIES`, and the `node:` form is NOT advertised ([0.3 · 28]).
-AS_METADATA_CLOSED_VALUES: dict[str, tuple[str, ...]] = {
-    "response_types_supported": ("code",),
-    "grant_types_supported": (
-        "authorization_code",
-        "refresh_token",
-        "urn:ietf:params:oauth:grant-type:device_code",
-    ),
-    "code_challenge_methods_supported": ("S256",),
-    "token_endpoint_auth_methods_supported": ("none",),
-}
 
 
 # --- the storage boundary (spec/contracts/storage.md) ---------------------------------------
@@ -827,206 +650,45 @@ class BlobStore(Protocol):
 STORAGE_CONTRACTS: tuple[str, ...] = ("ItemStore", "ContainerState", "BlobStore")
 
 
-# --- the authorization server's state (storage.md §3.1) — DRAFT binding (a1p), #173 ----------
+# --- the door's throttle state (storage.md §3.1) --------------------------------------------
 #
-# Not frozen. Two Protocols beside `ContainerState`, which is untouched. Both are durable container
-# state on the `ContainerState` substrate, never process memory: the Chief on #173, option (A),
-# 2026-10-09, `ASGateState` (sessions, throttle counters) included. No method takes a credential
-# value: every credential key is the lowercase hex sha256 of the whole value (`auth.py`'s
-# `_hash`), except `user_code_hash`, which is a keyed HMAC-SHA256 because the `user_code` is
-# low-entropy. No record carries the value itself.
+# The retired authorization server's `ASState` and `ASGateState` are gone (identity.md §9). Their
+# throttle counters stay, because the REST door runs on them (rest.md §2 item 7): durable container
+# state on the `ContainerState` substrate, never process memory (the Chief on #173, option (A)).
 
 
-class ASGrant(TypedDict):
-    """What a decided authorization will mint (§7: six capabilities and node ids, nothing else)."""
+class ThrottleState(Protocol):
+    """The door's throttle counters (rest.md §2 item 7). No rate and no window length here: those
+    are `AS_THROTTLE_RATES` and `AS_THROTTLE_WINDOW_SECONDS`, read by the door; the three keys are
+    opaque to the store."""
 
-    capabilities: list[Capability]
-    scopes: list[str]
-    principal: TokenPrincipal  # §10.3: `interactive` only where presence was composed
-    grant_expires_at: str  # §11.5: after the clamp
-
-
-class AuthorizationCodeRecord(TypedDict):
-    """§2: single-use, 60 s, bound to client, redirect and challenge, and the initiating session."""
-
-    code_hash: str
-    client_id: str
-    redirect_uri: str
-    code_challenge: str  # S256 only (§2); the method is not stored because there is one
-    session_hash: str
-    grant: ASGrant
-    expires_at: str  # issued + `AS_CODE_LIFETIME_SECONDS`
-
-
-DeviceDecision = Literal["pending", "granted", "denied"]
-
-#: §11.8 — the requester hint is bounded. Trust truncates a longer one before `put_device` and never
-#: refuses for it: refusing would branch on the hint. Draft (a1p, storage.md §3.1), not frozen.
-AS_REQUESTER_HINT_MAX_CHARS: int = 64
-
-
-class DeviceRequest(TypedDict):
-    """§3 mitigations 2–3: what the device client asked for, as §7 expands its `scope`. An
-    unparseable `scope` is refused at the endpoint (§11.2 consequence 2), so it never lands here.
-    Principal (§10.3) and the clamped expiry (§11.5) are Trust's at `/device`, not requested."""
-
-    capabilities: list[Capability]
-    scopes: list[str]
-
-
-class DeviceAuthorizationRecord(TypedDict):
-    """§3 / §11.8: the pending authorization, bound to its `device_code` (mitigation 3)."""
-
-    device_code_hash: str
-    user_code_hash: str  # HMAC-SHA256 under the device-code key, not a bare sha256 (§3.1)
-    client_id: str
-    requested: DeviceRequest  # written by `put_device` only; what `/device` renders (mitigation 2)
-    requester_hint: str | None  # UNVERIFIED client-supplied text (§11.8); `put_device` only
-    decision: DeviceDecision
-    grant: ASGrant | None  # set by `decide_device`; None while pending or when denied
-    expires_at: str
-    last_polled_at: str | None  # §3 mitigation 1's `slow_down`; written only by `poll_device`
-
-
-class RefreshRecord(TypedDict):
-    """§9.2: one link of a rotating chain. Kept after redemption, so reuse is detectable."""
-
-    refresh_hash: str
-    family_id: str  # `token.revoke` carries it ([0.3 · 30])
-    client_id: str
-    access_token_id: str  # the `Token.id` minted beside it; `revoke_family` revokes it too
-    grant: ASGrant  # rotation does not widen a grant (§9.2 clause 3)
-    redeemed_at: str | None
-    revoked: bool
-
-
-class DecidedRequestRecord(TypedDict):
-    """§11.4: a request reaches a decision once. `request_key` is Trust's digest of the request's
-    `(client_id, redirect_uri, state, code_challenge)`; opaque to the store."""
-
-    request_key: str
-    session_hash: str  # the deciding session (§11.0 substep 1)
-    decision: GrantDecision
-    decided_at: str
-    resubmission_seen: bool
-
-
-class SessionRecord(TypedDict):
-    """§10.1: not a `Token`, not a bearer credential, never in `token ls`. Ends at
-    `AS_SESSION_IDLE_SECONDS` idle or `AS_SESSION_ABSOLUTE_SECONDS` absolute — judged by Trust."""
-
-    session_hash: str
-    created_at: str
-    last_seen_at: str
-
-
-class ASState(Protocol):
-    """The AS's durable state (storage.md §3.1). `ContainerState`-class: never delegated (F3).
-
-    The plain getters return `None` for absent, expired, spent and revoked alike. The consumers do
-    not judge: `consume_code` ignores expiry, and `redeem_refresh` and `poll_device` return the
-    record as it stood before the call, so reuse stays detectable. All of it, every `bool` and
-    `revoke_family`'s list stay inside Trust (storage.md §5). No client listing. The implementer
-    MUST be the `ContainerState` implementer: `revoke_family` revokes its `Token`s.
-    """
-
-    # clients (§5) — the registry, not a `ContainerConfig` key
-    def put_client(self, registration: ClientRegistration) -> None: ...
-    def get_client(self, client_id: str) -> ClientRegistration | None: ...
-    def remove_client(self, client_id: str) -> bool: ...
-
-    # codes (§2) — consume is the only read, and spends the code whatever Trust then decides
-    def put_code(self, record: AuthorizationCodeRecord) -> None: ...
-    def consume_code(self, code_hash: str) -> AuthorizationCodeRecord | None: ...
-
-    # device authorizations (§3, §11.8)
-    def put_device(self, record: DeviceAuthorizationRecord) -> None: ...
-    #: ^ insert-only: a put on an existing `device_code_hash` changes nothing
-    def poll_device(self, device_code_hash: str, at: str) -> DeviceAuthorizationRecord | None: ...
-    #: ^ sets `last_polled_at` alone, atomically; returns the record as it stood before the call
-    def get_device_by_user_code(self, user_code_hash: str) -> DeviceAuthorizationRecord | None: ...
-    def decide_device(self, device_code_hash: str, grant: ASGrant | None) -> bool: ...
-    #: ^ pending -> granted/denied exactly once; False if it was not pending. Trust builds `grant`
-    #:   from the record's `requested`, capabilities and scopes unchanged (§11.2 consequence 1)
-    def consume_device(self, device_code_hash: str) -> DeviceAuthorizationRecord | None: ...
-    #: ^ None while pending: a poll before the decision spends nothing
-
-    # refresh chains (§9.2)
-    def put_refresh(self, record: RefreshRecord) -> None: ...
-    def redeem_refresh(self, refresh_hash: str) -> RefreshRecord | None: ...
-    #: ^ returns the record AS IT STOOD before the call; a non-null `redeemed_at` is reuse
-    def family_of_token(self, token_id: str) -> str | None: ...
-    def revoke_family(self, family_id: str) -> list[str]: ...
-    #: ^ every refresh record AND every `Token` they name, in one step; returns the `Token.id`s
-
-    # decided requests (§11.4)
-    def put_decided(self, record: DecidedRequestRecord) -> None: ...
-    def get_decided(self, request_key: str) -> DecidedRequestRecord | None: ...
-    def claim_resubmission(self, session_hash: str, request_key: str) -> bool: ...
-    #: ^ True exactly once per recorded (session, request): §11.0 substep 1
-
-
-class ASGateState(Protocol):
-    """What gates a request before evaluation (§11.0): sessions and throttle counters.
-
-    Container state on the same substrate as `ASState`, never process memory, so a restart lifts
-    no throttle and ends no session: the Chief on #173, option (A) (storage.md §3.1).
-    """
-
-    # interactive sessions (§10.1)
-    def put_session(self, record: SessionRecord) -> None: ...
-    def get_session(self, session_hash: str) -> SessionRecord | None: ...
-    def touch_session(self, session_hash: str, at: str) -> bool: ...
-    def end_session(self, session_hash: str) -> bool: ...
-
-    # throttle counters (§11.0, §12) — no rate, no window length (Trust's, #141); keys are Trust's
     def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
+    #: ^ increments and returns the new count, atomically
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
 
 
-#: storage.md §3.1, draft. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
-AS_STATE_CONTRACTS: tuple[str, ...] = ("ASState", "ASGateState")
+#: storage.md §3.1. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+DOOR_STATE_CONTRACTS: tuple[str, ...] = ("ThrottleState",)
 
 
 __all__ = [
-    "AS_ACCESS_TOKEN_LIFETIME_SECONDS",
-    "AS_AUTHORIZE_ERROR_REDIRECT_FIELDS",
-    "AS_AUTHORIZE_ERROR_REDIRECT_FORBIDDEN_FIELDS",
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
     "AS_CLIENT_REGISTER_OPS",
-    "AS_CLIENT_REGISTRY_READ_FIELDS",
-    "AS_CLIENT_TYPES",
-    "AS_CODE_LIFETIME_SECONDS",
-    "AS_CONTINUE_MAX_BYTES",
     "AS_DEVICE_REDEMPTION_CAUSES",
     "AS_GRANT_DECISIONS",
-    "AS_GRANT_LIFETIME_DEFAULT_SECONDS",
-    "AS_GRANT_LIFETIME_MAX_SECONDS",
     "AS_LOGIN_CAUSES",
-    "AS_METADATA_CLOSED_VALUES",
-    "AS_METADATA_ENDPOINT",
-    "AS_METADATA_FIELDS",
-    "AS_REQUESTER_HINT_MAX_CHARS",
     "AS_REVOKE_REFUSAL_CAUSES",
-    "AS_SCOPE_ALL_NODES",
-    "AS_SCOPE_NODE_PREFIX",
-    "AS_SESSION_ABSOLUTE_SECONDS",
-    "AS_SESSION_IDLE_SECONDS",
-    "AS_STATE_CONTRACTS",
     "AS_THROTTLE_RATES",
     "AS_THROTTLE_SURFACES",
     "AS_THROTTLE_WINDOW_SECONDS",
-    "AS_USER_CODE_ALPHABET",
-    "AS_USER_CODE_LENGTH",
     "BLOB_GRANT_LIFETIME_SECONDS",
     "CAPABILITIES",
-    "CONSENT_KINDS",
-    "CONSENT_KIND_FROM_CLIENT_TYPE",
     "CONTAINER_CONFIG_DEFAULTS",
     "CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY",
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
+    "DOOR_STATE_CONTRACTS",
     "EVENTS",
     "GENESIS_HASH",
     "HUMAN_ONLY_ACTS",
@@ -1044,32 +706,20 @@ __all__ = [
     "TOKEN_PRINCIPALS",
     "TRUST_STATUSES",
     "VERIFIED_ONLY_KINDS",
-    "ASClientType",
-    "ASGateState",
-    "ASGrant",
-    "ASState",
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
-    "AuthorizationCodeRecord",
     "AuthorizePosttrustCause",
     "AuthorizePretrustCause",
     "BlobGrant",
     "BlobStore",
     "Capability",
     "ClientRegisterOp",
-    "ClientRegistration",
-    "ConsentKind",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
     "ContextItem",
-    "DecidedRequestRecord",
-    "DeviceAuthorization",
-    "DeviceAuthorizationRecord",
-    "DeviceDecision",
     "DeviceRedemptionCause",
-    "DeviceRequest",
     "Event",
     "GrantDecision",
     "ItemStore",
@@ -1082,16 +732,15 @@ __all__ = [
     "Proposal",
     "ProposalStatus",
     "Provenance",
-    "RefreshRecord",
     "ResolvedItem",
     "RevokeRefusalCause",
     "Role",
     "RootType",
     "ServingPolicy",
-    "SessionRecord",
     "StructureFloor",
     "TextContent",
     "ThrottleRate",
+    "ThrottleState",
     "ThrottleSurface",
     "Token",
     "TokenPrincipal",

@@ -256,7 +256,10 @@ are `storage.md`'s, in the contract version that carries §V. **a1p.**
 - **`authorization-server.md` is retired** (§S): its endpoints, pages, device-code flow, client registry,
   throttle and state no longer bind a builder. The document stays as the record of what was frozen at 0.3.
   Its code (`src/egzos/authz/**`, never mounted) and its tables (`storage.md` §3.1's `ASState`,
-  `ASGateState`) are removed in the PR that lands §3. No deployment holds a token it issued.
+  `ASGateState`) are removed, ahead of the PR that lands §3, but for three things a living surface
+  still runs on: the MVP tap (`authz/presence.py`) and its two value helpers (`authz/values.py`),
+  which go when §5's confirm lands, and the throttle counters the door runs on (`rest.md` §2 item 7),
+  now `storage.md` §3.1's `ThrottleState`. No deployment holds a token it issued.
 - **Double login is retired** (§T). One sign-in at egzos.io covers every container, through a token
   bound to each (§3a); no container accepts a bare provider session.
 - **Not fixed here:** the REST routes and their shapes, copy, upload and the agent reads (`rest.md`
