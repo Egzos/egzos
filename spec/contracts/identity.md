@@ -1,9 +1,9 @@
 # Contract · identity — the container as a resource server
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
-Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U) into the
-contract set, and **retires `authorization-server.md`** (§9). One login takes effect with this merge:
-`CLAUDE.md`'s transition clause in `Egzos/egzos-platform` points here.
+Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB
+and §AD) into the contract set, and **retires `authorization-server.md`** (§9). One login takes effect
+with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform` points here.
 
 **Derivation.** No running shape yet: the walking skeleton accepts only its own `Token` (the CLI,
 stdio MCP, the lifeboat). Every clause is derived from the v0.7 decisions and from Supabase Auth's
@@ -148,11 +148,20 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   (the CLI), and it registers the container's client (§3a) and writes the owner's grant for the `sub`
   the owner signs in as. **a1p.**
 - **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
-  revoked; the owner `Token` from `init` stays the way back in. **a1p.**
-- **Every other grant and registration is an admin's act**, under `admin`, from an interactive
-  principal, **and it requires the confirm** (§5): a grant or a registration widens who can see
-  everything it covers, so it is gated like a move that widens an audience (§U), never a silent write.
-  A role bundle is expanded at grant time, as it is at mint (`capabilities.md` §2). **a1p.**
+  revoked; the owner `Token` from `init` stays the way back in. **a1p.** `TODO(chief)`, #283, before
+  egzos provisions a container for anyone: how the owner of such a container, who never ran `init`,
+  holds that `Token`, the recovery factor (§AD; Revocation below), for instance shown once at
+  provisioning, as GitHub shows recovery codes.
+- **Every other user grant is an admin's act**, under `admin`, from an interactive principal, **and
+  it requires the confirm** (§5): a grant widens who can see everything it covers, so it is gated like
+  a move that widens an audience (§U), never a silent write. A role bundle is expanded at grant time,
+  as it is at mint (`capabilities.md` §2). **a1p.**
+- **Every agent registration is the act of the person it serves.** Anyone holding a user grant
+  registers agents that serve themselves, an admin the same way, from an interactive principal and
+  with the confirm (§5). A registration never exceeds its registrant's grant: its capabilities and
+  scopes lie within it, and the intersection below still applies at check time. It needs no `publish`
+  (`capabilities.md` §1): the agent holds no more than its person. Nobody registers an agent to serve
+  someone else. **decided** (§AB); its route is `rest.md` §4.3.
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
   server, the consent page egzos.io hosts — a security surface, whose anti-phishing shape (telling the
   requesting client's real identity and scopes apart from a deceptively named registrant) is A2's to
@@ -165,9 +174,8 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
 - **An agent registration serves the one user who approved it.** It carries that user's `sub`, and a
   token naming the registration's `client_id` with any other `sub` is refused at check 7: another user
-  who authorizes the same agent at the provider gets nothing until a registration serving them exists.
-  **a1p** (a1r on #282). In v1.1 a registration serves the admin who approves it (`rest.md` §4.3);
-  an agent serving another granted person is later work.
+  who authorizes the same agent at the provider gets nothing until they register it for themselves
+  (above). **a1p** (a1r on #282).
 - **What a request may do.** For a session: the user grant's capabilities and scopes. For an agent: the
   registration's, **intersected** with the user grant's — an agent never holds more than the user it acts
   for. Coverage is computed down the path at check time, as for a `Token` (`capabilities.md` §5).
@@ -175,13 +183,21 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
 - **Audience** (`capabilities.md` §5) is every live `Token`, user grant and agent registration whose
   coverage reaches a container. The gate computes its delta over all three. **a1p.**
 - **Revocation** is an admin revoking a grant or a registration here, or the person a registration
-  serves revoking it (narrowing is never gated), effective on the next request (check 7 runs every
-  time); the last grant holding `admin` over `["*"]` is never revoked. Signing the user out at the
-  provider ends their tokens at `exp`.
+  serves revoking it (**decided** for a registration, §AB), effective on the next request (check 7
+  runs every time); the last grant holding `admin` over `["*"]` is never revoked. Revoking a grant
+  revokes, in the same step, every registration serving its `sub`, each with its own `identity.revoke`,
+  so a later grant to that `sub` starts with no agents. **a1p.** **Narrowing your own access is never
+  gated**: an admin revoking their own grant, or a person revoking a registration that serves them.
+  **At the REST door, ending a grant or a registration that serves someone else requires the
+  confirm** (§5), as granting it does (`rest.md` §4.3). **a1p** (GHSA-c3gg-hwx9-473g). **The owner
+  `Token` is the recovery factor** (§AD): on the CLI and the lifeboat it revokes without the confirm,
+  as it removes a credential, audited as every revoke is, and never at the REST door. **a1p.**
+  Signing the user out at the provider ends their tokens at `exp`.
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
   `outcome`, `capabilities` and `scopes`; a refusal (`outcome: refused`, `reason: last_admin`,
   `rest.md` §4.3) carries no `capabilities` or `scopes`, since nothing changed hands. They enter
-  `events.md` §1 with the code that appends them. **a1p.**
+  `events.md` §1 with the code that appends them. For a registration, `details.for` names the person
+  it serves (`user:<sub>`). **a1p.**
 
 ## 5 · The confirm — the presence backstop
 
@@ -190,8 +206,12 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
 
 - **When.** Every human-only act (`gate.confirm`, `approve.pending`, `yes.consume`); every move or copy
   whose audience delta is non-empty: the person is shown, inline, who will newly see the item, and
-  confirms (**decided**, §U, §V); and every user grant and agent registration (§4), which widen an
-  audience the same way (**a1p**, a1r's finding 2 on #282).
+  confirms (**decided**, §U, §V); every user grant and agent registration (§4), which widen an
+  audience the same way (**a1p**, a1r's finding 2 on #282; **decided** for a registration, §AB); and,
+  at the REST door, ending a grant or a registration that serves someone else (§4), which removes a
+  person's access as surely as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g). On a grant, a
+  registration or a gated revoke, the button also needs a fresh sign-in, as a first credential does
+  (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public
@@ -208,8 +228,7 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
     only there. A person with a credential on one origin and none on another is refused the button
     on that other origin and cannot assert there either; they enrol there through recovery (`rest.md`
     §4.3), or confirm on the origin that holds their credential. Taken on purpose: the alternative is
-    a button the thief of a session on the second origin could press. **#290, for the Chief to
-    ratify by its merge** (a1r on #290).
+    a button the thief of a session on the second origin could press. **decided** (§AD; a1r on #290).
 - **The button is refused to `principal: client`**, from either credential, always: an agent's token
   cannot confirm on the human's behalf. **decided** (§U, as amended on #281). That is all the refusal
   achieves. Software that drives a person's own browser session holds an `interactive` token
@@ -217,6 +236,16 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   backstop**, and an owner who wants it everywhere sets `confirm.allow_button` to `false`. **a1p.**
 - **The owner may require the stronger proof**: `confirm.allow_button` (§2) at `false` accepts only
   `biometric`. **a1p.**
+- **The credentials behind `biometric` follow GitHub's sudo model**, more strictly. A person's first
+  credential is enrolled under a fresh sign-in (the provider token's `amr` within 300 seconds), with
+  the button as the act (where buttons are off, only from the owner's own surfaces, `rest.md` §4.3).
+  Every further add, and every removal by the person themselves, takes a biometric from one of their
+  own existing credentials, never the button, whatever `confirm.allow_button` says: the provider
+  sign-in may be only an email link, and the authenticator is the stronger factor. In recovery, an
+  admin removes another person's credentials with the admin's own biometric, never the button, and
+  the owner `Token` (the CLI or the lifeboat, egzos's analogue of GitHub's recovery codes) removes
+  any. Every add and remove is audited, and credentials are listed with `created_at` and `last_used`.
+  **decided** (§AD); `rest.md` §4.3 binds it.
 - **The window** is `step_up.window_seconds`, per ring pair and manifest shape, unchanged. **carried**
   (`container.md` §8, R11).
 - **The record.** The existing `step_up` event carries `details.proof`: `biometric` or `button`. The

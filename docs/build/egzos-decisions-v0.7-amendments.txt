@@ -266,6 +266,102 @@ AA. AMENDMENT — EVERY TOKEN IS BOUND TO ONE CONTAINER (amends §S's mapping
 
 
 ================================================================================
+AB. AMENDMENT — AGENTS: EACH PERSON REGISTERS THEIR OWN (amends §S's agent
+    registry; replaces contract v1.1's rule that only an admin registers an
+    agent, to serve that admin)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
+          questions; recorded by the operator, enacted by this PR's merge;
+          the Chief may veto by reverting. Why, in the operator's words: an
+          agent acts for one person, on that person's grant, so that person
+          is the one who consents to it; the admin-only rule left every
+          other granted person without an agent of their own.
+
+[DECIDED] ANYONE HOLDING A USER GRANT REGISTERS AGENTS THAT SERVE
+          THEMSELVES, from an interactive principal, with the confirm (§U),
+          never beyond their own grant: a registration's capabilities and
+          scopes lie within the registrant's grant, and at check time the
+          agent still holds only what both cover. So registration needs no
+          publish: the agent holds no more than its person. An admin
+          registers for themselves the same way. Nobody registers an agent
+          to serve someone else. Contract: identity.md §4, rest.md §4.3.
+
+[DECIDED] REVOCATION is by the person a registration serves, or an admin.
+          User grants are outside this decision and stay an admin's act
+          (contract v1.1). Contract: identity.md §4, rest.md §4.3.
+
+
+================================================================================
+AC. AMENDMENT — UPLOADS NEVER WRITTEN AS ITEMS ARE KEPT AND SHOWN (applies
+    §Z to uploads)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
+          questions; recorded by the operator, enacted by this PR's merge;
+          the Chief may veto by reverting. Why: §Z, nothing is deleted
+          automatically, holds for bytes that arrived but never became an
+          item, as it does for staged bytes past retention.
+
+[DECIDED] AN UPLOAD NEVER WRITTEN AS AN ITEM IS KEPT AND SHOWN to whoever
+          uploaded it, to keep or delete: listed to its opener, an agent's
+          to the person the agent serves (§AB), and to an admin, and
+          removed only by an explicit discard, never on a timer.
+          Contract: rest.md §4.4.
+
+[DECIDED] A PER-PERSON CAP ON STAGED BYTES. Under §AB a person's agents
+          count toward that person's cap, never a cap of their own.
+          Contract: rest.md §4.4.
+
+
+================================================================================
+AD. AMENDMENT — CONFIRM CREDENTIALS FOLLOW GITHUB'S SUDO MODEL (amends §U:
+    how the credential behind the biometric confirm is added and removed)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-10-23, answering the operator's
+          questions with "how does GitHub handle this dilemma? follow
+          that"; the rules below are the operator's reading of GitHub's
+          model; recorded by the operator, enacted by this PR's merge; the
+          Chief may veto by reverting. Why: GitHub gates a change to an
+          account's sign-in factors behind a recent re-authentication
+          (sudo mode), lists and records every change, and recovers a lost
+          factor through a stronger path (recovery codes). egzos is
+          stricter in one place: the provider sign-in may be only an email
+          link, so once a person has an authenticator, it is the stronger
+          factor.
+
+[DECIDED] THE FIRST CREDENTIAL is enrolled under a fresh sign-in, as
+          GitHub's sudo mode asks (the provider token's most recent
+          authentication, its amr, within the contract's 300 seconds), with
+          the button as the act. Contract: identity.md §5, rest.md §4.3.
+
+[DECIDED] EVERY FURTHER ADD, AND EVERY REMOVAL BY THE PERSON THEMSELVES,
+          NEEDS A BIOMETRIC from one of that person's own existing
+          credentials, never the button. Contract: identity.md §5,
+          rest.md §4.3.
+
+[DECIDED] RECOVERY: an admin removes another person's credentials with the
+          admin's own biometric, never the button; the owner Token (the CLI
+          or the lifeboat, egzos's analogue of GitHub's recovery codes)
+          removes any. The person then enrols again as a first credential.
+          Contract: rest.md §4.3.
+
+[DECIDED] EVERY ADD AND REMOVE IS AUDITED, and a person's credentials are
+          listed with created_at and last_used. Contract: rest.md §4.3.
+
+[DECIDED] NO BUTTON ONCE A PERSON HAS A CREDENTIAL, on any origin: every
+          confirm of theirs then needs it. Kept by the Chief on 2026-10-23
+          in choosing how #285's two drafts were combined ("no plain button
+          once someone has Face ID set up"). A credential belongs to the
+          origin it was made on, as a security key registered with GitHub
+          works only there, so a person with a credential on one origin is
+          refused the button on another; they enrol there through
+          recovery, or confirm on the origin that holds their credential.
+          Contract: identity.md §5, rest.md §4.2.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -275,7 +371,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   3. egzos-decisions-v0.6-amendments.txt
   4. egzos-decisions-v0.7-amendments.txt — THIS: buy-don't-build, Supabase,
      one login, the confirm, places and sync, the experience, Stripe,
-     visibility, retention
+     visibility, retention, token binding, own agents, kept uploads,
+     confirm credentials
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 

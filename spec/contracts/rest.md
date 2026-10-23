@@ -408,8 +408,9 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
 3. **The second leg** carries `"confirm": {"challenge": <id>, "proof": "biometric", "assertion":
    <WebAuthn assertion>}`, or `"proof": "button"` with no assertion where `confirm.allow_button` is
    `true` **and the person has no registered credential** — once they have one, the button is refused
-   for them (`identity.md` §5). The container then, as **one atomic step** — of two concurrent requests
-   presenting one challenge, at most one proceeds past it, as §6's grant spend:
+   for them (`identity.md` §5) — and, on §4.3's acts on grants and registrations, a fresh sign-in
+   (§4.3). The container then, as **one atomic step** — of two concurrent requests presenting one
+   challenge, at most one proceeds past it, as §6's grant spend:
    - finds the challenge live, unspent and **bound to this request**: the same principal (the
      `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
      and the same audience delta, recomputed now;
@@ -424,10 +425,10 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    foreign or mismatched challenge, a failed assertion, a button where buttons are off, and a delta
    that changed since the challenge append `step_up` with `outcome: refused`, `details.proof` as
    presented and `details.reason` (`stale`, `spent`, `foreign`, `mismatch`, `assertion`, `button_off`,
-   `delta_changed`), as `events.md` §1 requires of every concluded presence check. The answer to the
-   caller is the same whatever the reason: `{"result": "confirm", …}` with a fresh challenge (and the
-   new `newly`, where the delta changed). The ledger says which case it was; the response does not
-   (`capabilities.md` §6 clause 3).
+   `delta_changed`, and §4.3's `not_fresh`), as `events.md` §1 requires of every concluded presence
+   check. The answer to the caller is the same whatever the reason: `{"result": "confirm", …}` with a
+   fresh challenge (and the new `newly`, where the delta changed). The ledger says which case it was;
+   the response does not (`capabilities.md` §6 clause 3).
 5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.** A proof
    that concludes spends its challenge whether it is confirmed or refused, as §6's grant is spent at
    check 4 whatever the later checks decide (a6 on #284); a refused attempt always gets a fresh one.
@@ -441,20 +442,22 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
 
 ### 4.3 · Grants, agents and confirm credentials
 
-The routes behind `identity.md` §4–§5. **a1p**, every clause, binding those records onto HTTP. Every
-route here needs an **`interactive` principal**: a `client` principal gets §3's refusal on all of them,
-reads included, because who else holds access is credential metadata an agent is never served. Every
-list is viewer-scoped and complete (§4). Every read appends `context.fetch` with `items: []` and
-`details.read` naming what was read.
+The routes behind `identity.md` §4–§5. **a1p**, every clause that cites no decision, binding those
+records onto HTTP. Every route here needs an **`interactive` principal**: a `client` principal gets
+§3's refusal on all of them, reads included, because who else holds access is credential metadata an
+agent is never served. Every list is viewer-scoped and complete (§4). Every read appends
+`context.fetch` with `items: []` and `details.read` naming what was read. The `/v1/grants` and
+`/v1/agents` routes need a person holding a provider token: a container `Token` names no `sub`, so it
+gets §3's refusal there, and its holder acts on grants from the CLI or the lifeboat (`identity.md` §4).
 
 | method · path | does | needs | `200` body | events |
 |---|---|---|---|---|
 | `GET /v1/grants` | the user grants | `admin` over `["*"]` | `{"grants": [<grant>]}` | `context.fetch` (`read: grants`) |
 | `POST /v1/grants` | grant a provider user access, with the confirm (§4.2) | `admin` over `["*"]` | `confirm`, then `{"grant": <grant>}` | first leg; `step_up`, `identity.grant` |
-| `DELETE /v1/grants/{sub}` | revoke a user grant | `admin` over `["*"]` | `{"result": "revoked"}` | `identity.revoke` |
+| `DELETE /v1/grants/{sub}` | revoke a user grant and every registration serving that `sub`; another person's with the confirm (below) | `admin` over `["*"]` | `{"result": "revoked"}`; another person's: `confirm` first | `identity.revoke`, and one per registration it ends (`kind: agent`); another person's: first leg; `step_up`, then each `identity.revoke` |
 | `GET /v1/agents` | registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
-| `POST /v1/agents` | register an agent, from the consent page's flow, with the confirm | `admin` over `["*"]` | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
-| `DELETE /v1/agents/{client_id}?sub=` | revoke one registration | the person it serves, or an admin | `{"result": "revoked"}` | `identity.revoke` |
+| `POST /v1/agents` | register an agent to serve the caller, from the consent page's flow, with the confirm | any grant; the registration within it | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
+| `DELETE /v1/agents/{client_id}?sub=` | revoke one registration; one serving someone else with the confirm (below) | the person it serves, or an admin | `{"result": "revoked"}`; someone else's: `confirm` first | `identity.revoke`; someone else's: first leg; `step_up`, `identity.revoke` |
 | `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | as revoke | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
 | `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
 | `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
@@ -471,8 +474,15 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   "confirm"?}`. `POST /v1/agents`: `{"authorization_id", "client_id", "name", "role"? |
   "capabilities"?, "scopes", "confirm"?}`; the registration serves the caller; `name` is at most 128
   characters, untrusted display data. A role bundle expands at grant time (`capabilities.md` §2). No
-  grant or registration exceeds the granter's own grant: wider capabilities or scopes are §3's refusal.
-- **Who registers an agent.** Only an admin, and the registration serves that admin (`identity.md` §4).
+  grant or registration exceeds the caller's own grant: wider capabilities or scopes are §3's refusal.
+- **Who registers an agent: each person, their own.** Anyone holding a user grant registers agents
+  that serve themselves, an admin the same way, with the confirm and never beyond their own grant
+  (above), and needs no `publish`; `identity.md` §4's intersection still applies at check time. Nobody
+  registers an agent to serve someone else. The person it serves, or an admin, revokes it. **decided**
+  (v0.7 §AB). A person holds at most 16 live registrations: a 17th answers `429` with
+  `{"error":"too_many_agents"}` and §3's headers before any leg, a fact about the caller's own, so the
+  audience the gate computes over registrations (`identity.md` §4) stays bounded. A `client_id` equal
+  to `identity.client_id` is §3's refusal: it names a person here, never an agent. **a1p.**
 - **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
   §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
   instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
@@ -480,11 +490,11 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   person whose container token makes the call, is for the body's `client_id`, and asks for no scopes
   beyond the body's; and it refuses a `client_id` registered on another container (`identity.md`
   §3a). **a1p** (a1r and a6 on #285).
-- **What the container holds to is the admin's confirm.** The first leg answers `newly: []` and, in
+- **What the container holds to is the registrant's confirm.** The first leg answers `newly: []` and, in
   its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
   the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
   (design-gap Egzos/egzos-platform#117). The first leg's `context.fetch` carries the same
-  `details.registers` (the `name` as escaped display data), so a first leg the admin walks away from
+  `details.registers` (the `name` as escaped display data), so a first leg the person walks away from
   still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
   as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. **a1p** (a6
   and a1r on #285).
@@ -498,6 +508,24 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
   **today**. An omitted line leaves no marker and no count, so the log cannot tell a reader what exists
   outside their sight, or whether a probed target existed.
+- **Ending someone else's access takes the confirm; narrowing your own does not.** Granting and
+  registering are gated (§4.2), so ending a grant or a registration that serves another person is
+  gated the same way: `DELETE /v1/grants/{sub}` for a `sub` other than the caller's own, and an
+  admin's `DELETE /v1/agents/{client_id}?sub=` for a registration serving someone else, answer §4.2's
+  first leg and revoke nothing until its second leg confirms. The first leg answers `newly: []` and,
+  in `"revokes"` (and its `context.fetch`'s `details.revokes`), the grant or registration it ends and
+  every registration a grant takes with it; its challenge is bound to the `sub`, or to the pair
+  `(client_id, sub)`, so a second leg naming another is `mismatch`. `last_admin` (below) is the
+  route's own check: it answers before any leg (§4.2 item 1) and is checked again inside the second
+  leg's atomic step. An admin revoking their own grant, or a person revoking a registration that
+  serves them, narrows only their own access: it is never gated, answers `{"result": "revoked"}` at
+  once, and appends only its `identity.revoke`s. **a1p** (GHSA-c3gg-hwx9-473g).
+- **On `POST /v1/grants`, `POST /v1/agents` and a gated revoke, the button also needs a fresh
+  sign-in**, as a first credential does (below): the provider token's `amr` within the last 300
+  seconds; a stale one concludes `step_up` refused `not_fresh` (§4.2 item 4). **What stays open, on
+  the record:** for a person with no credential, where buttons are on, these acts rest on a fresh
+  sign-in and the button; a credential of their own, or `confirm.allow_button` at `false`, closes it.
+  **a1p** (GHSA-c3gg-hwx9-473g).
 - **Revoking the last admin grant, or re-granting it narrower,** answers `409` with
   `{"error":"last_admin"}` and §3's headers, to the admin who asked — a fact about their own
   container — and appends `identity.revoke` (a revoke) or `identity.grant` (a narrowing re-grant)
@@ -514,29 +542,37 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   first leg answered after a refusal included; a first leg for a person with no credential appends
   nothing. The second leg carries `{"challenge", "attestation", "confirm"?}`; user verification is
   required. Every proof presented is concluded as §4.2's are, so the button's first enrolment leaves
-  its `step_up` too. **#290, for the Chief to ratify by its merge** (a1r on #290).
+  its `step_up` too. **decided** (v0.7 §AD: the button is the first enrolment's act, and every add is
+  audited; a1r on #290); **a1p**, the legs' shapes.
   - **A person with a credential adds another only with a biometric proof from an existing one** in
     `confirm`. The button is refused on this route whatever `confirm.allow_button` says, so a stolen
-    session cannot add the thief's authenticator.
+    session cannot add the thief's authenticator, and a fresh sign-in does not stand in for the proof:
+    the provider sign-in may be only an email link, and the authenticator is the stronger factor.
+    **decided** (v0.7 §AD).
   - **Removing a credential needs a biometric proof too, never the button** — the person's own, from
     any of their credentials, or, for an admin's recovery of another person, the admin's own (an admin
     with none registers one first). A stolen session can therefore neither remove a person's
     credentials to fall back to the button, nor clear them to enrol a first one of its own.
+    **decided** (v0.7 §AD).
   - **The first credential** needs, in `confirm`, the button **and a fresh sign-in**: the provider
     token's most recent authentication (its `amr` timestamp) within the last 300 seconds. A token
-    lifted from a session that signed in earlier cannot enrol one. Where `confirm.allow_button` is
-    `false`, the first credential is enrolled only from the owner's own surfaces (the lifeboat or the
-    CLI, holding the owner `Token`), which enrol the owner's own authenticator: **while buttons are
-    off, a person other than the owner who has no credential cannot enrol one, and so cannot perform
-    a confirm-gated act.** That is the cost of the stronger setting, taken on purpose: an owner turns
-    buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285). **This
-    door is never the owner's own surface**, and a container `Token` carries no sign-in to be fresh:
-    over REST, only a provider sign-in enrols a first credential. **#290, for the Chief to ratify
-    by its merge** (a1r on #290).
+    lifted from a session that signed in earlier cannot enrol one. **decided** (v0.7 §AD). Where
+    `confirm.allow_button` is `false`, the first credential is enrolled only from the owner's own
+    surfaces (the lifeboat or the CLI, holding the owner `Token`), which enrol the owner's own
+    authenticator: **while buttons are off, a person other than the owner who has no credential
+    cannot enrol one, and so cannot perform a confirm-gated act.** That is the cost of the stronger
+    setting, taken on purpose: an owner turns buttons off after the people who need the confirm have
+    enrolled. **a1p** (a1r on #285). **This door is never the owner's own surface**, and a container
+    `Token` carries no sign-in to be fresh: over REST, only a provider sign-in enrols a first
+    credential. **decided** (v0.7 §AD; a1r on #290).
   - **What stays open, on the record:** whoever holds a fresh session of a person who has no
-    credential yet can enrol the first one. **Recovery:** an admin removes a person's credentials
-    (`DELETE /v1/credentials/{id}?sub=`, with the admin's own confirm), and the owner can remove any
-    from the CLI or the lifeboat with the owner `Token`; the person then enrols again.
+    credential yet can enrol the first one. Where that person is an admin, the residual reaches every
+    person, since an admin's credential confirms recovery over theirs; `confirm.allow_button` at
+    `false` closes it, keeping a first enrolment to the owner's surfaces. **Recovery:** an admin
+    removes another person's credentials (`DELETE /v1/credentials/{id}?sub=`) with the admin's own
+    biometric proof, never the button, and the owner removes any from the CLI or the lifeboat with the
+    owner `Token`, egzos's analogue of GitHub's recovery codes; the person then enrols again.
+    **decided** (v0.7 §AD).
   - **Every second leg that concludes is audited**: `step_up` first where a `confirm` proof was
     presented (as §4.2 item 4, refused ones included), then `identity.credential`. An add carries
     `details.op: add` and `outcome: added`, or `refused` with `details.reason` (`attestation`, `stale`,
@@ -546,7 +582,8 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
     is a fresh `confirm`. **Every removal appends it, on every surface**: the owner's removal from the
     CLI or the lifeboat with the owner `Token` appends `identity.credential` (`op: remove`, `actor` the
     owner) too, since a removal reopens the button for that person. A `sub` the admin does not cover is
-    §3's refusal before any leg, and follows §4's rule for a refusal.
+    §3's refusal before any leg, and follows §4's rule for a refusal. **decided** (v0.7 §AD), the
+    audit of every add and remove; **a1p**, its details.
 - **New events**: `identity.grant` and `identity.revoke` (`details.kind`: `user` or `agent`), as
   `identity.md` §4 names them, and `identity.credential` (`details.op`: `add` or `remove`; never key
   material). They enter `events.md` §1 with their code (§5).
@@ -564,12 +601,14 @@ storage (v0.7 §S).
    surface escapes; `size` above the container's upload limit is `400`. The limit is a new key,
    `blobs.upload_max_bytes` (default 104857600, 100 MiB; an `admin` may change it), which enters
    `container.md` §8 and `_types.py` with the code that reads it, as `identity.md` §2's keys do. A
-   principal holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
-   item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it);
-   a 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a fact about the
-   caller's own uploads. So what a principal holds staged, and nobody has decided on, is bounded at 16
-   times `blobs.upload_max_bytes`, and a person's decision is what frees a slot (v0.7 §Z: asked about,
-   never purged). **a1p** (a6 on #285). A successful open appends nothing: no bytes have moved. A
+   person holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
+   item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it),
+   counting the uploads of every agent serving them (`identity.md` §4); a container `Token` counts as
+   a person of its own. A 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a
+   fact about what the caller's own person holds. So what a person holds staged, and nobody has
+   decided on, is capped at 16 times `blobs.upload_max_bytes`, and a person's decision is what frees a
+   slot (v0.7 §Z: asked about, never purged). **decided**, the per-person cap on staged bytes (v0.7
+   §AC); **a1p**, the 16 (a6 on #285). A successful open appends nothing: no bytes have moved. A
    refused open — a `scope` the token cannot write to — follows §4's rule and appends `context.fetch`
    with `items: []`.
 2. **Bytes.** `PUT /v1/uploads/{id}` with the raw bytes. The id is bound to the principal that opened
@@ -594,12 +633,15 @@ storage (v0.7 §S).
 "30 days cold, then purge"):
 
 - **An orphan** is an upload whose bytes were staged but which expired before an item was written. It
-  is listed to its opener — and to an admin — in `GET /v1/pending` under `"uploads": [{"upload",
-  "name", "size", "sha256", "scope", "opened_at"}]`, counts toward the 16, and is removed only by
-  `DELETE /v1/uploads/{id}` (its opener, or a person with `admin` over the whole container), which
-  deletes the staged bytes and appends **`upload.discard`** (`opener`, and `bytes_deleted`: false
-  when another live upload or staged item holds the same bytes, which then stay). Its opener may
-  discard an open upload the same way, to free its slot before the hour is up. **a1p.**
+  is listed in `GET /v1/pending` under `"uploads": [{"upload", "name", "size", "sha256", "scope",
+  "opened_at"}]` to its opener, an agent's to the person the agent serves (an agent reads no
+  `GET /v1/pending`, §4), and to an admin; it counts toward the 16, and is removed only by
+  `DELETE /v1/uploads/{id}` (its opener, the person an agent opener serves, or a person with `admin`
+  over the whole container), which deletes the staged bytes and appends **`upload.discard`**
+  (`opener`, and `bytes_deleted`: false when another live upload or staged item holds the same bytes,
+  which then stay). Its opener may discard an open upload the same way, to free its slot before the
+  hour is up. **decided** (v0.7 §AC, applying §Z); **a1p**, the cap of 16 and `upload.discard`'s
+  details.
 - **A staged artifact item past `blobs.staging_retention_days`** appears in `GET /v1/pending` under
   `"staged": [<item>]` — to an interactive principal covering its scope, and **instead of** in `items`,
   never both — until a person promotes it or tombstones it; a tombstone deletes the **staged** bytes
