@@ -164,7 +164,7 @@ jobs:
           mkdir -p docs/build
           git show "${B}:docs/build/REVIEW-DECISIONS.md" > docs/build/REVIEW-DECISIONS.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
@@ -494,7 +494,7 @@ jobs:
       # which the run log prints. The artifact is as public as the log on this repository: the gain is
       # retention and no plaintext in an indexed log, not confidentiality. What keeps the detail safe
       # is that main holds no open reproduction (a security regression test lands with its fix).
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ !cancelled() }}
         with:
           name: adversarial-suite
@@ -521,7 +521,7 @@ jobs:
 
       # The suite's result, from the job above, as an artifact: the session cites it and executes
       # nothing, and the detail never enters this log.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         id: download
         continue-on-error: true
         with:
@@ -538,7 +538,7 @@ jobs:
 
       # Builder identity (D6): a6 files private Security Advisories and non-security issues as egzos-forge.
       - id: forge
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
@@ -583,7 +583,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1
         id: sweep
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
@@ -682,7 +682,7 @@ jobs:
             | grep -qx true || { echo "PR #$PR does not carry the security label"; exit 1; }
 
       - id: forge
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ secrets.FORGE_APP_ID }}
           private-key: ${{ secrets.FORGE_APP_PRIVATE_KEY }}
@@ -719,7 +719,7 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
-      - uses: anthropics/claude-code-action@ed670b4cf9de2a5a570d130d2f6197b9e543cd64 # v1
+      - uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1
         id: file
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
