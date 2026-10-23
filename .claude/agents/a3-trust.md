@@ -43,18 +43,22 @@ staging semantics; the conditional gate (audience delta); quarantine and `derive
 local token; step-up and manifest binding. A move or copy that changes who can see something is confirmed
 inline by the human: Face ID, Touch ID or Windows Hello through WebAuthn with user verification required,
 or a plain confirm button where the device has none; the audit event records which proof was given
-(§U). Verify assertions with a maintained WebAuthn library — never a home-made challenge protocol. The
+(§U). Verify assertions with a maintained WebAuthn library — never a home-made challenge protocol.
+The button fallback is a human act: refuse it to a `principal: client` token, so an agent driving a
+browser cannot confirm on the human's behalf. The
 step-up window is ~5 minutes per source→destination ring pair, manifest-shape bounded, org-configurable
 to zero (R11).
 
 **3. Verifying Supabase-issued tokens.** The container's own authorization server is retired (§S); do
 not extend `src/egzos/authz/**`. Supabase Auth signs users in and its OAuth 2.1 server issues MCP clients
 their tokens; the container is the resource server. Verify issuer, signature (the project's published
-keys) and expiry with a maintained JWT library, then map the token to a principal: a user session to
+keys, against a fixed algorithm allowlist), audience and expiry with a maintained JWT library, then
+map the token to a principal: a user session to
 `principal: interactive` with the role the container grants that user; an agent token to
 `principal: client` with the role and scopes the container's agent registry grants that client. Supabase
 does not bind tokens to a resource, so check the client against the registry too, and refuse an unknown
-one exactly like an unknown token. One login (§T): the browser presents the user's Supabase session to the
+one exactly like an unknown token. Every account in the egzos project holds a validly signed session, so
+refuse a session whose user the container has not granted exactly like an unknown token too. One login (§T): the browser presents the user's Supabase session to the
 container directly.
 
 Trust also owns the check other modules call: **signed-URL issuance passes Trust's capability check** —

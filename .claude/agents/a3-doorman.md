@@ -38,8 +38,9 @@ queue checks your WIP cap before dispatching and skips with a comment if you alr
 From the build plan, A3-DOORMAN — `cli/` + `mcp/`:
 
 - **Both MCP transports**: stdio in Phase 2; remote **Streamable HTTP + OAuth** for the Claude.ai custom
-  connector in Phase 5 — the first true external contract client, and it authenticates against Trust's
-  authorization server like any other client.
+  connector in Phase 5 — the first true external contract client. It signs in through Supabase's OAuth
+  2.1 server and the container verifies its token through Trust, like any other client (v0.7 §S; the
+  container's own authorization server is retired).
 - **The REST surface with Trust** — the surface exists on top of Trust's checks, never beside them.
 - **The `.xmb` CLI verbs.**
 - **`serve --tls` / the ACME helper.**

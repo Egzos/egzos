@@ -8,8 +8,8 @@ This file binds every agent that runs in this repository. Read it first, then yo
 ## What this repository is
 
 `egzos` is the source-available core of egzos — an MCP-first, CLI-first personal context layer where the user's
-container is the home and platforms are clients. **Public from commit one** (private for a spell in October
-2026, public again from 2026-10-23), source-available under the PolyForm Strict License 1.0.0 from v0.1.1
+container is the home and platforms are clients. **Public from commit one**, apart from a private interval in
+October 2026 (public again from 2026-10-23); source-available under the PolyForm Strict License 1.0.0 from v0.1.1
 (the Chief, 2026-10-09; v0.1.0 and earlier were Apache-2.0). The closed, paid flagship (`egzos.io` UI,
 hosting, relay, server-side intelligence) lives in the sibling `Egzos/egzos-platform` (proprietary; public only while it holds nothing but scaffolding, private from
 its first product-code commit — D10), split from this repo on the container contract. The core is free for
@@ -22,7 +22,8 @@ escalation issue to a1p-planner, batched at phase boundaries — never a drive-b
 
 The Chief's current decisions are `docs/build/egzos-decisions-v0.7-amendments.txt` (2026-10-23): Supabase
 for login, agent sign-in, the hosted database and file storage; one login; the Face ID / Touch ID confirm;
-places with git-like push and pull; copy beside move. Where an older text disagrees, v0.7 wins.
+places with git-like push and pull; copy beside move. Where an older text disagrees, v0.7 wins — except
+`spec/contracts/**`: a frozen contract stays law until the contract version that carries v0.7 lands.
 
 ## Buy, don't build
 

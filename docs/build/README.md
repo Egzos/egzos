@@ -23,7 +23,8 @@ for login, agent sign-in, the hosted database and file storage, with the contain
 server retired (§S); one login (§T); the Face ID / Touch ID confirm (§U); places and git-like sync, copy
 beside move (§V); the egzosux experience, J4S and the three.js stack (§W); Stripe behind a provider
 interface (§X); the repository public again (§Y); no automatic deletion (§Z). Where it disagrees with
-an older text, it wins. Compiled 2026-10-23.
+an older text, it wins, except a frozen contract in `spec/contracts/**`, which stays law until the
+contract version that carries v0.7 lands. Compiled 2026-10-23.
 
 **`REVIEW-DECISIONS.md`**
 The review register: settled review dispositions that a1r-reviewer and a2-conformance consult

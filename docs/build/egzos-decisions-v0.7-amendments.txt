@@ -121,7 +121,9 @@ U. THE CONFIRM — FACE ID / TOUCH ID (amends R11's step-up and v0.6 §K's
           Windows Hello, through WebAuthn with user verification required.
           Where the device has none, a plain confirm button. The audit event
           records which proof was given (biometric or button), so the ledger
-          shows the weaker one for what it is.
+          shows the weaker one for what it is. The button is a human act: it
+          is refused to an agent's token (principal: client), so an agent
+          driving a browser cannot confirm on the human's behalf.
 
 [DECIDED] BUILT ON ESTABLISHED PIECES (§R): the browser's WebAuthn API and a
           maintained WebAuthn library to verify the assertion, or Supabase
