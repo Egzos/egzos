@@ -223,10 +223,18 @@ def test_a_grants_display_name_is_short_and_shows_what_it_says(name, tmp_path):
     assert c.backend.get_user_grant("bob") is None
 
 
+@pytest.mark.parametrize("sub", ["", "x" * 256, " bob", "b ob", "bob\n", "b\tob", "b\x00ob",
+                                 "bo​b", "bob‮", "b ob", "b ob", 7])
+def test_a_grant_names_the_providers_user_id_as_one_token(box, sub):
+    with pytest.raises(ValueError):
+        box.identity.grant_user(sub, name="bob", role="reader", scopes=["*"], **KW)
+    assert box.backend.list_user_grants() == []
+
+
 # -- the cascade (§4) ------------------------------------------------------------------------------
-def _agent(c, client_id, sub, revoked=False):
+def _agent(c, client_id, sub, revoked=False, caps=("fetch",)):
     c.backend.put_agent_registration({
-        "client_id": client_id, "sub": sub, "name": client_id, "capabilities": ["fetch"],
+        "client_id": client_id, "sub": sub, "name": client_id, "capabilities": list(caps),
         "scopes": ["*"], "created_at": "2026-10-23T00:00:00Z", "revoked": revoked})
 
 
@@ -244,3 +252,49 @@ def test_a_revoke_ends_every_agent_serving_that_person_and_a_new_grant_revives_n
     assert [a["client_id"] for a in box.identity.serving(ALICE)] == ["a1"]
     box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
     assert box.identity.serving(BOB) == [] and box.identity._agent("a1", BOB) is None
+
+
+# -- whom a grant opens to, and how far its grantor reaches (§4, rest.md §4.2-§4.3) ----------------
+@pytest.fixture
+def tree(box):
+    """`P` and `Q` under the root, `T` under `P`, and `*` the whole container."""
+    root, nk = box.nodes.user_root(), {"token": box.owner, **KW}
+    p = box.nodes.create("project", "p", parent=root, **nk)
+    return {"*": "*", "P": p.id, "T": box.nodes.create("thread", "t", parent=p, **nk).id,
+            "Q": box.nodes.create("project", "q", parent=root, **nk).id}
+
+
+@pytest.mark.parametrize(("before", "after", "agent", "newly"), [
+    (None, "P", None, [f"user:{BOB}"]),  # a first grant opens the person
+    ("revoked", "P", None, [f"user:{BOB}"]),  # so does one after a revoke, which reaches nothing
+    ("*", "P", None, []),  # narrower opens nobody
+    ("P", "*", None, [f"user:{BOB}"]),
+    ("P", "T", None, []),  # within what they already cover
+    ("T", "P", "fetch", [f"agent:a1:{BOB}", f"user:{BOB}"]),  # their agents widen with them
+    ("P", "Q", "curate", [f"user:{BOB}"]),  # an agent sharing no capability reaches nothing
+])
+def test_a_grant_opens_whoever_it_newly_lets_see_something(box, tree, before, after, agent,
+                                                          newly):
+    if before:
+        box.identity.grant_user(BOB, name="bob", role="reader", scopes=[tree.get(before, "*")],
+                                **KW)
+    if before == "revoked":
+        box.identity.revoke_user(BOB, **KW)
+    if agent:
+        _agent(box, "a1", BOB, caps=(agent,))
+    opens = box.identity.opens(BOB, "Robert", ["fetch"], [tree[after]])
+    assert [m for m, _ in opens] == newly
+    assert all(name == "Robert" for m, name in opens if m.startswith("user:"))
+
+
+@pytest.mark.parametrize(("capabilities", "scope", "exceeds"), [
+    (["fetch"], "T", False),  # coverage runs down the path
+    (["fetch", "remember"], "P", False),
+    (["fetch"], "*", True),  # the whole container only from a grantor holding it
+    (["fetch"], "Q", True),
+    (["publish"], "P", True),  # a capability the grantor lacks
+])
+def test_no_grant_exceeds_its_grantors_own(box, tree, capabilities, scope, exceeds):
+    box.identity.grant_user(ALICE, name="alice", role="contributor", scopes=[tree["P"]], **KW)
+    grantor = box.identity._person(ALICE, "box")
+    assert box.identity.exceeds(grantor, capabilities, [tree[scope]]) is exceeds

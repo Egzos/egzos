@@ -37,11 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A first credential needs the button and a sign-in under five minutes old. The owner's recovery
   path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Grants at the door** (`rest.md` §4.3): an admin signed in at the provider lists who may sign in
-  (`GET /v1/grants`) and ends a person's access (`DELETE /v1/grants/{sub}`). Ending someone
-  else's takes the confirm, which shows whose access ends and every agent it takes with it; ending
-  your own does not. With the button, it also needs a sign-in under five minutes old. Revoking a
-  grant, here or with `egzos grant rm`, also revokes every agent serving that person, each on the
-  record, so a later grant starts with no agents.
+  (`GET /v1/grants`), grants a person access (`POST /v1/grants`: a role or capabilities, over
+  scopes named by id or path, never beyond the admin's own) and ends a person's access (`DELETE
+  /v1/grants/{sub}`). Granting takes the confirm, which shows who would newly see something, and so
+  does ending someone else's access, which shows whose access ends and every agent it takes with
+  it; ending your own does not. With the button, both also need a sign-in under five minutes old.
+  The last grant holding `admin` over the whole container is never revoked, nor re-granted anything
+  short of that. Revoking a grant, here or with `egzos grant rm`, also revokes every agent serving
+  that person, each on the record, so a later grant starts with no agents.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its
