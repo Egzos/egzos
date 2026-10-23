@@ -195,8 +195,8 @@ class ResolvedItem(TypedDict):
 class BlobGrant(TypedDict):
     """Minted by TRUST, never by Store/Vault (F5). Store renders it; it decides nothing.
 
-    *Decided, not running.* `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]);
-    the grant id is not the bearer secret.
+    `sig` is an HMAC over the descriptor with a container key ([0.3 · 45]); the grant id is not the
+    bearer secret.
     """
 
     sha256: str
@@ -256,10 +256,10 @@ Event = Literal[
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
-#: `blob.grant` is decided, not running (F5) — IN the vocabulary, so a validator built on this tuple
-#: accepts it (`AuditEntry.event` needs the member the day F5 lands); what does not exist yet is any
-#: code that emits it. The nine `authz.*` names and `client.register` are the same case: decided at
-#: the 0.3 freeze (authorization-server.md §12 rows (a), (b), (d)–(h), §11.9, §9.3 and §5;
+#: `blob.grant` runs with the REST door's grants (F5, rest.md §6). The eight `authz.*` names that
+#: do not run and `client.register` are IN the vocabulary, so a validator built on this tuple
+#: accepts them: decided at the 0.3 freeze
+#: (authorization-server.md §12 rows (a), (b), (d)–(h), §11.9, §9.3 and §5;
 #: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
 #: (container.md §8, [0.3 · 40]), with no config surface; and so is `rest.tally`, the REST door's
 #: per-window tally (rest.md §2, the Chief on #165 items 2 and 3), with no REST door in this tree.
@@ -845,9 +845,21 @@ class UploadState(Protocol):
     #:   caller writes the outcome (`staged`, `item`) with `put_upload` in the same transaction.
 
 
-#: storage.md §3.1–§3.4. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+class GrantState(Protocol):
+    """rest.md §6's spent grants (storage.md §3.5), keyed on the sha256 of a descriptor's `sig`,
+    never the `sig`: with the other four fields it is the credential."""
+
+    def spend_grant(self, sig_hash: str, expires_at: str) -> bool: ...
+    #: ^ records it, atomically, and is True only for the call that found it unrecorded: of two
+    #:   concurrent spends of one grant exactly one proceeds. It commits on its own: never called
+    #:   inside a transaction that may roll back, since a later refusal still spends the grant.
+    def forget_grants(self, expired_before: str) -> None: ...
+    #: ^ drops the records of grants that expired before this time
+
+
+#: storage.md §3.1–§3.5. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
 DOOR_STATE_CONTRACTS: tuple[str, ...] = (
-    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState"
+    "ThrottleState", "IdentityState", "ConfigState", "ConfirmState", "UploadState", "GrantState"
 )
 
 
@@ -907,6 +919,7 @@ __all__ = [
     "DeviceRedemptionCause",
     "Event",
     "GrantDecision",
+    "GrantState",
     "IdentityState",
     "ItemStore",
     "Kind",

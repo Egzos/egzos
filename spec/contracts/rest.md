@@ -681,9 +681,13 @@ with the code that appends them, because the conformance tests pin that table to
 
 1. When a read in §4 serves an `artifact` item, `inline` carries the bytes only when the size is at
    or below `blobs.inline_max_bytes` **and** `mime` matches `text/*`.
-2. Otherwise the door asks Trust: `Trust.authorize_pull(token, item) -> BlobGrant | silence`. Trust
-   applies the same capability, coverage and serving check as a fetch: **artifact download IS
-   fetch**. A minted grant appends `blob.grant`. On silence the item is served with no grant.
+2. Otherwise (**a1p**: whenever `inline` does not carry the bytes) the door asks Trust:
+   `Trust.authorize_pull(token, item) -> BlobGrant | silence`. Trust applies the same capability,
+   coverage and serving check as a fetch: **artifact download IS fetch**. A minted grant appends
+   `blob.grant`. On silence the item is served with no grant.
+   Trust is silent, too, on an artifact an agent wrote, until a person promotes it, and on a copy
+   of one, until the copy or its source is promoted: an agent's upload stays staged that long,
+   unaddressable (`storage.md` §4, §4.4 here). **a1p.**
 3. Store renders the grant into a URL. It decides nothing, and it never mints on its own authority.
 4. The response carries the item with `grant` (the descriptor `{sha256, item, token, expires_at,
    sig}`) and `grant_url` beside it. **a1p**: the two field names.
@@ -694,7 +698,11 @@ with the code that appends them, because the conformance tests pin that table to
 /v1/blobs/<sha256>?item=<item id>&token=<Token.id>&expires_at=<UTC ISO-8601>&sig=<sig>
 ```
 
-`token` is the `Token.id`, an identifier and not a value (`capabilities.md` §5).
+`token` is the `Token.id`, an identifier and not a value (`capabilities.md` §5); for a provider
+token, its grant's: `user:<sub>`, or `agent:<client_id>:<sub>`, which check 5 re-derives from
+`identity.md` §4's records. `expires_at` is written to the microsecond, `%Y-%m-%dT%H:%M:%S.%fZ`,
+fixed width, so two compare as the times they are; two mints for one token and item within one
+tick of the clock are one grant. **a1p.**
 
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token
@@ -713,10 +721,10 @@ review:** a grant URL is redeemable by whoever holds it, so the grant is bounded
   time plus 300 seconds (`_types.py`'s `BLOB_GRANT_LIFETIME_SECONDS`). **It is not configurable**:
   no config key, no flag and no client parameter lengthens or shortens it.
 - A leaked `grant_url` is therefore dead after one pull, or after five minutes at most.
-- The spent record is kept until the grant's `expires_at`, keyed on the sha256 of the descriptor's
-  `sig` and never on the `sig` itself: with the other four fields, the `sig` is the credential, and
-  a credential is kept only as its hash, as `Token.secret_hash` is (`model.py`). **a1p.** Where it
-  is persisted joins #165 item 4's batch, beside the grant key.
+- The spent record is kept at least a lifetime past the grant's `expires_at`, keyed on the sha256
+  of the descriptor's `sig` and never on the `sig` itself: with the other four fields, the `sig` is
+  the credential, and a credential is kept only as its hash, as `Token.secret_hash` is
+  (`model.py`). **a1p.** Where it persists is decided with the key, below.
 
 **The redemption checks, in this order. decided** for each check, **a1p** for the order:
 
@@ -768,9 +776,37 @@ Referrer-Policy: no-referrer
   `forged` in the window's `rest.tally` (§2 item 7), so a flood of forged descriptors leaves a
   trace. **decided** (the Chief on #165 item 2, option (b), 2026-10-09); **a1p**, the shape.
 
-**The key.** `TODO(a1p)`, #165 item 4: where the HMAC key is provisioned, stored and rotated.
-Rotation voids every outstanding grant. It was drafted for the #143 batch beside the authorization
-server's own keys, which retired with it (`identity.md` §9).
+**The key. a1p** (#165 item 4), for a container its owner runs (`init`: a local or a self-hosted
+one). The MAC is HMAC-SHA256 over every descriptor field but `sig`, written as `canonical` JSON
+(`events.md` §3), from the standard library.
+
+- **Provisioned at first need**, never at `init`: the first mint or redemption that finds no key
+  makes one, 32 bytes from the platform CSPRNG (`capabilities.md` §5), so a container made before
+  this clause needs no step to get one. A `grant.key` that is not 32 bytes signs and verifies
+  nothing: Trust is silent, every redemption is refused, and reads go on.
+- **Stored as `grant.key` in the container's home, 0600**, written as `throttle.key` is (`storage.md`
+  §3.1): whole, linked into place, first writer wins. It is never a config key (`container.md` §8)
+  and never a row of the container's state, so no read route serves it. **No export or sync
+  carries `grant.key` or `throttle.key`**: a place makes its own, and a grant verifies only at the
+  place that minted it, where its spent record is. A copy of the whole home carries the key with
+  the state, and restoring one brings both back as they stood, so a grant spent since the copy
+  reads unspent for what is left of its 300 seconds: after such a restore the owner replaces the
+  key (below). Restored without the key, the container makes a new one at first need, which voids
+  every grant minted under the old one.
+- **Rotated by the owner, from the CLI with the owner `Token`** (`egzos blob rotate`): a new key
+  replaces the old one in place, every outstanding grant fails check 2 from then on, and
+  `blob.rotate` is appended, `actor` the owner and no key material. Every mint and redemption
+  reads the key afresh, so a rotation reaches a running door at its next request. `blob.rotate`
+  enters `events.md` §1 and `_types.py` with the code that appends it. **Not running**: until it
+  does, the owner deletes `grant.key`, and the next mint or redemption makes a new one, to the same
+  effect but with no entry.
+- **The spent records persist in the container's state**, as `storage.md` §3.5's `GrantState`, on
+  the `ContainerState` substrate as the confirm's challenges are: a spend is one atomic write every
+  process serving the container sees. A record is a `sig`'s sha256 and its grant's `expires_at`, no
+  secret, kept at least a lifetime past that.
+- **A container egzos hosts** is not decided here: where its key is provisioned, held and rotated
+  joins `identity.md` §4's `TODO(chief)`, #283, on hosted provisioning, the same question for the
+  same owner.
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
@@ -786,5 +822,6 @@ other four questions were the retired authorization server's and close with it.
 
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
 `identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
-§4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. Where the grant key persists → #165 item 4.
+§4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
+`identity.md` §4's `TODO(chief)`, #283.
 The look of any client → its design spec.

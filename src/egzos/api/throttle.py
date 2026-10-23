@@ -18,11 +18,8 @@ and never discloses the bucket's key — a source address never reaches the chai
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import hmac
-import os
-import secrets
 import time
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
@@ -30,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from egzos._types import AS_THROTTLE_RATES, AS_THROTTLE_WINDOW_SECONDS, ThrottleState
+from egzos.auth import home_secret
 from egzos.ledger import Ledger
 
 SURFACE = "rest"
@@ -57,32 +55,11 @@ def throttle_key(home: Path) -> bytes:
     the same way, so every process reads the same key. Should all `KEY_SLOTS` names be short, it
     raises and the door does not start: it fails closed, never on an empty key."""
     for slot in range(KEY_SLOTS):
-        path = Path(home) / (KEY_FILE if slot == 0 else f"{KEY_FILE}.{slot}")
-        try:
-            data = path.read_bytes()
-        except FileNotFoundError:
-            data = _create(path)
+        name = KEY_FILE if slot == 0 else f"{KEY_FILE}.{slot}"
+        data = home_secret(Path(home) / name, KEY_BYTES)
         if len(data) == KEY_BYTES:
             return data
     raise RuntimeError("the throttle key cannot be read")
-
-
-def _create(path: Path) -> bytes:
-    """Link a whole new key at `path` unless another process got there first; either way, return
-    the key that is there now."""
-    tmp = path.with_name(f".{KEY_FILE}.{secrets.token_hex(8)}")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    try:
-        with os.fdopen(fd, "wb") as fh:
-            fh.write(secrets.token_bytes(KEY_BYTES))
-            fh.flush()
-            os.fsync(fh.fileno())
-        with contextlib.suppress(FileExistsError):
-            os.link(tmp, path)
-    finally:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(tmp)
-    return path.read_bytes()
 
 
 class Throttle:

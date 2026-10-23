@@ -260,6 +260,24 @@ spend_upload(upload_id, step)                    -> bool                  # step
   one. No column holds a secret: an upload names its principal, scope, display name, type, size
   and digest.
 
+## 3.5 · Spent grants — `GrantState`
+
+**Status of this section: contract v1.1** (`rest.md` §6). One Protocol beside `ContainerState`, on
+its substrate and never delegated (F3). **a1p.**
+
+```
+# GrantState — rest.md §6's spent grants, keyed on the sha256 of a descriptor's sig
+spend_grant(sig_hash, expires_at)                -> bool    # True for the one call that records it
+forget_grants(expired_before)                    -> None    # drops the records of grants expired before then
+```
+
+- **A grant is spent once, atomically.** Of two concurrent spends of one grant, exactly one is
+  `True` (`rest.md` §6 check 4). A spend commits on its own and is never rolled back: a redemption
+  refused at a later check has still spent its grant.
+- **No column holds a secret.** A record is the sha256 of a `sig`, never the `sig`, and the
+  grant's `expires_at`; it is kept at least a lifetime past that (`rest.md` §6). The key that signs
+  grants is not here: it is a file in the container's home that no export carries (`rest.md` §6).
+
 ## 4 · `BlobStore` — content-addressed, staged
 
 ```
@@ -294,8 +312,8 @@ would be Store deciding a Trust question inside a module that is about to move t
 
 The mint and the redemption are **two separate audit events**: `blob.grant` when Trust mints the
 descriptor, `blob.pull` when the bytes are actually served (`events.md`). One without the other is a
-finding, not a shortcut. **decided, not running** — the skeleton serves `text/*` inline at or below
-64 KiB, records every pull, and has no grant.
+finding, not a shortcut. **running**: the REST door's reads mint (`rest.md` §6); the redemption is
+**decided, not running**.
 
 The descriptor is `{sha256, item, token, expires_at, sig}`; `sig` is an **HMAC over the descriptor
 with a container key** (`context-item.md` §3, [0.3 · 45]).
@@ -395,9 +413,9 @@ rule, `canonical` and the event list → `events.md`.
 The postgres+pgvector and mem0/zep backends themselves are Phase 5. This document fixes only the
 contract they must satisfy.
 
-§3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState`, §3.3's `ConfirmState` and §3.4's
-`UploadState` are contract v1.1, not part of the 0.3 freeze; their partition is decided on #173 (option (A), on the
-`ContainerState` substrate).
+§3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState`, §3.3's `ConfirmState`, §3.4's
+`UploadState` and §3.5's `GrantState` are contract v1.1, not part of the 0.3 freeze; their partition
+is decided on #173 (option (A), on the `ContainerState` substrate).
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases

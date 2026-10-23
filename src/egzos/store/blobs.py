@@ -6,7 +6,8 @@ Lives inside the store module on the Store/Vault seam (v0.5 §D, R5): no back-re
 nodes, resolver or items, so it moves to Vault whole at Phase 5.
 
 Signed URLs are NOT minted here. Artifact download IS fetch: issuance passes Trust's capability
-check (a3-store charter). The skeleton serves small blobs inline and records every pull.
+check (a3-store charter). Store only renders the `BlobGrant` Trust minted into its URL
+(`grant_url`), and decides nothing (F5, storage.md §4).
 """
 
 from __future__ import annotations
@@ -14,6 +15,9 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
+from urllib.parse import urlencode
+
+from egzos._types import BlobGrant
 
 
 class BlobStore:
@@ -70,6 +74,16 @@ class BlobStore:
             path.unlink()
             return True
         return False
+
+
+#: rest.md §6: a grant's fields in its URL's query, in this order; `sha256` is the path's.
+GRANT_QUERY = ("item", "token", "expires_at", "sig")
+
+
+def grant_url(grant: BlobGrant) -> str:
+    """rest.md §6's URL for a grant, its four other fields in the query, each value encoded."""
+    query = urlencode([(k, grant[k]) for k in GRANT_QUERY], safe=":")
+    return f"/v1/blobs/{grant['sha256']}?{query}"
 
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")

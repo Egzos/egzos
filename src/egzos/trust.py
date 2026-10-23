@@ -10,18 +10,25 @@ matches — TOCTOU closed (v0.4 §5).
 
 Human-only acts (approve-from-pending, confirming a publish) demand the interactive principal.
 No capability reaches them: a maximally granted client can only PROPOSE.
+
+Trust alone mints a `BlobGrant` (F5, rest.md §6), on a fetch's check: artifact download IS fetch.
 """
 
 from __future__ import annotations
 
 import hashlib
+import hmac
+import time
 from collections.abc import Callable, Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 from egzos._ids import ulid
+from egzos._types import BLOB_GRANT_LIFETIME_SECONDS, BlobGrant
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import RING_RANK, ROLE_BUNDLES, ContextItem, Node, Token, canonical, now_iso
+from egzos.store.blobs import _is_digest
 from egzos.store.nodes import NodeService
 
 
@@ -35,6 +42,16 @@ class HumanOnly(TrustError):
 
 # One refusal for both branches of the gate (container.md §6, capabilities.md §1).
 _MOVE_REFUSED = "moving items needs `organize` (and `publish` where the audience widens)"
+#: rest.md §6 (a1p): the grant key's file in the container's home, and its length.
+GRANT_KEY_FILE = "grant.key"
+GRANT_KEY_BYTES = 32
+_UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
+
+
+def _utc(at: float) -> str:
+    """UTC ISO-8601, fixed width to the microsecond, so two of these compare as the times they
+    are."""
+    return datetime.fromtimestamp(at, UTC).strftime(_UTC)
 
 
 class TrustEngine:
@@ -49,6 +66,11 @@ class TrustEngine:
         # Moves a staged artifact's bytes into the promoted store on promotion, True if any moved
         # (storage.md §4); the container wires in its blob store's `promote`.
         self.promote_blob: Callable[[str], bool] = lambda sha: False
+        # rest.md §6, wired by the container: the grant key, read at every use so a new one
+        # reaches every process; and a fetch's `find.shown`. Unwired, nothing is signed or served.
+        self.grant_key: Callable[[], bytes] = bytes
+        self.shown: Callable[[Token, ContextItem, Node], bool] = lambda token, item, node: False
+        self.clock: Callable[[], float] = time.time
 
     # -- coverage & audience -----------------------------------------------------------------
     def covers(self, token: Token, node: Node) -> bool:
@@ -93,6 +115,65 @@ class TrustEngine:
         return hashlib.sha256(
             canonical({"items": sorted(item_ids), "target": target, "audience": audience}).encode()
         ).hexdigest()
+
+    # -- BlobGrant (F5, rest.md §6) --------------------------------------------------------------
+    def authorize_pull(self, token: Token, item: ContextItem) -> BlobGrant | None:
+        """A grant to pull this artifact's bytes, or silence: `pull_refusal`'s check, or a key that
+        cannot be read. A mint appends `blob.grant`; silence nothing: the read is on the record."""
+        sha, key = item.content.get("sha256"), self._key()
+        if (key is None or item.kind != "artifact" or not _is_digest(sha)
+                or self.pull_refusal(token, item)):
+            return None
+        now = self.clock()
+        # rest.md §6: a spent record is kept a lifetime past its grant's expiry, then forgotten.
+        self.backend.forget_grants(_utc(now - BLOB_GRANT_LIFETIME_SECONDS))
+        expires_at = _utc(now + BLOB_GRANT_LIFETIME_SECONDS)
+        grant: BlobGrant = {"sha256": sha, "item": item.id, "token": token.id,
+                            "expires_at": expires_at, "sig": ""}
+        grant["sig"] = self._sign(grant, key)
+        self.ledger.append("blob.grant", actor=token.owner, principal=token.principal,
+                           subject=item.id, scope=item.scope, token=token.id, sha256=sha,
+                           expires_at=expires_at)
+        return grant
+
+    def _key(self) -> bytes | None:
+        """The grant key, read afresh at every use; None unless it is `GRANT_KEY_BYTES` long."""
+        key = self.grant_key()
+        return key if len(key) == GRANT_KEY_BYTES else None
+
+    @staticmethod
+    def _sign(grant: BlobGrant, key: bytes) -> str:
+        """[0.3 · 45]: HMAC-SHA256 under the container's key over every descriptor field but
+        `sig`, as `canonical` JSON — each value a quoted string under its name, so no two
+        descriptors share a message, and a field added later is covered with no edit here."""
+        body = canonical({k: v for k, v in grant.items() if k != "sig"})
+        return hmac.new(key, body.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    def pull_refusal(self, token: Token, item: ContextItem) -> int | None:
+        """rest.md §6's checks 5 and 6, as they stand now: 5 when the token is not live or lacks
+        `fetch` over the item's scope; 6 when the item is not served to it. None when both pass."""
+        node = self.backend.get_node(item.scope)
+        if not token.has("fetch") or (node and not self.covers(token, node)):
+            return 5
+        if (node is None or item.status == "quarantined"
+                or not self.shown(token, item, node) or self._staged(item)):
+            return 6
+        return None
+
+    def _staged(self, item: ContextItem) -> bool:
+        """Whether an artifact's bytes are still staged (storage.md §4): an agent's, until a person
+        promotes the item; a copy's, which names its source's bytes, until it or its source is
+        promoted. A source no longer read is judged by what the copy carries of it. Never by
+        whether the bytes are stored, which would answer for some other item ([0.3 · 41])."""
+        seen: set[str] = set()
+        while item.provenance.get("approved_by") is None:
+            source_id = item.provenance.get("derived_from")
+            source = self.backend.get(source_id) if source_id and source_id not in seen else None
+            if source is None:
+                return item.provenance.get("principal") != "interactive"
+            seen.add(item.id)
+            item = source
+        return False
 
     # -- pending -------------------------------------------------------------------------------
     def pending(self) -> dict[str, Any]:
