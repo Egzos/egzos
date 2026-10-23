@@ -298,10 +298,15 @@ must say so explicitly, because scope-free `admin` makes every floor in this sec
 
 ## 8 · The container-config object
 
-**decided, not running.** The skeleton has no config surface; every value below is a constant in
-`model.py`. F1 needs **two** configurable values, F2 and F5 one each, and R11 **two** more — **six
-keys**, so the freeze introduces **one object** rather than six ad-hoc settings, defined here. (The
-count is spelled out because the table below has six rows and the sentence used to say four.)
+**The freeze's six are decided, not running**: nothing sets them, and each is a constant in
+`model.py`. F1 needs **two** configurable values, F2 and F5 one each, and R11 **two** more, so the
+freeze introduced **one object** rather than six ad-hoc settings, defined here. Contract v1.1 adds
+the provider's five (`identity.md` §2), and those **run**: `egzos config set` and `egzos link` set
+them, `config.set` records each change, and the identity code reads them on every request. That
+is **eleven keys**; the table below has eleven rows. (The counts are spelled out because a sentence
+here once outlived its table.) `confirm.allow_button` and `blobs.upload_max_bytes` join the table
+with the code that reads them. Only a key some code reads is settable: a key set but never read
+would tell the owner something false.
 
 | key | default | applies at | may a deployment change it? |
 |---|---|---|---|
@@ -311,10 +316,16 @@ count is spelled out because the table below has six rows and the sentence used 
 | `blobs.inline_max_bytes` | `65536` (64 KiB) | container | **yes** — F5 (`storage.md` §4) |
 | `blobs.staging_retention_days` | `30` | container | **yes** — R11, as amended by v0.7 §Z: 30 days, then ask (`rest.md` §4.4) |
 | `step_up.window_seconds` | `300` (≈5 min) | container, per source→destination **ring pair** | **yes, including `0`** — R11; `0` is *no grace period*, never *no check* |
+| `identity.issuer` | absent | container | **yes** — the provider's issuer URL; absent, the container accepts only its own `Token` (`identity.md` §1–§2) |
+| `identity.client_id` | absent | container | **yes** — this container's own OAuth client at the provider (`identity.md` §3a) |
+| `identity.audience` | `authenticated` | container | **yes** — the `aud` an access token must carry (`identity.md` §3) |
+| `identity.algorithms` | `ES256 RS256` | container | **yes** — asymmetric algorithms only; never `none`, never `HS*` |
+| `identity.browser_origins` | `https://egzos.io` | container | **yes** — the origins the REST door answers CORS for (`identity.md` §6) |
 
 A deployment that omits the object gets the defaults, and the defaults are exactly what the skeleton
 runs as constants — so `between` + floor `project` + 64 KiB is both the shipped default and the
-observed behaviour.
+observed behaviour. The identity keys' defaults leave a container with no provider: it accepts only
+its own `Token`, exactly as before v1.1.
 
 ### The dotted keys above are the names on the wire
 

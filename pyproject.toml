@@ -19,6 +19,8 @@ dependencies = [
     "fastapi>=0.115",
     "jinja2>=3.1",
     "uvicorn>=0.30",
+    # identity.md §3: the provider's tokens are checked with a maintained JWT library (v0.7 §R)
+    "pyjwt[crypto]>=2.10",
 ]
 
 [project.optional-dependencies]

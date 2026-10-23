@@ -49,33 +49,33 @@ def test_sqlite_backend_conforms_to_throttle_state_signatures():
 
 
 def test_throttle_incr_starts_at_one(backend: SqliteBackend):
-    assert backend.throttle_incr("login", "global", "w1") == 1
+    assert backend.throttle_incr("rest", "global", "w1") == 1
 
 
 def test_throttle_incr_accumulates(backend: SqliteBackend):
-    assert backend.throttle_incr("login", "global", "w1") == 1
-    assert backend.throttle_incr("login", "global", "w1") == 2
-    assert backend.throttle_incr("login", "global", "w1") == 3
+    assert backend.throttle_incr("rest", "global", "w1") == 1
+    assert backend.throttle_incr("rest", "global", "w1") == 2
+    assert backend.throttle_incr("rest", "global", "w1") == 3
 
 
 def test_throttle_count_reads_without_incrementing(backend: SqliteBackend):
-    backend.throttle_incr("login", "global", "w1")
-    assert backend.throttle_count("login", "global", "w1") == 1
-    assert backend.throttle_count("login", "global", "w1") == 1  # unchanged by the read
+    backend.throttle_incr("rest", "global", "w1")
+    assert backend.throttle_count("rest", "global", "w1") == 1
+    assert backend.throttle_count("rest", "global", "w1") == 1  # unchanged by the read
 
 
 def test_throttle_count_is_zero_for_an_unseen_key(backend: SqliteBackend):
-    assert backend.throttle_count("login", "global", "w1") == 0
+    assert backend.throttle_count("rest", "global", "w1") == 0
 
 
 def test_throttle_keys_are_compared_as_opaque_tuples(backend: SqliteBackend):
     """Every one of `surface`, `bucket_key` and `window_key` is its own axis: changing any one
     starts a fresh counter, and the store draws no relationship between two keys."""
-    backend.throttle_incr("login", "global", "w1")
+    backend.throttle_incr("rest", "global", "w1")
     assert backend.throttle_count("device", "global", "w1") == 0
-    assert backend.throttle_count("login", "source:1.2.3.4", "w1") == 0
-    assert backend.throttle_count("login", "global", "w2") == 0
-    assert backend.throttle_count("login", "global", "w1") == 1
+    assert backend.throttle_count("rest", "source:1.2.3.4", "w1") == 0
+    assert backend.throttle_count("rest", "global", "w2") == 0
+    assert backend.throttle_count("rest", "global", "w1") == 1
 
 
 def test_every_throttle_surface_gets_its_own_counter(backend: SqliteBackend):
@@ -86,10 +86,10 @@ def test_every_throttle_surface_gets_its_own_counter(backend: SqliteBackend):
 def test_a_throttle_count_survives_a_restart(tmp_path):
     """One substrate (storage.md §3.1): a restart lifts nothing."""
     path = tmp_path / "container.db"
-    SqliteBackend(path).throttle_incr("login", "global", "w1")
+    SqliteBackend(path).throttle_incr("rest", "global", "w1")
     reopened = SqliteBackend(path)
-    assert reopened.throttle_count("login", "global", "w1") == 1
-    assert reopened.throttle_incr("login", "global", "w1") == 2
+    assert reopened.throttle_count("rest", "global", "w1") == 1
+    assert reopened.throttle_incr("rest", "global", "w1") == 2
 
 
 def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
@@ -106,7 +106,7 @@ def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
 
     def incr(conn: SqliteBackend) -> None:
         barrier.wait()
-        value = conn.throttle_incr("login", "global", "w1")
+        value = conn.throttle_incr("rest", "global", "w1")
         with lock:
             results.append(value)
 
@@ -118,4 +118,4 @@ def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
     t2.join()
 
     assert sorted(results) == [1, 2]  # every return value distinct, no loss
-    assert a.throttle_count("login", "global", "w1") == 2
+    assert a.throttle_count("rest", "global", "w1") == 2

@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from egzos._types import ThrottleSurface
+from egzos._types import AgentRegistration, ThrottleSurface, UserGrant
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -37,11 +37,26 @@ CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit
   BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
   BEGIN SELECT RAISE(ABORT, 'audit is append-only'); END;
+-- The retired authorization server's tables (identity.md §9): never written, since the AS was
+-- never mounted, and dropped from a file made before their removal.
+DROP TABLE IF EXISTS as_sessions;
+DROP TABLE IF EXISTS as_throttle;
+DROP TABLE IF EXISTS as_clients;
+DROP TABLE IF EXISTS as_codes;
+DROP TABLE IF EXISTS as_decided;
+DROP TABLE IF EXISTS as_devices;
+DROP TABLE IF EXISTS as_refresh;
 -- ThrottleState (storage.md §3.1): the door's throttle counters, on this same substrate and
 -- connection as ContainerState, never process memory, so a restart lifts no throttle.
 CREATE TABLE IF NOT EXISTS throttle (
   surface TEXT NOT NULL, bucket_key TEXT NOT NULL, window_key TEXT NOT NULL,
   count INTEGER NOT NULL, PRIMARY KEY (surface, bucket_key, window_key));
+-- IdentityState and ConfigState (storage.md §3.2): identity.md §4's grants and registrations,
+-- and container.md §8's settings. No column holds a credential: a grant names a provider user id.
+CREATE TABLE IF NOT EXISTS user_grants (sub TEXT PRIMARY KEY, doc TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS agent_registrations (
+  client_id TEXT NOT NULL, sub TEXT NOT NULL, doc TEXT NOT NULL, PRIMARY KEY (client_id, sub));
+CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
 
@@ -270,3 +285,51 @@ class SqliteBackend:
             (surface, bucket_key, window_key),
         ).fetchone()
         return row[0] if row else 0
+
+    # -- IdentityState (storage.md §3.2) -----------------------------------------------------
+    def put_user_grant(self, grant: UserGrant) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO user_grants(sub,doc) VALUES(?,?)",
+            (grant["sub"], json.dumps(grant)),
+        )
+        self._commit()
+
+    def get_user_grant(self, sub: str) -> UserGrant | None:
+        row = self.db.execute("SELECT doc FROM user_grants WHERE sub=?", (sub,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_user_grants(self) -> list[UserGrant]:
+        rows = self.db.execute("SELECT doc FROM user_grants ORDER BY rowid")
+        return [json.loads(r[0]) for r in rows]
+
+    def put_agent_registration(self, registration: AgentRegistration) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO agent_registrations(client_id,sub,doc) VALUES(?,?,?)",
+            (registration["client_id"], registration["sub"], json.dumps(registration)),
+        )
+        self._commit()
+
+    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+        row = self.db.execute(
+            "SELECT doc FROM agent_registrations WHERE client_id=? AND sub=?", (client_id, sub)
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+        if client_id is None:
+            rows = self.db.execute("SELECT doc FROM agent_registrations ORDER BY rowid")
+        else:
+            rows = self.db.execute(
+                "SELECT doc FROM agent_registrations WHERE client_id=? ORDER BY rowid", (client_id,)
+            )
+        return [json.loads(r[0]) for r in rows]
+
+    # -- ConfigState (storage.md §3.2) -------------------------------------------------------
+    def get_config(self) -> dict[str, Any]:
+        return {k: json.loads(v) for k, v in self.db.execute("SELECT key, value FROM config")}
+
+    def put_config(self, key: str, value: Any) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO config(key,value) VALUES(?,?)", (key, json.dumps(value))
+        )
+        self._commit()

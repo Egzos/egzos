@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The container verifies sign-ins from your identity provider** (Supabase Auth, or a self-hosted
+  one): `spec/contracts/identity.md` §3's seven checks, in order, with PyJWT. A person signs in
+  once, at egzos.io; the token is bound to this one container, and what it may do is the grant
+  written here. An agent's token is admitted only through a registration an admin made for it.
+- **`egzos link --issuer … --client-id … --sub …`** links the container to the provider and grants
+  your provider user everything here. The owner token keeps working, as the way back in.
+- **`egzos config get` / `config set`** for the provider keys (`identity.*`), each change recorded
+  as `config.set`; **`egzos grant ls` / `grant rm`** for who may sign in. The last admin grant over
+  the whole container cannot be revoked.
+- Granted people and agents count in an item's audience, so moving something where a granted
+  person would newly see it stops at the gate, as it does for a minted token.
+
 ### Fixed
 
 - **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
@@ -26,7 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   revocation and metadata modules, their page templates and their sqlite tables). It was never
   mounted, and v0.7 retires it: Supabase Auth signs people and agents in, and the container verifies
   its tokens (`spec/contracts/identity.md`). The MVP step-up tap stays until the Face ID / Touch ID
-  confirm replaces it, and the REST door keeps its throttle counters.
+  confirm replaces it, and the REST door keeps its throttle counters. Two contract v1.1 amendments
+  came with it, by the Chief's merge of #286: `identity.md` §9 now removes the server ahead of the
+  PR that lands §3, keeping the tap, its two value helpers and the throttle counters; and
+  `storage.md` §3.1's draft `ASState` and `ASGateState` (#173) became `ThrottleState`.
 
 ## [0.1.2] — the CLI works from the home directory (2026-10-09)
 

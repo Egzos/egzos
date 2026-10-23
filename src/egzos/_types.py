@@ -246,6 +246,8 @@ Event = Literal[
     "client.register",
     "config.set",
     "rest.tally",
+    "identity.grant",
+    "identity.revoke",
 ]
 #: An append whose event name is not here MUST be rejected. `approval.stale` is a TOCTOU refusal,
 #: split from a human `approval.deny` (freeze item 39); `step_up` runs (the MVP tap, ahead of 2.2);
@@ -256,6 +258,8 @@ Event = Literal[
 #: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
 #: (container.md §8, [0.3 · 40]), with no config surface; and so is `rest.tally`, the REST door's
 #: per-window tally (rest.md §2, the Chief on #165 items 2 and 3), with no REST door in this tree.
+#: `config.set` runs since `egzos config set` and `egzos link` (contract v1.1); `identity.grant` and
+#: `identity.revoke` are `identity.md` §4's, running with the grants they record.
 #: events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 
@@ -412,6 +416,16 @@ class ContainerConfig(TypedDict):
     blobs_staging_retention_days: int
     #: R11 — per source→destination ring pair, manifest-shape bounded, org-configurable to ZERO.
     step_up_window_seconds: int
+    #: identity.md §2 — the issuer URL; absent, no provider (the container's own `Token` only).
+    identity_issuer: str | None
+    #: identity.md §2 — this container's own OAuth client at the provider (§3a).
+    identity_client_id: str | None
+    #: identity.md §2 — the `aud` an access token must carry.
+    identity_audience: str
+    #: identity.md §2 — the signing algorithms accepted, space-separated; never `none` or `HS*`.
+    identity_algorithms: str
+    #: identity.md §2 — the origins the REST door answers CORS for (§6), space-separated.
+    identity_browser_origins: str
 
 
 CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
@@ -421,6 +435,11 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "blobs_inline_max_bytes": 64 * 1024,
     "blobs_staging_retention_days": 30,
     "step_up_window_seconds": 300,
+    "identity_issuer": None,
+    "identity_client_id": None,
+    "identity_audience": "authenticated",
+    "identity_algorithms": "ES256 RS256",
+    "identity_browser_origins": "https://egzos.io",
 }
 
 #: Wire key -> `ContainerConfig` field. **The dotted names are canonical** (container.md §8): they
@@ -443,6 +462,11 @@ CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
     "blobs.inline_max_bytes": "blobs_inline_max_bytes",
     "blobs.staging_retention_days": "blobs_staging_retention_days",
     "step_up.window_seconds": "step_up_window_seconds",
+    "identity.issuer": "identity_issuer",
+    "identity.client_id": "identity_client_id",
+    "identity.audience": "identity_audience",
+    "identity.algorithms": "identity_algorithms",
+    "identity.browser_origins": "identity_browser_origins",
 }
 
 
@@ -667,8 +691,59 @@ class ThrottleState(Protocol):
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int: ...
 
 
-#: storage.md §3.1. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
-DOOR_STATE_CONTRACTS: tuple[str, ...] = ("ThrottleState",)
+# --- who may call the container, and its settings (storage.md §3.2) -------------------------
+#
+# identity.md §4's two records and container.md §8's settings, durable container state on the
+# `ContainerState` substrate and never delegated (F3), like the throttle above.
+
+
+class UserGrant(TypedDict):
+    """identity.md §4: what a provider user may do here. `sub` is the provider's user id."""
+
+    sub: str
+    name: str  # rest.md §4.3's display name; untrusted display data
+    capabilities: list[Capability]
+    scopes: list[str]
+    created_at: str
+    revoked: bool
+
+
+class AgentRegistration(TypedDict):
+    """identity.md §4: an agent's OAuth client, admitted here for the one user it serves."""
+
+    client_id: str
+    sub: str
+    name: str
+    capabilities: list[Capability]
+    scopes: list[str]
+    created_at: str
+    revoked: bool
+
+
+class IdentityState(Protocol):
+    """identity.md §4's grants and registrations. The getters return revoked records too: the
+    caller judges liveness, and a revoked record is kept so its history reads back."""
+
+    def put_user_grant(self, grant: UserGrant) -> None: ...
+    #: ^ insert or replace, keyed on `sub`
+    def get_user_grant(self, sub: str) -> UserGrant | None: ...
+    def list_user_grants(self) -> list[UserGrant]: ...
+    def put_agent_registration(self, registration: AgentRegistration) -> None: ...
+    #: ^ insert or replace, keyed on `(client_id, sub)`
+    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None: ...
+    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]: ...
+
+
+class ConfigState(Protocol):
+    """container.md §8's object as set: wire key -> value. A key never set is absent, and the
+    reader serves `CONTAINER_CONFIG_DEFAULTS` for it (absence by absence, never by truthiness)."""
+
+    def get_config(self) -> dict[str, Any]: ...
+    def put_config(self, key: str, value: Any) -> None: ...
+
+
+#: storage.md §3.1 and §3.2. Kept apart from `STORAGE_CONTRACTS`, which is the frozen 0.3 set.
+DOOR_STATE_CONTRACTS: tuple[str, ...] = ("ThrottleState", "IdentityState", "ConfigState")
 
 
 __all__ = [
@@ -706,6 +781,7 @@ __all__ = [
     "TOKEN_PRINCIPALS",
     "TRUST_STATUSES",
     "VERIFIED_ONLY_KINDS",
+    "AgentRegistration",
     "ArtifactContent",
     "AudienceMember",
     "AuditEntry",
@@ -715,6 +791,7 @@ __all__ = [
     "BlobStore",
     "Capability",
     "ClientRegisterOp",
+    "ConfigState",
     "ContainerConfig",
     "ContainerState",
     "ContainerType",
@@ -722,6 +799,7 @@ __all__ = [
     "DeviceRedemptionCause",
     "Event",
     "GrantDecision",
+    "IdentityState",
     "ItemStore",
     "Kind",
     "Lifecycle",
@@ -746,4 +824,5 @@ __all__ = [
     "TokenPrincipal",
     "Trust",
     "TrustStatus",
+    "UserGrant",
 ]

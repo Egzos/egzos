@@ -11,21 +11,21 @@ and `::test_reads_are_audited`.
 
 ## 1 · The vocabulary
 
-An appended event whose name is not in this list MUST be rejected. **Thirty-one names are listed
-below**: eighteen **run**, and thirteen (`blob.grant`, `client.register`, `config.set`,
-`rest.tally` and the nine `authz.*` rows) are **decided, not running** — `blob.grant` by F5,
-`rest.tally` by the Chief on #165 (2026-10-09), the other eleven by the 0.3 freeze: the nine
-`authz.*` and `client.register` for the container's authorization server
-(`authorization-server.md` §5, §9.3, §11.9 and §12; [0.3 · 29, 31, 33, 36], #140, #144), and
-`config.set` for the config object (`container.md` §8; [0.3 · 40]). The typed vocabulary in this
-repository — `_types.py`'s `Event`, and the `EVENTS` tuple derived from it — carries **all
-thirty-one**, the thirteen included: `AuditEntry.event` is typed `Event`, and each emitter needs its
-member on the day it lands. So a validator written against `EVENTS` accepts an append under any of
-the thirteen today, and **nothing in this tree rejects one** — what is not running is the *emitter*:
-no code path mints a `BlobGrant`, serves an AS page or the REST door, registers a client or changes
-a config key, so no such entry is ever produced. `ledger.py` imports this tuple rather than
-restating it. Counted here because a count that disagrees with its own table, or with the constant beside it, is the kind
-of drift a reader resolves by guessing.
+An appended event whose name is not in this list MUST be rejected. **Thirty-three names are listed
+below**: twenty-one **run**, and twelve (`blob.grant`, `client.register`, `rest.tally` and the nine
+`authz.*` rows) are **decided, not running** — `blob.grant` by F5, `rest.tally` by the Chief on #165
+(2026-10-09), the other ten by the 0.3 freeze for the container's authorization server
+(`authorization-server.md` §5, §9.3, §11.9 and §12; [0.3 · 29, 31, 33, 36], #140, #144), which
+contract v1.1 retires (below). `config.set` runs since `egzos config set` and `egzos link`
+(`container.md` §8; [0.3 · 40]), and `identity.grant` and `identity.revoke` run with the grants they
+record (`identity.md` §4). The typed vocabulary in this repository — `_types.py`'s `Event`, and the
+`EVENTS` tuple derived from it — carries **all thirty-three**, the twelve included: `AuditEntry.event`
+is typed `Event`, and each emitter needs its member on the day it lands. So a validator written
+against `EVENTS` accepts an append under any of the twelve today, and **nothing in this tree rejects
+one** — what is not running is the *emitter*: no code path mints a `BlobGrant`, serves an AS page or
+the REST door, or registers a client, so no such entry is ever produced. `ledger.py` imports this
+tuple rather than restating it. Counted here because a count that disagrees with its own table, or
+with the constant beside it, is the kind of drift a reader resolves by guessing.
 
 | event | emitted when | status |
 |---|---|---|
@@ -58,8 +58,10 @@ of drift a reader resolves by guessing.
 | `authz.revoke_refuse` | the owner path refuses a revoke by `Token.id` (AS §11.9) | decided, not running |
 | `authz.grant` | the owner decides a consent request, `decision: granted` or `denied` (AS §9.3) | decided, not running |
 | `client.register` | the owner registers, amends or removes a client, `op: add · amend · remove` (AS §5) | decided, not running |
-| `config.set` | a container-config key is changed — an `admin` act (`container.md` §8) | decided, not running |
+| `config.set` | a container-config key is changed — an `admin` act (`container.md` §8) | running |
 | `rest.tally` | a window closes in which the REST door's throttle admitted a 401 or a refused redemption that names no caller (`rest.md` §2) | decided, not running |
+| `identity.grant` | a user grant or an agent registration is written, `kind: user · agent` (`identity.md` §4) | running |
+| `identity.revoke` | a grant or registration is revoked, or the last admin grant's revoke is refused (`identity.md` §4) | running |
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
@@ -76,7 +78,11 @@ event, so an `audit` query never has to tell them apart by `details`.
 `authz.redeem`, `authz.refuse`, `authz.reject`, `authz.render`, `authz.tally`, `authz.revoke_refuse`,
 `authz.grant` and `client.register` have no surface left, and no code appends them. Their rows and
 `_types.py`'s `Event` members stay, as the record of what was frozen. **`authz.release` is not
-retired**: the REST door's throttle releases under it (`rest.md` §2 item 7). **a1p.**
+retired**: the REST door's throttle releases under it (`rest.md` §2 item 7). So are four of the six
+throttle surfaces `authz.release` may name (`_types.py`'s `ThrottleSurface`): `login`, `device`,
+`authorize` and `revoke` were the retired server's pages, and no code throttles or releases under
+them; they stay in the closed vocabulary as the record. `tap` and `rest` are the living ones.
+**a1p.**
 
 **A consent decision is none of the three: it is `authz.grant`** (`authorization-server.md` §9.3,
 [0.3 · 29]). One row, `details` `{client_id, decision, scopes, capabilities}`, with `decision`

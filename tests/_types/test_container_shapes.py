@@ -54,6 +54,12 @@ CONFIG_WIRE_ROWS = [
     ("blobs.inline_max_bytes", "blobs_inline_max_bytes"),
     ("blobs.staging_retention_days", "blobs_staging_retention_days"),
     ("step_up.window_seconds", "step_up_window_seconds"),
+    # identity.md §2, contract v1.1: the provider keys, entering with the code that reads them.
+    ("identity.issuer", "identity_issuer"),
+    ("identity.client_id", "identity_client_id"),
+    ("identity.audience", "identity_audience"),
+    ("identity.algorithms", "identity_algorithms"),
+    ("identity.browser_origins", "identity_browser_origins"),
 ]
 
 # `model.BASELINE_CREATE` — what the default floor must reproduce (v0.3 §2).
@@ -135,6 +141,11 @@ def test_container_config_defaults_cover_every_key_and_are_the_skeletons_constan
         "blobs_inline_max_bytes": 65536,
         "blobs_staging_retention_days": 30,
         "step_up_window_seconds": 300,
+        "identity_issuer": None,
+        "identity_client_id": None,
+        "identity_audience": "authenticated",
+        "identity_algorithms": "ES256 RS256",
+        "identity_browser_origins": "https://egzos.io",
     }
 
 
@@ -195,10 +206,8 @@ def test_the_wire_mapping_covers_the_config_object_and_nothing_else():
 
 
 def test_no_config_wire_key_is_spelled_the_same_as_its_field():
-    """Every row differs, so a loader that skips the mapping fails on all six, never on some.
-
-    Unlike `CONSENT_KIND_FROM_CLIENT_TYPE`, where two of three rows are identities and the bug can
-    hide, this mapping has no row that works by accident.
+    """Every row differs, so a loader that skips the mapping fails on every key, never on some:
+    no row works by accident, as a mapping whose rows are mostly identities would let a bug hide.
     """
     for wire_key, field in t.CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY.items():
         assert "." in wire_key, wire_key

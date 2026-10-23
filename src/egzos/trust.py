@@ -15,6 +15,7 @@ No capability reaches them: a maximally granted client can only PROPOSE.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from egzos._ids import ulid
@@ -41,6 +42,10 @@ class TrustEngine:
         self.backend = backend
         self.ledger = ledger
         self.nodes = nodes
+        # The audience beyond minted tokens: the container wires in its grants and registrations
+        # (identity.md §4), and how to re-read a caller under the lock, whichever kind it is.
+        self.principals: Callable[[], Iterable[Token]] = list
+        self.refresh: Callable[[Token], Token | None] = lambda t: self.backend.get_token(t.id)
 
     # -- coverage & audience -----------------------------------------------------------------
     def covers(self, token: Token, node: Node) -> bool:
@@ -53,9 +58,10 @@ class TrustEngine:
         return any(s in ancestor_ids for s in token.scopes)
 
     def audience(self, node: Node) -> list[dict[str, Any]]:
-        """Who can see `node`: every live token whose coverage reaches it — people AND agents."""
+        """Who can see `node`: every live token whose coverage reaches it — people AND agents —
+        and every live user grant and agent registration (identity.md §4), counted the same way."""
         out = []
-        for t in self.backend.list_tokens():
+        for t in [*self.backend.list_tokens(), *self.principals()]:
             if self.covers(t, node):
                 out.append(
                     {
@@ -345,7 +351,7 @@ class TrustEngine:
         second waits here, then finds it decided and lands nothing. The answer is the one a
         missing id gets."""
         current = self.backend.get_proposal(proposal_id)
-        fresh = self.backend.get_token(token.id)
+        fresh = self.refresh(token)
         if not current or current["status"] != "open" or not fresh:
             raise TrustError("no open proposal with that id")
         if not self.decides_over(fresh, current):

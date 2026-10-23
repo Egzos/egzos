@@ -138,7 +138,7 @@ authorization; the container decides what a session may do). Two records, kept i
 never delegated (F3):
 
 ```
-UserGrant          { sub, capabilities, scopes, created_at, revoked }
+UserGrant          { sub, name, capabilities, scopes, created_at, revoked }
 AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, revoked }
 ```
 

@@ -10,9 +10,19 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
+from egzos._types import CONTAINER_CONFIG_DEFAULTS, CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
 from egzos.auth import Auth
 from egzos.backends import SqliteBackend
+from egzos.identity import (
+    IDENTITY_KEYS,
+    ConfigError,
+    GrantToken,
+    Identity,
+    node_ancestors,
+    validate,
+)
 from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
@@ -45,6 +55,46 @@ class Container:
         self.store.covers = self.trust.covers
         self.store.shown = lambda token, item, node: shown(self, token, item, node)
         self.nodes.covers = self.trust.covers
+        self.identity = Identity(
+            self.backend,
+            self.ledger,
+            self.config_value,
+            ancestors=node_ancestors(self.backend.get_node, self.nodes.ancestors),
+            atomic=self.backend.atomic,
+        )
+        self.trust.principals = self.identity.audience_tokens
+        self.trust.refresh = self._refresh
+
+    def _refresh(self, token: Token) -> Token | None:
+        """The caller as it stands now: a minted token re-read, a grant re-derived (§4)."""
+        if isinstance(token, GrantToken):
+            return self.identity.refresh(token)
+        return self.backend.get_token(token.id)
+
+    # -- the container-config object (container.md §8) ------------------------------------------
+    def config_value(self, key: str) -> Any:
+        """The value of a wire key as set, or its default. Absence is tested by absence, never by
+        truthiness (`CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY`): an empty string set is a value."""
+        stored = self.backend.get_config()
+        if key in stored:
+            return stored[key]
+        return CONTAINER_CONFIG_DEFAULTS[CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY[key]]  # type: ignore[literal-required]
+
+    def set_config(self, key: str, value: Any, *, token: Token) -> Any:
+        """Set a key: an `admin` act over the whole container, from a person (§8), recorded by
+        `config.set` with the value as it then stands. Only the keys code here reads are settable;
+        the rest are still the constants they always were, and setting one would be a lie."""
+        if token.principal != "interactive" or not token.has("admin") or "*" not in token.scopes:
+            raise PermissionError("changing the container's config is an admin's act")
+        if key not in IDENTITY_KEYS:
+            raise ConfigError(f"{key}: not a key this container sets")
+        value = validate(key, value)
+        with self.backend.atomic():
+            self.backend.put_config(key, value)
+            self.ledger.append(
+                "config.set", actor=token.owner, principal=token.principal, key=key, value=value
+            )
+        return value
 
     @property
     def initialized(self) -> bool:

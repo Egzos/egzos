@@ -35,6 +35,9 @@ OWNER_STATE_EVENTS = ("client.register", "config.set")
 # rest.md §2's per-window tally: the Chief on #165 items 2 and 3.
 REST_EVENTS = ("rest.tally",)
 
+# identity.md §4's grants (contract v1.1), entering with the code that appends them.
+IDENTITY_EVENTS = ("identity.grant", "identity.revoke")
+
 # The nineteen names events.md §1 carried before this PR, unchanged and in place.
 PRIOR_EVENTS = (
     "container.init",
@@ -59,9 +62,11 @@ PRIOR_EVENTS = (
 )
 
 
-def test_event_is_the_prior_nineteen_then_authz_then_owner_state_then_the_rest_tally():
-    assert t.EVENTS == PRIOR_EVENTS + AUTHZ_EVENTS + OWNER_STATE_EVENTS + REST_EVENTS
-    assert len(t.EVENTS) == len(set(t.EVENTS)) == 31
+def test_event_is_the_prior_nineteen_then_authz_then_owner_state_then_rest_then_identity():
+    assert t.EVENTS == (
+        PRIOR_EVENTS + AUTHZ_EVENTS + OWNER_STATE_EVENTS + REST_EVENTS + IDENTITY_EVENTS
+    )
+    assert len(t.EVENTS) == len(set(t.EVENTS)) == 33
 
 
 def test_authz_family_is_exactly_the_nine():
