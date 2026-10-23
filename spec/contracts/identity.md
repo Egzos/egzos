@@ -36,8 +36,9 @@ container that runs today. **a1p.**
 
 Six keys join the container-config object (`container.md` §8), changed by the same `admin` act and
 recorded by the same `config.set`. None holds a secret: the provider's keys are public (§3), and the
-container's client is a public client. **a1p**, all six. They enter `container.md` §8's table and `_types.py`'s `ContainerConfig` with the code that reads
-them, as that table's conformance test requires.
+container's client is a public client. **a1p**, all six. They enter `container.md` §8's table and
+`_types.py`'s `ContainerConfig` with the code that reads them, as that table's conformance test
+requires.
 
 | key | default | what it is |
 |---|---|---|
@@ -106,6 +107,17 @@ session. Each token is bound to one container through the provider's own OAuth 2
   request, under the confirm (§4). A self-hosted provider with its own consent page owes the same rule.
   **a1p** (a1r on #282). A container accepts only a `client_id` registered here.
 - **A token for one container is refused at every other**, at check 6, with the one `401`.
+- **A container-bound token is not a provider session.** It is presented only to the container it
+  names: never to the provider's authorization, consent or account endpoints, and a container never
+  forwards a caller's token anywhere, the provider included. A provider whose consent endpoint
+  accepted such a token would let any container that receives a person's token approve a sign-in in
+  that person's name, for that person's other containers, and be handed the code. So the consent page
+  egzos.io hosts acts with egzos.io's own first-party session (a token with no `client_id`, which
+  every container refuses at check 6), and a container reads nothing from the provider with a
+  caller's token (`rest.md` §4.3). **a1p** (a6 on #285). `TODO(a1p)`, #283: confirm, before the door
+  ships, that Supabase's consent endpoints refuse an access token carrying a `client_id`; if they
+  accept one, this binding does not hold against a hostile container, and the Chief decides before
+  the door ships.
 
 **A failed check appends no entry of its own**: the request is unauthenticated (`rest.md` §2 clauses 5
 and 6), and the container appends no entry naming a caller it could not verify, whichever check failed.
@@ -163,7 +175,8 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   coverage reaches a container. The gate computes its delta over all three. **a1p.**
 - **Revocation** is an admin revoking a grant or a registration here, or the person a registration
   serves revoking it (narrowing is never gated), effective on the next request (check 7 runs every
-  time); the last grant holding `admin` over `["*"]` is never revoked. Signing the user out at the provider ends their tokens at `exp`.
+  time); the last grant holding `admin` over `["*"]` is never revoked. Signing the user out at the
+  provider ends their tokens at `exp`.
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
   `capabilities` and `scopes`. They enter `events.md` §1 with the code that appends them. **a1p.**
 

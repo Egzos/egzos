@@ -456,7 +456,7 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
 | `DELETE /v1/agents/{client_id}?sub=` | revoke one registration | the person it serves, or an admin | `{"result": "revoked"}` | `identity.revoke` |
 | `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | as revoke | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
 | `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
-| `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `step_up` where a proof was presented; `identity.credential` |
+| `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
 | `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
 
 - **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
@@ -472,16 +472,18 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   characters, untrusted display data. A role bundle expands at grant time (`capabilities.md` §2). No
   grant or registration exceeds the granter's own grant: wider capabilities or scopes are §3's refusal.
 - **Who registers an agent.** Only an admin, and the registration serves that admin (`identity.md` §4).
-- **The consent page's flow is verified, not trusted.** `POST /v1/agents` carries the provider's
-  `authorization_id`. Before the first leg answers, the container asks the provider — with the caller's
-  own provider token — for that authorization, and requires it to be pending, requested by the caller's
-  own `sub`, for the body's `client_id`, and for no more than the body's scopes. Any mismatch, and an
-  unknown or already-decided authorization, is §3's refusal. **Checking the authorization and writing
-  the registration are one atomic step keyed on `authorization_id`**: of two concurrent requests
-  naming one authorization, at most one registers, and every later request naming it is §3's refusal,
-  whatever the provider says. Only after the registration is written does egzos.io tell the provider
-  to issue. A `client_id` registered on another container is refused there by the consent page
-  (`identity.md` §3a).
+- **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
+  §3a), so it does not read the provider's authorization itself. The consent page egzos.io hosts
+  reads it with egzos.io's own first-party session, refuses a `client_id` registered on another
+  container (`identity.md` §3a), and only then calls this route. What the container holds to is the
+  admin's confirm: the first leg's `newly` names the registration — its `name`, untrusted display
+  data, beside its `client_id` — and the challenge is bound to the body's `client_id`, its
+  capabilities as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`.
+  **a1p** (a6 on #285).
+- **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
+  authorization, at most one registers, and every later request naming it is §3's refusal.
+  `identity.grant` records it as `details.authorization_id`, so the consent page's record and the
+  container's join. Only after the registration is written does egzos.io tell the provider to issue.
 - **The agent log serves only what the reader may see now.** It lists the agent's entries for that
   person (`details.for`), and omits every entry that was a refusal — a probe's `context.fetch` with
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
@@ -492,8 +494,13 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
   refused`, `details.reason: last_admin`.
 - **Credential registration has two legs.** The first answers `{"result": "register", "challenge",
   "webauthn": <PublicKeyCredentialCreationOptions>, "expires_at"}`, a challenge bound to the caller as
-  §4.2's are, and appends nothing. The second carries `{"challenge", "attestation", "confirm"?}`; user
-  verification is required.
+  §4.2's are. For a person who already has a credential it also answers `"confirm": {"challenge",
+  "webauthn": <PublicKeyCredentialRequestOptions>}`: a second challenge, for the assertion the second
+  leg's `confirm` carries, issued and bound as §4.2's first leg issues one (the act `credential.add`).
+  That first leg lists the person's credentials to their authenticator, so it appends §4.2's first-leg
+  `context.fetch` (`details.read: credentials`); a first leg for a person with no credential appends
+  nothing. The second leg carries `{"challenge", "attestation", "confirm"?}`; user verification is
+  required.
   - **A person with a credential adds another only with a biometric proof from an existing one** in
     `confirm`. The button is refused on this route whatever `confirm.allow_button` says, so a stolen
     session cannot add the thief's authenticator.
@@ -505,16 +512,24 @@ list is viewer-scoped and complete (§4). Every read appends `context.fetch` wit
     token's most recent authentication (its `amr` timestamp) within the last 300 seconds. A token
     lifted from a session that signed in earlier cannot enrol one. Where `confirm.allow_button` is
     `false`, the first credential is enrolled only from the owner's own surfaces (the lifeboat or the
-    CLI, holding the owner `Token`).
+    CLI, holding the owner `Token`), which enrol the owner's own authenticator: **while buttons are
+    off, a person other than the owner who has no credential cannot enrol one, and so cannot perform
+    a confirm-gated act.** That is the cost of the stronger setting, taken on purpose: an owner turns
+    buttons off after the people who need the confirm have enrolled. **a1p** (a1r on #285).
   - **What stays open, on the record:** whoever holds a fresh session of a person who has no
     credential yet can enrol the first one. **Recovery:** an admin removes a person's credentials
     (`DELETE /v1/credentials/{id}?sub=`, with the admin's own confirm), and the owner can remove any
     from the CLI or the lifeboat with the owner `Token`; the person then enrols again.
   - **Every second leg that concludes is audited**: `step_up` first where a `confirm` proof was
-    presented (as §4.2 item 4, refused ones included), then `identity.credential` with `details.op:
-    add` and `outcome: added` or `refused` with `details.reason` (`attestation`, `stale`, `no_proof`,
-    `not_fresh`, `button_refused`). The caller's answer to a refusal is a fresh `register`, whatever the
-    reason.
+    presented (as §4.2 item 4, refused ones included), then `identity.credential`. An add carries
+    `details.op: add` and `outcome: added`, or `refused` with `details.reason` (`attestation`, `stale`,
+    `no_proof`, `not_fresh`, `button_refused`); the caller's answer to a refusal is a fresh `register`,
+    whatever the reason. A removal carries `details.op: remove` and `outcome: removed`, or `refused`
+    with `details.reason` (`stale`, `no_proof`, `button_refused`, `assertion`); the answer to a refusal
+    is a fresh `confirm`. **Every removal appends it, on every surface**: the owner's removal from the
+    CLI or the lifeboat with the owner `Token` appends `identity.credential` (`op: remove`, `actor` the
+    owner) too, since a removal reopens the button for that person. A `sub` the admin does not cover is
+    §3's refusal before any leg, and follows §4's rule for a refusal.
 - **New events**: `identity.grant` and `identity.revoke` (`details.kind`: `user` or `agent`), as
   `identity.md` §4 names them, and `identity.credential` (`details.op`: `add` or `remove`; never key
   material). They enter `events.md` §1 with their code (§5).
