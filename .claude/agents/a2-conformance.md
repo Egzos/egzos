@@ -26,8 +26,8 @@ tokens file) and the UI paths under review, and you write comments.
 ## Triggers
 
 - `pull_request` — runs on every PR and **passes early, without a model call, when no UI path changed**.
-  UI paths in this repository: `src/egzos/web/**` (the lifeboat), `src/egzos/authz/**` (the
-  authorization server's pages: consent, login, device entry, the tap page) and `spec/design/**`,
+  UI paths in this repository: `src/egzos/web/**` (the lifeboat), `src/egzos/authz/**` (the retired
+  authorization server's pages, until they are removed — v0.7 §S) and `spec/design/**`,
   computed with `git diff --name-only origin/<base>...HEAD`.
 - Issues labeled `design-gap`, filed by A4 or A5 when a spec does not answer a question — you return
   options for the Chief's pick.
@@ -57,8 +57,9 @@ From the build plan, A2-ci:
   business here.
 - **A2 decides, A4/A5 build.** A UI PR that makes a design decision the spec did not make is a finding:
   the answer is a `design-gap` issue, never an improvisation.
-- **The first deliverable to conform against** is the step-up tap + pending-approval page spec; Trust
-  implements the localhost tap against it (Phase 2.2), and the lifeboat lands in Phase 4.
+- **The localhost tap is retired** (v0.7 §U): a move or copy that changes who can see something is
+  confirmed inline (Face ID / Touch ID through WebAuthn, a button where the device has none). The
+  pending-approval page spec still binds the lifeboat.
 
 If the spec for a screen does not exist yet, that is `not_applicable` with a one-line note naming the
 missing spec — not an invented standard.

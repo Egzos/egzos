@@ -8,10 +8,10 @@ This file binds every agent that runs in this repository. Read it first, then yo
 ## What this repository is
 
 `egzos` is the source-available core of egzos — an MCP-first, CLI-first personal context layer where the user's
-container is the home and platforms are clients. **Public from commit one**, source-available under the
-PolyForm Strict License 1.0.0 from v0.1.1 (the Chief, 2026-10-09; v0.1.0 and earlier were Apache-2.0). The closed,
-paid flagship (`egzos.io` UI, hosting, relay, server-side intelligence) lives in the sibling
-`Egzos/egzos-platform` (proprietary; public only while it holds nothing but scaffolding, private from
+container is the home and platforms are clients. **Public from commit one**, apart from a private interval in
+October 2026 (public again from 2026-10-23); source-available under the PolyForm Strict License 1.0.0 from v0.1.1
+(the Chief, 2026-10-09; v0.1.0 and earlier were Apache-2.0). The closed, paid flagship (`egzos.io` UI,
+hosting, relay, server-side intelligence) lives in the sibling `Egzos/egzos-platform` (proprietary; public only while it holds nothing but scaffolding, private from
 its first product-code commit — D10), split from this repo on the container contract. The core is free for
 noncommercial use under its licence; commercial use needs a separate licence from the Chief.
 Experiences and infrastructure are the flagship's, over there (the Chief, 2026-10-09, #193).
@@ -19,6 +19,23 @@ Experiences and infrastructure are the flagship's, over there (the Chief, 2026-1
 The build is contract-first: `spec/contracts/**` is drafted from the walking skeleton (Phase 0.2),
 reviewed by A6 and the Chief personally (Phase 0.3), and is then law. Changing a frozen contract is an
 escalation issue to a1p-planner, batched at phase boundaries — never a drive-by.
+
+The Chief's current decisions are `docs/build/egzos-decisions-v0.7-amendments.txt` (2026-10-23): Supabase
+for login, agent sign-in, the hosted database and file storage; one login; the Face ID / Touch ID confirm;
+places with git-like push and pull; copy beside move. Where an older text disagrees, v0.7 wins — except
+`spec/contracts/**`: a frozen contract stays law until the contract version that carries v0.7 lands.
+
+## Buy, don't build
+
+If a widely used service or library does the job, use it. Login, OAuth, sessions, passkeys, databases,
+file storage, payments, hosting, DNS, email, queues, cloud-storage connectors and crypto primitives are
+bought — a paid service or a maintained open-source project — never built. We build only what egzos is:
+the node model and resolver, the trust rules and the gate, the ledger, the container contract, sync
+between places, and the experience. Building a commodity piece needs the Chief's explicit yes, recorded in
+the decisions log; an issue or PR that would build one says so in its first line and names the service
+it passed over. A reviewer who finds commodity infrastructure built without that record raises it as a
+finding. (v0.7 §R. The container's own OAuth server, built without this question being asked, is the
+reason for the rule and is retired.)
 
 ## The trust posture (the build dogfoods the product)
 
@@ -129,7 +146,7 @@ console before the first real run (`MODEL_*` env in the workflows mirrors this t
 | a1r-reviewer | reviews every PR for contract conformance, trust invariants, audit coverage, cross-module consistency; owns integration + conformance suites; nightly integration + drift report; reviews a1p's output | `pull_request`, nightly |
 | a2-conformance | design-gap issues (options for the Chief's pick) and design-conformance comments on UI PRs — comment-only; required check on UI paths | `pull_request` (UI paths), `design-gap` label |
 | a3-store | node model, resolver, find/%n, local ONNX embeddings, auto-title pipeline; until Phase 5 also sqlite backend, blob store, `.xmb` core along the seam a1p cuts | queue label |
-| a3-trust | the trust engine, tokens/presence, and the container's OAuth 2.1 authorization server (PKCE, device-code, MCP clients; consent + step-up pages); the localhost tap against A2's spec | queue label |
+| a3-trust | the trust engine, tokens and the confirm (Face ID / Touch ID via WebAuthn, button fallback), and verifying Supabase-issued tokens — the container is a resource server; its own OAuth server is retired (v0.7 §S) | queue label |
 | a3-ledger | append-only hash-chained audit, event taxonomy, anomaly primitives, `audit anomalies` | queue label |
 | a3-doorman | `cli/` + `mcp/` + REST surface; both MCP transports; `.xmb` verbs; `serve --tls`; the CLI/MCP injection boundary | queue label |
 | a5-dinghy | the lifeboat: FastAPI + Jinja + htmx, in-process, tokens as CSS variables, no JS toolchain | queue label |

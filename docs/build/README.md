@@ -17,6 +17,15 @@ publicity and disclosure (§L), runtime topology (§M), sequencing and consisten
 ratified defaults (§O), and the design system and component sourcing charter (§P).
 Compiled 2026-09-03.
 
+**`egzos-decisions-v0.7-amendments.txt`**
+The v0.7 amendment set: the Chief's calls of 2026-10-22/23. Covers: buy, don't build (§R); Supabase
+for login, agent sign-in, the hosted database and file storage, with the container's own authorization
+server retired (§S); one login (§T); the Face ID / Touch ID confirm (§U); places and git-like sync, copy
+beside move (§V); the egzosux experience, J4S and the three.js stack (§W); Stripe behind a provider
+interface (§X); the repository public again (§Y); no automatic deletion (§Z). Where it disagrees with
+an older text, it wins, except a frozen contract in `spec/contracts/**`, which stays law until the
+contract version that carries v0.7 lands. Compiled 2026-10-23.
+
 **`REVIEW-DECISIONS.md`**
 The review register: settled review dispositions that a1r-reviewer and a2-conformance consult
 **before** raising a finding, so a settled point is cited rather than re-litigated on every PR

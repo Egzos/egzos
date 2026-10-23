@@ -57,9 +57,9 @@ From the build plan, A1 FOREMAN / A1p PLANNER:
   (content-addressing, signed URLs, staging prefix), the backends and the `.xmb` core are written to
   move to Vault whole.
 - **Phase 0.2 — draft the frozen artifacts FROM THE RUNNING SHAPES** of the walking skeleton, as
-  `spec/*.md` plus typed stubs: the ContextItem schema; the container contract including the
-  authorization-server surface (auth-code + PKCE, device-code, MCP clients, client registration /
-  redirect allowlist for egzos.io and localhost, AS metadata); the backend contract; the capability
+  `spec/*.md` plus typed stubs: the ContextItem schema; the container contract (its
+  authorization-server surface is retired by the v0.7 decisions, §S: Supabase issues tokens and the
+  container verifies them — the next contract version carries that); the backend contract; the capability
   vocabulary (`enterprise` omitted); the event taxonomy (approvals included). Note contract v1.1 scope
   (intelligence read surface + AS metadata) for the Phase 5 boundary (R7) — planned, not a Phase 6
   escalation, and reviewed there by Chief + A1p + A6.
