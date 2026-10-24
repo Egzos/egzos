@@ -430,6 +430,25 @@ def mv(
         )
 
 
+@app.command()
+def rm(item: str = typer.Argument(..., help="Item id or %n")):
+    """Tombstone an item no person has promoted, so no read serves it again (an inbox thread a
+    capture opened keeps its name). An agent's file still staged goes with it, unless another upload
+    or staged item holds the same bytes. A promoted item is tombstoned only at the door, where the
+    confirm asks the person: any process that can run this terminal could run `rm` (rest.md §4)."""
+    c = _container()
+    token = _admin(c, "tombstoning an item")
+    from egzos.store.uploads import Promoted
+
+    try:  # the store decides under its lock, so an item promoted since `_item_ref` read it stays
+        gone = c.uploads.tombstone(token, _item_ref(c, item).id, unpromoted_only=True)
+    except Promoted:
+        _fail("a promoted item is tombstoned at the door, where the confirm asks you")
+    if gone is None:
+        _fail("not found")  # quarantined, or gone since: as absent (silence-not-errors)
+    _out({"id": gone.id, "tombstoned": True}, f"tombstoned {gone.id}")
+
+
 # -- trust ------------------------------------------------------------------------------------
 @trust_app.command("pending")
 def trust_pending():
