@@ -32,6 +32,7 @@ def test_defaults_until_set_and_absence_is_not_falsiness(box):
     assert box.config_value("identity.audience") == "authenticated"
     assert box.config_value("identity.algorithms") == "ES256 RS256"
     assert box.config_value("identity.browser_origins") == "https://egzos.io"
+    assert box.config_value("identity.origin") is None  # the door uses the origin it binds
     box.set_config("identity.browser_origins", "", token=box.owner)
     assert box.config_value("identity.browser_origins") == ""
 
@@ -70,6 +71,19 @@ def test_only_the_keys_this_version_reads_are_settable(box):
         ("identity.browser_origins", "https://egzos.io/path"),
         ("identity.browser_origins", "http://egzos.io"),
         ("identity.browser_origins", "egzos.io"),
+        ("identity.browser_origins", "https://egzos.io:443"),
+        *(("identity.origin", v) for v in (
+            "https://box.example/mcp", "http://box.example", "https://box.example?x=1",
+            "https://a.example https://b.example", "", 443,
+            # only the form a browser sends: published as held, so nothing around it, no default
+            # or impossible port, and no character a header or another URL parser reads apart
+            " https://box.example", "https://box.example ", "https://box.ex\tample",
+            "https://box.example\r\n", "https://box.example:abc", "https://box.example:99999",
+            "https://box.example:443", "https://box.example:", "https://box.example?",
+            "https://box.example#", "https://@box.example", "HTTPS://Box.Example",
+            'https://box.example",error="x', "https://evil.example\\.box.example",
+            "https://b\u00f3x.example", "https://box\uff03example", "https://[0:0:0:0:0:0:0:1]",
+            "https://[1:2]")),
     ],
 )
 def test_values_a_container_will_not_hold(key, value):
@@ -83,6 +97,10 @@ def test_loopback_may_use_plain_http_and_duplicates_collapse():
         "http://localhost:5173"
     )
     assert validate("identity.algorithms", "ES256 ES256 RS256") == "ES256 RS256"
+    for origin in ("http://[::1]:7426", "http://localhost", "https://box.example",
+                   "https://box.example:8443", "https://[2001:db8::1]:8443"):
+        assert validate("identity.origin", origin) == origin
+    assert validate("identity.origin", None) is None
 
 
 # -- grants (§4) -----------------------------------------------------------------------------------

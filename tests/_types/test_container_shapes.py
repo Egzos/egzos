@@ -60,6 +60,7 @@ CONFIG_WIRE_ROWS = [
     ("identity.audience", "identity_audience"),
     ("identity.algorithms", "identity_algorithms"),
     ("identity.browser_origins", "identity_browser_origins"),
+    ("identity.origin", "identity_origin"),  # the container's public origin (#294)
     ("confirm.allow_button", "confirm_allow_button"),
     # rest.md §4.4, contract v1.1: the upload's limit, entering with the code that reads it.
     ("blobs.upload_max_bytes", "blobs_upload_max_bytes"),
@@ -149,6 +150,7 @@ def test_container_config_defaults_cover_every_key_and_are_the_skeletons_constan
         "identity_audience": "authenticated",
         "identity_algorithms": "ES256 RS256",
         "identity_browser_origins": "https://egzos.io",
+        "identity_origin": None,
         "confirm_allow_button": True,
         "blobs_upload_max_bytes": 104857600,
     }

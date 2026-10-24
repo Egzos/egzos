@@ -201,10 +201,17 @@ class Door:
         return self.c.nodes.user_root()
 
     def scope(self, token: Token, ref: str | None) -> Node | None:
-        """A covered node, or None for absent and uncovered alike. Raises `AmbiguousRef`."""
+        """A covered node, or None for absent and uncovered alike. Raises `AmbiguousRef` to a
+        token holding `fetch`: the matches are named only to one that could list them, and to
+        any other an ambiguous tail is an absent one (§3)."""
         if ref is None:
             return self.start(token)
-        node = self.c.nodes.resolve_ref(ref, token)
+        try:
+            node = self.c.nodes.resolve_ref(ref, token)
+        except AmbiguousRef:
+            if token.has("fetch"):
+                raise
+            return None
         return node if node and self.c.trust.covers(token, node) else None
 
     def node(self, node: Node) -> dict[str, Any]:
@@ -229,7 +236,8 @@ def create_app(
     container: Container, *, door: Door | None = None, origin: str = "http://127.0.0.1:7426"
 ) -> FastAPI:
     """The door, served from `origin`: the door's own, as `serve` binds it (`bound_origin`). The
-    default is `serve`'s default bind; only tests rely on it."""
+    default is `serve`'s default bind; only tests rely on it. Where `identity.origin` is set, that
+    is the origin clients reach, and `/mcp`'s metadata and challenge name it (identity.md §2)."""
     d = door or Door(container)
     c = container
     own = origin  # the middleware's `origin` is the request's header
@@ -250,11 +258,21 @@ def create_app(
         finally:
             task.cancel()
 
+    def public() -> str:
+        """The container's public origin (identity.md §2), read on every request so that a
+        `config set` reaches a running door; absent, the origin `serve` binds."""
+        named = c.config_value("identity.origin")
+        return own if named is None else named
+
     def resource_metadata() -> Response:
-        """RFC 9728's document for `/mcp` (identity.md §7): this door's origin, and the provider
-        that issues its tokens. A container with no provider has none to name (§1)."""
+        """RFC 9728's document for `/mcp` (identity.md §7): the public origin, and the provider that
+        issues its tokens. A container with no provider has none to name (§1), so the key is left
+        out, as RFC 9728 allows."""
         issuer = c.config_value("identity.issuer")
-        return _json(200, {"resource": own, "authorization_servers": [issuer] if issuer else []})
+        doc: dict[str, Any] = {"resource": public()}
+        if issuer is not None:
+            doc["authorization_servers"] = [issuer]
+        return _json(200, doc)
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
@@ -279,15 +297,15 @@ def create_app(
         path = request.url.path
         if request.method == "OPTIONS":
             # identity.md §6: a preflight from an allowed origin gets 204 on every /v1/ path,
-            # declared or not; from any other origin, §3's refusal and no CORS header.
-            if cors and path.startswith("/v1/"):
+            # declared or not, and at /mcp; from any other origin, §3's refusal and no CORS header.
+            if cors and (path.startswith("/v1/") or path == MCP_PATH):
                 return out(Response(status_code=204, headers=HEADERS))
             return refusal()
         if path == METADATA_PATH:
             # Public and the same for every caller, so it needs no credential and is never held:
             # a client reads it to learn where to get one (identity.md §7).
             return out(resource_metadata() if request.method == "GET" else refusal())
-        metadata = own + METADATA_PATH if path == MCP_PATH else None
+        metadata = public() + METADATA_PATH if path == MCP_PATH else None
         address = request.client.host if request.client else None
         # §6: a redemption is the descriptor's alone, so no Authorization header is read on it.
         # Decided on the path the router matches, so no other route is reached without a caller.
@@ -299,6 +317,10 @@ def create_app(
         if token is None and not pull:
             d.throttle.count(address, refused=False)
             return out(unauthorized(metadata))
+        if path == MCP_PATH and request.method in ("GET", "DELETE"):
+            # identity.md §7: a stateless /mcp opens no stream and has no session to end. The
+            # transport's 405, the same for every verified caller; the 401 above came first.
+            return out(_json(405, {"error": "method_not_allowed"}, {"Allow": "POST"}))
         request.state.token = token
         with acting_for(getattr(token, "acting_for", None)):
             try:

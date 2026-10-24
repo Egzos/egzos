@@ -66,6 +66,17 @@ def test_config_get_reads_defaults_and_set_changes_one(home, capsys):
     assert code == 1
 
 
+def test_config_sets_gets_and_unsets_the_public_origin(home, capsys):
+    """identity.md §2: `identity.origin` is handled as the other identity keys are."""
+    code, out = _json(capsys, ["config", "set", "identity.origin", "https://box.example"])
+    assert code == 0 and out == {"identity.origin": "https://box.example"}
+    assert _json(capsys, ["config", "get", "identity.origin"]) == (
+        0, {"identity.origin": "https://box.example"})
+    assert _json(capsys, ["config", "set", "identity.origin", "http://box.example"])[0] == 1
+    assert _json(capsys, ["config", "set", "identity.origin", "--unset"]) == (
+        0, {"identity.origin": None})
+
+
 def test_config_set_unset_makes_a_key_absent(home, capsys):
     assert _json(capsys, ["config", "set", "identity.client_id", "c-1"])[0] == 0
     code, out = _json(capsys, ["config", "set", "identity.client_id", "--unset"])
