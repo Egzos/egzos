@@ -438,12 +438,12 @@ def rm(item: str = typer.Argument(..., help="Item id or %n")):
     confirm asks the person: any process that can run this terminal could run `rm` (rest.md §4)."""
     c = _container()
     token = _admin(c, "tombstoning an item")
-    target = _item_ref(c, item)
-    if target.status == "quarantined":
-        _fail("not found")  # as at the door: a quarantined item is §3's refusal (rest.md §4)
-    if c.uploads.promoted(target):
+    from egzos.store.uploads import Promoted
+
+    try:  # the store decides under its lock, so an item promoted since `_item_ref` read it stays
+        gone = c.uploads.tombstone(token, _item_ref(c, item).id, unpromoted_only=True)
+    except Promoted:
         _fail("a promoted item is tombstoned at the door, where the confirm asks you")
-    gone = c.uploads.tombstone(token, target.id)
     if gone is None:
         _fail("not found")  # quarantined, or gone since: as absent (silence-not-errors)
     _out({"id": gone.id, "tombstoned": True}, f"tombstoned {gone.id}")

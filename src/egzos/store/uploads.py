@@ -43,6 +43,11 @@ _DIGEST = re.compile(r"[0-9a-f]{64}")
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
 
 
+class Promoted(Exception):
+    """A tombstone that refuses promoted items found one, under the lock (rest.md §4: the terminal
+    never tombstones what a person promoted)."""
+
+
 class TooManyUploads(Exception):
     """§4.4 item 1: the caller's person already holds `MAX_HELD` uploads. A fact about their own."""
 
@@ -278,17 +283,22 @@ class Uploads:
         node = self.backend.get_node(item.scope)
         return node is not None and self.store.covers is not None and self.store.covers(token, node)
 
-    def tombstone(self, token: Token, item_id: str) -> ContextItem | None:
+    def tombstone(self, token: Token, item_id: str, *,
+                  unpromoted_only: bool = False) -> ContextItem | None:
         """Tombstone the item as it stands under the lock, with its `item.tombstone`, in one step;
         None, and nothing written, where `token` may not. An artifact whose bytes are still staged
         releases them, deleted unless another upload or staged item holds them (`_shared`), and
         `staged_deleted` records only bytes deleted in fact: another item's promotion may have
         moved them already. Promoted bytes are never deleted ([0.3 · 44]). Its upload then frees
-        its slot (`holds`). The confirm a promoted item needs is the caller's."""
+        its slot (`holds`). The confirm a promoted item needs is the caller's; with
+        `unpromoted_only`, a promoted item raises `Promoted` under the lock and nothing is written.
+        """
         with self.backend.atomic():
             item = self.backend.get(item_id)  # a tombstoned item reads as absent
             if item is None or not self.tombstonable(token, item):
                 return None
+            if unpromoted_only and self.promoted(item):
+                raise Promoted
             sha = item.content.get("sha256") if item.kind == "artifact" else None
             if not (isinstance(sha, str) and item.id in self._staged_at(sha)
                     and not self._shared(sha, item=item.id)):

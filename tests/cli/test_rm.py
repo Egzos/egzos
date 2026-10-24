@@ -107,3 +107,18 @@ def test_rm_answers_a_quarantined_item_as_the_door_does(home, capsys):
     c.trust.promote(note, token=c.require_token(), actor=OWNER)
     c.trust.quarantine(c.store.get(note.id), token=c.require_token(), actor=OWNER, reason="test")
     assert _json(capsys, ["rm", note.id]) == (1, {"error": "not found"})
+
+
+def test_rm_decides_promotion_under_the_lock_not_from_its_own_read(home, capsys, monkeypatch):
+    """An item a person promotes after `rm` read it is still refused: the store checks promotion
+    as the item stands under its lock (a1r on #307)."""
+    import egzos.cli as cli
+
+    c = Container(home)
+    note = c.store.add(body="draft", token=c.require_token(), **KW)
+    stale = c.store.get(note.id)  # read while nobody had promoted it
+    c.trust.promote(c.store.get(note.id), token=c.require_token(), actor=OWNER)
+    monkeypatch.setattr(cli, "_item_ref", lambda _c, _ref: stale)
+    code, out = _json(capsys, ["rm", note.id])
+    assert code == 1 and "door" in out["error"]
+    assert Container(home).store.get(note.id) is not None
