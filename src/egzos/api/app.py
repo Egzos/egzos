@@ -16,7 +16,8 @@ artifact arrives through an upload (§4.4): open, bytes, item, and leaves throug
 (§6): `GET /v1/fetch` and `GET /v1/items/{id}` carry one beside an artifact whose bytes do not ride
 inline, and `GET /v1/blobs/{sha256}` redeems it, by the descriptor alone, never a bearer. An admin
 lists the grants, grants access with the confirm, and ends one (§4.3), with the confirm where it is
-someone else's. The agent routes (§4.3) land with their own code; until then those paths are
+someone else's. A person lists the agents serving them and registers one with the confirm (§4.3).
+Ending a registration and the agent log land with their own code; until then those paths are
 undeclared and answer §3's refusal, like any other.
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
@@ -44,7 +45,7 @@ from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of
 from egzos.container import Container
-from egzos.identity import GrantToken, LastAdmin, display_name
+from egzos.identity import GrantToken, LastAdmin, TooManyAgents, display_name, provider_id
 from egzos.ledger import acting_for
 from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
@@ -952,6 +953,104 @@ def create_app(
             d.probe(token, sub)
             return refusal()
         return _json(200, {"result": "revoked"})
+
+    # -- agents (§4.3) --------------------------------------------------------------------------
+    def registrant(token: Token | None) -> bool:
+        """A person signed in at the provider, on any live grant: whose agents these are. A
+        container `Token` names no `sub`; an agent is never served who else holds access."""
+        return isinstance(token, GrantToken) and token.principal == "interactive"
+
+    def agent(r: dict[str, Any], seen: dict[tuple[str, str], str]) -> dict[str, Any]:
+        """§4.3's `<agent>`, `last_seen` read from the chain: null for an agent never seen."""
+        keys = ("client_id", "name", "sub", "capabilities", "scopes", "created_at")
+        return {**{k: r[k] for k in keys}, "last_seen": seen.get((r["client_id"], r["sub"]))}
+
+    @app.get("/v1/agents")
+    async def list_agents(request: Request):
+        token: Token = request.state.token
+        _only(request.query_params, set())
+        if not registrant(token):
+            d.probe(token, "agents")
+            return refusal()
+        # The registrations serving this person; for an admin over everything, everyone's.
+        live = ([r for r in c.backend.list_agent_registrations() if not r["revoked"]]
+                if grantor(token) else c.identity.serving(token.sub))
+        seen = c.identity.last_seen(live)
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read="agents", items=[], layers=[], withheld=0,
+                        agents=[{"client_id": r["client_id"], "sub": r["sub"]} for r in live])
+        return _json(200, {"agents": [agent(r, seen) for r in live]})
+
+    @app.post("/v1/agents")
+    async def add_agent(request: Request):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        if not registrant(token):  # as on the grant routes, the door never reads this body
+            d.probe(token, "agents")
+            return refusal()
+        body = await _object(
+            request, {"authorization_id", "client_id", "name", "role", "capabilities", "scopes",
+                      "confirm"}, {"authorization_id", "client_id", "name", "scopes"})
+        proof = presented(body)
+        refs = body["scopes"]
+        try:  # what the consent page relays; the name is the agent's own claim
+            authorization = provider_id(body["authorization_id"])
+            client_id = provider_id(body["client_id"])
+            name = display_name(body["name"])
+            caps = c.identity.expand(body.get("role"), body.get("capabilities"))
+        except ValueError as e:
+            raise Invalid from e
+        if not isinstance(refs, list) or not 0 < len(refs) <= scopes_max:
+            raise Invalid
+        refs = [_str(r) for r in refs]
+        # The lookups, after every shape check, resolved as a grant's are: node ids, never refs.
+        nodes = [d.scope(token, r) for r in refs if r != "*"]
+        scopes = ["*"] if "*" in refs else sorted({n.id for n in nodes if n is not None})
+        # This container's own client names a person, never an agent; a registration never
+        # exceeds the caller's own grant, and needs no `publish`; an authorization registers once.
+        head = c.ledger.tail(1)[-1]["seq"]  # the door reads the chain to here; the lock, past it
+        if (client_id == c.config_value("identity.client_id") or None in nodes
+                or c.identity.exceeds(token, caps, scopes) or c.identity.claimed(authorization)):
+            d.probe(token, client_id)
+            return refusal()
+        if c.identity.full(token.sub, client_id):  # a fact about the caller's own, before any leg
+            return _json(429, {"error": "too_many_agents"})
+        # The challenge binds the registration as it would land, beside its client (the subject):
+        # what the person is shown is what lands.
+        terms = json.dumps({"authorization_id": authorization, "name": name,
+                            "capabilities": caps, "scopes": scopes}, sort_keys=True)
+
+        def first() -> Response:  # nobody newly sees anything: the agent is named apart, as itself
+            return first_leg(token, act="agent.add", subject=client_id, destination=terms,
+                             delta=[], origin=origin,
+                             registers={"client_id": client_id, "name": name})
+
+        if proof is None:
+            return first()
+        made, reason = None, None
+        with c.backend.atomic():
+            # As on the grant routes: the caller as their grant stands now, still covering the
+            # registration, so a revoke since the door leaves no agent for a later grant to find;
+            # the door's token concludes, as only it carries the sign-in time.
+            now = c.identity.refresh(token)
+            if registrant(now) and not c.identity.exceeds(now, caps, scopes):
+                reason = c.confirm.conclude(token, proof, act="agent.add", subject=client_id,
+                                            destination=terms, delta=[], origin=origin,
+                                            fresh_sign_in=True)
+                if reason is None:
+                    try:
+                        made = c.identity.register_agent(
+                            token, client_id, authorization_id=authorization, name=name,
+                            capabilities=caps, scopes=scopes, after=head)
+                    except TooManyAgents:  # a 16th landed since the door; its step_up commits
+                        return _json(429, {"error": "too_many_agents"})
+        if reason is not None:
+            return first()
+        if made is None:  # the caller's grant changed since the door, or the authorization is spent
+            d.probe(token, client_id)
+            return refusal()
+        return _json(200, {"agent": agent(made, c.identity.last_seen([made]))})
 
     # -- confirm credentials (§4.3) -------------------------------------------------------------
     def whose(token: Token, sub: str | None) -> str | None:

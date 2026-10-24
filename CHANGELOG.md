@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The last grant holding `admin` over the whole container is never revoked, nor re-granted anything
   short of that. Revoking a grant, here or with `egzos grant rm`, also revokes every agent serving
   that person, each on the record, so a later grant starts with no agents.
+- **Agents at the door** (`rest.md` §4.3): a person signed in at the provider lists the agents
+  serving them, with when each last acted for them (`GET /v1/agents`; an admin over the whole
+  container sees everyone's), and registers one to serve themselves (`POST /v1/agents`, from the
+  consent page). Registering takes the confirm, which names the agent; a registration never
+  reaches beyond the person's own grant, and with the button registering needs a sign-in under
+  five minutes old. An authorization registers one agent, once; a person holds at most 16.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its

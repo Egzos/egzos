@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 from egzos.container import OWNER, Container
-from egzos.identity import ConfigError, LastAdmin, validate
+from egzos.identity import MAX_AGENTS, ConfigError, LastAdmin, TooManyAgents, validate
 
 ALICE, BOB = "alice-sub", "bob-sub"
 KW = {"actor": OWNER, "principal": "interactive"}
@@ -172,8 +174,6 @@ def test_two_concurrent_revokes_never_remove_the_last_admin(tmp_path):
     """a1r on #287: the check and the write are one transaction, so of two revokes racing on the
     only two whole-container admins, exactly one lands. Two containers on one file are two
     connections, as two processes would be."""
-    import threading
-
     first = Container(tmp_path)
     first.init()
     for sub in (ALICE, BOB):
@@ -226,7 +226,7 @@ def test_a_grants_display_name_is_short_and_shows_what_it_says(name, tmp_path):
 @pytest.mark.parametrize("sub", ["", "x" * 256, " bob", "b ob", "bob\n", "b\tob", "b\x00ob",
                                  "bo​b", "bob‮", "b ob", "b ob", 7])
 def test_a_grant_names_the_providers_user_id_as_one_token(box, sub):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="a grant names the provider's user id"):
         box.identity.grant_user(sub, name="bob", role="reader", scopes=["*"], **KW)
     assert box.backend.list_user_grants() == []
 
@@ -252,6 +252,51 @@ def test_a_revoke_ends_every_agent_serving_that_person_and_a_new_grant_revives_n
     assert [a["client_id"] for a in box.identity.serving(ALICE)] == ["a1"]
     box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
     assert box.identity.serving(BOB) == [] and box.identity._agent("a1", BOB) is None
+
+
+# -- agent registrations (§4, rest.md §4.3) --------------------------------------------------------
+TERMS = {"authorization_id": "auth-1", "name": "Helper", "capabilities": ["fetch"], "scopes": ["*"]}
+
+
+def test_only_a_person_registers_an_agent_and_it_serves_them(box):
+    box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
+    _agent(box, "a1", BOB)
+    for who in (box.owner, box.identity._agent("a1", BOB)):  # the owner's `Token`; an agent
+        with pytest.raises(PermissionError):
+            box.identity.register_agent(who, "helper", **TERMS)
+    made = box.identity.register_agent(box.identity._person(BOB, "box"), "helper", **TERMS)
+    assert made["sub"] == BOB and box.backend.list_agent_registrations(client_id="helper") == [made]
+
+
+@pytest.mark.parametrize("race", ["the sixteenth slot", "one authorization"])
+def test_two_concurrent_registrations_never_both_land(tmp_path, race):
+    """The checks and the write are one transaction, over the chain past what the door read: two
+    containers on one file are two connections, as two processes would be."""
+    first = Container(tmp_path)
+    first.init()
+    first.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], **KW)
+    held = MAX_AGENTS - 1 if race == "the sixteenth slot" else 0
+    for n in range(held):
+        _agent(first, f"a{n}", BOB)
+    head, gate, outcomes = first.ledger.tail(1)[-1]["seq"], threading.Barrier(2, timeout=10), []
+
+    def register(n):
+        box = Container(tmp_path)
+        terms = {**TERMS, "authorization_id": f"auth-{n}" if held else "auth-1", "after": head}
+        gate.wait()
+        try:
+            made = box.identity.register_agent(box.identity._person(BOB, "box"), f"new{n}", **terms)
+            outcomes.append("registered" if made else "spent")
+        except TooManyAgents:
+            outcomes.append("full")
+
+    threads = [threading.Thread(target=register, args=(n,)) for n in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert sorted(outcomes) == sorted(["registered", "full" if held else "spent"])
+    assert len(first.identity.serving(BOB)) == held + 1
 
 
 # -- whom a grant opens to, and how far its grantor reaches (§4, rest.md §4.2-§4.3) ----------------

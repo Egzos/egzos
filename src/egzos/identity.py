@@ -88,6 +88,15 @@ class LastAdmin(Exception):
     """§4: the last live grant holding `admin` over `["*"]` is never revoked."""
 
 
+#: rest.md §4.3: the live registrations one person holds at most, so the audience the gate
+#: computes over registrations (§4) stays bounded.
+MAX_AGENTS = 16
+
+
+class TooManyAgents(Exception):
+    """rest.md §4.3: the person already holds `MAX_AGENTS` live registrations. Their own fact."""
+
+
 #: A name shown to a person deciding something — who would newly see an item, an agent's own
 #: claim, a device — is at most this long.
 DISPLAY_NAME_MAX = 128
@@ -103,6 +112,17 @@ def display_name(value: Any, *, limit: int = DISPLAY_NAME_MAX) -> str:
         raise ValueError(f"a name of 1 to {limit} characters")
     if any(unicodedata.category(ch) in _HIDDEN for ch in value):
         raise ValueError("a name holds no control or formatting characters")
+    return value
+
+
+def provider_id(value: Any, what: str = "an id the provider issued") -> str:
+    """An id the provider issued — a user's, an OAuth client's, an authorization's — as given, or
+    `ValueError(what)`: 1 to 255 characters, with no whitespace and, as in a display name, no
+    control or formatting character, so it reads as what it is wherever it is listed."""
+    if not isinstance(value, str) or not value or len(value) > 255 or any(
+        ch.isspace() or unicodedata.category(ch) in _HIDDEN for ch in value
+    ):
+        raise ValueError(what)
     return value
 
 
@@ -516,14 +536,9 @@ class Identity:
 
     @staticmethod
     def user_id(value: Any) -> str:
-        """The provider's user id a grant names, as given, or `ValueError`: 1 to 255 characters,
-        with no whitespace and, as in a display name, no control or formatting character, so it
-        reads as what it is wherever a grant is listed. A provider's user id is a UUID."""
-        if not isinstance(value, str) or not value or len(value) > 255 or any(
-            ch.isspace() or unicodedata.category(ch) in _HIDDEN for ch in value
-        ):
-            raise ValueError("a grant names the provider's user id")
-        return value
+        """The provider's user id a grant names, read as `provider_id` reads any id the provider
+        issued. A provider's user id is a UUID."""
+        return provider_id(value, "a grant names the provider's user id")
 
     def grant_user(
         self,
@@ -691,6 +706,69 @@ class Identity:
         return bool(mine and _whole(mine)) and not any(
             _whole(g) for g in grants if g["sub"] != sub
         )
+
+    # -- agent registrations (§4, rest.md §4.3) -------------------------------------------------
+    def register_agent(self, person: GrantToken, client_id: str, *, authorization_id: str,
+                       name: str, capabilities: list[str], scopes: list[str],
+                       after: int | None = None) -> AgentRegistration | None:
+        """Write a registration serving `person` and append `identity.grant` attributed to them:
+        `kind: agent`, `for` the person, and `authorization_id` as the caller claimed it, never a
+        verified fact. Each person registers their own (v0.7 §AB). The caller has judged the act,
+        the confirm included, in the transaction this joins, and may have read the chain through
+        seq `after`. The rest of it and the cap are checked with the write, under one lock: of two
+        registrations naming one authorization at most one lands (None for the other and every
+        later one), and two at 15 never both take the 16th (`TooManyAgents`)."""
+        if not isinstance(person, GrantToken) or person.principal != "interactive":
+            raise PermissionError("registering an agent is a person's act")
+        registration: AgentRegistration = {
+            "client_id": client_id, "sub": person.sub, "name": name,
+            "capabilities": list(capabilities), "scopes": list(scopes), "created_at": now_iso(),
+            "revoked": False,
+        }
+        with self.atomic():
+            if self.claimed(authorization_id, after):
+                return None
+            if self.full(person.sub, client_id):
+                raise TooManyAgents(person.sub)
+            self.state.put_agent_registration(registration)
+            self.ledger.append(
+                "identity.grant", actor=person.owner, principal=person.principal,
+                subject=client_id, kind="agent", outcome="granted",
+                capabilities=registration["capabilities"], scopes=registration["scopes"],
+                authorization_id=authorization_id, **{"for": f"user:{person.sub}"},
+            )
+        return registration
+
+    def full(self, sub: str, client_id: str) -> bool:
+        """Whether `sub` holds `MAX_AGENTS` live registrations besides one of `client_id`, which
+        registering it again replaces: a 17th is refused, never written (rest.md §4.3)."""
+        return sum(r["client_id"] != client_id for r in self.serving(sub)) >= MAX_AGENTS
+
+    def claimed(self, authorization_id: str, after: int | None = None) -> bool:
+        """Whether a registration was ever written for this authorization, which keys one
+        (rest.md §4.3). Its only record is `identity.grant`'s `details.authorization_id`: neither
+        identity.md §4's record nor storage.md §3.2 holds it, so this reads the chain; with
+        `after`, only its tail past that seq, so a lock never waits on a read of all of it."""
+        return any(
+            e["event"] == "identity.grant" and e["details"].get("kind") == "agent"
+            and e["details"].get("authorization_id") == authorization_id
+            for e in (self.ledger.backend.audit_iter() if after is None
+                      else self.ledger.tail(self.ledger.tail(1)[-1]["seq"] - after))
+        )
+
+    def last_seen(self, registrations: Iterable[AgentRegistration]) -> dict[tuple[str, str], str]:
+        """When each agent last acted for the person it serves, by `(client_id, sub)`: its newest
+        entry attributed to it and naming that person (`details.for`, §3a). A pair never seen is
+        absent. Read from the chain in one pass, as nothing else records it (rest.md §4.3)."""
+        wanted = {(f"agent:{r['client_id']}", f"user:{r['sub']}"): (r["client_id"], r["sub"])
+                  for r in registrations}
+        seen: dict[tuple[str, str], str] = {}
+        if wanted:
+            for entry in self.ledger.backend.audit_iter():
+                pair = wanted.get((entry["actor"], entry["details"].get("for")))
+                if pair is not None:
+                    seen[pair] = entry["ts"]
+        return seen
 
 
 def _whole(grant: UserGrant) -> bool:
