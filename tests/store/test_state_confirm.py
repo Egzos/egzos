@@ -60,3 +60,18 @@ def test_credentials_list_by_person_and_keep_the_removed(backend):
     assert [c["id"] for c in backend.list_credentials("self")] == ["a"]
     assert backend.get_credential("a")["removed"] is True
     assert sorted(c["id"] for c in backend.list_credentials()) == ["a", "b"]
+
+
+def test_forget_challenges_drops_those_expired_before_then_spent_or_not(make_backend):
+    backend = make_backend()
+    when, later = "2026-10-23T00:05:00.000000Z", "2026-10-24T00:00:00.000000Z"
+    for cid, expires_at in [("a", when), ("b", when), ("c", later)]:
+        backend.put_challenge({**_challenge(cid), "expires_at": expires_at})
+    backend.spend_challenge("a")
+    backend.forget_challenges(when)  # expired at that time, not before it: kept
+    assert backend.spend_challenge("a")["spent"] is True
+    backend.forget_challenges("2026-10-23T00:05:00.000001Z")
+    reopened = make_backend()
+    assert reopened.spend_challenge("a") is None  # spent, and forgotten
+    assert reopened.spend_challenge("b") is None  # unspent, and forgotten all the same
+    assert reopened.spend_challenge("c")["spent"] is False  # not yet expired: kept

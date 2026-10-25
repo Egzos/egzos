@@ -121,3 +121,31 @@ def test_throttle_buckets_lists_one_window_and_one_surface(backend: ThrottleStat
     backend.throttle_incr("tap", "global", "w1")
     assert backend.throttle_buckets("rest", "w1") == [("global", 2), ("source:a", 1)]
     assert backend.throttle_buckets("rest", "w3") == []
+
+
+# -- windows (storage.md §3.1: a closed window's counters are forgotten) ---------------------
+
+
+def test_throttle_windows_names_each_counted_window_of_one_surface_once(backend: ThrottleState):
+    backend.throttle_incr("rest", "global", "w2")
+    backend.throttle_incr("rest", "global", "w1")
+    backend.throttle_incr("rest", "source:a", "w1")
+    backend.throttle_incr("tap", "global", "w3")
+    assert sorted(backend.throttle_windows("rest")) == ["w1", "w2"]  # no order is fixed
+    assert backend.throttle_windows("tap") == ["w3"]
+    assert backend.throttle_windows("device") == []
+
+
+def test_throttle_forget_drops_one_window_of_one_surface_for_good(make_backend):
+    backend = make_backend()
+    for surface, bucket, window in [("rest", "global", "w1"), ("rest", "source:a", "w1"),
+                                    ("rest", "global", "w2"), ("tap", "global", "w1")]:
+        backend.throttle_incr(surface, bucket, window)
+    backend.throttle_forget("rest", "w1")
+    backend.throttle_forget("rest", "never")  # a window never counted: nothing to drop
+    reopened = make_backend()
+    assert reopened.throttle_buckets("rest", "w1") == []
+    assert reopened.throttle_windows("rest") == ["w2"]
+    assert reopened.throttle_count("rest", "global", "w2") == 1  # another window is kept
+    assert reopened.throttle_count("tap", "global", "w1") == 1  # and another surface's
+    assert reopened.throttle_incr("rest", "global", "w1") == 1  # a forgotten window starts afresh
