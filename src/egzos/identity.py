@@ -616,16 +616,28 @@ class Identity:
                     scopes=grant["scopes"],
                 )
                 for agent in self.serving(sub):
-                    self.state.put_agent_registration({**agent, "revoked": True})
-                    self.ledger.append(
-                        "identity.revoke", actor=actor, principal=principal,
-                        subject=agent["client_id"], kind="agent", outcome="revoked",
-                        capabilities=agent["capabilities"], scopes=agent["scopes"],
-                        **{"for": f"user:{sub}"},
-                    )
+                    self.revoke_agent(agent["client_id"], sub, actor=actor, principal=principal)
                 return True
         self._refused("identity.revoke", sub, actor=actor, principal=principal)
         raise LastAdmin(sub)
+
+    def revoke_agent(self, client_id: str, sub: str, *, actor: str, principal: str) -> bool:
+        """Revoke the live registration of `client_id` serving `sub` and append its
+        `identity.revoke` (`kind: agent`, `for` the person it served), as one transaction: of two
+        concurrent revokes of one registration, one ends it and the other finds nothing. The caller
+        has judged the act: the person it serves (never gated), an admin ending someone else's under
+        the confirm at the REST door, or a revoke of the grant it serves (§4). `False` for none."""
+        with self.atomic():
+            registration = self.state.get_agent_registration(client_id, sub)
+            if not _live(registration):
+                return False
+            self.state.put_agent_registration({**registration, "revoked": True})
+            self.ledger.append(
+                "identity.revoke", actor=actor, principal=principal, subject=client_id,
+                kind="agent", outcome="revoked", capabilities=registration["capabilities"],
+                scopes=registration["scopes"], **{"for": f"user:{sub}"},
+            )
+        return True
 
     def serving(self, sub: str) -> list[AgentRegistration]:
         """Every live registration serving `sub`. storage.md §3.2 lists registrations by
@@ -755,6 +767,14 @@ class Identity:
             for e in (self.ledger.backend.audit_iter() if after is None
                       else self.ledger.tail(self.ledger.tail(1)[-1]["seq"] - after))
         )
+
+    def acted(self, client_id: str, sub: str) -> list[dict[str, Any]]:
+        """What an agent did for one person, oldest first: every entry attributed to it that
+        names that person (`details.for`, §3a), its refusals included. Read from the chain in one
+        pass, as `last_seen` reads it (rest.md §4.3's log)."""
+        pair = (f"agent:{client_id}", f"user:{sub}")
+        return [e for e in self.ledger.backend.audit_iter()
+                if (e["actor"], e["details"].get("for")) == pair]
 
     def last_seen(self, registrations: Iterable[AgentRegistration]) -> dict[tuple[str, str], str]:
         """When each agent last acted for the person it serves, by `(client_id, sub)`: its newest

@@ -254,6 +254,30 @@ def test_a_revoke_ends_every_agent_serving_that_person_and_a_new_grant_revives_n
     assert box.identity.serving(BOB) == [] and box.identity._agent("a1", BOB) is None
 
 
+def test_revoking_an_agent_ends_that_registration_alone_and_records_it(box, monkeypatch):
+    for client_id, sub in (("a1", BOB), ("a2", BOB), ("a1", ALICE)):
+        _agent(box, client_id, sub)
+    assert box.identity.revoke_agent("a1", BOB, actor=f"user:{BOB}", principal="interactive")
+    (ended,) = _events(box, "identity.revoke")
+    assert (ended["actor"], ended["subject"], ended["details"]) == (f"user:{BOB}", "a1", {
+        "kind": "agent", "outcome": "revoked", "capabilities": ["fetch"], "scopes": ["*"],
+        "for": f"user:{BOB}"})
+    assert [(a["client_id"], a["sub"]) for a in box.backend.list_agent_registrations()
+            if not a["revoked"]] == [("a2", BOB), ("a1", ALICE)]
+    # Ended already, or never registered: nothing to end, and nothing recorded.
+    assert not box.identity.revoke_agent("a1", BOB, **KW)
+    assert not box.identity.revoke_agent("a9", BOB, **KW)
+    assert len(_events(box, "identity.revoke")) == 1
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the chain cannot take an entry")
+
+    monkeypatch.setattr(box.ledger, "append", broken)
+    with pytest.raises(RuntimeError):  # the revoke and its entry land together
+        box.identity.revoke_agent("a2", BOB, **KW)
+    assert not box.backend.get_agent_registration("a2", BOB)["revoked"]
+
+
 # -- agent registrations (§4, rest.md §4.3) --------------------------------------------------------
 TERMS = {"authorization_id": "auth-1", "name": "Helper", "capabilities": ["fetch"], "scopes": ["*"]}
 

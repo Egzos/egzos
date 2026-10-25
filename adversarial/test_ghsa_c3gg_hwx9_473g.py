@@ -1,8 +1,9 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""GHSA-c3gg-hwx9-473g, grants: at the REST door, ending another person's grant requires the
-confirm (identity.md §4-§5, rest.md §4.3). Without one it revokes nothing and answers the first
-leg; only a confirmed second leg revokes. Granting with the button also needs a fresh sign-in."""
+"""GHSA-c3gg-hwx9-473g: at the REST door, ending another person's grant, or an agent registration
+that serves someone else, requires the confirm (identity.md §4-§5, rest.md §4.3). Without one it
+revokes nothing and answers the first leg; only a confirmed second leg revokes. Granting with the
+button also needs a fresh sign-in."""
 
 from __future__ import annotations
 
@@ -76,3 +77,24 @@ def test_ghsa_c3gg_hwx9_473g_granting_with_the_button_needs_a_fresh_sign_in(tmp_
     assert grant(alice(signed_in_ago=3600))["result"] == "confirm"
     assert c.backend.get_user_grant("dave") is None
     assert grant(alice())["grant"]["sub"] == "dave"
+
+
+def test_ghsa_c3gg_hwx9_473g_ending_an_agent_serving_another_person_needs_the_confirm(tmp_path):
+    c, door, alice = _door(tmp_path)
+    c.backend.put_agent_registration({
+        "client_id": "helper", "sub": "bob", "name": "Helper", "capabilities": ["fetch"],
+        "scopes": ["*"], "created_at": "2026-10-23T00:00:00Z", "revoked": False})
+    admin = alice()
+
+    first = door.delete("/v1/agents/helper?sub=bob", headers=admin)
+    assert first.status_code == 200 and first.json()["result"] == "confirm"
+    forged = door.request("DELETE", "/v1/agents/helper?sub=bob", headers=admin, json={
+        "confirm": {"challenge": "forged", "proof": "button"}})
+    assert forged.json()["result"] == "confirm"
+    assert not c.backend.get_agent_registration("helper", "bob")["revoked"]
+    assert not [e for e in c.ledger.tail(200) if e["event"] == "identity.revoke"]
+
+    second = door.request("DELETE", "/v1/agents/helper?sub=bob", headers=admin, json={
+        "confirm": {"challenge": first.json()["challenge"], "proof": "button"}})
+    assert second.json() == {"result": "revoked"}
+    assert c.backend.get_agent_registration("helper", "bob")["revoked"]
