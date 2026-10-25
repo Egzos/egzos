@@ -159,19 +159,20 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   egzos provisions, who never ran `init`, gets that `Token`, the recovery factor (§AD; Revocation
   below), at provisioning: it is minted then and shown once, as GitHub shows recovery codes. The
   container keeps only its hash, as for every `Token`, and no `keychain.json` is written on the
-  host. **decided, not running** (v0.7 §AF). Its plaintext crosses one channel, once, from the
-  container itself: a response from its own origin to the owner signed in through the provider,
-  never cached and never in a URL, or a terminal on its host. It never passes through egzos.io's
-  servers (§T) and is written nowhere: no environment variable or host secret, file, log or job
-  output, row or chain entry holds it (`events.md` §4 item 4). **a1p.** `TODO(chief)`, #283, before
-  egzos provisions a container for anyone: which of the two channels.
+  host, and its plaintext is shown on the container's own page: a response from its own origin to
+  the owner signed in through the provider, never cached and never in a URL. **decided, not
+  running** (v0.7 §AF). It never passes through egzos.io's servers
+  (§T) or a terminal on its host, and is written nowhere: no environment variable or host secret,
+  file, log or job output, row or chain entry holds it (`events.md` §4 item 4). **a1p.**
 - **A hosted container's home.** Its host keeps the container's `grant.key` and `throttle.key` on a
   small persistent volume that is its home (`EGZOS_HOME`), made at first need as for any container
   (`rest.md` §6, `storage.md` §3.1); its database and object store are named by the host's secrets,
   never by config keys (`storage.md` §3.7). Its owner has no shell on the host, so the operator
   replaces either key, from the host. After any restore of the database, the operator replaces
   `grant.key` (until `egzos blob rotate` runs, by deleting it) before the door serves again, and
-  re-applies the revocations the restore undid. **a1p** (v0.7 §AF).
+  re-applies the revocations the restore undid. **a1p** (v0.7 §AF). `TODO(a1p)`, #283: the record
+  outside the database those revocations are re-applied from, since the restore takes their own
+  entries with it; it joins `storage.md` §1's outside anchor, which comes with sync (v0.7 §V).
 - **Every other user grant is an admin's act**, under `admin`, from an interactive principal, **and
   it requires the confirm** (§5): a grant widens who can see everything it covers, so it is gated like
   a move that widens an audience (§U), never a silent write. A role bundle is expanded at grant time,

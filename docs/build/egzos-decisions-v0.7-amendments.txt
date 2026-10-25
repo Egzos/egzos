@@ -417,14 +417,14 @@ AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
           ContainerState may live on Supabase's Postgres. The database
           vendor joins the ledger's trust path, as §T recorded for the
           identity provider. The chain is hashed, not signed: audit verify
-          catches any edit short of a full re-chain from GENESIS.
-          Contract: storage.md §1.
-          Operator's note, not the Chief's words: the line on audit
-          verify above is recorded as it was put to the Chief, but
-          verify reaches less far. An entry re-hashed with every entry
-          after it verifies, as does a chain whose last entries are
-          gone; storage.md §1 states that reach. The decision is
-          unchanged.
+          catches an edit only while every later entry is left as it was.
+          An entry re-hashed with every entry after it verifies, as does a
+          chain whose last entries are gone, a restore included. The
+          question first put to the Chief claimed more; the operator
+          corrected it, and the Chief confirmed the decision with this
+          reach the same day, asking that the outside anchor that would
+          catch those, each place recording the cloud's head when it
+          pulls, come with sync (§V). Contract: storage.md §1.
 
 [DECIDED] ONE SUPABASE PROJECT PER HOSTED CONTAINER, holding its database
           and its Storage. Auth stays in the identity project (§T).
@@ -452,7 +452,10 @@ AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
 [DECIDED] THE OWNER TOKEN OF A CONTAINER egzos PROVISIONS is minted at
           provisioning and shown once, like recovery codes (§AD). The
           server keeps only its hash, and there is no keychain.json on the
-          host. Contract: identity.md §4.
+          host. It is shown on the container's own page: from its own
+          origin, to the owner signed in through the provider, never
+          cached and never in a URL, so egzos's servers never see it.
+          Contract: identity.md §4.
 
 
 ================================================================================

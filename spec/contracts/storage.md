@@ -66,8 +66,8 @@ the object store can substitute bytes until `get` checks them (§4). The chain i
 `audit verify` catches an edit, an insertion or a removal only while every later entry is left as
 it was. An entry re-hashed with every entry after it verifies, as does a chain whose last entries
 are gone, a restore to an earlier point included, or whose `seq` is renumbered (`events.md` §3). An
-outside anchor, such as each place recording the cloud's head when it pulls (v0.7 §V), is what
-would catch those; none is decided. **a1p** (v0.7 §AF), the reach as stated here.
+outside anchor, each place recording the cloud's head when it pulls, is what would catch those;
+the Chief has asked that it come with sync (v0.7 §V, §AF). **a1p** (v0.7 §AF), the reach as stated here.
 
 ## 2 · `ItemStore` — pluggable, delegable
 
@@ -329,7 +329,7 @@ atomic()                                         -> context manager   # every wr
   commits alone, with the proof's `step_up`, before the act's block opens, so a concluded proof
   stays spent and audited whatever its act then does (`rest.md` §4.2 items 4–5), and the act's block
   re-checks what the challenge bound. Not running for `spend_challenge`: the door concludes the
-  proof inside the act's block.
+  proof inside the act's block (#321).
 - **`ChainConflict`**, declared in `_types.py` beside this Protocol, is what `audit_append` raises
   when another writer appended after the same head: the ledger re-reads the head and re-chains, so
   the chain never forks. The store keeps one successor per entry whatever the lock, because an
