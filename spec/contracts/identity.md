@@ -2,8 +2,9 @@
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
 Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB,
-§AD and §AE) into the contract set, and **retires `authorization-server.md`** (§9). One login takes effect
-with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform` points here.
+§AD and §AE) and of 2026-10-25 (§AF) into the contract set, and **retires `authorization-server.md`**
+(§9). One login takes effect with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform`
+points here.
 
 **Derivation.** No running shape yet: the walking skeleton accepts only its own `Token` (the CLI,
 stdio MCP, the lifeboat). Every clause is derived from the v0.7 decisions and from Supabase Auth's
@@ -154,10 +155,23 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   (the CLI), and it registers the container's client (§3a) and writes the owner's grant for the `sub`
   the owner signs in as. **a1p.**
 - **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
-  revoked; the owner `Token` from `init` stays the way back in. **a1p.** `TODO(chief)`, #283, before
-  egzos provisions a container for anyone: how the owner of such a container, who never ran `init`,
-  holds that `Token`, the recovery factor (§AD; Revocation below), for instance shown once at
-  provisioning, as GitHub shows recovery codes.
+  revoked; the owner `Token` from `init` stays the way back in. **a1p.** The owner of a container
+  egzos provisions, who never ran `init`, gets that `Token`, the recovery factor (§AD; Revocation
+  below), at provisioning: it is minted then and shown once, as GitHub shows recovery codes. The
+  container keeps only its hash, as for every `Token`, and no `keychain.json` is written on the
+  host. **decided, not running** (v0.7 §AF). Its plaintext crosses one channel, once, from the
+  container itself: a response from its own origin to the owner signed in through the provider,
+  never cached and never in a URL, or a terminal on its host. It never passes through egzos.io's
+  servers (§T) and is written nowhere: no environment variable or host secret, file, log or job
+  output, row or chain entry holds it (`events.md` §4 item 4). **a1p.** `TODO(chief)`, #283, before
+  egzos provisions a container for anyone: which of the two channels.
+- **A hosted container's home.** Its host keeps the container's `grant.key` and `throttle.key` on a
+  small persistent volume that is its home (`EGZOS_HOME`), made at first need as for any container
+  (`rest.md` §6, `storage.md` §3.1); its database and object store are named by the host's secrets,
+  never by config keys (`storage.md` §3.7). Its owner has no shell on the host, so the operator
+  replaces either key, from the host. After any restore of the database, the operator replaces
+  `grant.key` (until `egzos blob rotate` runs, by deleting it) before the door serves again, and
+  re-applies the revocations the restore undid. **a1p** (v0.7 §AF).
 - **Every other user grant is an admin's act**, under `admin`, from an interactive principal, **and
   it requires the confirm** (§5): a grant widens who can see everything it covers, so it is gated like
   a move that widens an audience (§U), never a silent write. A role bundle is expanded at grant time,
