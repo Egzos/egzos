@@ -107,6 +107,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
   argument or a bare group now prints `{"error": …}` on stdout, as every other `--json` failure
   does, and still exits 2 (#203). A `--json` after `--` is data, not the flag.
+- Principal ids are now unambiguous.
 
 ### Changed
 
