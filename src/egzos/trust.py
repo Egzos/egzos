@@ -282,15 +282,16 @@ class TrustEngine:
         return item
 
     def quarantine(self, item: ContextItem, *, token: Token, actor: str, reason: str) -> list[str]:
-        node = self.backend.get_node(item.scope)
-        if node is None or not self.covers(token, node):
-            raise TrustError("not found")  # the same answer as an item that does not exist
-        if not token.has("curate"):
-            raise TrustError("quarantine needs `curate`")
-        affected = [item.id]
-        item.trust = {"status": "quarantined", "reason": reason, "at": now_iso()}
+        self._may_quarantine(item, token)
         # The item, every derived copy and the chain entry land together, or none of them.
         with self.backend.atomic():
+            # Quarantined as it stands under the lock, checked again there: a write since the
+            # caller read it is observed, never written over (storage.md §3.6;
+            # GHSA-m955-fr24-frwq).
+            item = self._fresh(item, refusal="already quarantined")
+            self._may_quarantine(item, token)
+            affected = [item.id]
+            item.trust = {"status": "quarantined", "reason": reason, "at": now_iso()}
             self.backend.put(item)
             # propagates immediately to descendants via derived_from (v0.3 §5)
             for other in self._all_items():
@@ -320,6 +321,14 @@ class TrustEngine:
             and (n := self.backend.get_node(it.scope))
             and self.covers(token, n)
         ]
+
+    def _may_quarantine(self, item: ContextItem, token: Token) -> None:
+        """A quarantine's checks, before its lock and again under it: coverage, then `curate`."""
+        node = self.backend.get_node(item.scope)
+        if node is None or not self.covers(token, node):
+            raise TrustError("not found")  # the same answer as an item that does not exist
+        if not token.has("curate"):
+            raise TrustError("quarantine needs `curate`")
 
     # -- the gate ------------------------------------------------------------------------------
     def gate(

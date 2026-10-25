@@ -110,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Principal ids are now unambiguous** (#316, `rest.md` §6). Every id whose parts hold neither `%`
   nor `:`, every Supabase-issued id among them, is unchanged. On another provider, a proposal parked
   or an upload opened before the upgrade under an id that held either may need to be made again.
+- A write that must not lose a concurrent update now holds the container's write lock from its read
+  (`storage.md` §2, §3.6).
 
 ### Changed
 
@@ -125,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
   answers only "Ignored the following versions that require a different python version").
   Homebrew users can install uv with `brew install uv`.
+- `egzos trust quarantine` refuses an item that is already quarantined, and keeps its first reason.
 
 ### Removed
 

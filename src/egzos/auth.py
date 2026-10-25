@@ -125,15 +125,18 @@ class Auth:
         """`token rm`. `True` when the token is revoked, whether by this call or before it; an
         already-revoked token is not revoked twice and gets no second `token.revoke`
         (authorization-server.md §9.2, as `authz.revoke`). The event carries no `family_id`:
-        `Backend` has no family read yet (#242)."""
-        token = self.backend.get_token(token_id)
-        if not token:
-            return False
-        if token.revoked:
-            return True
-        token.revoked = True
-        self.backend.put_token(token)
-        self.ledger.append("token.revoke", actor=actor, principal=principal, subject=token.id)
+        `Backend` has no family read yet (#242). The read, the check, the write and the entry are
+        one `atomic()` block, which holds the write lock from before the read (storage.md §3.6;
+        GHSA-m955-fr24-frwq)."""
+        with self.backend.atomic():
+            token = self.backend.get_token(token_id)
+            if not token:
+                return False
+            if token.revoked:
+                return True
+            token.revoked = True
+            self.backend.put_token(token)
+            self.ledger.append("token.revoke", actor=actor, principal=principal, subject=token.id)
         return True
 
     # -- keychain stand-in -------------------------------------------------------------
@@ -155,13 +158,18 @@ class Auth:
         return self.use(json.loads(self.keychain.read_text())["token"])
 
     def use(self, value: str) -> Token | None:
-        """The token a bearer value proves, or None. Every failure looks the same to the caller."""
+        """The token a bearer value proves, or None. Every failure looks the same to the caller.
+        The read, the check and the `last_used` write are one `atomic()` block, which holds the
+        write lock from before the read (storage.md §3.6; GHSA-m955-fr24-frwq)."""
         tid = token_id_of(value or "")
-        token = self.backend.get_token(tid) if tid else None
-        if not token or not token.live or not token.secret_hash:
+        if not tid:
             return None
-        if not same(_hash(value), token.secret_hash):
-            return None
-        token.last_used = now_iso()
-        self.backend.put_token(token)
+        with self.backend.atomic():
+            token = self.backend.get_token(tid)
+            if not token or not token.live or not token.secret_hash:
+                return None
+            if not same(_hash(value), token.secret_hash):
+                return None
+            token.last_used = now_iso()
+            self.backend.put_token(token)
         return token
