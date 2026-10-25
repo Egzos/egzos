@@ -1,24 +1,16 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`SqliteBackend`'s `ConfirmState` (storage.md §3.3): challenges spent once, credentials kept."""
+"""`ConfirmState` (storage.md §3.3) on every backend: challenges spent once, credentials kept."""
 
 from __future__ import annotations
 
 import inspect
 import threading
 
-import pytest
-
 from egzos._types import ConfirmState
-from egzos.backends.sqlite import SqliteBackend
 
 CONFIRM_STATE = frozenset({"put_challenge", "spend_challenge", "forget_challenges",
                            "put_credential", "get_credential", "list_credentials"})
-
-
-@pytest.fixture
-def backend(tmp_path):
-    return SqliteBackend(tmp_path / "container.db")
 
 
 def _challenge(cid="c1"):
@@ -26,12 +18,12 @@ def _challenge(cid="c1"):
             "delta": [], "expires_at": "2099-01-01T00:00:00Z"}
 
 
-def test_the_protocol_is_pinned_and_the_backend_matches_it():
+def test_the_protocol_is_pinned_and_the_backend_matches_it(backend_class):
     names = {n for n, _ in inspect.getmembers(ConfirmState, inspect.isfunction) if n[0] != "_"}
     assert names == CONFIRM_STATE
     for name in names:
         expected = list(inspect.signature(getattr(ConfirmState, name)).parameters)
-        assert list(inspect.signature(getattr(SqliteBackend, name)).parameters) == expected, name
+        assert list(inspect.signature(getattr(backend_class, name)).parameters) == expected, name
 
 
 def test_a_challenge_spends_once(backend):
@@ -41,13 +33,13 @@ def test_a_challenge_spends_once(backend):
     assert backend.spend_challenge("never") is None
 
 
-def test_two_connections_spending_one_challenge_see_it_fresh_once(tmp_path):
-    SqliteBackend(tmp_path / "c.db").put_challenge(_challenge())
+def test_two_connections_spending_one_challenge_see_it_fresh_once(make_backend):
+    make_backend().put_challenge(_challenge())
     seen: list[bool] = []
     gate = threading.Barrier(2)
 
     def spend():
-        b = SqliteBackend(tmp_path / "c.db")
+        b = make_backend()
         gate.wait()
         seen.append(b.spend_challenge("c1")["spent"])
 
