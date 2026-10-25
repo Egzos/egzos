@@ -811,6 +811,14 @@ refusal, so the response never says which bucket or check refused it. **a1p**, t
 **On success** the door streams the bytes and appends one `blob.pull` (`subject` the item, `scope`,
 `sha256`, `size`), attributed to the token the descriptor names. **decided** (`events.md` §1).
 
+**Redemption stays at the container, on every substrate. a1p** (v0.7 §AF). Check 8 reads the
+bytes from the container's own blob store, a directory or an object-store prefix (`storage.md` §4),
+and the door streams them itself, under the headers below. `grant_url` is always this door's
+`/v1/blobs/` URL: no storage vendor's signed URL, and no object-store location, reaches a client,
+in a response body or through a redirect. A vendor's URL is honoured by the vendor, not the
+container, so it would bypass the single-use spend and the other checks, those headers and
+`blob.pull`'s entry.
+
 **The bytes are never rendered on the container's origin. a1p**: the AS's pages share this origin,
 so an HTML or SVG artifact served as its own `mime` would run script beside the login. The response
 carries:
