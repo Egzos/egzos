@@ -17,12 +17,10 @@ from collections.abc import Iterable, Iterator
 from contextlib import AbstractContextManager
 from typing import Any, Protocol
 
+# Declared in the shared types (storage.md §3.6) and exported here too, so the ledger's and the
+# sqlite backend's `from egzos.backends.base import ChainConflict` stay as they are.
+from egzos._types import ChainConflict as ChainConflict
 from egzos.model import ContextItem, Node, Token
-
-
-class ChainConflict(Exception):
-    """`audit_append` lost a race: another writer appended after the same head. The ledger
-    re-reads the head and re-chains; the chain never forks."""
 
 
 class Backend(Protocol):

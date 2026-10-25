@@ -113,6 +113,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Contracts: where a hosted container's state lives** (the Chief's decisions of 2026-10-25, v0.7
+  §AF). A container egzos hosts may keep its state on its own Supabase project's Postgres and its
+  files in that project's Storage, and its owner token is shown once at provisioning, with only its
+  hash kept (`storage.md` §1, §3.7, §4; `identity.md` §4; `rest.md` §6). Writes take one lock per
+  container, typed as `_types.Transactional` with `ChainConflict` beside it (`storage.md` §3.6).
+  Nothing runs differently yet.
 - The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzos`,
   which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
   answers only "Ignored the following versions that require a different python version").

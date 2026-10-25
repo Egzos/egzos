@@ -22,6 +22,7 @@ twice, and ``__all__`` complete (``tests/_types/test_exports.py``) and isort-sor
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping
+from contextlib import AbstractContextManager
 from types import MappingProxyType
 from typing import Any, Literal, NamedTuple, NotRequired, Protocol, TypedDict, get_args
 
@@ -657,7 +658,8 @@ class ContainerState(Protocol):
 
     # audit chain — append-only; the LEDGER computes the chain, the store only appends
     def audit_append(self, entry: AuditEntry) -> AuditEntry: ...
-    #: ^ the input carries no `seq`: the store assigns it, returns the stored entry (events.md §3)
+    #: ^ the input carries no `seq`: the store assigns it, returns the stored entry (events.md §3),
+    #:   and raises `ChainConflict` when an entry already follows its `prev_hash` (storage.md §3.6)
     def audit_last(self) -> AuditEntry | None: ...
     def audit_iter(self) -> Iterator[AuditEntry]: ...
     def audit_tail(self, n: int) -> list[AuditEntry]: ...
@@ -868,6 +870,32 @@ DOOR_STATE_CONTRACTS: tuple[str, ...] = (
 )
 
 
+# --- one writer per container (storage.md §3.6, v0.7 §AF) -----------------------------------
+#
+# The skeleton's `Backend` already runs `atomic()` and raises `ChainConflict`; both are declared
+# here so a second substrate builds against the type, not against `backends/`. Kept out of
+# `STORAGE_CONTRACTS` and `DOOR_STATE_CONTRACTS`: F3's three stand, and so does §3's count.
+
+
+class ChainConflict(Exception):
+    """`audit_append` lost a race: another writer appended after the same head. The ledger
+    re-reads the head and re-chains; the chain never forks."""
+
+
+class Transactional(Protocol):
+    """The container's one write lock, on the `ContainerState` substrate (storage.md §3.6).
+
+    `atomic()` holds it from entry to exit, taken before the block's first read, so a check that
+    reads, then writes, still holds at its write. A nested block joins the outer one, never a
+    savepoint: the act commits once, when the outermost block exits, and an exception leaving that
+    block rolls back every write to this substrate inside it; a `BlobStore` call is not one. A
+    block is one caller's, on the connection that holds the lock. A write outside any block
+    commits alone, under the same lock. A writer waits a bounded time for the lock, then raises.
+    """
+
+    def atomic(self) -> AbstractContextManager[None]: ...
+
+
 __all__ = [
     "AS_AUTHORIZE_POSTTRUST_CAUSES",
     "AS_AUTHORIZE_PRETRUST_CAUSES",
@@ -912,6 +940,7 @@ __all__ = [
     "BlobGrant",
     "BlobStore",
     "Capability",
+    "ChainConflict",
     "ClientRegisterOp",
     "ConfigState",
     "ConfirmChallenge",
@@ -948,6 +977,7 @@ __all__ = [
     "ThrottleSurface",
     "Token",
     "TokenPrincipal",
+    "Transactional",
     "Trust",
     "TrustStatus",
     "UploadRecord",

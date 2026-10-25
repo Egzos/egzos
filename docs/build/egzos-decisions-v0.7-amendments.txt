@@ -1,10 +1,12 @@
 ================================================================================
 EGZOS — DECISIONS LOG · v0.7 AMENDMENT SET
 Delta on top of the v0.4 log and the v0.5 and v0.6 amendment sets. Records
-the Chief's calls of 2026-10-22/23: buy, don't build; Supabase for the
-platform services; one login; the Face ID / Touch ID confirm; places and
-git-like sync; the egzosux experience; Stripe; the repository's visibility.
-Sections not mentioned carry forward unchanged. Compiled 2026-10-23.
+the Chief's calls of 2026-10-22/23 and 2026-10-25: buy, don't build;
+Supabase for the platform services; one login; the Face ID / Touch ID
+confirm; places and git-like sync; the egzosux experience; Stripe; the
+repository's visibility; where a hosted container's state lives and runs. Sections
+not mentioned carry forward unchanged. Compiled 2026-10-23; §AF added
+2026-10-25.
 Read together with: egzos-decisions-log-v0.4.txt · egzos-decisions-v0.5-
 amendments.txt · egzos-decisions-v0.6-amendments.txt · egzos-handoff.txt ·
 egzos-build-plan-v1.2.txt
@@ -396,6 +398,67 @@ AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
 
 
 ================================================================================
+AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
+    OWNER TOKEN (reads storage.md's [0.3 · 5] for a managed Postgres; answers
+    identity.md §4's TODO(chief) on hosted provisioning; Egzos/egzos#319)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-10-25, answering the operator's
+          questions; recorded by the operator, enacted by #319's merge; the
+          Chief may veto by reverting. The operator's own calls made with
+          these are the contracts' a1p clauses, not decisions recorded
+          here, among them one writer per container (storage.md §3.6),
+          where a hosted container's keys and secrets live (identity.md
+          §4, storage.md §3.7) and downloads through the container
+          (storage.md §4).
+
+[DECIDED] A MANAGED POSTGRES THAT ONLY THE CONTAINER'S OPERATOR ADMINISTERS
+          IS THE OPERATOR'S OWN SUBSTRATE under storage.md's [0.3 · 5], so
+          ContainerState may live on Supabase's Postgres. The database
+          vendor joins the ledger's trust path, as §T recorded for the
+          identity provider. The chain is hashed, not signed: audit verify
+          catches an edit only while every later entry is left as it was.
+          An entry re-hashed with every entry after it verifies, as does a
+          chain whose last entries are gone, a restore included. The
+          question first put to the Chief claimed more; the operator
+          corrected it, and the Chief confirmed the decision with this
+          reach the same day, asking that the outside anchor that would
+          catch those, each place recording the cloud's head when it
+          pulls, come with sync (§V). Contract: storage.md §1.
+
+[DECIDED] ONE SUPABASE PROJECT PER HOSTED CONTAINER, holding its database
+          and its Storage. Auth stays in the identity project (§T).
+          Contract: storage.md §3.7, §4.
+
+[DECIDED] THE POSTGRES DRIVER IS psycopg 3, as an optional extra, chosen
+          knowing its licence, LGPL-3.0, which the question named.
+
+[DECIDED] POSTGRES RUNS IN THE REQUIRED tests CHECK: a postgres service
+          container joins the tests job, and a test fails when the
+          postgres case goes missing. No new check name. The workflow is
+          the Chief's commit.
+
+[DECIDED] ITEMS WRITTEN IN THE SAME SECOND LIST BY ID, NEWEST FIRST, on
+          every backend (created_at DESC, id DESC), so sqlite and postgres
+          list alike. Text search stays as it runs.
+          Contract: storage.md §2.
+
+[DECIDED] ONE FLY APP PER HOSTED CONTAINER (§S's managed host): one
+          machine, the small volume that is its home, and its own secrets,
+          so no machine holds another container's credentials. Its calls
+          to its database stay synchronous, which one person's container
+          bears.
+
+[DECIDED] THE OWNER TOKEN OF A CONTAINER egzos PROVISIONS is minted at
+          provisioning and shown once, like recovery codes (§AD). The
+          server keeps only its hash, and there is no keychain.json on the
+          host. It is shown on the container's own page: from its own
+          origin, to the owner signed in through the provider, never
+          cached and never in a URL, so egzos's servers never see it.
+          Contract: identity.md §4.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -406,7 +469,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   4. egzos-decisions-v0.7-amendments.txt — THIS: buy-don't-build, Supabase,
      one login, the confirm, places and sync, the experience, Stripe,
      visibility, retention, token binding, own agents, kept uploads,
-     confirm credentials, where the app lives
+     confirm credentials, where the app lives, where a hosted
+     container's state lives and runs
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 

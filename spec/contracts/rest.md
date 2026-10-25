@@ -867,9 +867,8 @@ one). The MAC is HMAC-SHA256 over every descriptor field but `sig`, written as `
   the `ContainerState` substrate as the confirm's challenges are: a spend is one atomic write every
   process serving the container sees. A record is a `sig`'s sha256 and its grant's `expires_at`, no
   secret, kept at least a lifetime past that.
-- **A container egzos hosts** is not decided here: where its key is provisioned, held and rotated
-  joins `identity.md` §4's `TODO(chief)`, #283, on hosted provisioning, the same question for the
-  same owner.
+- **A container egzos hosts** keeps its key on its home's volume, and its operator, not its owner,
+  replaces it: `identity.md` §4 (v0.7 §AF).
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
@@ -886,5 +885,5 @@ other four questions were the retired authorization server's and close with it.
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
 `identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
 §4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
-`identity.md` §4's `TODO(chief)`, #283.
+`identity.md` §4.
 The look of any client → its design spec.
