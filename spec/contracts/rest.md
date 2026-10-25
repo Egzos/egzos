@@ -756,6 +756,14 @@ token, its grant's: `user:<sub>`, or `agent:<client_id>:<sub>`, which check 5 re
 fixed width, so two compare as the times they are; two mints for one token and item within one
 tick of the clock are one grant. **a1p.**
 
+**A provider token's id names exactly one `(client_id, sub)` pair. a1p** (GHSA-9g46-638p-v4xm,
+#316). Where no part holds `%` or `:`, a UUID among them, the id is written as above. Otherwise its
+kind is written `user%` or `agent%`, which no id written as above holds, and each part has `%`
+written `%25` and `:` written `%3A`. A string is read back only where writing the pair its parts
+decode to gives the same string, so no other spelling names a pair, and a container `Token`'s id,
+which holds no `:`, names none. This id is not attribution: `actor` and `details.for` carry their
+one part raw (`identity.md` §3a).
+
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token
 value, so redemption takes no `Authorization` header and consults none. **The cost, stated for the
