@@ -128,7 +128,15 @@ the value in `details`. [0.3 · 40]
 { seq, ts, event, actor, principal, subject, scope, details, prev_hash, hash }
 ```
 
-- `seq` — monotonic, assigned by the store on append.
+- `seq` — monotonic, assigned by the store on append, **under the container's write lock
+  (`storage.md` §3.6), as the head's `seq` plus one** (on an empty chain, the store's own first
+  number), and never from a database sequence or counter that can hand out values out of commit
+  order. `seq` order is the chain's order: the ledger chains onto the highest `seq`
+  (`audit_last`), `audit verify` walks in `seq` order (§3), and a reader of the tail past a `seq`
+  takes it for every entry appended since. A gap, as a renumbering may leave, stays allowed, and
+  `seq` stays outside the hash (§3). **a1p** (v0.7 §AF); **running** on sqlite, whose
+  `AUTOINCREMENT` counts inside the write transaction, on a table no entry is ever deleted from
+  (§4 item 1).
 - `actor` / `principal` — who acted, and as what: `interactive`, `client` or `none`
   (`capabilities.md` §3). Both are mandatory on every entry; `principal` is never null. **`none`
   is for an entry with no caller to name** — `authorization-server.md` §12.2: rows (a), (b), (d),
@@ -221,6 +229,11 @@ owner inspecting their own container, and the order they are shown is the order 
    the reason, and exits non-zero. A rewritten entry and a re-pointed `prev_hash` are distinct
    failures and are reported distinctly — **this is the one place a specific error is correct**,
    because the audience is the owner inspecting their own container, not a caller probing it.
+   The triggers refuse an update, a delete and, on postgres, a truncate. On postgres the
+   privileges enforce it as well: the role the container runs as holds only reading and appending
+   on the chain (`storage.md` §3.7). Whoever owns the table or holds the database's admin
+   credentials (on sqlite, whoever can write its file) can still rewrite the chain, and
+   `audit verify` catches such a rewrite only as far as `storage.md` §1 states. **a1p** (v0.7 §AF).
 2. **Audit coverage.** Every read, blob pull, grant mint, silent gate pass, step-up and approval is
    an event. A surface that produces an effect without a corresponding event is non-conforming.
    **Two exceptions, each closed and each decided at the 0.3 freeze; nothing else is excepted.**
