@@ -286,7 +286,8 @@ class TrustEngine:
         # The item, every derived copy and the chain entry land together, or none of them.
         with self.backend.atomic():
             # Quarantined as it stands under the lock, checked again there: a write since the
-            # caller read it is observed, never written over (GHSA-m955-fr24-frwq).
+            # caller read it is observed, never written over (storage.md §3.6;
+            # GHSA-m955-fr24-frwq).
             item = self._fresh(item, refusal="already quarantined")
             self._may_quarantine(item, token)
             affected = [item.id]

@@ -126,8 +126,8 @@ class Auth:
         already-revoked token is not revoked twice and gets no second `token.revoke`
         (authorization-server.md §9.2, as `authz.revoke`). The event carries no `family_id`:
         `Backend` has no family read yet (#242). The read, the check, the write and the entry are
-        one `atomic()` block, which holds the write lock from before the read
-        (GHSA-m955-fr24-frwq)."""
+        one `atomic()` block, which holds the write lock from before the read (storage.md §3.6;
+        GHSA-m955-fr24-frwq)."""
         with self.backend.atomic():
             token = self.backend.get_token(token_id)
             if not token:
@@ -160,7 +160,7 @@ class Auth:
     def use(self, value: str) -> Token | None:
         """The token a bearer value proves, or None. Every failure looks the same to the caller.
         The read, the check and the `last_used` write are one `atomic()` block, which holds the
-        write lock from before the read (GHSA-m955-fr24-frwq)."""
+        write lock from before the read (storage.md §3.6; GHSA-m955-fr24-frwq)."""
         tid = token_id_of(value or "")
         if not tid:
             return None
