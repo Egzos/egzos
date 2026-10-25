@@ -204,7 +204,7 @@ class SqliteBackend:
         if text:
             sql += " AND doc LIKE ?"
             args.append(f"%{text}%")  # SKELETON: substring; embeddings later
-        sql += " ORDER BY created_at DESC"
+        sql += " ORDER BY created_at DESC, id DESC"  # same-second items by id (storage.md §2)
         return [ContextItem.from_dict(json.loads(r[0])) for r in self.db.execute(sql, args)]
 
     def tombstone(self, item_id: str) -> bool:

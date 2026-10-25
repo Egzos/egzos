@@ -17,6 +17,7 @@ import egzos._types as t
 # Names the module imports for its own use — present in its namespace, not part of its surface.
 IMPORTED = {
     "annotations",
+    "AbstractContextManager",
     "Any",
     "Iterable",
     "Iterator",

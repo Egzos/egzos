@@ -2,11 +2,15 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """`ContainerState`'s nodes, tokens and proposals (storage.md §3) on every backend: each reads back
 as put, a second put of one id replaces it (a move, a revocation, a decision), and a miss is `None`
-or a shorter list (§5). No contract fixes a list's order, so ids are compared as sets."""
+or a shorter list (§5). Each `list_*` of §3-§3.4 returns last-write order, a replaced record last,
+but `list_uploads`, which keeps open order (§3.7): pinned once, at the end; elsewhere ids compare as
+sets."""
 
 from __future__ import annotations
 
 from dataclasses import replace
+
+import pytest
 
 from egzos.model import Node, Token
 
@@ -64,3 +68,51 @@ def test_proposals_read_back_list_by_status_and_a_decision_replaces_one(backend)
     assert sorted(p["id"] for p in backend.list_proposals()) == ["p1", "p2"]
     assert backend.list_proposals("denied") == []
     assert backend.get_proposal("never") is None
+
+
+_WHO = {"name": "n", "capabilities": ["fetch"], "scopes": ["*"], "created_at": AT}
+_CREDENTIAL = {"credential_id": "x", "public_key": "k", "sign_count": 0, "rp_id": "egzos.io",
+               "name": "phone", "created_at": AT, "last_used": None}
+_UPLOAD = {"actor": "self", "scope": "n1", "name": "a.txt", "mime": "text/plain", "size": 3,
+           "sha256": "0" * 64, "opened_at": AT, "expires_at": AT, "staged": False, "item": None,
+           "promoted": False}
+
+#: §3.7, for each `list_*` of §3-§3.4: how to write record `i`, the second time as a replacement (a
+#: rename, a revocation, a removal, a discard); every way to list the records, each filter keeping
+#: all three; and how a listed record is named.
+LISTS = {
+    "nodes": (lambda b, i, again: b.put_node(replace(_node(i, "thread", "p"), name=f"v{again:d}")),
+              lambda b: [b.list_nodes(), b.list_nodes(parent="p"), b.list_nodes(type="thread")],
+              lambda n: n.id),
+    "tokens": (lambda b, i, again: b.put_token(Token(
+                   id=i, principal="client", owner="self", client="bot", capabilities=["fetch"],
+                   scopes=["n1"], created_at=AT, revoked=again)),
+               lambda b: [b.list_tokens()], lambda t: t.id),
+    "proposals": (lambda b, i, again: b.put_proposal({**_proposal(i), "reason": f"v{again:d}"}),
+                  lambda b: [b.list_proposals(), b.list_proposals("open")], lambda p: p["id"]),
+    "user_grants": (lambda b, i, again: b.put_user_grant({**_WHO, "sub": i, "revoked": again}),
+                    lambda b: [b.list_user_grants()], lambda g: g["sub"]),
+    "agent_registrations": (
+        lambda b, i, again: b.put_agent_registration(
+            {**_WHO, "client_id": "a", "sub": i, "revoked": again}),
+        lambda b: [b.list_agent_registrations(), b.list_agent_registrations("a")],
+        lambda r: r["sub"]),
+    "credentials": (
+        lambda b, i, again: b.put_credential(
+            {**_CREDENTIAL, "id": i, "person": "self", "removed": again}),
+        lambda b: [b.list_credentials(), b.list_credentials("self")], lambda c: c["id"]),
+    "uploads": (
+        lambda b, i, again: b.put_upload(
+            {**_UPLOAD, "id": i, "principal": "t1", "discarded": again}),
+        lambda b: [b.list_uploads(), b.list_uploads("t1")], lambda u: u["id"]),
+}
+
+
+@pytest.mark.parametrize("kind", sorted(LISTS))
+def test_each_list_returns_last_write_order_but_uploads_keep_open_order(backend, kind):
+    write, lists, name = LISTS[kind]
+    for i in ("b", "c", "a"):  # neither key order nor its reverse
+        write(backend, i, False)
+    write(backend, "b", True)  # last now, but an upload is rewritten in place
+    got = [[name(r) for r in listed] for listed in lists(backend)]
+    assert got == [["b", "c", "a"] if kind == "uploads" else ["c", "a", "b"]] * len(got)

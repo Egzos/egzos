@@ -811,6 +811,14 @@ refusal, so the response never says which bucket or check refused it. **a1p**, t
 **On success** the door streams the bytes and appends one `blob.pull` (`subject` the item, `scope`,
 `sha256`, `size`), attributed to the token the descriptor names. **decided** (`events.md` §1).
 
+**Redemption stays at the container, on every substrate. a1p** (v0.7 §AF). Check 8 reads the
+bytes from the container's own blob store, a directory or an object-store prefix (`storage.md` §4),
+and the door streams them itself, under the headers below. `grant_url` is always this door's
+`/v1/blobs/` URL: no storage vendor's signed URL, and no object-store location, reaches a client,
+in a response body or through a redirect. A vendor's URL is honoured by the vendor, not the
+container, so it would bypass the single-use spend and the other checks, those headers and
+`blob.pull`'s entry.
+
 **The bytes are never rendered on the container's origin. a1p**: the AS's pages share this origin,
 so an HTML or SVG artifact served as its own `mime` would run script beside the login. The response
 carries:
@@ -867,9 +875,8 @@ one). The MAC is HMAC-SHA256 over every descriptor field but `sig`, written as `
   the `ContainerState` substrate as the confirm's challenges are: a spend is one atomic write every
   process serving the container sees. A record is a `sig`'s sha256 and its grant's `expires_at`, no
   secret, kept at least a lifetime past that.
-- **A container egzos hosts** is not decided here: where its key is provisioned, held and rotated
-  joins `identity.md` §4's `TODO(chief)`, #283, on hosted provisioning, the same question for the
-  same owner.
+- **A container egzos hosts** keeps its key on its home's volume, and its operator, not its owner,
+  replaces it: `identity.md` §4 (v0.7 §AF).
 
 **The lifeboat's same-origin route** redeems the same descriptor under the same checks on its own
 host (#138). It is a5-dinghy's and is not an endpoint of this door. The deployment preview limit
@@ -886,5 +893,5 @@ other four questions were the retired authorization server's and close with it.
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
 `identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
 §4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
-`identity.md` §4's `TODO(chief)`, #283.
+`identity.md` §4.
 The look of any client → its design spec.

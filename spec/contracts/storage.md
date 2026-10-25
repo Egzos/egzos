@@ -15,7 +15,9 @@ verbatim from the running code — the *methods* are running, the *partition* is
 review must read §1–§3 knowing it is reading a **decided split, not a running one**.
 
 Every clause is marked **running** (observed in the skeleton), **decided, not running** (a Chief
-freeze decision F1–F5 or 0.3 decision the skeleton does not yet execute). A `[0.3 · N]` marking
+freeze decision F1–F5 or 0.3 decision, or from contract v1.1 a v0.7 one, the skeleton does not yet
+execute) or **a1p** (the operator's binding of a decision, a proposal the review reads as one, as in
+`identity.md`). A `[0.3 · N]` marking
 cites item `N` of the Chief's freeze record on #31 (2026-10-03). The open→0.3 marking the draft
 carried is gone from `spec/contracts/` and `src/`: the record answered every one. The design specs
 still carry the retired marker; design-gap #157 tracks their revision by A2 (`README.md`).
@@ -52,6 +54,20 @@ container, is not a "third-party store" in F3's sense. **Delegation to a third-p
 forbidden** — mem0, zep, a hosted vector database, or any service whose operator is not the
 container's. The line is who operates the substrate, not which engine it is. **decided, not
 running** (postgres is Phase 5).
+
+**A managed postgres that only the container's operator administers is the operator's own
+substrate** under [0.3 · 5], so `ContainerState` may live on Supabase's postgres, in the container's
+own project (§3.7). The database vendor joins the ledger's trust path, as v0.7 §T records for the
+identity provider. **decided, not running** (v0.7 §AF). For a container egzos hosts, that operator
+is egzos: egzos, the vendor and the host join its trust path, for reading as for writing. The chain
+records acts, not the state they leave: tokens, grants, registrations and config are rows it does
+not cover, so whoever can write the database can grant itself the container, and whoever can write
+the object store can substitute bytes until `get` checks them (§4). The chain is hashed, not signed:
+`audit verify` catches an edit, an insertion or a removal only while every later entry is left as
+it was. An entry re-hashed with every entry after it verifies, as does a chain whose last entries
+are gone, a restore to an earlier point included, or whose `seq` is renumbered (`events.md` §3). An
+outside anchor, each place recording the cloud's head when it pulls, is what would catch those;
+the Chief has asked that it come with sync (v0.7 §V, §AF). **a1p** (v0.7 §AF), the reach as stated here.
 
 ## 2 · `ItemStore` — pluggable, delegable
 
@@ -98,7 +114,9 @@ positional refs are identical between two conforming containers. A backend that 
 non-conforming. This key orders **results** only. Since the Chief's revision of item 1 it
 disambiguates nothing: an ambiguous path is refused (`container.md` §2), so no ordering here can
 steer which node a reference names. **decided, not running**: the skeleton orders
-`created_at DESC`.
+`created_at DESC`. **Items written in the same second fall by id, newest first, on every backend**
+(`created_at DESC, id DESC`), so sqlite and postgres list alike, ties included. **decided, not
+running** (v0.7 §AF); ordering by an item's latest write rather than its creation stays not running.
 
 ### `tombstone` and `get`
 
@@ -109,12 +127,14 @@ it was not found. `get` on a tombstoned item returns `None`: to every read path 
 
 That boolean is **internal to the storage boundary and MUST NOT be reflected to a caller** — see §5.
 
-TODO(a1p): `put` is unconditional replace (`INSERT OR REPLACE`) with no return and no
-compare-and-swap parameter, while `lifecycle.version` increments on every mutation
-(`context-item.md` §6). Two concurrent writers therefore lose an update silently and the version
-counter records only one of them. No source names a concurrency model for the storage boundary. The
-freeze should either put the expected-version argument in the signature or state that serialising
-writes is the caller's problem — inventing either one here would be guessing in a contract.
+**`put` stays an unconditional replace; a read-then-write is serialised by its caller, inside one
+`atomic()` block.** `put` has no return and no expected-version argument, while `lifecycle.version`
+increments on every mutation (`context-item.md` §6). A read-then-write that must not lose an update
+runs inside one block, which holds the container's one write lock from before its first read
+(§3.6), so two such writers run one after the other and the version counter records both. A
+delegated `ItemStore` (§1) is outside that lock, and none conforms until its specification
+serialises a read-then-write on one item as `atomic()` does and lets an act's item writes roll back
+with the act's chain entry. **a1p** (v0.7 §AF), closing the question the freeze left open here.
 
 ## 3 · `ContainerState` — never delegated
 
@@ -143,7 +163,9 @@ Phase 5. **Never delegated to a third-party store.**
 
 `audit_append` receives an entry **without** `seq`: the ledger computes `hash` over the entry minus
 `hash` and minus `seq`, and the store assigns `seq` and returns the stored entry
-(`events.md` §3). The store appends; it never computes the chain. **running.**
+(`events.md` §3). The store appends; it never computes the chain. **running.** A second entry
+after the same `prev_hash` is refused with `ChainConflict` (§3.6), never the driver's own error, so
+the ledger re-chains. **running.**
 
 Node and chain semantics — container types, ring ranks, the chain walk, the serving policy, the
 gate and the container config object — are `container.md`'s, not this document's. This document
@@ -278,6 +300,87 @@ forget_grants(expired_before)                    -> None    # drops the records 
   grant's `expires_at`; it is kept at least a lifetime past that (`rest.md` §6). The key that signs
   grants is not here: it is a file in the container's home that no export carries (`rest.md` §6).
 
+## 3.6 · One writer per container — `Transactional`
+
+**Status of this section: contract v1.1, a1p** (enacted with v0.7 §AF). One Protocol beside
+`ContainerState`, in `src/egzos/_types.py`, implemented by the backend that implements it, on its
+substrate and never delegated (F3). It is not one of §1's three contracts, so `STORAGE_CONTRACTS`
+and §3's count stand. Its method and `ChainConflict` are **running** (the skeleton's `Backend`);
+what follows is **a1p**.
+
+```
+# Transactional — the container's one write lock
+atomic()                                         -> context manager   # every write to this substrate inside lands together or not at all
+```
+
+- **One writer per container.** `atomic()` holds a write lock over the whole container from entry
+  to exit, taken before the block's first read, so a read inside sees every earlier commit and a
+  check that reads, then writes, still holds at its write. sqlite takes it with `BEGIN IMMEDIATE`;
+  postgres with `pg_advisory_xact_lock` on a key for this container, at READ COMMITTED. A writer
+  waits a bounded time for it, then raises; none waits forever.
+- **Nested calls join.** A block opened inside another is part of it, not a savepoint: the act
+  commits once, when the outermost block exits, and an exception leaving the outermost block rolls
+  back every write to this substrate in it.
+- **A block is one caller's.** Nothing inside it awaits or yields to another request, and every
+  statement in it runs on the connection that holds the lock.
+- **A write outside any block commits alone**, under the same lock, held for that write only.
+- **Each spend says whether its act can undo it.** `spend_grant` commits alone and is refused inside
+  a block (§3.5); `spend_upload` rolls back with the act that spent it (§3.4). `spend_challenge`
+  commits alone, with the proof's `step_up`, before the act's block opens, so a concluded proof
+  stays spent and audited whatever its act then does (`rest.md` §4.2 items 4–5), and the act's block
+  re-checks what the challenge bound. Not running for `spend_challenge`: the door concludes the
+  proof inside the act's block (#321).
+- **`ChainConflict`**, declared in `_types.py` beside this Protocol, is what `audit_append` raises
+  when another writer appended after the same head: the ledger re-reads the head and re-chains, so
+  the chain never forks. The store keeps one successor per entry whatever the lock, because an
+  append outside a block reads the head before it holds the lock.
+
+`TODO(a1p)`, #283, before an object store runs: where a block's `BlobStore` calls run against its
+COMMIT. A blob write is not a write to this substrate and no rollback undoes it, so a `promote` or
+a `discard` made before a COMMIT that then fails stays made, and a transfer inside a block holds
+the lock for as long as it takes (§4).
+
+## 3.7 · What every substrate keeps, and how it is named
+
+**Status of this section: contract v1.1, a1p** (enacted with v0.7 §AF). What the container's own
+substrate keeps for §3–§3.6, and for §2 when it is not delegated, postgres (§1) as much as sqlite,
+and how a container names its own.
+
+- **One container per database.** A database holds no other container's state, and no column names
+  a container: one chain grows from one GENESIS with one successor per entry (`events.md` §3), which
+  a table two containers shared could not hold. **a1p.** A container egzos hosts has its own
+  Supabase project, holding its database and its Storage (§4); sign-in stays in the identity project
+  (`identity.md` §1). **decided, not running** (v0.7 §AF).
+- **No process holds a credential that reaches another container's state.** A container's host
+  holds only its own project's connection string and Storage keys. A vendor credential that reaches
+  more than one project, such as a management access token, is used only in the operator's
+  provisioning act; no container's host and no process that answers requests holds it, egzos.io's
+  included (v0.7 §T). **a1p.**
+- **On postgres, the role the container runs as owns no table**, and holds only what its methods
+  need: on the audit chain, reading and appending. Append-only is enforced twice, by triggers that
+  refuse an update, a delete or a truncate, and by those privileges, since a table's owner can set
+  its triggers aside. The owning role applies the schema from outside the container, which never
+  holds that role's credentials. No role but those two holds a privilege on the container's schema,
+  the vendor's own API roles (`anon`, `authenticated`, `service_role`) included, and the vendor's
+  data API never serves it; where row-level security is on, its only policies name the container's
+  role. **a1p.**
+- **A document reads back exactly as written.** Each one a method stores is kept as the JSON text
+  the backend wrote, never in a type that rewrites it (postgres `jsonb` reorders keys, respells
+  numbers and refuses `\u0000`), so a reader gets back the text that was written: an entry re-hashes
+  to its stored `hash` (`events.md` §3), and an item keeps every field it was put with
+  (`context-item.md` §1). **a1p.**
+- **Lists come back in last-write order.** Each `list_*` method returns its records in the order
+  they were last written, a replaced record last, except `list_uploads`, which keeps the order the
+  uploads were opened, since `put_upload` rewrites a record in place. **a1p**, as sqlite runs it.
+- **The substrate is named outside the container**, by environment variables of the process that
+  opens it, never by a config key (`container.md` §8) or a row: a database's connection string and
+  an object store's keys are secrets, the host's. egzos never prints, logs or writes them, to a
+  file, an agent's launch configuration or the chain, and an error names the variable, never its
+  value. Their names enter here with the code that reads them. **a1p.** `TODO(a1p)`, #283, before
+  that code: how a home stays bound to the substrate it was made on, so that none opens another's
+  database or falls back to a fresh local store, and a missing volume never makes fresh keys that
+  lift a throttle (§3.1).
+
 ## 4 · `BlobStore` — content-addressed, staged
 
 ```
@@ -292,6 +395,23 @@ discard(sha)   -> bool          # deletes staged bytes only; True if there were 
 Two prefixes under the blob root: `sha256/<hash>` for promoted bytes and `staging/<hash>` for staged
 bytes. `put` is idempotent — an identical write of existing content is a no-op returning the same
 address. **running.**
+
+**The blob root is a directory or an object-store prefix**: the home's `blobs/` locally, and for a
+container egzos hosts a prefix in its own project's Storage (§3.7), its own substrate under §1's
+reading of [0.3 · 5]. **decided, not running** (v0.7 §AF) for the hosted store; **a1p** for the
+root.
+
+**`promote` decides by the staged bytes alone**, never by whether promoted ones exist. Where the
+store has no rename, as an S3-style store has none, it copies, then deletes the staged copy (the
+skeleton's directory store copies too): a crash between the two leaves only a staged copy beside the
+promoted bytes, which a retried `promote` (it copies again, deletes, and returns `True`) or a
+`discard` removes. The copy lands whole or not at all: one object write, or in a directory a write
+to a temporary name renamed into place. **a1p** (v0.7 §AF); not running in the directory store,
+whose copy is one plain write.
+
+**The content address is checked.** `get` returns `None` for bytes that do not hash to their
+address, and `promote` treats staged bytes that do not as nothing staged, so a store can lose bytes
+but never substitute them. **a1p** (v0.7 §AF); not running: the directory store does not re-hash.
 
 **Dedup is unobservable. [0.3 · 41]** `put` and `stage` are internal to the storage boundary: no
 external surface calls either or sees its result beyond the content address of the bytes the caller
@@ -309,6 +429,10 @@ the bytes were already stored.
 nothing about whether the grant should exist. **Signed-URL issuance passes Trust's capability check
 — artifact download IS fetch** (decisions log, DECIDED). A `BlobStore` method that consulted a token
 would be Store deciding a Trust question inside a module that is about to move to Vault.
+
+**Downloads stay at the container**, on an object store too: redemption reads the bytes from the
+store and streams them (`rest.md` §6), and no storage vendor's signed URL reaches a client. **a1p**
+(v0.7 §AF).
 
 The mint and the redemption are **two separate audit events**: `blob.grant` when Trust mints the
 descriptor, `blob.pull` when the bytes are actually served (`events.md`). One without the other is a
@@ -396,8 +520,9 @@ type already sits above both modules.
 The binding requirement, enforceable in review on every Phase 1–4 PR:
 
 - **No back-references.** `blobs.py` and `backends/**` import nothing from `store/nodes.py`,
-  `store/items.py` or `resolver.py`. Today `blobs.py` imports only `hashlib` and `pathlib`, and
-  `backends/base.py` imports only the shared model — that is the property to hold, not to restore.
+  `store/items.py` or `resolver.py`. Today `blobs.py` and `backends/base.py` import only the
+  standard library and the shared model and types (`model.py`, `_types.py`) — that is the property
+  to hold, not to restore.
 - Blob addressing is by `sha256` alone. The blob store never resolves an item id, a scope or a node.
 - A PR that gives either module knowledge of the node tree breaks R5 whether or not it passes tests.
 
@@ -415,7 +540,9 @@ contract they must satisfy.
 
 §3.1's `ThrottleState`, §3.2's `IdentityState` and `ConfigState`, §3.3's `ConfirmState`, §3.4's
 `UploadState` and §3.5's `GrantState` are contract v1.1, not part of the 0.3 freeze; their partition
-is decided on #173 (option (A), on the `ContainerState` substrate).
+is decided on #173 (option (A), on the `ContainerState` substrate). §3.6's `Transactional` and §3.7
+are contract v1.1 too, enacted with v0.7 §AF, as are the paragraphs added with them to §1–§4;
+`Transactional` sits on that substrate as well, outside `STORAGE_CONTRACTS`.
 
 `Node` and `Proposal`, referenced by `ContainerState`'s signatures above, are defined by the
 container contract (**#28**, landed) and typed in `src/egzos/_types.py`. The provisional aliases
