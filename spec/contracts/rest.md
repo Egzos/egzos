@@ -414,7 +414,8 @@ the row does not name is `400` (§3).
    principal at `GET /v1/pending`, since a client-facing token read needs the event `[v1.1 · #137
    10]` defers. The flagship's *moved* and *pending* states read `result`.
 8. **`POST /v1/scopes`** returns the created node. `parent` absent is the personal root, as
-   `egzos mk`.
+   `egzos mk`. To a principal without `fetch`, the node's `path` is `null`: a computed path names
+   its ancestors, and only `fetch` reads names (§3). **a1p.**
 9. **`GET /v1/pending`** is two lists as `Trust.pending` returns them, plus §4.4's `staged` and
    `uploads` where the reader has any: `items`, every `unverified`
    item in a scope the token covers, and `proposals`, every `open` proposal the token decides over
