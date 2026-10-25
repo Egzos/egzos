@@ -101,7 +101,11 @@ class SqliteBackend:
     def atomic(self):
         """Every write inside lands together or not at all. BEGIN IMMEDIATE takes the write lock
         up front, so no other process can move the chain head mid-act."""
-        if self._depth == 0 and not self.db.in_transaction:
+        if self._depth == 0:
+            if self.db.in_transaction:
+                # Only a lone write that failed (a busy database) leaves one open. Let it go, so
+                # the block holds the lock from its start (GHSA-m955-fr24-frwq).
+                self.db.rollback()
             self.db.execute("BEGIN IMMEDIATE")
         self._depth += 1
         try:
