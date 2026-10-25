@@ -123,6 +123,11 @@ own.
      stays refused while it does (as `authorization-server.md` §11.0 states for the AS surfaces;
      a6 on #184). The decision stands as written, and it is revisited only if it bites in
      practice. TODO(chief), #141: confirm the decision holds for a renewable, not a capped, cost.
+   - **Two kinds of request stand outside the throttle. a1p** (#294): every `OPTIONS`
+     (`identity.md` §6's preflight, or §3's refusal of one), and every request at the
+     protected-resource metadata's path (`identity.md` §7: the metadata on `GET`, §3's refusal
+     otherwise). None reads a credential, and each answer turns on the request alone, the same for
+     every caller, so it is answered as usual while a bucket holds and is never counted.
    - **The chain.** No attempt at the door appends an engage entry: the door has no per-attempt
      event a caller-less attempt could carry. The release appends `authz.release` with `surface:
      rest`, `refused` and `window_key` whenever the throttle engaged, `refused: 0` included (§12.1
@@ -195,7 +200,9 @@ It is the answer to every one of these, with no distinction between them:
 - an `interactive`-only endpoint (§4) called with a `client` principal. **a1p**: the running CLI
   refuses this with its own text (`_owner`), and #155 brings it into line;
 - a path no route declares, and a method a route does not declare. **a1p**, following the
-  lifeboat's R12: a framework `405` would confirm the path exists;
+  lifeboat's R12: a framework `405` would confirm the path exists. One exception: a verified
+  caller's `GET` or `DELETE` at `/mcp` gets the transport's `405`, since `/mcp`'s `401` already
+  tells everyone it exists (`identity.md` §7);
 - a `BlobGrant` redemption that fails any check (§6).
 
 **The move gate keeps its order.** `organize` is checked before the audience delta is computed
@@ -220,6 +227,11 @@ the matches; **a1p**, the bytes (#187). The candidates are only the nodes the to
 answer names nothing the token could not list at `GET /v1/scopes`; a tail whose only matches are
 uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the running MCP door's
 `_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`).
+
+**Only a principal holding `fetch` is told the matches. a1p** (#294): they are what
+`GET /v1/scopes` would list, and it needs `fetch`. Any other gets §3's refusal and §4's probe
+instead, as for an absent tail, on every route that takes a reference, `POST /v1/items` included,
+and in the MCP tools alike (`egzos_fetch`, `egzos_remember`).
 
 ## 4 · The v1.0 endpoints
 

@@ -432,6 +432,8 @@ class ContainerConfig(TypedDict):
     identity_algorithms: str
     #: identity.md §2 — the origins the REST door answers CORS for (§6), space-separated.
     identity_browser_origins: str
+    #: identity.md §2 — the origin clients reach the container at; absent, the one `serve` binds.
+    identity_origin: str | None
     #: identity.md §2, §5 — whether the confirm accepts the button proof; `false`: biometric only.
     confirm_allow_button: bool
     #: rest.md §4.4 — the largest artifact one upload may carry, in bytes.
@@ -450,6 +452,7 @@ CONTAINER_CONFIG_DEFAULTS: ContainerConfig = {
     "identity_audience": "authenticated",
     "identity_algorithms": "ES256 RS256",
     "identity_browser_origins": "https://egzos.io",
+    "identity_origin": None,
     "confirm_allow_button": True,
     "blobs_upload_max_bytes": 100 * 1024 * 1024,
 }
@@ -479,6 +482,7 @@ CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY: dict[str, str] = {
     "identity.audience": "identity_audience",
     "identity.algorithms": "identity_algorithms",
     "identity.browser_origins": "identity_browser_origins",
+    "identity.origin": "identity_origin",
     "confirm.allow_button": "confirm_allow_button",
     "blobs.upload_max_bytes": "blobs_upload_max_bytes",
 }
