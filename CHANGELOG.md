@@ -113,6 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Items written in the same second list newest id first** (v0.7 §AF, `storage.md` §2), so
+  `egzos ls`, the inbox and every backend agree on their order; they listed in no fixed order before.
 - **Contracts: where a hosted container's state lives** (the Chief's decisions of 2026-10-25, v0.7
   §AF). A container egzos hosts may keep its state on its own Supabase project's Postgres and its
   files in that project's Storage, and its owner token is shown once at provisioning, with only its
