@@ -311,15 +311,18 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
   are the transport's: each turns on the request alone, never on a container fact, so none reveals
   what `rest.md` §3's refusal withholds. `rest.md` §2's and §3's uniform answers bind every answer
   given before verification. **a1p** (#294).
-- **A person's token is accepted here.** A person's provider token, or the owner's `Token`, runs the
-  tools as `interactive`. `capabilities.md` §3 refuses `serve` an interactive token, so the stdio
+- **A person's own sign-in is accepted here; the owner's `Token` is not.** A person's provider
+  token runs the tools as `interactive`, and a client container `Token` (`egzos token create`) as
+  `client`. The owner's container `Token`, interactive and never expiring, gets the same `401` at
+  `/mcp` as no credential at all, so an MCP client is never handed it. **decided** (the Chief,
+  2026-10-24, on #310). `capabilities.md` §3 refuses `serve` an interactive token, so the stdio
   door never runs on the human's own credential; `/mcp` runs on none, and each request carries and
   proves its own. No human-only act ever gets an MCP tool, so a person's token at `/mcp` holds
   nothing that person's own surfaces don't. What those surfaces hold goes with the token, though:
-  an MCP client given a person's token, the owner's `Token` included, can present it at `/v1/` as
-  well, and confirm with §5's button wherever §5 still accepts one (no credential registered and
+  an MCP client given a person's provider token can present it at `/v1/` as well, and confirm
+  with §5's button wherever §5 still accepts one (no credential registered and
   `confirm.allow_button` at `true`, both the defaults). The backstop there is §5's biometric, as
-  for any software that holds a person's token. **a1p** (#294).
+  for any software that holds a person's token. **a1p** (#294), the rest.
 
 ## 8 · Places
 

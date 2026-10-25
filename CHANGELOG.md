@@ -83,7 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and with no provider linked it names no authorization server at all. `/mcp` answers CORS as
   `/v1/` does, its preflight included, and a `GET` or `DELETE` there answers `405` with
   `Allow: POST`. A person's own sign-in works at `/mcp` too: no MCP tool does anything only a
-  person may do. Whoever holds a person's token can use it at `/v1/` as well, so give one to an
+  person may do. The owner's CLI token does not: at `/mcp` it is answered as no credential. Whoever holds a person's token can use it at `/v1/` as well, so give one to an
   MCP client only as you would to any software (registering Face ID / Touch ID, or setting
   `confirm.allow_button` to `false`, keeps the button out of its reach).
 - **An ambiguous scope reference names its matches only to a token that may read** (`fetch`), at

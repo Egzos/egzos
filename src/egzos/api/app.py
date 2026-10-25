@@ -317,6 +317,12 @@ def create_app(
         if token is None and not pull:
             d.throttle.count(address, refused=False)
             return out(unauthorized(metadata))
+        if path == MCP_PATH and token.principal == "interactive" and not isinstance(
+                token, GrantToken):
+            # identity.md §7 (the Chief, on #310): the owner's container Token, interactive and
+            # never expiring, is no credential at /mcp, so an MCP client is never handed it.
+            d.throttle.count(address, refused=False)
+            return out(unauthorized(metadata))
         if path == MCP_PATH and request.method in ("GET", "DELETE"):
             # identity.md §7: a stateless /mcp opens no stream and has no session to end. The
             # transport's 405, the same for every verified caller; the 401 above came first.

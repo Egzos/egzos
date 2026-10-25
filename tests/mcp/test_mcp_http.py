@@ -233,11 +233,33 @@ def test_a_persons_token_works_as_interactive(c, sign):
     assert "for" not in entry["details"]
 
 
+def _bot(c):
+    """A client container Token over everything: an MCP client's own credential, never the owner's
+    (identity.md §7)."""
+    if not hasattr(c, "_mcp_bot"):
+        c._mcp_bot = c.auth.mint(principal="client", owner=OWNER, client="bot", role="curator",
+                                 scopes=["*"], actor=OWNER, by_principal="interactive")
+    return c._mcp_bot
+
+
+def test_the_owners_cli_token_is_no_credential_at_mcp(c):
+    """identity.md §7 (the Chief, on #310): the owner's container Token, interactive and never
+    expiring, gets the same 401 at /mcp as no credential at all; a client Token is served."""
+    with TestClient(create_app(c, origin=ORIGIN)) as door:
+        bare = door.post("/mcp", headers=H, json=INIT)
+        owner = door.post("/mcp", headers={**H, **_bearer(c.owner.secret)}, json=INIT)
+        assert (owner.status_code, owner.content, owner.headers["www-authenticate"]) == (
+            bare.status_code, bare.content, bare.headers["www-authenticate"]) == (
+            401, bare.content, CHALLENGE)
+        assert door.post("/mcp", headers={**H, **_bearer(_bot(c).secret)},
+                         json=INIT).status_code == 200
+
+
 # -- stateless: no session to steal, nothing but POST ----------------------------------------------
 def test_no_session_is_issued_and_only_post_is_declared(c):
     nobody = c.auth.mint(principal="client", owner=OWNER, client="probe", role="reader", scopes=[],
                          actor=OWNER, by_principal="interactive")
-    h = {**H, **_bearer(c.owner.secret)}
+    h = {**H, **_bearer(_bot(c).secret)}
     with TestClient(create_app(c, origin=ORIGIN)) as door:
         r = door.post("/mcp", headers=h, json=INIT)
         assert r.status_code == 200 and "mcp-session-id" not in r.headers
@@ -245,14 +267,14 @@ def test_no_session_is_issued_and_only_post_is_declared(c):
         # identity.md §7: no stream to open, no session to end: the transport's 405, the same for
         # every verified caller; an unverified one meets the 401 first
         for method in ("GET", "DELETE"):
-            owner, other = (door.request(method, "/mcp", headers={**H, **_bearer(t.secret)})
-                            for t in (c.owner, nobody))
-            assert (owner.status_code, owner.content) == (405, b'{"error":"method_not_allowed"}')
-            assert sorted(owner.headers.items()) == sorted(other.headers.items())
-            assert (owner.headers["allow"], owner.headers["content-type"]) == (
+            bot, other = (door.request(method, "/mcp", headers={**H, **_bearer(t.secret)})
+                          for t in (_bot(c), nobody))
+            assert (bot.status_code, bot.content) == (405, b'{"error":"method_not_allowed"}')
+            assert sorted(bot.headers.items()) == sorted(other.headers.items())
+            assert (bot.headers["allow"], bot.headers["content-type"]) == (
                 "POST", "application/json")
-            assert owner.headers["cache-control"] == "no-store"
-            assert owner.headers["x-content-type-options"] == "nosniff"
+            assert bot.headers["cache-control"] == "no-store"
+            assert bot.headers["x-content-type-options"] == "nosniff"
             unverified = door.request(method, "/mcp", headers=H)
             assert (unverified.status_code, unverified.headers["www-authenticate"]) == (
                 401, CHALLENGE)
@@ -272,7 +294,7 @@ def test_a_listen_is_answered_and_never_held_open(c):
         "_meta": {f"io.modelcontextprotocol/{k}": v for k, v in (
             ("protocolVersion", "2026-07-28"), ("clientCapabilities", {}),
             ("clientInfo", {"name": "probe", "version": "1"}))}}}).encode()
-    headers = {**H, **_bearer(c.owner.secret), "MCP-Protocol-Version": "2026-07-28",
+    headers = {**H, **_bearer(_bot(c).secret), "MCP-Protocol-Version": "2026-07-28",
                "Mcp-Method": "subscriptions/listen"}
     scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "POST",
              "scheme": "https", "path": "/mcp", "raw_path": b"/mcp", "query_string": b"",
@@ -301,7 +323,7 @@ def test_mcp_reads_no_larger_a_body_than_the_door(c):
     big = {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
            "params": {"name": "egzos_remember", "arguments": {"text": "x" * BODY_MAX_BYTES}}}
     with TestClient(create_app(c, origin=ORIGIN)) as door:
-        r = door.post("/mcp", headers={**H, **_bearer(c.owner.secret)}, json=big)
+        r = door.post("/mcp", headers={**H, **_bearer(_bot(c).secret)}, json=big)
     assert r.status_code == 413 and not _events(c, "item.add")
 
 
@@ -315,7 +337,7 @@ def test_past_the_credential_the_transports_own_answers_are_its_own(c):
              ({**H, "Content-Type": "text/plain"}, json.dumps(INIT)), (H, "{")]
     with TestClient(create_app(c, origin=ORIGIN)) as door:
         answers = [[door.post("/mcp", headers={**h, **_bearer(t.secret)}, content=body)
-                    for t in (c.owner, nobody)] for h, body in asked]
+                    for t in (_bot(c), nobody)] for h, body in asked]
         unverified = [door.post("/mcp", headers=h, content=body) for h, body in asked]
     for owner, other in answers:  # byte for byte, whoever asks
         assert (owner.status_code, owner.content, sorted(owner.headers.items())) == (
@@ -334,7 +356,7 @@ def test_mcp_is_answered_cors_as_v1_is_its_preflight_included(c):
     with TestClient(create_app(c, origin=ORIGIN)) as door:
         mcp, v1 = door.options("/mcp", headers=pre), door.options("/v1/fetch", headers=pre)
         foreign = door.options("/mcp", headers={**pre, "Origin": "https://evil.example"})
-        h = {**H, **_bearer(c.owner.secret), "Origin": pre["Origin"]}
+        h = {**H, **_bearer(_bot(c).secret), "Origin": pre["Origin"]}
         posted = door.post("/mcp", headers=h, json=INIT)
     assert mcp.status_code == v1.status_code == 204
     assert sorted(mcp.headers.items()) == sorted(v1.headers.items())
@@ -353,14 +375,14 @@ def test_the_throttle_holds_mcp_with_its_own_401(c):
         for _ in range(RATE.per_source + 1):  # public, the same for everyone: never counted
             assert door.get(METADATA).status_code == 200
             assert door.options("/mcp", headers=pre).status_code == 204
-        live = door.post("/mcp", headers={**H, **_bearer(c.owner.secret)}, json=INIT)
+        live = door.post("/mcp", headers={**H, **_bearer(_bot(c).secret)}, json=INIT)
         assert live.status_code == 200  # so nothing above filled a bucket
         for _ in range(RATE.per_source):
             door.post("/mcp", headers=H, json=INIT)
-        held = door.post("/mcp", headers={**H, **_bearer(c.owner.secret)}, json=INIT)
+        held = door.post("/mcp", headers={**H, **_bearer(_bot(c).secret)}, json=INIT)
         assert (held.status_code, held.content) == (401, UNAUTHORIZED)
         assert held.headers["www-authenticate"] == CHALLENGE
-        held_v1 = door.get("/v1/fetch", headers=_bearer(c.owner.secret))
+        held_v1 = door.get("/v1/fetch", headers=_bearer(_bot(c).secret))
         assert (held_v1.status_code, held_v1.headers["www-authenticate"]) == (401, "Bearer")
         assert door.get(METADATA).status_code == 200  # served while held (rest.md §2 item 7)
         assert door.options("/mcp", headers=pre).status_code == 204
