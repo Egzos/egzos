@@ -148,6 +148,7 @@ def principal_parts(token_id: str) -> tuple[str | None, str] | None:
     if not 1 <= len(parts) <= 2 or not all(parts):
         return None
     pair = (None, parts[0]) if len(parts) == 1 else (parts[0], parts[1])
+    # The kind is never parsed: this round trip is what refuses a foreign or mismatched one.
     return pair if principal_id(*pair) == token_id else None
 
 
