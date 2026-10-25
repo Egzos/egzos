@@ -107,6 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
   argument or a bare group now prints `{"error": …}` on stdout, as every other `--json` failure
   does, and still exits 2 (#203). A `--json` after `--` is data, not the flag.
+- **Principal ids are now unambiguous** (#316, `rest.md` §6). Every id whose parts hold neither `%`
+  nor `:`, every Supabase-issued id among them, is unchanged. On another provider, a proposal parked
+  or an upload opened before the upgrade under an id that held either may need to be made again.
 
 ### Changed
 
