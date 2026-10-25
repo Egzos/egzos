@@ -7,6 +7,8 @@ not the nav count, not the queue, not its own page — exactly as it sees an unk
 
 from __future__ import annotations
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -73,6 +75,8 @@ def test_narrow_token_sees_an_empty_queue_owner_sees_the_proposal(world):
 
 def test_narrow_token_gets_the_same_page_as_an_unknown_id(world):
     _c, _boat, client, pid, narrow, monkeypatch = world
+    # Every page prints the time it was rendered; pin it, so two renders a second apart compare.
+    monkeypatch.setattr(time, "strftime", lambda fmt, *when: "12:00:00")
     monkeypatch.setenv("EGZOS_TOKEN", narrow.secret)
     seen = client.get(f"/pending/{pid}")
     unknown = client.get("/pending/01ZZZZZZZZZZZZZZZZZZZZZZZZ")
