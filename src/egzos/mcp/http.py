@@ -12,13 +12,17 @@ entries name the user it acts for.
 
 - **Stateless, with JSON responses.** Each POST is its own exchange and no `Mcp-Session-Id` is
   issued, so there is no session another principal could present. GET and DELETE, which only a
-  session needs, are not declared and get the door's one refusal. `subscriptions/listen` is not
-  served either, so no POST becomes a stream that outlives the check of the caller who opened it.
+  session needs, never reach the SDK: the door answers a verified one with the transport's `405`
+  (identity.md §7). `subscriptions/listen` is not served either, so no POST becomes a stream that
+  outlives the check of the caller who opened it.
 - **The door's body limit**, not the SDK's larger default: what `/mcp` reads is what `/v1/` reads.
+  Past the credential, the SDK's own answers (its JSON-RPC errors, and the bare `400`, `406` and
+  `413` it gives a request it will not read) are the transport's, and turn on the request alone
+  (identity.md §7).
 - **The SDK's DNS-rebinding guard is off.** It would refuse every Host but loopback, and no
   contract names a Host. A rebound page has no credential to present: the door reads only
   `Authorization: Bearer`, never a cookie (rest.md §2 items 1 and 3), and its Origin policy is
-  identity.md §6's CORS, which the door applies here as on every answer.
+  identity.md §6's CORS, which the door applies here as on every answer, preflight included.
 """
 
 from __future__ import annotations

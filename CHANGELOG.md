@@ -81,9 +81,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `/.well-known/oauth-protected-resource`, which tells a client where to sign in. It is stateless
   and holds no stream open, so there is no session for anyone else to pick up, and it shares the
   door's throttle and body limit. Built on the MCP SDK's transport. MCP over stdio is unchanged.
-  One limit for now: the metadata names the origin `serve` binds, so behind a TLS-terminating
-  proxy or on a wildcard address it is not the origin clients reach, and sign-in discovery there
-  points the wrong way. No config key names the public origin yet.
+  Behind a TLS-terminating proxy or on a wildcard address, set **`identity.origin`** to the origin
+  clients reach, written as a browser sends it (`egzos config set identity.origin https://…`), and
+  the metadata and the `401` name it instead of the origin `serve` binds (#294);
+  `identity.browser_origins` entries are held to the same form. The metadata is never throttled,
+  and with no provider linked it names no authorization server at all. `/mcp` answers CORS as
+  `/v1/` does, its preflight included, and a `GET` or `DELETE` there answers `405` with
+  `Allow: POST`. A person's own sign-in works at `/mcp` too: no MCP tool does anything only a
+  person may do. The owner's CLI token does not: at `/mcp` it is answered as no credential. Whoever holds a person's token can use it at `/v1/` as well, so give one to an
+  MCP client only as you would to any software (registering Face ID / Touch ID, or setting
+  `confirm.allow_button` to `false`, keeps the button out of its reach).
+- **An ambiguous scope reference names its matches only to a token that may read** (`fetch`), at
+  the door and over MCP alike. Any other token gets the answer for a scope that is not there: the
+  door's one `404`, or `egzos_remember`'s "scope not found" (`rest.md` §3, #294).
 - **Download artifacts at the door** (`rest.md` §6): `/v1/fetch` and `/v1/items/{id}` carry a
   grant beside an artifact whose bytes do not ride inline, and `GET /v1/blobs/…` redeems it by the
   grant alone, once, within five minutes, as a download that never renders. The grant is signed

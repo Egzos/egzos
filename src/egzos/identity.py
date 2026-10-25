@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import threading
 import time
 import unicodedata
@@ -57,10 +58,11 @@ IDENTITY_KEYS = (
     "identity.algorithms",
     "identity.browser_origins",
 )
-#: The keys some code reads, so the only keys `config set` takes: §2's six (`confirm.allow_button`
-#: is the confirm's, `egzos.confirm`), and the two the upload reads (`rest.md` §4.4).
+#: The keys some code reads, so the only keys `config set` takes: §2's seven (`identity.origin` is
+#: the door's, `egzos.api`; `confirm.allow_button` the confirm's, `egzos.confirm`), and the two the
+#: upload reads (`rest.md` §4.4).
 SETTABLE_KEYS = (
-    *IDENTITY_KEYS, "confirm.allow_button", "blobs.upload_max_bytes",
+    *IDENTITY_KEYS, "identity.origin", "confirm.allow_button", "blobs.upload_max_bytes",
     "blobs.staging_retention_days",
 )
 #: The bounds of the two numeric keys: an upload of 1 byte to 1 TiB; 0 days to a century.
@@ -138,15 +140,29 @@ def _loopback(host: str | None) -> bool:
         return False
 
 
+_LABEL = r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?"
+#: An origin as a browser sends one (RFC 6454 §6.2): a scheme, a lowercase ASCII host or a
+#: bracketed IPv6 address, and a port, with nothing around them.
+_ORIGIN = re.compile(rf"(https?)://({_LABEL}(?:\.{_LABEL})*|\[[0-9a-f:]+\])(?::([1-9][0-9]*))?")
+_DEFAULT_PORT = {"https": 443, "http": 80}
+
+
 def _origin(value: str, *, key: str) -> str:
-    """An origin, exactly: `https://host[:port]`, or `http://` on a loopback host only."""
-    parts = urlsplit(value)
-    if parts.scheme not in ("https", "http") or not parts.hostname:
+    """An origin, exactly as a browser sends it: `https://host[:port]`, or `http://` on a loopback
+    host only, with no default port and nothing else. Only such a value can match an `Origin`
+    header, and only such a value is published (§7) as it is held."""
+    match = _ORIGIN.fullmatch(value)
+    scheme, host, port = match.groups() if match else ("", "", None)
+    if host.startswith("["):  # an IPv6 address, written as a browser writes it, or nothing
+        try:
+            host = host[1:-1] if ipaddress.IPv6Address(host[1:-1]).compressed == host[1:-1] else ""
+        except ValueError:
+            host = ""
+    if not host or port is not None and (
+            len(port) > 5 or int(port) > 65535 or int(port) == _DEFAULT_PORT[scheme]):
         raise ConfigError(f"{key}: {value!r} is not an origin")
-    if parts.scheme == "http" and not _loopback(parts.hostname):
+    if scheme == "http" and not _loopback(host):
         raise ConfigError(f"{key}: plain http is for a loopback host only")
-    if parts.path or parts.query or parts.fragment or parts.username or parts.password:
-        raise ConfigError(f"{key}: {value!r} is not an origin")
     return value
 
 
@@ -189,6 +205,12 @@ def validate(key: str, value: Any) -> Any:
         if not isinstance(value, str):
             raise ConfigError(f"{key}: origins, separated by spaces")
         return " ".join(dict.fromkeys(_origin(o, key=key) for o in value.split()))
+    if key == "identity.origin":
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ConfigError(f"{key}: an origin, or nothing")
+        return _origin(value, key=key)  # one origin, held as a browser origin is
     if key == "confirm.allow_button":
         if isinstance(value, bool):
             return value

@@ -23,7 +23,7 @@ from typing import Any
 
 from egzos import __version__
 from egzos.container import Container
-from egzos.model import Token
+from egzos.model import KINDS, Token
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef
 
@@ -169,16 +169,27 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         token = caller()
         if token is None:
             return NOT_LIVE
+        # As `POST /v1/items`: the capability, then the request's shape, before any lookup, so
+        # neither answer turns on what `scope` names (rest.md §3).
+        if not token.has("remember"):
+            _probe(token, scope)
+            return json.dumps({"ok": False, "reason": "token lacks `remember`"})
+        if kind and kind not in KINDS:  # an empty kind is the default, as `store.add` reads it
+            return json.dumps({"ok": False, "reason": f"unknown kind {kind!r}"})
+        absent = json.dumps({"ok": False, "reason": "scope not found"})
+        reads = token.has("fetch")  # paths are named only to who could list them (rest.md §3)
         try:
             node = _scope(scope, token) if scope else None
         except AmbiguousRef as e:
             _probe(token, scope)
+            if not reads:
+                return absent
             return json.dumps({"ok": False, "reason": "ambiguous", "matches": e.paths},
                               ensure_ascii=False)
         if scope and node is None:
             # silence-not-errors: the same shape whether the scope is absent or not this token's
             _probe(token, scope)
-            return json.dumps({"ok": False, "reason": "scope not found"})
+            return absent
         try:
             item = store.add(
                 body=text,
@@ -190,15 +201,16 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                 actor=token.owner,
                 principal=token.principal,
             )
-        except StoreError as e:
-            return json.dumps({"ok": False, "reason": str(e)})
+        except StoreError:
+            _probe(token, scope)  # past the lookup, every refusal is the absent one
+            return absent
         return json.dumps(
             {
                 "ok": True,
                 "id": item.id,
                 "status": item.status,
                 "auto_title": item.content["auto_title"],
-                "scope": nodes.path(nodes.backend.get_node(item.scope)),
+                "scope": nodes.path(nodes.backend.get_node(item.scope)) if reads else scope,
             }
         )
 

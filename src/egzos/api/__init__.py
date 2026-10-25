@@ -13,10 +13,10 @@ throttle's per-source bucket (rest.md §2 item 7) counts the proxy as one source
 global bucket still bounds a sweep, and a proxy that throttles per client is the place to split
 callers apart. A forwarded header is never read to do it here.
 
-The door's own origin, which `/mcp`'s protected-resource metadata names (identity.md §7), is the
-one `serve` binds: the socket's scheme, host and port, never a request's `Host` or a forwarded
-header, so the document is the same for every caller. Behind a proxy, or on a wildcard address,
-that is not the origin clients reach; no contract key names that origin yet.
+The origin `/mcp`'s protected-resource metadata names (identity.md §7) is `identity.origin`, the
+one clients reach (§2), when the owner sets it, as behind a proxy or on a wildcard address. Absent,
+it is the one `serve` binds: the socket's scheme, host and port. Never a request's `Host` or a
+forwarded header, so the document is the same for every caller.
 """
 
 from __future__ import annotations

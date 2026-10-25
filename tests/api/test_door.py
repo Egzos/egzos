@@ -128,13 +128,37 @@ def test_an_ambiguous_tail_names_only_what_the_token_covers(c, door):
     a, b = _project(c, "a"), _project(c, "b")
     for parent in (a, b):
         c.nodes.create("thread", "same", parent, token=c.owner, **KW)
+    both = {"error": "ambiguous", "matches": sorted(["user:self/project:a/thread:same",
+                                                     "user:self/project:b/thread:same"])}
     r = door.get("/v1/fetch?scope=thread:same", headers=_auth(c.owner))
-    assert r.status_code == 409
-    assert r.json() == {"error": "ambiguous",
-                        "matches": sorted(["user:self/project:a/thread:same",
-                                           "user:self/project:b/thread:same"])}
+    assert r.status_code == 409 and r.json() == both
     t = _client(c, scopes=[a.id])
     assert door.get("/v1/fetch?scope=thread:same", headers=_auth(t)).status_code == 200
+    r = door.post("/v1/items", headers=_auth(c.owner), json={"body": "x", "scope": "thread:same"})
+    assert (r.status_code, r.json()) == (409, both) and not _events(c, "item.add")
+
+
+def test_an_ambiguous_tail_is_the_absent_answer_without_fetch(c, door, linked):
+    """§3 (#294): the matches are named only to a principal that could list them, so a person
+    who may write here but not read gets an ambiguous tail answered as an absent one."""
+    c.identity.grant_user("scribe", name="scribe", capabilities=["remember"], scopes=["*"], **KW)
+    for parent in (_project(c, "a"), _project(c, "b")):
+        c.nodes.create("thread", "same", parent, token=c.owner, **KW)
+    h = {"Authorization": f"Bearer {linked('scribe')}"}
+    reads = len(_events(c, "context.fetch"))
+    answers = {ref: [door.get(f"/v1/fetch?scope={ref}", headers=h),
+                     door.get(f"/v1/scopes?under={ref}", headers=h),
+                     door.post("/v1/items", headers=h, json={"body": "x", "scope": ref})]
+               for ref in ("thread:same", "thread:none")}  # an ambiguous tail, an absent one
+    shapes = {ref: [(r.status_code, r.content, sorted(r.headers.items())) for r in rs]
+              for ref, rs in answers.items()}
+    assert shapes["thread:same"] == shapes["thread:none"]
+    assert {s[:2] for s in shapes["thread:same"]} == {(404, NOT_FOUND)}
+    probes = _events(c, "context.fetch")[reads:]  # each refusal is a read (§4), naming the ref
+    assert [e["details"]["ref"] for e in probes] == ["thread:same"] * 3 + ["thread:none"] * 3
+    assert not _events(c, "item.add")
+    ok = door.post("/v1/items", headers=h, json={"body": "x", "scope": "project:a/thread:same"})
+    assert ok.status_code == 200  # named in full, the write lands
 
 
 # -- §4: reads -------------------------------------------------------------------------------------

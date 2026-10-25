@@ -34,9 +34,9 @@ container that runs today. **a1p.**
 
 ## 2 · Configuration
 
-Six keys join the container-config object (`container.md` §8), changed by the same `admin` act and
+Seven keys join the container-config object (`container.md` §8), changed by the same `admin` act and
 recorded by the same `config.set`. None holds a secret: the provider's keys are public (§3), and the
-container's client is a public client. **a1p**, all six. They enter `container.md` §8's table and
+container's client is a public client. **a1p**, all seven. They enter `container.md` §8's table and
 `_types.py`'s `ContainerConfig` with the code that reads them, as that table's conformance test
 requires.
 
@@ -47,6 +47,7 @@ requires.
 | `identity.audience` | `authenticated` | the `aud` value an access token must carry |
 | `identity.algorithms` | `ES256 RS256` | the signing algorithms accepted. Never `none`, never a symmetric `HS*` |
 | `identity.browser_origins` | `https://egzos.io` | origins the REST door answers CORS for (§6). While §3a's stand-in holds (v0.7 §AE), it is set to the stand-in origin, never left at the default |
+| `identity.origin` | absent | the origin clients reach the container at, e.g. `https://ali.egzos.cloud`: `https`, or `http` on a loopback host only, written exactly as a browser sends an `Origin` and checked as an `identity.browser_origins` entry is. It names §7's `resource` and the metadata URL in its `401`, and §3a's container callback. Absent: the origin `serve` binds, read from the socket, never from `Host` or a forwarded header (#294) |
 | `confirm.allow_button` | `true` | whether the confirm accepts the button proof (§5); `false` requires `biometric` |
 
 **Symmetric signing is refused outright.** An `HS256` token can only be checked with the provider's
@@ -92,7 +93,8 @@ session. Each token is bound to one container through the provider's own OAuth 2
 
 - **Each container is a public OAuth client of the provider** (`identity.client_id`), registered when the
   container is linked to it. Its redirect URIs are exactly two full URIs, matched exactly — egzos.io's
-  callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`
+  callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`,
+  where the container origin is §2's `identity.origin` (#294)
   — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
   a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
   Until egzos.io is bought, `https://egzos-site.vercel.app` stands in for it here and in
@@ -275,6 +277,11 @@ door:
   declared or not**, so a preflight does not map the routes. From any other origin it gets `rest.md` §3's
   refusal, with no CORS header.
 - Any other origin gets no CORS header on any answer. Non-browser callers are unaffected.
+- **`/mcp` (§7) is answered exactly as `/v1/` is**, with the same headers, its preflight included.
+  **a1p** (#294). The header list is the one above, so a browser MCP client is served only while it
+  sends no other header. `TODO(a1p)`, #283: whether the list also names the transport's own headers
+  (`MCP-Protocol-Version`, which an MCP client sends after `initialize`), and whether answers
+  expose `WWW-Authenticate`.
 
 ## 7 · Agents over HTTP (MCP)
 
@@ -282,12 +289,40 @@ An agent that is not on the user's machine reaches the container over MCP's Stre
 at `/mcp`. **decided** (§S), **a1p** the binding:
 
 - The container publishes protected-resource metadata (RFC 9728) at
-  `/.well-known/oauth-protected-resource`: `resource` its own origin, `authorization_servers`
-  `[identity.issuer]`. Nothing in it is secret or varies by caller.
+  `/.well-known/oauth-protected-resource`: `resource` its public origin, `identity.origin` (§2), and
+  `authorization_servers` `[identity.issuer]`, a key left out entirely while no issuer is set (RFC
+  9728 makes it optional; **a1p**, #294). Nothing in it is secret or varies by caller, so it is
+  served while the throttle holds and never counted (`rest.md` §2 item 7).
 - An unauthenticated MCP request gets `401` with `WWW-Authenticate: Bearer resource_metadata="<that
-  URL>"`, identical for every unauthenticated case (§3).
+  URL>"`, under the same public origin, identical for every unauthenticated case (§3).
 - The agent registers with and signs in through the provider's OAuth server, then presents its token
   here; §3 and §4 decide the rest. MCP over stdio is unchanged.
+- **Where the transport's rules meet the door's.** `/mcp` is stateless and declares `POST` alone. A
+  verified `GET` (a stream) or `DELETE` (a session's end) answers `405`, with `Allow: POST`,
+  `rest.md` §3's headers and `{"error":"method_not_allowed"}`, the same for every caller: it tells
+  a caller only that `/mcp` exists, which its `401` tells everyone. An unverified one gets the `401`
+  first, as every request does; any other method but §6's preflight gets `rest.md` §3's refusal.
+  `Origin` validation stays §6's CORS, which governs what a browser lets a page read. It is not the
+  guard against DNS rebinding, to which a rebound page looks same-origin: the guard is that the
+  door reads only the bearer header, never a cookie (`rest.md` §2 items 1 and 3), so a rebound page
+  finds no ambient credential to carry, and `/mcp` never accepts one. **a1p** (#294).
+- **The transport's own answers stay its own.** Once a caller is verified, `/mcp`'s JSON-RPC errors,
+  whatever their status, and the bare `400`, `406` and `413` it gives a request it will not read
+  are the transport's: each turns on the request alone, never on a container fact, so none reveals
+  what `rest.md` §3's refusal withholds. `rest.md` §2's and §3's uniform answers bind every answer
+  given before verification. **a1p** (#294).
+- **A person's own sign-in is accepted here; the owner's `Token` is not.** A person's provider
+  token runs the tools as `interactive`, and a client container `Token` (`egzos token create`) as
+  `client`. The owner's container `Token`, interactive and never expiring, gets the same `401` at
+  `/mcp` as no credential at all, so an MCP client is never handed it. **decided** (the Chief,
+  2026-10-24, on #310). `capabilities.md` §3 refuses `serve` an interactive token, so the stdio
+  door never runs on the human's own credential; `/mcp` runs on none, and each request carries and
+  proves its own. No human-only act ever gets an MCP tool, so a person's token at `/mcp` holds
+  nothing that person's own surfaces don't. What those surfaces hold goes with the token, though:
+  an MCP client given a person's provider token can present it at `/v1/` as well, and confirm
+  with §5's button wherever §5 still accepts one (no credential registered and
+  `confirm.allow_button` at `true`, both the defaults). The backstop there is §5's biometric, as
+  for any software that holds a person's token. **a1p** (#294), the rest.
 
 ## 8 · Places
 
