@@ -1,12 +1,12 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-`SqliteBackend`'s `ThrottleState` — storage.md §3.1, the door's throttle counters (rest.md §2 item
+`ThrottleState` on every backend — storage.md §3.1, the door's throttle counters (rest.md §2 item
 7).
 
-On the same sqlite file and the same connection as `ContainerState`, never process memory: a
+On the same substrate and the same connection as `ContainerState`, never process memory: a
 restart lifts no throttle (the Chief on #173, option (A)). Every atomicity claim here is checked
-with **two `SqliteBackend` instances on one file** (two connections), per the issue's instruction,
+with **two backend instances on one store** (two connections), per the issue's instruction,
 not two calls on one connection — a single connection serialises its own calls trivially and would
 prove nothing about the store's own atomicity.
 """
@@ -16,60 +16,53 @@ from __future__ import annotations
 import inspect
 import threading
 
-import pytest
-
 from egzos._types import AS_THROTTLE_SURFACES, ThrottleState
-from egzos.backends.sqlite import SqliteBackend
 
 #: `ThrottleState` is not `@runtime_checkable`, so conformance is checked as the method set and
 #: each method's own signature.
 THROTTLE_STATE = frozenset({"throttle_incr", "throttle_count", "throttle_buckets",
                             "throttle_windows", "throttle_forget"})
 
-@pytest.fixture
-def backend(tmp_path):
-    return SqliteBackend(tmp_path / "container.db")
 
-
-def test_method_set_matches_the_protocol():
-    """`SqliteBackend` offers every `ThrottleState` method the Protocol declares, unrenamed."""
+def test_method_set_matches_the_protocol(backend_class):
+    """The backend offers every `ThrottleState` method the Protocol declares, unrenamed."""
     for name in THROTTLE_STATE:
-        assert callable(getattr(SqliteBackend, name, None)), name
+        assert callable(getattr(backend_class, name, None)), name
 
 
-def test_sqlite_backend_conforms_to_throttle_state_signatures():
+def test_the_backend_conforms_to_throttle_state_signatures(backend_class):
     """Each method's own parameter names match the Protocol's, so a caller typed against
-    `ThrottleState` calls `SqliteBackend` with the same keywords."""
+    `ThrottleState` calls the backend with the same keywords."""
     for name in THROTTLE_STATE:
         protocol_params = list(inspect.signature(getattr(ThrottleState, name)).parameters)
-        backend_params = list(inspect.signature(getattr(SqliteBackend, name)).parameters)
+        backend_params = list(inspect.signature(getattr(backend_class, name)).parameters)
         assert backend_params == protocol_params, name
 
 
 # -- throttle counters -----------------------------------------------------------------------
 
 
-def test_throttle_incr_starts_at_one(backend: SqliteBackend):
+def test_throttle_incr_starts_at_one(backend: ThrottleState):
     assert backend.throttle_incr("rest", "global", "w1") == 1
 
 
-def test_throttle_incr_accumulates(backend: SqliteBackend):
+def test_throttle_incr_accumulates(backend: ThrottleState):
     assert backend.throttle_incr("rest", "global", "w1") == 1
     assert backend.throttle_incr("rest", "global", "w1") == 2
     assert backend.throttle_incr("rest", "global", "w1") == 3
 
 
-def test_throttle_count_reads_without_incrementing(backend: SqliteBackend):
+def test_throttle_count_reads_without_incrementing(backend: ThrottleState):
     backend.throttle_incr("rest", "global", "w1")
     assert backend.throttle_count("rest", "global", "w1") == 1
     assert backend.throttle_count("rest", "global", "w1") == 1  # unchanged by the read
 
 
-def test_throttle_count_is_zero_for_an_unseen_key(backend: SqliteBackend):
+def test_throttle_count_is_zero_for_an_unseen_key(backend: ThrottleState):
     assert backend.throttle_count("rest", "global", "w1") == 0
 
 
-def test_throttle_keys_are_compared_as_opaque_tuples(backend: SqliteBackend):
+def test_throttle_keys_are_compared_as_opaque_tuples(backend: ThrottleState):
     """Every one of `surface`, `bucket_key` and `window_key` is its own axis: changing any one
     starts a fresh counter, and the store draws no relationship between two keys."""
     backend.throttle_incr("rest", "global", "w1")
@@ -79,33 +72,31 @@ def test_throttle_keys_are_compared_as_opaque_tuples(backend: SqliteBackend):
     assert backend.throttle_count("rest", "global", "w1") == 1
 
 
-def test_every_throttle_surface_gets_its_own_counter(backend: SqliteBackend):
+def test_every_throttle_surface_gets_its_own_counter(backend: ThrottleState):
     for surface in AS_THROTTLE_SURFACES:
         assert backend.throttle_incr(surface, "global", "w1") == 1
 
 
-def test_a_throttle_count_survives_a_restart(tmp_path):
+def test_a_throttle_count_survives_a_restart(make_backend):
     """One substrate (storage.md §3.1): a restart lifts nothing."""
-    path = tmp_path / "container.db"
-    SqliteBackend(path).throttle_incr("rest", "global", "w1")
-    reopened = SqliteBackend(path)
+    make_backend().throttle_incr("rest", "global", "w1")
+    reopened = make_backend()
     assert reopened.throttle_count("rest", "global", "w1") == 1
     assert reopened.throttle_incr("rest", "global", "w1") == 2
 
 
-def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
+def test_throttle_incr_is_atomic_across_two_connections(make_backend):
     """Of two concurrent incrementers on two connections, the counter ends at exactly 2 and each
-    caller's own return value is distinct — no lost update. One `SqliteBackend` is one sqlite
-    connection used by one thread at a time (the module's own documented contract); the
+    caller's own return value is distinct — no lost update. One backend instance is one
+    connection used by one thread at a time (`backends/sqlite.py`'s own documented contract); the
     concurrency this proves is between the two connections, not within either one."""
-    path = tmp_path / "container.db"
-    a = SqliteBackend(path)
-    b = SqliteBackend(path)
+    a = make_backend()
+    b = make_backend()
     results: list[int] = []
     lock = threading.Lock()
     barrier = threading.Barrier(2)
 
-    def incr(conn: SqliteBackend) -> None:
+    def incr(conn: ThrottleState) -> None:
         barrier.wait()
         value = conn.throttle_incr("rest", "global", "w1")
         with lock:
@@ -122,7 +113,7 @@ def test_throttle_incr_is_atomic_across_two_connections(tmp_path):
     assert a.throttle_count("rest", "global", "w1") == 2
 
 
-def test_throttle_buckets_lists_one_window_and_one_surface(backend: SqliteBackend):
+def test_throttle_buckets_lists_one_window_and_one_surface(backend: ThrottleState):
     backend.throttle_incr("rest", "global", "w1")
     backend.throttle_incr("rest", "global", "w1")
     backend.throttle_incr("rest", "source:a", "w1")
