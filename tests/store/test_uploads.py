@@ -12,6 +12,7 @@ import time
 import pytest
 
 from egzos.container import OWNER, Container
+from egzos.identity import principal_id
 from egzos.store.uploads import MAX_HELD, TooManyUploads, person_of
 
 KW = {"actor": OWNER, "principal": "interactive"}
@@ -45,15 +46,19 @@ def test_an_upload_is_its_persons_whichever_principal_opens_it(c):
     node = c.nodes.user_root()
     for token in (*people.values(), c.owner, tab):
         record = c.uploads.open(token, scope=node, **SHAPE)
-        # identity.md §3a's attribution: an agent acts for `user:<sub>`; anyone else for itself.
-        expected = getattr(token, "acting_for", None) or token.id
+        # The person an agent serves, by that person's id; anyone else is its own person.
+        expected = principal_id(None, token.sub) if token.principal == "client" else token.id
         assert person_of(record["principal"], record["actor"]) == expected
         assert person_of(token.id, token.owner) == expected
-    # A client_id or a sub may hold a colon: the owner is stripped as a prefix, never split.
-    assert person_of("agent:https://c.example/m.json:s1", "agent:https://c.example/m.json") == (
-        "user:s1")
-    assert person_of("agent:a1:x:y", "agent:a1") == "user:x:y"
-    assert person_of("user:x:y", "user:x") == "user:x:y"  # only an agent serves someone else
+    # A provider principal's id names one (client_id, sub) pair, beside its own owner only.
+    url = "https://c.example/m.json"
+    assert person_of(principal_id(url, "s1"), f"agent:{url}") == "user:s1"
+    assert person_of(principal_id("a1", "x:y"), "agent:a1") == principal_id(None, "x:y")
+    assert person_of(principal_id(None, "x:y"), "user:x:y") == principal_id(None, "x:y")
+    for principal, actor in [(principal_id("a1", "x"), "agent:a2"), ("agent:a1:x:y", "agent:a1"),
+                             ("agent:a1:x%3Ay", "agent:a1"), ("user:x:y", "user:x"),
+                             (principal_id(None, "x:y"), "user:x%3Ay")]:
+        assert person_of(principal, actor) is None  # nobody's: an admin's alone to discard
 
 
 @pytest.mark.parametrize("pair", [("alice", "a1"), ("a1", "a2")])

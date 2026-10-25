@@ -756,6 +756,16 @@ token, its grant's: `user:<sub>`, or `agent:<client_id>:<sub>`, which check 5 re
 fixed width, so two compare as the times they are; two mints for one token and item within one
 tick of the clock are one grant. **a1p.**
 
+**A provider token's id names exactly one `(client_id, sub)` pair. a1p** (GHSA-9g46-638p-v4xm,
+#316). The id is a kind followed by each part, joined by `:`. Where no part holds `%` or `:`, the
+kind is `user` or `agent` and each part is written as it is: the form above. Every Supabase-issued
+id has that form, since a UUID holds neither character. Where any part holds `%` or `:`, the kind
+is `user%` or `agent%`, and in each part every `%` is written `%25` and every `:` is written `%3A`:
+`user%:<sub>` or `agent%:<client_id>:<sub>`, with each part so escaped. A string is read back only
+where its parts, none empty, decode to a pair that writes the same string, so no other spelling
+names a pair, and a container `Token`'s id, which holds no `:`, names none. This id is not
+attribution: `actor` and `details.for` carry their one part raw (`identity.md` §3a).
+
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token
 value, so redemption takes no `Authorization` header and consults none. **The cost, stated for the

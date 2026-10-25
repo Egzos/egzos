@@ -25,6 +25,7 @@ from typing import Any
 from egzos._ids import ulid
 from egzos._types import UploadRecord
 from egzos.backends.base import Backend
+from egzos.identity import principal_id, principal_parts
 from egzos.ledger import Ledger
 from egzos.model import ContextItem, Node, Token
 from egzos.store.blobs import BlobStore
@@ -52,15 +53,22 @@ class TooManyUploads(Exception):
     """§4.4 item 1: the caller's person already holds `MAX_HELD` uploads. A fact about their own."""
 
 
-def person_of(principal: str, actor: str) -> str:
+def person_of(principal: str, actor: str) -> str | None:
     """Whose upload it is (§4.4, v0.7 §AC), from the opener's `Token.id` and `owner`, both recorded
-    at open. An agent's principal is `agent:<client_id>:<sub>` and its owner `agent:<client_id>`
-    (identity.md §3a), so it serves `user:<sub>`: the owner is stripped as a prefix, never split on
-    a colon. Anything else is its own person: a person is `user:<sub>`, and a container `Token`'s id
-    is a ULID, whatever owner it names."""
-    if principal.startswith("agent:") and principal.startswith(actor + ":"):
-        return "user:" + principal[len(actor) + 1:]
-    return principal
+    at open. A container `Token`'s id is a ULID, which holds no `:`: its own person, whatever owner
+    it names. A provider principal's id names one `(client_id, sub)` pair (`principal_parts`); a
+    person's, recorded beside `user:<sub>`, is that person, and an agent's, recorded beside
+    `agent:<client_id>`, serves the person whose id is `principal_id(None, sub)`. An id that reads
+    as no pair, or that was recorded beside an owner other than its own, is nobody's: None, which
+    answers to an admin alone."""
+    if ":" not in principal:
+        return principal
+    pair = principal_parts(principal)
+    if pair is None:
+        return None
+    client_id, sub = pair
+    owner = f"user:{sub}" if client_id is None else f"agent:{client_id}"
+    return principal_id(None, sub) if actor == owner else None
 
 
 def valid_open(name: Any, mime: Any, size: Any, sha256: Any, *, limit: int) -> bool:
