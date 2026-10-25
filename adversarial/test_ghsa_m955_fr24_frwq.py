@@ -8,10 +8,12 @@ a second connection, as a second process has."""
 from __future__ import annotations
 
 import contextlib
+import sqlite3
 import threading
 
 import pytest
 
+from egzos.backends.sqlite import SqliteBackend
 from egzos.container import OWNER, Container
 from egzos.trust import TrustError
 
@@ -108,3 +110,20 @@ def test_ghsa_m955_fr24_frwq_item_record_under_the_lock(window, monkeypatch, wri
     assert (stored.scope, stored.status) == (read.scope, "quarantined")
     assert not _events(c, "item.tombstone") and not _events(c, "item.move")
     assert len(_events(c, "trust.quarantine")) == 1
+
+
+def test_ghsa_m955_fr24_frwq_a_block_after_a_failed_write_still_holds_the_lock(tmp_path):
+    """A lone write that fails on a busy database leaves nothing behind that a later block would
+    run in: the block still holds the write lock from its start."""
+    a, b = SqliteBackend(tmp_path / "egzos.db"), SqliteBackend(tmp_path / "egzos.db")
+    for backend in (a, b):
+        backend.db.execute("PRAGMA busy_timeout = 50")
+    b.db.execute("BEGIN IMMEDIATE")  # another process holds the lock
+    with pytest.raises(sqlite3.OperationalError):
+        a.put_config("first", 1)
+    b.db.rollback()
+    with a.atomic():
+        with pytest.raises(sqlite3.OperationalError):
+            b.put_config("second", 2)  # kept out for as long as the block runs
+        a.put_config("third", 3)
+    assert a.get_config() == {"third": 3}
