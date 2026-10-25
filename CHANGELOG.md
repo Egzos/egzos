@@ -50,7 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   container sees everyone's), and registers one to serve themselves (`POST /v1/agents`, from the
   consent page). Registering takes the confirm, which names the agent; a registration never
   reaches beyond the person's own grant, and with the button registering needs a sign-in under
-  five minutes old. An authorization registers one agent, once; a person holds at most 16.
+  five minutes old. An authorization registers one agent, once; a person holds at most 16. The
+  person an agent serves ends it at once (`DELETE /v1/agents/{client_id}`); an admin ending one
+  that serves someone else takes the confirm, which names the agent and whom it serves, and with
+  the button a sign-in under five minutes old. Either reads what an agent did for that person,
+  newest first (`GET /v1/agents/{client_id}/log`): only what the reader's grant covers today,
+  never a refusal, and never an entry's details.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its

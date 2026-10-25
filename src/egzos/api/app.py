@@ -16,9 +16,8 @@ artifact arrives through an upload (§4.4): open, bytes, item, and leaves throug
 (§6): `GET /v1/fetch` and `GET /v1/items/{id}` carry one beside an artifact whose bytes do not ride
 inline, and `GET /v1/blobs/{sha256}` redeems it, by the descriptor alone, never a bearer. An admin
 lists the grants, grants access with the confirm, and ends one (§4.3), with the confirm where it is
-someone else's. A person lists the agents serving them and registers one with the confirm (§4.3).
-Ending a registration and the agent log land with their own code; until then those paths are
-undeclared and answer §3's refusal, like any other.
+someone else's. A person lists the agents serving them, registers one with the confirm, ends one,
+and reads what one did for them (§4.3): an admin ends one serving someone else with the confirm.
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
 its `401` alone names the protected-resource metadata, which is served to anyone, unthrottled.
@@ -1079,6 +1078,112 @@ def create_app(
             d.probe(token, client_id)
             return refusal()
         return _json(200, {"agent": agent(made, c.identity.last_seen([made]))})
+
+    def served(token: Token, sub: str | None) -> str | None:
+        """The person whose registration a route names (`sub`, §4.3): the caller, or another
+        person only for an admin over the whole container. None is §3's refusal, as it is for a
+        client principal and a container `Token`."""
+        if not registrant(token):
+            return None
+        if sub is None or sub == token.sub:
+            return token.sub
+        return sub if grantor(token) else None
+
+    @app.delete("/v1/agents/{client_id}")
+    async def end_agent(request: Request, client_id: str):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, {"sub"})
+        sub = served(token, request.query_params.get("sub"))
+        # As on the grant routes, a caller who may not act here never makes the door read a body.
+        if sub is None:
+            d.probe(token, client_id)
+            return refusal()
+        proof = presented(await optional_body(request))
+        found = c.backend.get_agent_registration(client_id, sub)
+        if found is None or found["revoked"]:
+            d.probe(token, client_id)
+            return refusal()
+        # Ending your own agent narrows only your own access, so it is never gated, and a confirm
+        # sent with it concludes nothing; ending one that serves someone else is gated as
+        # registering it was, the challenge bound to the pair (GHSA-c3gg-hwx9-473g).
+        gated = sub != token.sub
+        binding = {"act": "agent.revoke", "subject": client_id, "destination": sub, "delta": [],
+                   "origin": origin}
+
+        def first() -> Response:  # the registration it ends; the name is the agent's own claim
+            return first_leg(token, **binding, revokes={"agent": {
+                "client_id": client_id, "name": found["name"], "sub": sub}})
+
+        if gated and proof is None:
+            return first()
+        revoked, reason = False, None
+        with c.backend.atomic():
+            # Gated, as on the grant routes: the caller as their grant stands now, still an admin
+            # over everything; the door's token concludes, as only it carries the sign-in time.
+            # Your own: a revoke of your grant since the door ended this registration with it.
+            if not gated or grantor(c.identity.refresh(token)):
+                if gated:
+                    reason = c.confirm.conclude(token, proof, **binding, fresh_sign_in=True)
+                if reason is None:
+                    revoked = c.identity.revoke_agent(client_id, sub, actor=token.owner,
+                                                      principal=token.principal)
+        if reason is not None:
+            return first()
+        if not revoked:  # the caller's grant or the registration changed since the door
+            d.probe(token, client_id)
+            return refusal()
+        return _json(200, {"result": "revoked"})
+
+    @app.get("/v1/agents/{client_id}/log")
+    async def agent_log(request: Request, client_id: str):
+        token: Token = request.state.token
+        params = request.query_params
+        _only(params, {"sub", "limit"})
+        raw = params.get("limit", "50")
+        limit = int(raw) if re.fullmatch(r"[0-9]{1,3}", raw) else 0
+        if not 0 < limit <= 200:
+            raise Invalid
+        sub = served(token, params.get("sub"))
+        # A revoked registration's log is still its history, there to review after ending it.
+        if sub is None or c.backend.get_agent_registration(client_id, sub) is None:
+            d.probe(token, client_id)
+            return refusal()
+        sight: dict[str, bool] = {}
+
+        def sees(ref: str | None) -> bool:
+            # Covered today: an item by the node it sits in now, a node by itself, and anything
+            # else (a proposal, an upload, a client id) never. A tombstoned or quarantined item
+            # reads as absent, as at every item route (§3).
+            if ref is None:
+                return False
+            if ref not in sight:
+                item = c.store.get(ref)  # None for a tombstoned item
+                node = c.backend.get_node(item.scope if item else ref)
+                sight[ref] = (node is not None and c.trust.covers(token, node)
+                              and (item is None or item.status != "quarantined"))
+            return sight[ref]
+
+        lines: list[dict[str, Any]] = []
+        positions: list[int] = []  # their chain positions, on the record only: served, a position
+        withheld = 0               # would count what the reader cannot see (§4.3, "no count")
+        for e in reversed(c.identity.acted(client_id, sub)):
+            if len(lines) == limit:
+                break
+            # Omitted, with no marker and no count: a refused act, a probe (§4's names no
+            # subject), and a line whose subject, or scope where it names one, is out of sight.
+            if (e["details"].get("outcome") != "refused" and sees(e["subject"])
+                    and (e["scope"] is None or sees(e["scope"]))):
+                lines.append({k: e[k] for k in ("ts", "event", "subject", "scope")})
+                positions.append(e["seq"])
+            else:
+                withheld += 1
+        # `withheld`, on the record only: the lines passed over to serve these.
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, subject=client_id, read="agent_log", items=[],
+                        layers=[], withheld=withheld, agent={"client_id": client_id, "sub": sub},
+                        entries=positions)
+        return _json(200, {"entries": lines})
 
     # -- confirm credentials (§4.3) -------------------------------------------------------------
     def whose(token: Token, sub: str | None) -> str | None:
