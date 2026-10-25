@@ -29,7 +29,7 @@ from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import jwt
 
@@ -126,6 +126,30 @@ def provider_id(value: Any, what: str = "an id the provider issued") -> str:
     ):
         raise ValueError(what)
     return value
+
+
+def principal_id(client_id: str | None, sub: str) -> str:
+    """A provider principal's `Token.id`, naming exactly one `(client_id, sub)` pair
+    (GHSA-9g46-638p-v4xm): `user:<sub>` for a person, `agent:<client_id>:<sub>` for an agent, as
+    ever, where no part holds `%` or `:`, a UUID among them. Otherwise the kind is `user%` or
+    `agent%`, which no id written before held, and each part has `%` written `%25` and `:` `%3A`.
+    The owner and `acting_for` are attribution, not ids: one part each, raw (identity.md §3a)."""
+    kind, parts = ("user", [sub]) if client_id is None else ("agent", [client_id, sub])
+    if any("%" in p or ":" in p for p in parts):
+        kind, parts = kind + "%", [p.replace("%", "%25").replace(":", "%3A") for p in parts]
+    return ":".join([kind, *parts])
+
+
+def principal_parts(token_id: str) -> tuple[str | None, str] | None:
+    """The `(client_id, sub)` pair a provider principal's id names, `client_id` None for a person:
+    `principal_id` read back. None for any string `principal_id` would not write, a container
+    `Token`'s ULID among them, so no other spelling names a pair."""
+    parts = [unquote(p) for p in token_id.split(":")[1:]]
+    if not 1 <= len(parts) <= 2 or not all(parts):
+        return None
+    pair = (None, parts[0]) if len(parts) == 1 else (parts[0], parts[1])
+    # The kind is never parsed: this round trip is what refuses a foreign or mismatched one.
+    return pair if principal_id(*pair) == token_id else None
 
 
 # -- configuration (§2) --------------------------------------------------------------------------
@@ -444,7 +468,7 @@ class Identity:
         if not _live(grant):
             return None
         return GrantToken(
-            id=f"user:{sub}",
+            id=principal_id(None, sub),
             principal="interactive",
             owner=f"user:{sub}",
             client=client_id,
@@ -466,7 +490,7 @@ class Identity:
         if not capabilities or not scopes:
             return None
         return GrantToken(
-            id=f"agent:{client_id}:{sub}",
+            id=principal_id(client_id, sub),
             principal="client",
             owner=f"agent:{client_id}",
             client=client_id,
@@ -505,21 +529,24 @@ class Identity:
 
     def named(self, token_id: str) -> GrantToken | None:
         """The person or agent a `GrantToken` id names, as the grants stand now (rest.md §6 check
-        5). Revoked since, a stand-in that is revoked and holds nothing, so a refusal is still
-        attributed to whom the grant named. None for an id that is not a grant's."""
-        own = self.config("identity.client_id") or ""
-        if token_id.startswith("user:"):
-            sub = token_id[len("user:"):]
+        5): the one pair `principal_parts` reads from it. Revoked since, a stand-in that is revoked
+        and holds nothing, so a refusal is still attributed to whom the grant named. None for an
+        id that is not a grant's."""
+        pair = principal_parts(token_id)
+        if pair is None:
+            return None
+        client_id, sub = pair
+        if client_id is None:
+            own = self.config("identity.client_id") or ""
             return self._person(sub, own) or GrantToken(
-                id=token_id, principal="interactive", owner=token_id, client=own,
+                id=token_id, principal="interactive", owner=f"user:{sub}", client=own,
                 capabilities=[], scopes=[], revoked=True, sub=sub, client_id=own)
-        for r in self.state.list_agent_registrations() if token_id.startswith("agent:") else ():
-            if f"agent:{r['client_id']}:{r['sub']}" == token_id:
-                return self._agent(r["client_id"], r["sub"]) or GrantToken(
-                    id=token_id, principal="client", owner=f"agent:{r['client_id']}",
-                    client=r["client_id"], capabilities=[], scopes=[], revoked=True, sub=r["sub"],
-                    client_id=r["client_id"], acting_for=f"user:{r['sub']}")
-        return None
+        if self.state.get_agent_registration(client_id, sub) is None:
+            return None
+        return self._agent(client_id, sub) or GrantToken(
+            id=token_id, principal="client", owner=f"agent:{client_id}", client=client_id,
+            capabilities=[], scopes=[], revoked=True, sub=sub, client_id=client_id,
+            acting_for=f"user:{sub}")
 
     def audience_tokens(self) -> list[GrantToken]:
         """Every live grant and registration, as the gate counts them (§4: audience is every
@@ -683,11 +710,11 @@ class Identity:
         them whose reach, its registration intersected with the grant (§4), the grant widens."""
         old = self.state.get_user_grant(sub)
         had_caps, had_scopes = (old["capabilities"], old["scopes"]) if _live(old) else ([], [])
-        out = [(f"user:{sub}", name)] if self._wider(had_scopes, scopes) else []
+        out = [(principal_id(None, sub), name)] if self._wider(had_scopes, scopes) else []
         for agent in self.serving(sub):
             before = self._reach(agent, had_caps, had_scopes)
             if self._wider(before, self._reach(agent, capabilities, scopes)):
-                out.append((f"agent:{agent['client_id']}:{sub}", agent["name"]))
+                out.append((principal_id(agent["client_id"], sub), agent["name"]))
         return sorted(out)
 
     def _reach(
