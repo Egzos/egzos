@@ -514,7 +514,9 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
 - **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
   `{"client_id", "name", "sub", "capabilities", "scopes", "created_at", "last_seen"}`, `last_seen` read
   from the ledger. `<credential>` is `{"id", "name", "created_at", "last_used"}` — never the public key
-  or the credential id's bytes. `<entry-line>` is `{"seq", "ts", "event", "subject", "scope"}`.
+  or the credential id's bytes. `<entry-line>` is `{"ts", "event", "subject", "scope"}`, with no
+  chain position, which would count the lines the reader cannot see (the log's omission rule
+  below). The log's `limit` is 1 to 200, 50 when absent; any other value is §3's `400`. **a1p.**
 - **`sub` in a query** names the person a registration or credential belongs to. Absent, it is the
   caller; present and not the caller, the caller must be an admin. A `client_id` names one registration
   per person, so the pair `(client_id, sub)` is what a revoke or a log read acts on.
