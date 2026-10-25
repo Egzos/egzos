@@ -592,7 +592,10 @@ def create_app(
         except StructureError:
             d.probe(token, ref)
             return refusal()
-        return _json(200, {"node": d.node(node)})
+        made = d.node(node)
+        if not token.has("fetch"):
+            made["path"] = None  # §4.1 item 8: a computed path names ancestors; only `fetch` reads
+        return _json(200, {"node": made})
 
     # -- the confirm (§4.2) ---------------------------------------------------------------------
     def names(delta: list[dict[str, Any]]) -> list[str]:

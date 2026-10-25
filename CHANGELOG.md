@@ -102,6 +102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `POST /v1/scopes` serves a created node's path only to a token that may read (`fetch`); any
+  other gets `path: null` (`rest.md` §4.1).
 - **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
   argument or a bare group now prints `{"error": …}` on stdout, as every other `--json` failure
   does, and still exits 2 (#203). A `--json` after `--` is data, not the flag.
