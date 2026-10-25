@@ -1,6 +1,6 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`SqliteBackend`'s `IdentityState` and `ConfigState` (storage.md §3.2): the method sets, their
+"""`IdentityState` and `ConfigState` (storage.md §3.2) on every backend: the method sets, their
 signatures against the Protocols, and what the store keeps."""
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ import inspect
 import pytest
 
 from egzos._types import ConfigState, IdentityState
-from egzos.backends.sqlite import SqliteBackend
 
 IDENTITY_STATE = frozenset({
     "put_user_grant", "get_user_grant", "list_user_grants",
@@ -23,18 +22,13 @@ def _methods(protocol) -> set[str]:
     return {n for n, _ in inspect.getmembers(protocol, inspect.isfunction) if n[0] != "_"}
 
 
-@pytest.fixture
-def backend(tmp_path):
-    return SqliteBackend(tmp_path / "container.db")
-
-
 @pytest.mark.parametrize(("protocol", "names"), [(IdentityState, IDENTITY_STATE),
                                                   (ConfigState, CONFIG_STATE)])
-def test_the_protocols_are_pinned_and_the_backend_matches_them(protocol, names):
+def test_the_protocols_are_pinned_and_the_backend_matches_them(protocol, names, backend_class):
     assert _methods(protocol) == names
     for name in names:
         expected = list(inspect.signature(getattr(protocol, name)).parameters)
-        assert list(inspect.signature(getattr(SqliteBackend, name)).parameters) == expected, name
+        assert list(inspect.signature(getattr(backend_class, name)).parameters) == expected, name
 
 
 def _grant(sub="alice", **over):
@@ -73,6 +67,6 @@ def test_config_absence_is_absence_and_an_empty_value_is_a_value(backend):
     assert backend.get_config() == {"identity.browser_origins": "", "identity.issuer": None}
 
 
-def test_the_records_survive_a_restart(tmp_path):
-    SqliteBackend(tmp_path / "c.db").put_user_grant(_grant())
-    assert SqliteBackend(tmp_path / "c.db").get_user_grant("alice")["sub"] == "alice"
+def test_the_records_survive_a_restart(make_backend):
+    make_backend().put_user_grant(_grant())
+    assert make_backend().get_user_grant("alice")["sub"] == "alice"

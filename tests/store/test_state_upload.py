@@ -1,6 +1,6 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`SqliteBackend`'s `UploadState` (storage.md §3.4): each step spent once, records kept."""
+"""`UploadState` (storage.md §3.4) on every backend: each step spent once, records kept."""
 
 from __future__ import annotations
 
@@ -10,14 +10,8 @@ import threading
 import pytest
 
 from egzos._types import UploadState
-from egzos.backends.sqlite import SqliteBackend
 
 UPLOAD_STATE = frozenset({"put_upload", "get_upload", "list_uploads", "spend_upload"})
-
-
-@pytest.fixture
-def backend(tmp_path):
-    return SqliteBackend(tmp_path / "container.db")
 
 
 def _upload(uid="u1", principal="t1"):
@@ -27,12 +21,12 @@ def _upload(uid="u1", principal="t1"):
             "staged": False, "item": None, "promoted": False, "discarded": False}
 
 
-def test_the_protocol_is_pinned_and_the_backend_matches_it():
+def test_the_protocol_is_pinned_and_the_backend_matches_it(backend_class):
     names = {n for n, _ in inspect.getmembers(UploadState, inspect.isfunction) if n[0] != "_"}
     assert names == UPLOAD_STATE
     for name in names:
         expected = list(inspect.signature(getattr(UploadState, name)).parameters)
-        assert list(inspect.signature(getattr(SqliteBackend, name)).parameters) == expected, name
+        assert list(inspect.signature(getattr(backend_class, name)).parameters) == expected, name
 
 
 def test_each_step_spends_once_and_apart(backend):
@@ -62,13 +56,13 @@ def test_records_list_by_principal_and_keep_the_discarded(backend):
     assert backend.get_upload("never") is None
 
 
-def test_two_connections_spending_one_step_proceed_once(tmp_path):
-    SqliteBackend(tmp_path / "c.db").put_upload(_upload())
+def test_two_connections_spending_one_step_proceed_once(make_backend):
+    make_backend().put_upload(_upload())
     seen: list[bool] = []
     gate = threading.Barrier(2)
 
     def spend():
-        b = SqliteBackend(tmp_path / "c.db")
+        b = make_backend()
         gate.wait()
         seen.append(b.spend_upload("u1", "item"))
 
