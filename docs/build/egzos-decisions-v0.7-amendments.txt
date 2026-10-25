@@ -400,11 +400,11 @@ AE. AMENDMENT — WHERE THE APP LIVES, HOW PEOPLE SIGN IN, AND THE CALLBACK
 ================================================================================
 AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
     OWNER TOKEN (reads storage.md's [0.3 · 5] for a managed Postgres; answers
-    identity.md §4's TODO(chief) on hosted provisioning; Egzos/egzos#NNN)
+    identity.md §4's TODO(chief) on hosted provisioning; Egzos/egzos#319)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-10-25, answering the operator's
-          questions; recorded by the operator, enacted by #NNN's merge; the
+          questions; recorded by the operator, enacted by #319's merge; the
           Chief may veto by reverting. The operator's own calls made with
           these are the contracts' a1p clauses, not decisions recorded
           here, among them one writer per container (storage.md §3.6),
