@@ -41,7 +41,7 @@ def new_secret(token_id: str) -> str:
 
 def token_id_of(value: str) -> str | None:
     """The public id inside a bearer value, or None when the value is not one."""
-    if not value.startswith(PREFIX):
+    if not value.startswith(PREFIX) or "\0" in value:  # no id holds U+0000 (storage.md §3.7)
         return None
     rest = value[len(PREFIX):]
     tid, sep, _ = rest.partition("_")
@@ -107,18 +107,19 @@ class Auth:
         )
         secret = new_secret(token.id)
         token.secret_hash = _hash(secret)
-        self.backend.put_token(token)
+        with self.backend.atomic():  # the token and its entry, together (GHSA-2478-6jv5-83ff)
+            self.backend.put_token(token)
+            self.ledger.append(
+                "token.mint",
+                actor=actor,
+                principal=by_principal,
+                subject=token.id,
+                token_principal=principal,
+                client=client,
+                role=role,
+                scopes=scopes,
+            )
         token.secret = secret
-        self.ledger.append(
-            "token.mint",
-            actor=actor,
-            principal=by_principal,
-            subject=token.id,
-            token_principal=principal,
-            client=client,
-            role=role,
-            scopes=scopes,
-        )
         return token
 
     def revoke(self, token_id: str, *, actor: str, principal: str) -> bool:

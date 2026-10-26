@@ -151,30 +151,33 @@ class Store:
             lifecycle={"created_at": ts, "updated_at": ts, "version": 1},
             visibility={"ring": scope.type},
         )
-        if opened_thread is not None:
-            # A name is one path segment: a "/" in writer-supplied text would split it.
-            opened_thread.name = content["auto_title"][:40].replace("/", "-")
-            self.backend.put_node(opened_thread)
+        # One block: the thread, the item and their entries land together, or none of them, so a
+        # busy lock refuses before anything is written (storage.md §3.6; GHSA-2478-6jv5-83ff).
+        with self.backend.atomic():
+            if opened_thread is not None:
+                # A name is one path segment: a "/" in writer-supplied text would split it.
+                opened_thread.name = content["auto_title"][:40].replace("/", "-")
+                self.backend.put_node(opened_thread)
+                self.ledger.append(
+                    "node.create",
+                    actor=actor,
+                    principal=principal,
+                    subject=opened_thread.id,
+                    scope=opened_thread.parent,
+                    type="thread",
+                    auto=True,
+                )
+            self.backend.put(item)
             self.ledger.append(
-                "node.create",
+                "item.add",
                 actor=actor,
                 principal=principal,
-                subject=opened_thread.id,
-                scope=opened_thread.parent,
-                type="thread",
-                auto=True,
+                subject=item.id,
+                scope=scope.id,
+                kind=kind,
+                status="unverified",
+                auto_title=content["auto_title"],
             )
-        self.backend.put(item)
-        self.ledger.append(
-            "item.add",
-            actor=actor,
-            principal=principal,
-            subject=item.id,
-            scope=scope.id,
-            kind=kind,
-            status="unverified",
-            auto_title=content["auto_title"],
-        )
         return item
 
     # -- read -----------------------------------------------------------------------------
