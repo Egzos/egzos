@@ -21,6 +21,23 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    # v0.7 §AF (D13): the Postgres backend's case runs in this required check. A throwaway
+    # database inside the job; its password is not a secret, and no secret reaches this job.
+    services:
+      postgres:
+        image: postgres:17@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe
+        env:
+          POSTGRES_PASSWORD: egzos-ci
+          POSTGRES_DB: egzos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d egzos"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      EGZOS_TEST_POSTGRES: postgresql://postgres:egzos-ci@localhost:5432/egzos
     steps:
       # Every required check takes its controls from the base and diffs against it, so a run against
       # any other base says nothing about a merge into the default branch. No pull_request workflow
@@ -47,7 +64,7 @@ jobs:
           python-version: "3.12"
 
       - name: install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,postgres]"
 
       - name: lint
         run: ruff check .
@@ -66,5 +83,5 @@ jobs:
       - name: pytest on the requires-python floor
         run: |
           python -m venv /tmp/floor
-          /tmp/floor/bin/pip install -e ".[dev]"
+          /tmp/floor/bin/pip install -e ".[dev,postgres]"
           /tmp/floor/bin/pytest -q
