@@ -14,7 +14,7 @@ from typing import Any
 
 from egzos._types import CONTAINER_CONFIG_DEFAULTS, CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
 from egzos.auth import Auth, home_secret
-from egzos.backends import SqliteBackend
+from egzos.binding import HomeBinding, HomeBindingError
 from egzos.confirm import Confirm
 from egzos.identity import (
     SETTABLE_KEYS,
@@ -35,6 +35,8 @@ from egzos.trust import GRANT_KEY_BYTES, GRANT_KEY_FILE, TrustEngine
 
 OWNER = "self"
 
+__all__ = ["OWNER", "Container", "HomeBindingError", "default_home"]
+
 
 def _step_up_window() -> int:
     from egzos.authz.presence import window_seconds
@@ -53,7 +55,11 @@ class Container:
         # 0700 (no window at the umask's mode), then pinned 0700 if it already existed.
         self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.home, 0o700)
-        self.backend = SqliteBackend(self.home / "egzos.db")
+        # storage.md §3.7: the database EGZOS_DATABASE_URL names, else the home's own egzos.db.
+        # The home's binding is checked here, before anything is built that could serve.
+        self.binding = HomeBinding(self.home)
+        self.backend = self.binding.open()
+        self._closed = False
         self.ledger = Ledger(self.backend)
         self.nodes = NodeService(self.backend, self.ledger)
         self.blobs = BlobStore(self.home / "blobs")
@@ -138,9 +144,25 @@ class Container:
 
         The check and the creation are one transaction (#136): BEGIN IMMEDIATE takes the write
         lock first, so a second `init` racing this one waits, then finds the container
-        initialized, and never mints a second owner or a second set of roots."""
+        initialized, and never mints a second owner or a second set of roots.
+
+        On a named database this block is the home's make (storage.md §3.7): it finds the chain
+        empty and appends its first entry, or stops, and the binding is written once it commits."""
         with self.backend.atomic():
-            return self._init_locked()
+            making = self.binding.making(self.backend)
+            token = self._init_locked()
+        if making:
+            self.binding.made(self.backend)
+        return token
+
+    def close(self) -> None:
+        """A clean close: a bound home records the newest entry it has seen (storage.md §3.7),
+        and the connection is let go. A second call does nothing."""
+        if self._closed:
+            return
+        self._closed = True
+        self.binding.record(self.backend)
+        self.backend.db.close()
 
     def _init_locked(self) -> Token:
         if self.initialized:
