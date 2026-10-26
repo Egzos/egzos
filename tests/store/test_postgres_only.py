@@ -14,7 +14,7 @@ import time
 
 import pytest
 
-from egzos._types import GENESIS_HASH, ChainConflict
+from egzos._types import GENESIS_HASH, ChainConflict, StorageBusy
 from egzos.ledger import Ledger
 from egzos.model import ContextItem, Node
 
@@ -109,14 +109,14 @@ def test_a_writer_waits_a_bounded_time_then_raises_and_leaves_nothing_open(make_
     first = make_backend()
     monkeypatch.setattr(postgres, "LOCK_TIMEOUT", "50ms")
     second = make_backend()
-    with first.atomic(), pytest.raises(errors.LockNotAvailable):
+    with first.atomic(), pytest.raises(StorageBusy):  # the driver's LockNotAvailable, renamed
         second.put_node(_node("n"))
     second.put_node(_node("n"))  # the next write takes the lock afresh
     assert first.get_node("n") == _node("n")
 
 
 def test_a_block_lets_go_of_a_transaction_left_open(backend):
-    backend.db.execute("BEGIN")  # as a lone write that failed leaves one on sqlite (#329)
+    backend.db.execute("BEGIN")  # as a caller of `db` may leave one (#329)
     backend.db.execute("INSERT INTO nodes (id, type, name, doc) VALUES ('stray', 't', 'n', '{}')")
     with backend.atomic():
         backend.put_node(_node("n"))
@@ -164,13 +164,6 @@ def test_a_document_is_kept_as_the_exact_text_written_never_jsonb(backend, where
 def test_where_postgres_would_answer_otherwise_it_answers_as_sqlite(backend):
     item = ContextItem(id="i", kind="memory", scope="n", content={"body": "b"})
     backend.put(item)
-    backend.put_node(_node("n"))
-    assert backend.get("i\0") is None and backend.get_node("n\0") is None
-    assert backend.list_nodes(parent="n\0") == [] and backend.find_root("thread\0") is None
-    assert backend.query(["n", "n\0"]) == [item] and backend.query(["n"], key="k\0") == []
     assert backend.query(["n"], text="\0tail") == [item]  # sqlite's pattern ends at a NUL: `%`
     assert backend.query(["n"], text="b\0") == []  # `%b`: no document ends so
     assert backend.query(["n"], text="\u212a") == []  # the Kelvin sign: a locale folds it to `k`
-    with pytest.raises(errors.DataError):  # a NUL is never written: postgres cannot keep one
-        backend.put_node(_node("x\0"))
-    assert backend.list_nodes() == [_node("n")]

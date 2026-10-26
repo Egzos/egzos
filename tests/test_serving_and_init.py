@@ -140,8 +140,7 @@ def test_no_audience_change_lands_between_the_manifest_check_and_the_move(tmp_pa
     # the move takes. Right after execute hashes the manifest, a second connection tries to widen
     # the destination's audience. Either that write is blocked until the move commits, or execute
     # sees it and refuses; a widened audience and an executed move together is the bug.
-    import sqlite3
-
+    from egzos._types import StorageBusy
     from egzos.trust import TrustEngine, TrustError
 
     home = tmp_path / "home"
@@ -159,7 +158,7 @@ def test_no_audience_change_lands_between_the_manifest_check_and_the_move(tmp_pa
                 a.auth.mint(principal="client", owner=OWNER, client="late", role="reader",
                             scopes=[other_id], actor=OWNER, by_principal="interactive")
                 widened.append(True)
-            except sqlite3.OperationalError:  # the write lock is held: execute is mid-decision
+            except StorageBusy:  # the write lock is held: execute is mid-decision
                 widened.append(False)
         return h
 

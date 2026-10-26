@@ -16,12 +16,15 @@ connection is bound to the thread that opened it. Nothing here awaits — it jus
 
 from __future__ import annotations
 
+import functools
 import json
 import secrets
 from collections.abc import Callable
 from typing import Any
 
 from egzos import __version__
+from egzos._types import StorageBusy
+from egzos.backends.base import holds_nul
 from egzos.container import Container
 from egzos.model import KINDS, Token
 from egzos.store.items import StoreError
@@ -55,6 +58,22 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
     """The server and its tools. `caller()` is the live principal of the call being served, or
     None, which every tool answers with `NOT_LIVE`."""
     from mcp.server.mcpserver import MCPServer
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    def answered(tool):
+        """rest.md §3 in the tool's own channel: U+0000 in an argument, before any lookup, and a
+        busy store end the call with the door's word in its error result, never a driver's."""
+
+        @functools.wraps(tool)
+        async def call(**arguments: Any) -> str:
+            if holds_nul(arguments):
+                raise ToolError("invalid_request")
+            try:
+                return await tool(**arguments)
+            except StorageBusy:
+                raise ToolError("busy") from None
+
+        return call
 
     server = MCPServer(
         name="egzos",
@@ -94,6 +113,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         description="Resolve the user's context for a scope (path or id; "
         "default: the personal root). Returns the layered chain and the items the token may see.",
     )
+    @answered
     async def egzos_fetch(
         scope: str | None = None, query: str | None = None, kinds: list[str] | None = None
     ) -> str:
@@ -159,6 +179,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         description="Write a new item. Lands UNVERIFIED in the inbox "
         "(or a given scope); the user promotes it. Kinds: memory, preference, skill, rule.",
     )
+    @answered
     async def egzos_remember(
         text: str,
         kind: str = "memory",
@@ -217,6 +238,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
     @server.tool(
         name="egzos_inbox", description="What has been captured but not yet wrapped or promoted."
     )
+    @answered
     async def egzos_inbox() -> str:
         token = caller()
         if token is None:

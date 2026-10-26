@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -15,12 +15,17 @@ from egzos._types import (
     AgentRegistration,
     ConfirmChallenge,
     ConfirmCredential,
+    StorageBusy,
     ThrottleSurface,
     UploadRecord,
     UserGrant,
 )
-from egzos.backends.base import ChainConflict
+from egzos.backends.base import ChainConflict, refuse_nul
 from egzos.model import ContextItem, Node, Token
+
+#: How long a writer waits for the container's write lock, in seconds, before it raises
+#: `StorageBusy` (storage.md §3.6): postgres's `lock_timeout`.
+LOCK_TIMEOUT = 10.0
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -91,7 +96,7 @@ class SqliteBackend:
         # portal included). A sync handler would run in Starlette's threadpool; add a lock here
         # before writing one. Writers in other processes are serialised by sqlite itself, and the
         # chain by its unique prev_hash.
-        self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=10)
+        self.db = sqlite3.connect(str(self.path), check_same_thread=False, timeout=LOCK_TIMEOUT)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(_SCHEMA)
@@ -100,13 +105,19 @@ class SqliteBackend:
     @contextmanager
     def atomic(self):
         """Every write inside lands together or not at all. BEGIN IMMEDIATE takes the write lock
-        up front, so no other process can move the chain head mid-act."""
+        up front, so no other process can move the chain head mid-act. Not taken within
+        `LOCK_TIMEOUT`, it raises `StorageBusy`, and nothing was written (storage.md §3.6)."""
         if self._depth == 0:
             if self.db.in_transaction:
-                # Only a lone write that failed (a busy database) leaves one open. Let it go, so
-                # the block holds the lock from its start (GHSA-m955-fr24-frwq).
+                # Every write here takes this block, so only a caller of `db` leaves one open. Let
+                # it go, so the block holds the lock from its start (GHSA-m955-fr24-frwq).
                 self.db.rollback()
-            self.db.execute("BEGIN IMMEDIATE")
+            try:
+                self.db.execute("BEGIN IMMEDIATE")
+            except sqlite3.OperationalError as e:
+                if e.sqlite_errorcode & 0xFF != sqlite3.SQLITE_BUSY:  # and its extended codes
+                    raise
+                raise StorageBusy("the container's write lock was not taken in time") from e
         self._depth += 1
         try:
             yield
@@ -119,23 +130,26 @@ class SqliteBackend:
         if self._depth == 0:
             self.db.commit()
 
-    def _commit(self) -> None:
-        if self._depth == 0:
-            self.db.commit()
+    def _write(self, sql: str, args: Sequence[Any] = ()) -> sqlite3.Cursor:
+        """One write under the lock: inside a block it joins it, outside it commits alone."""
+        with self.atomic():
+            return self.db.execute(sql, args)
 
     # -- nodes --------------------------------------------------------------------------
     def put_node(self, node: Node) -> None:
-        self.db.execute(
+        refuse_nul(node.id, node.type, node.name, node.parent)
+        self._write(
             "INSERT OR REPLACE INTO nodes(id,type,name,parent,doc) VALUES(?,?,?,?,?)",
             (node.id, node.type, node.name, node.parent, json.dumps(node.to_dict())),
         )
-        self._commit()
 
     def get_node(self, node_id: str) -> Node | None:
+        refuse_nul(node_id)
         row = self.db.execute("SELECT doc FROM nodes WHERE id=?", (node_id,)).fetchone()
         return Node.from_dict(json.loads(row[0])) if row else None
 
     def list_nodes(self, parent: str | None = None, type: str | None = None) -> list[Node]:
+        refuse_nul(parent, type)
         sql, args = "SELECT doc FROM nodes WHERE 1=1", []
         if parent is not None:
             sql += " AND parent=?"
@@ -148,6 +162,7 @@ class SqliteBackend:
         ]
 
     def find_root(self, type: str) -> Node | None:
+        refuse_nul(type)
         row = self.db.execute(
             "SELECT doc FROM nodes WHERE type=? AND parent IS NULL", (type,)
         ).fetchone()
@@ -155,7 +170,9 @@ class SqliteBackend:
 
     # -- items --------------------------------------------------------------------------
     def put(self, item: ContextItem) -> None:
-        self.db.execute(
+        created_at = item.lifecycle.get("created_at", "")
+        refuse_nul(item.id, item.kind, item.scope, item.key, item.status, created_at)
+        self._write(
             "INSERT OR REPLACE INTO items(id,kind,scope,key,status,tombstoned,created_at,doc) "
             "VALUES(?,?,?,?,?,?,?,?)",
             (
@@ -165,13 +182,13 @@ class SqliteBackend:
                 item.key,
                 item.status,
                 1 if item.lifecycle.get("tombstoned") else 0,
-                item.lifecycle.get("created_at", ""),
+                created_at,
                 json.dumps(item.to_dict()),
             ),
         )
-        self._commit()
 
     def get(self, item_id: str) -> ContextItem | None:
+        refuse_nul(item_id)
         row = self.db.execute(
             "SELECT doc FROM items WHERE id=? AND tombstoned=0", (item_id,)
         ).fetchone()
@@ -188,6 +205,7 @@ class SqliteBackend:
         include_tombstoned: bool = False,
     ) -> list[ContextItem]:
         scopes = list(scopes)
+        refuse_nul(scopes, key)
         if not scopes:
             return []
         sql = f"SELECT doc FROM items WHERE scope IN ({','.join('?' * len(scopes))})"
@@ -196,6 +214,7 @@ class SqliteBackend:
             sql += " AND tombstoned=0"
         if kinds:
             kinds = list(kinds)
+            refuse_nul(kinds)
             sql += f" AND kind IN ({','.join('?' * len(kinds))})"
             args += kinds
         if key is not None:
@@ -203,6 +222,7 @@ class SqliteBackend:
             args.append(key)
         if statuses:
             statuses = list(statuses)
+            refuse_nul(statuses)
             sql += f" AND status IN ({','.join('?' * len(statuses))})"
             args += statuses
         if text:
@@ -212,6 +232,7 @@ class SqliteBackend:
         return [ContextItem.from_dict(json.loads(r[0])) for r in self.db.execute(sql, args)]
 
     def tombstone(self, item_id: str) -> bool:
+        refuse_nul(item_id)
         item = self.get(item_id)
         if not item:
             return False
@@ -221,16 +242,14 @@ class SqliteBackend:
 
     # -- audit --------------------------------------------------------------------------
     def audit_append(self, entry: dict[str, Any]) -> dict[str, Any]:
-        try:
-            cur = self.db.execute(
+        refuse_nul(entry["ts"], entry["hash"], entry["prev_hash"])
+        try:  # alone, its block rolls back; inside a block the whole act unwinds, not just this
+            cur = self._write(
                 "INSERT INTO audit(ts,hash,prev_hash,doc) VALUES(?,?,?,?)",
                 (entry["ts"], entry["hash"], entry["prev_hash"], json.dumps(entry)),
             )
         except sqlite3.IntegrityError as e:
-            if self._depth == 0:  # inside atomic() the whole act unwinds, not just this entry
-                self.db.rollback()
             raise ChainConflict(str(e)) from e
-        self._commit()
         return {**entry, "seq": cur.lastrowid}
 
     def audit_last(self) -> dict[str, Any] | None:
@@ -249,13 +268,14 @@ class SqliteBackend:
 
     # -- tokens -------------------------------------------------------------------------
     def put_token(self, token: Token) -> None:
-        self.db.execute(
+        refuse_nul(token.id)
+        self._write(
             "INSERT OR REPLACE INTO tokens(id,doc) VALUES(?,?)",
             (token.id, json.dumps(token.to_dict(with_secret_hash=True))),
         )
-        self._commit()
 
     def get_token(self, token_id: str) -> Token | None:
+        refuse_nul(token_id)
         row = self.db.execute("SELECT doc FROM tokens WHERE id=?", (token_id,)).fetchone()
         return Token.from_dict(json.loads(row[0])) if row else None
 
@@ -267,17 +287,19 @@ class SqliteBackend:
 
     # -- proposals ----------------------------------------------------------------------
     def put_proposal(self, proposal: dict[str, Any]) -> None:
-        self.db.execute(
+        refuse_nul(proposal["id"], proposal["status"])
+        self._write(
             "INSERT OR REPLACE INTO proposals(id,status,doc) VALUES(?,?,?)",
             (proposal["id"], proposal["status"], json.dumps(proposal)),
         )
-        self._commit()
 
     def get_proposal(self, proposal_id: str) -> dict[str, Any] | None:
+        refuse_nul(proposal_id)
         row = self.db.execute("SELECT doc FROM proposals WHERE id=?", (proposal_id,)).fetchone()
         return json.loads(row[0]) if row else None
 
     def list_proposals(self, status: str | None = None) -> list[dict[str, Any]]:
+        refuse_nul(status)
         if status:
             rows = self.db.execute(
                 "SELECT doc FROM proposals WHERE status=? ORDER BY rowid", (status,)
@@ -293,6 +315,7 @@ class SqliteBackend:
         """Increments and returns the new count, atomically: of two concurrent callers on the
         same key, each observes its own correctly incremented total, never the other's. Names no
         rate and no window length (Trust's, #141); the three keys are compared as opaque values."""
+        refuse_nul(surface, bucket_key, window_key)
         with self.atomic():
             self.db.execute(
                 "INSERT INTO throttle(surface,bucket_key,window_key,count) VALUES(?,?,?,1) "
@@ -306,6 +329,7 @@ class SqliteBackend:
         return row[0]
 
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        refuse_nul(surface, bucket_key, window_key)
         row = self.db.execute(
             "SELECT count FROM throttle WHERE surface=? AND bucket_key=? AND window_key=?",
             (surface, bucket_key, window_key),
@@ -313,6 +337,7 @@ class SqliteBackend:
         return row[0] if row else 0
 
     def throttle_buckets(self, surface: ThrottleSurface, window_key: str) -> list[tuple[str, int]]:
+        refuse_nul(surface, window_key)
         rows = self.db.execute(
             "SELECT bucket_key, count FROM throttle WHERE surface=? AND window_key=? "
             "ORDER BY bucket_key",
@@ -321,6 +346,7 @@ class SqliteBackend:
         return [(k, n) for k, n in rows]
 
     def throttle_windows(self, surface: ThrottleSurface) -> list[str]:
+        refuse_nul(surface)
         rows = self.db.execute(
             "SELECT DISTINCT window_key FROM throttle WHERE surface=? ORDER BY window_key",
             (surface,),
@@ -328,20 +354,19 @@ class SqliteBackend:
         return [r[0] for r in rows]
 
     def throttle_forget(self, surface: ThrottleSurface, window_key: str) -> None:
-        self.db.execute(
-            "DELETE FROM throttle WHERE surface=? AND window_key=?", (surface, window_key)
-        )
-        self._commit()
+        refuse_nul(surface, window_key)
+        self._write("DELETE FROM throttle WHERE surface=? AND window_key=?", (surface, window_key))
 
     # -- IdentityState (storage.md §3.2) -----------------------------------------------------
     def put_user_grant(self, grant: UserGrant) -> None:
-        self.db.execute(
+        refuse_nul(grant["sub"])
+        self._write(
             "INSERT OR REPLACE INTO user_grants(sub,doc) VALUES(?,?)",
             (grant["sub"], json.dumps(grant)),
         )
-        self._commit()
 
     def get_user_grant(self, sub: str) -> UserGrant | None:
+        refuse_nul(sub)
         row = self.db.execute("SELECT doc FROM user_grants WHERE sub=?", (sub,)).fetchone()
         return json.loads(row[0]) if row else None
 
@@ -350,19 +375,21 @@ class SqliteBackend:
         return [json.loads(r[0]) for r in rows]
 
     def put_agent_registration(self, registration: AgentRegistration) -> None:
-        self.db.execute(
+        refuse_nul(registration["client_id"], registration["sub"])
+        self._write(
             "INSERT OR REPLACE INTO agent_registrations(client_id,sub,doc) VALUES(?,?,?)",
             (registration["client_id"], registration["sub"], json.dumps(registration)),
         )
-        self._commit()
 
     def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+        refuse_nul(client_id, sub)
         row = self.db.execute(
             "SELECT doc FROM agent_registrations WHERE client_id=? AND sub=?", (client_id, sub)
         ).fetchone()
         return json.loads(row[0]) if row else None
 
     def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+        refuse_nul(client_id)
         if client_id is None:
             rows = self.db.execute("SELECT doc FROM agent_registrations ORDER BY rowid")
         else:
@@ -376,25 +403,26 @@ class SqliteBackend:
         return {k: json.loads(v) for k, v in self.db.execute("SELECT key, value FROM config")}
 
     def put_config(self, key: str, value: Any) -> None:
-        self.db.execute(
+        refuse_nul(key)
+        self._write(
             "INSERT OR REPLACE INTO config(key,value) VALUES(?,?)", (key, json.dumps(value))
         )
-        self._commit()
 
     # -- ConfirmState (storage.md §3.3) ------------------------------------------------------
     def put_challenge(self, challenge: ConfirmChallenge) -> None:
-        self.db.execute(
+        refuse_nul(challenge["id"], challenge["expires_at"])
+        self._write(
             "INSERT INTO challenges(id,spent,expires_at,doc) VALUES(?,0,?,?)",
             (challenge["id"], challenge["expires_at"], json.dumps(challenge)),
         )
-        self._commit()
 
     def forget_challenges(self, expired_before: str) -> None:
-        self.db.execute("DELETE FROM challenges WHERE expires_at < ?", (expired_before,))
-        self._commit()
+        refuse_nul(expired_before)
+        self._write("DELETE FROM challenges WHERE expires_at < ?", (expired_before,))
 
     def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None:
         """Mark it spent and return it as it stood: of two concurrent spends, one sees it fresh."""
+        refuse_nul(challenge_id)
         with self.atomic():
             row = self.db.execute(
                 "SELECT spent, doc FROM challenges WHERE id=?", (challenge_id,)
@@ -405,19 +433,21 @@ class SqliteBackend:
         return {**json.loads(row[1]), "spent": bool(row[0])}
 
     def put_credential(self, credential: ConfirmCredential) -> None:
-        self.db.execute(
+        refuse_nul(credential["id"], credential["person"])
+        self._write(
             "INSERT OR REPLACE INTO credentials(id,person,doc) VALUES(?,?,?)",
             (credential["id"], credential["person"], json.dumps(credential)),
         )
-        self._commit()
 
     def get_credential(self, credential_id: str) -> ConfirmCredential | None:
+        refuse_nul(credential_id)
         row = self.db.execute(
             "SELECT doc FROM credentials WHERE id=?", (credential_id,)
         ).fetchone()
         return json.loads(row[0]) if row else None
 
     def list_credentials(self, person: str | None = None) -> list[ConfirmCredential]:
+        refuse_nul(person)
         if person is None:
             rows = self.db.execute("SELECT doc FROM credentials ORDER BY rowid")
         else:
@@ -428,21 +458,24 @@ class SqliteBackend:
 
     # -- UploadState (storage.md §3.4) -------------------------------------------------------
     def put_upload(self, upload: UploadRecord) -> None:
-        cur = self.db.execute(
-            "UPDATE uploads SET doc=? WHERE id=?", (json.dumps(upload), upload["id"])
-        )
-        if cur.rowcount == 0:
-            self.db.execute(
-                "INSERT INTO uploads(id,principal,doc) VALUES(?,?,?)",
-                (upload["id"], upload["principal"], json.dumps(upload)),
+        refuse_nul(upload["id"], upload["principal"])
+        with self.atomic():
+            cur = self.db.execute(
+                "UPDATE uploads SET doc=? WHERE id=?", (json.dumps(upload), upload["id"])
             )
-        self._commit()
+            if cur.rowcount == 0:
+                self.db.execute(
+                    "INSERT INTO uploads(id,principal,doc) VALUES(?,?,?)",
+                    (upload["id"], upload["principal"], json.dumps(upload)),
+                )
 
     def get_upload(self, upload_id: str) -> UploadRecord | None:
+        refuse_nul(upload_id)
         row = self.db.execute("SELECT doc FROM uploads WHERE id=?", (upload_id,)).fetchone()
         return json.loads(row[0]) if row else None
 
     def list_uploads(self, principal: str | None = None) -> list[UploadRecord]:
+        refuse_nul(principal)
         if principal is None:
             rows = self.db.execute("SELECT doc FROM uploads ORDER BY rowid")
         else:
@@ -452,26 +485,26 @@ class SqliteBackend:
         return [json.loads(r[0]) for r in rows]
 
     def spend_upload(self, upload_id: str, step: str) -> bool:
+        refuse_nul(upload_id)
         column = {"bytes": "bytes_spent", "item": "item_spent"}[step]
-        cur = self.db.execute(
+        cur = self._write(
             f"UPDATE uploads SET {column}=1 WHERE id=? AND {column}=0", (upload_id,)  # noqa: S608
         )
-        self._commit()
         return cur.rowcount == 1
 
     # -- GrantState (storage.md §3.5) --------------------------------------------------------
     def spend_grant(self, sig_hash: str, expires_at: str) -> bool:
         """Record a spend, committed at once: of two concurrent spends of one grant, exactly one
         inserts. Refused inside `atomic()` or any open transaction, whose rollback would undo it."""
+        refuse_nul(sig_hash, expires_at)
         if self._depth or self.db.in_transaction:
             raise RuntimeError("a grant is spent outside any transaction")
-        cur = self.db.execute(
+        cur = self._write(
             "INSERT OR IGNORE INTO spent_grants(sig_hash,expires_at) VALUES(?,?)",
             (sig_hash, expires_at),
         )
-        self._commit()
         return cur.rowcount == 1
 
     def forget_grants(self, expired_before: str) -> None:
-        self.db.execute("DELETE FROM spent_grants WHERE expires_at < ?", (expired_before,))
-        self._commit()
+        refuse_nul(expired_before)
+        self._write("DELETE FROM spent_grants WHERE expires_at < ?", (expired_before,))

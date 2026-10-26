@@ -3,8 +3,9 @@
 """`Transactional` (storage.md §3.6) on every backend: the container's one write lock. A nested
 block joins the outer one, an exception leaving the outermost block undoes every write in it, a
 write outside any block commits alone, a second writer waits for the first's commit and then reads
-it, and no grant is spent inside a block (§3.5). Not pinned: how long a writer waits before it
-raises, which the contract bounds without naming the bound (ten seconds on sqlite)."""
+it, a writer that cannot take the lock in time raises `StorageBusy` and writes nothing, and no
+grant is spent inside a block (§3.5). Not pinned: how long a writer waits before it raises, which
+the contract bounds without naming the bound (ten seconds on sqlite)."""
 
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ import threading
 
 import pytest
 
-from egzos._types import GENESIS_HASH, ChainConflict, Transactional
+from egzos._types import GENESIS_HASH, ChainConflict, StorageBusy, Transactional
 from egzos.ledger import Ledger
 from egzos.model import ContextItem, Node
 
@@ -107,6 +108,23 @@ def test_a_second_writer_waits_for_the_first_commit_then_reads_it(make_backend, 
     waiter.join(10)
     assert not waiter.is_alive()
     assert third.get_config() == {"first": 1, "second": "waited" if lone else "saw 1"}
+
+
+@pytest.mark.parametrize("lone", [False, True], ids=["block", "lone-write"])
+def test_a_writer_that_cannot_take_the_lock_in_time_raises_storage_busy(make_backend, brief_lock,
+                                                                        lone):
+    holder, waiter = make_backend(), make_backend()
+    with holder.atomic():
+        holder.put_config("held", 1)
+        with pytest.raises(StorageBusy):  # never the driver's own error (storage.md §3.6)
+            if lone:
+                waiter.put_config("late", 2)
+            else:
+                with waiter.atomic():
+                    waiter.put_config("late", 2)
+    assert waiter.get_config() == {"held": 1}  # nothing was written, and nothing was left open
+    waiter.put_config("after", 3)  # the next write takes the lock afresh
+    assert holder.get_config() == {"held": 1, "after": 3}
 
 
 def test_a_grant_is_refused_in_a_nested_block_and_the_refusal_spends_nothing(make_backend):

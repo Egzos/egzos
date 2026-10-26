@@ -18,21 +18,23 @@ from contextlib import contextmanager
 from typing import Any
 
 import psycopg
-from psycopg import pq
+from psycopg import errors, pq
 from psycopg.sql import SQL, Identifier
 
 from egzos._types import (
     AgentRegistration,
     ConfirmChallenge,
     ConfirmCredential,
+    StorageBusy,
     ThrottleSurface,
     UploadRecord,
     UserGrant,
 )
-from egzos.backends.base import ChainConflict
+from egzos.backends.base import ChainConflict, refuse_nul
 from egzos.model import ContextItem, Node, Token
 
-#: How long a writer waits for the container's write lock before it raises: sqlite's busy timeout.
+#: How long a writer waits for the container's write lock before it raises `StorageBusy`
+#: (storage.md §3.6): sqlite's busy timeout.
 LOCK_TIMEOUT = "10s"
 
 #: storage.md §3.7. Documents are the JSON text the backend wrote, never `jsonb`. `write_order`
@@ -146,7 +148,8 @@ class PostgresBackend:
     def atomic(self) -> Iterator[None]:
         """Every write inside lands together or not at all. The lock is taken before the block's
         first read, at READ COMMITTED, so each later statement sees every earlier commit, and a
-        block opened inside this one joins it (storage.md §3.6)."""
+        block opened inside this one joins it. A lock not taken within `LOCK_TIMEOUT` raises
+        `StorageBusy`, and nothing was written (storage.md §3.6)."""
         if self._depth:
             self._depth += 1
             try:
@@ -160,8 +163,10 @@ class PostgresBackend:
         try:
             self.db.execute(self._begin, prepare=False)
             yield
-        except BaseException:
+        except BaseException as e:
             self.db.rollback()
+            if isinstance(e, errors.LockNotAvailable):
+                raise StorageBusy("the container's write lock was not taken in time") from e
             raise
         else:
             self.db.commit()
@@ -174,11 +179,6 @@ class PostgresBackend:
             return self.db.execute(query, args)
 
     def _all(self, query: str, args: Sequence[Any] = ()) -> list[Any]:
-        # postgres keeps no NUL in text, so a value holding one names no row: a read answers the
-        # miss sqlite gives for it, never the driver's error (storage.md §5).
-        if any(isinstance(a, str) and "\0" in a for a in args):
-            return []
-        args = [[v for v in a if "\0" not in v] if isinstance(a, list) else a for a in args]
         return self.db.execute(query, args).fetchall()
 
     def _get(self, table: str, **keys: str) -> Any:
@@ -195,30 +195,36 @@ class PostgresBackend:
 
     # -- nodes --------------------------------------------------------------------------
     def put_node(self, node: Node) -> None:
+        refuse_nul(node.id, node.type, node.name, node.parent)
         self._write(_PUT["nodes"],
                     (node.id, node.type, node.name, node.parent, json.dumps(node.to_dict())))
 
     def get_node(self, node_id: str) -> Node | None:
+        refuse_nul(node_id)
         doc = self._get("nodes", id=node_id)
         return Node.from_dict(doc) if doc is not None else None
 
     def list_nodes(self, parent: str | None = None, type: str | None = None) -> list[Node]:
+        refuse_nul(parent, type)
         return [Node.from_dict(d) for d in self._list("nodes", parent=parent, type=type)]
 
     def find_root(self, type: str) -> Node | None:
+        refuse_nul(type)
         rows = self._all("SELECT doc FROM nodes WHERE type = %s AND parent IS NULL "
                          "ORDER BY write_order LIMIT 1", (type,))  # sqlite's first, by rowid
         return Node.from_dict(json.loads(rows[0][0])) if rows else None
 
     # -- items --------------------------------------------------------------------------
     def put(self, item: ContextItem) -> None:
+        created_at = item.lifecycle.get("created_at", "")
+        refuse_nul(item.id, item.kind, item.scope, item.key, item.status, created_at)
         self._write(_PUT["items"], (
             item.id, item.kind, item.scope, item.key, item.status,
-            bool(item.lifecycle.get("tombstoned")), item.lifecycle.get("created_at", ""),
-            json.dumps(item.to_dict()),
+            bool(item.lifecycle.get("tombstoned")), created_at, json.dumps(item.to_dict()),
         ))
 
     def get(self, item_id: str) -> ContextItem | None:
+        refuse_nul(item_id)
         rows = self._all("SELECT doc FROM items WHERE id = %s AND NOT tombstoned", (item_id,))
         return ContextItem.from_dict(json.loads(rows[0][0])) if rows else None
 
@@ -233,20 +239,25 @@ class PostgresBackend:
         include_tombstoned: bool = False,
     ) -> list[ContextItem]:
         scopes = list(scopes)
+        refuse_nul(scopes, key)
         if not scopes:
             return []
         sql, args = "SELECT doc FROM items WHERE scope = ANY(%s)", [scopes]
         if not include_tombstoned:
             sql += " AND NOT tombstoned"
         if kinds:
+            kinds = list(kinds)
+            refuse_nul(kinds)
             sql += " AND kind = ANY(%s)"
-            args.append(list(kinds))
+            args.append(kinds)
         if key is not None:
             sql += " AND key = %s"
             args.append(key)
         if statuses:
+            statuses = list(statuses)
+            refuse_nul(statuses)
             sql += " AND status = ANY(%s)"
-            args.append(list(statuses))
+            args.append(statuses)
         if text:
             # sqlite's `doc LIKE` over the stored JSON: ASCII letters fold (COLLATE "C"), `%` and
             # `_` are wildcards, `\` is literal (ESCAPE ''), and the pattern ends at a NUL.
@@ -256,6 +267,7 @@ class PostgresBackend:
         return [ContextItem.from_dict(json.loads(r[0])) for r in self._all(sql, args)]
 
     def tombstone(self, item_id: str) -> bool:
+        refuse_nul(item_id)
         item = self.get(item_id)
         if not item:
             return False
@@ -267,6 +279,7 @@ class PostgresBackend:
     def audit_append(self, entry: dict[str, Any]) -> dict[str, Any]:
         # A second successor of one entry is not inserted, so no error spoils a block it runs in:
         # the block goes on, as sqlite's does after a failed statement, and the ledger re-chains.
+        refuse_nul(entry["ts"], entry["hash"], entry["prev_hash"])
         with self.atomic():
             row = self.db.execute(
                 "INSERT INTO audit (seq, ts, hash, prev_hash, doc) "
@@ -298,9 +311,11 @@ class PostgresBackend:
 
     # -- tokens -------------------------------------------------------------------------
     def put_token(self, token: Token) -> None:
+        refuse_nul(token.id)
         self._write(_PUT["tokens"], (token.id, json.dumps(token.to_dict(with_secret_hash=True))))
 
     def get_token(self, token_id: str) -> Token | None:
+        refuse_nul(token_id)
         doc = self._get("tokens", id=token_id)
         return Token.from_dict(doc) if doc is not None else None
 
@@ -309,18 +324,22 @@ class PostgresBackend:
 
     # -- proposals ----------------------------------------------------------------------
     def put_proposal(self, proposal: dict[str, Any]) -> None:
+        refuse_nul(proposal["id"], proposal["status"])
         self._write(_PUT["proposals"],
                     (proposal["id"], proposal["status"], json.dumps(proposal)))
 
     def get_proposal(self, proposal_id: str) -> dict[str, Any] | None:
+        refuse_nul(proposal_id)
         return self._get("proposals", id=proposal_id)
 
     def list_proposals(self, status: str | None = None) -> list[dict[str, Any]]:
+        refuse_nul(status)
         return self._list("proposals", status=status or None)  # sqlite's `if status:`
 
     # -- ThrottleState (storage.md §3.1) ----------------------------------------------------
     def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
         """Increments and returns the new count, atomically, under the lock."""
+        refuse_nul(surface, bucket_key, window_key)
         return self._write(
             "INSERT INTO throttle (surface, bucket_key, window_key, count) VALUES (%s, %s, %s, 1) "
             "ON CONFLICT (surface, bucket_key, window_key) "
@@ -329,6 +348,7 @@ class PostgresBackend:
         ).fetchone()[0]
 
     def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        refuse_nul(surface, bucket_key, window_key)
         rows = self._all(
             "SELECT count FROM throttle WHERE surface = %s AND bucket_key = %s AND window_key = %s",
             (surface, bucket_key, window_key),
@@ -336,37 +356,45 @@ class PostgresBackend:
         return rows[0][0] if rows else 0
 
     def throttle_buckets(self, surface: ThrottleSurface, window_key: str) -> list[tuple[str, int]]:
+        refuse_nul(surface, window_key)
         rows = self._all("SELECT bucket_key, count FROM throttle WHERE surface = %s "
                          "AND window_key = %s ORDER BY bucket_key", (surface, window_key))
         return [(k, n) for k, n in rows]
 
     def throttle_windows(self, surface: ThrottleSurface) -> list[str]:
+        refuse_nul(surface)
         rows = self._all("SELECT DISTINCT window_key FROM throttle WHERE surface = %s "
                          "ORDER BY window_key", (surface,))
         return [r[0] for r in rows]
 
     def throttle_forget(self, surface: ThrottleSurface, window_key: str) -> None:
+        refuse_nul(surface, window_key)
         self._write("DELETE FROM throttle WHERE surface = %s AND window_key = %s",
                     (surface, window_key))
 
     # -- IdentityState (storage.md §3.2) -----------------------------------------------------
     def put_user_grant(self, grant: UserGrant) -> None:
+        refuse_nul(grant["sub"])
         self._write(_PUT["user_grants"], (grant["sub"], json.dumps(grant)))
 
     def get_user_grant(self, sub: str) -> UserGrant | None:
+        refuse_nul(sub)
         return self._get("user_grants", sub=sub)
 
     def list_user_grants(self) -> list[UserGrant]:
         return self._list("user_grants")
 
     def put_agent_registration(self, registration: AgentRegistration) -> None:
+        refuse_nul(registration["client_id"], registration["sub"])
         self._write(_PUT["agent_registrations"],
                     (registration["client_id"], registration["sub"], json.dumps(registration)))
 
     def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+        refuse_nul(client_id, sub)
         return self._get("agent_registrations", client_id=client_id, sub=sub)
 
     def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+        refuse_nul(client_id)
         return self._list("agent_registrations", client_id=client_id)
 
     # -- ConfigState (storage.md §3.2) -------------------------------------------------------
@@ -375,18 +403,22 @@ class PostgresBackend:
         return {k: json.loads(v) for k, v in rows}
 
     def put_config(self, key: str, value: Any) -> None:
+        refuse_nul(key)
         self._write(_PUT["config"], (key, json.dumps(value)))
 
     # -- ConfirmState (storage.md §3.3) ------------------------------------------------------
     def put_challenge(self, challenge: ConfirmChallenge) -> None:
+        refuse_nul(challenge["id"], challenge["expires_at"])
         self._write("INSERT INTO challenges (id, expires_at, doc) VALUES (%s, %s, %s)",
                     (challenge["id"], challenge["expires_at"], json.dumps(challenge)))
 
     def forget_challenges(self, expired_before: str) -> None:
+        refuse_nul(expired_before)
         self._write("DELETE FROM challenges WHERE expires_at < %s", (expired_before,))
 
     def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None:
         """Mark it spent and return it as it stood: of two concurrent spends, one sees it fresh."""
+        refuse_nul(challenge_id)
         with self.atomic():
             rows = self._all("SELECT spent, doc FROM challenges WHERE id = %s", (challenge_id,))
             if not rows:
@@ -395,29 +427,36 @@ class PostgresBackend:
         return {**json.loads(rows[0][1]), "spent": rows[0][0]}
 
     def put_credential(self, credential: ConfirmCredential) -> None:
+        refuse_nul(credential["id"], credential["person"])
         self._write(_PUT["credentials"],
                     (credential["id"], credential["person"], json.dumps(credential)))
 
     def get_credential(self, credential_id: str) -> ConfirmCredential | None:
+        refuse_nul(credential_id)
         return self._get("credentials", id=credential_id)
 
     def list_credentials(self, person: str | None = None) -> list[ConfirmCredential]:
+        refuse_nul(person)
         return self._list("credentials", person=person)
 
     # -- UploadState (storage.md §3.4) -------------------------------------------------------
     def put_upload(self, upload: UploadRecord) -> None:
         # Rewritten in place, as sqlite's UPDATE: its open order, principal and spends stand.
+        refuse_nul(upload["id"], upload["principal"])
         self._write("INSERT INTO uploads (id, principal, doc) VALUES (%s, %s, %s) "
                     "ON CONFLICT (id) DO UPDATE SET doc = excluded.doc",
                     (upload["id"], upload["principal"], json.dumps(upload)))
 
     def get_upload(self, upload_id: str) -> UploadRecord | None:
+        refuse_nul(upload_id)
         return self._get("uploads", id=upload_id)
 
     def list_uploads(self, principal: str | None = None) -> list[UploadRecord]:
+        refuse_nul(principal)
         return self._list("uploads", principal=principal)
 
     def spend_upload(self, upload_id: str, step: str) -> bool:
+        refuse_nul(upload_id)
         column = {"bytes": "bytes_spent", "item": "item_spent"}[step]
         cur = self._write(f"UPDATE uploads SET {column} = true WHERE id = %s AND NOT {column}",
                           (upload_id,))
@@ -427,6 +466,7 @@ class PostgresBackend:
     def spend_grant(self, sig_hash: str, expires_at: str) -> bool:
         """Record a spend, committed at once: of two concurrent spends of one grant, exactly one
         inserts. Refused inside `atomic()` or any open transaction, whose rollback would undo it."""
+        refuse_nul(sig_hash, expires_at)
         if self._depth or self.db.info.transaction_status != pq.TransactionStatus.IDLE:
             raise RuntimeError("a grant is spent outside any transaction")
         cur = self._write("INSERT INTO spent_grants (sig_hash, expires_at) VALUES (%s, %s) "
@@ -434,4 +474,5 @@ class PostgresBackend:
         return cur.rowcount == 1
 
     def forget_grants(self, expired_before: str) -> None:
+        refuse_nul(expired_before)
         self._write("DELETE FROM spent_grants WHERE expires_at < %s", (expired_before,))
