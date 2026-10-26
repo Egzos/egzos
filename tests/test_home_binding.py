@@ -193,6 +193,29 @@ def test_an_endpoint_holding_userinfo_stops_and_is_never_shown(tmp_path, monkeyp
            names=("EGZOS_BLOBS_S3_ENDPOINT", "EGZOS_BLOBS_S3_ACCESS_KEY_ID"))
 
 
+def test_an_endpoint_no_url_parser_reads_stops_and_is_never_shown(tmp_path, monkeypatch):
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    endpoint = f"http://[::1{SECRET}"  # an unclosed IPv6 literal: urlsplit refuses it
+    _name_store(monkeypatch, {"EGZOS_BLOBS_S3_ENDPOINT": endpoint})
+    _stops("blobs-endpoint", tmp_path, KEY_ID, SECRET, endpoint, PASSWORD, REFUSED,
+           names=("EGZOS_BLOBS_S3_ENDPOINT",))
+
+
+def test_an_object_store_opendal_refuses_to_build_stops_with_nothing_of_its_text(
+    tmp_path, monkeypatch
+):
+    import opendal
+
+    def refuse(*args, **kwargs):
+        raise RuntimeError(f"config invalid: {kwargs.get('secret_access_key')}")
+
+    monkeypatch.setattr(opendal, "Operator", refuse)
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    _name_store(monkeypatch)
+    _stops("blobs-endpoint", tmp_path, KEY_ID, SECRET, PASSWORD, REFUSED,
+           names=("EGZOS_BLOBS_S3_ENDPOINT",))
+
+
 def test_an_object_store_without_opendal_stops_before_the_database_is_reached(
     tmp_path, monkeypatch
 ):
