@@ -12,7 +12,8 @@ prefix of its own, emptied after it. The six are taken out of the environment wh
 imported, at collection and so before any test runs, so that no test's container is named a store
 it did not ask for; a run that collects nothing under `tests/store/` keeps them. The probes are
 test-only and join no Protocol: `refuses` tries an update or a delete of an audit entry (events.md
-§4 item 1), and `staged` reads what no `BlobStore` reader may (storage.md §4)."""
+§4 item 1), `staged` reads what no `BlobStore` reader may (storage.md §4), and `fail_commit` makes a
+backend's next COMMIT fail as a disk or connection fault would (§3.6)."""
 
 from __future__ import annotations
 
@@ -241,3 +242,27 @@ def s3_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[dict[st
 @pytest.fixture
 def staged(blob_store_name: str) -> Callable[[Any, str], bytes | None]:
     return BLOB_STORES[blob_store_name].staged
+
+
+class CommitFailed(ConnectionError):
+    """The fault `fail_commit` stands in for; a test names it `ConnectionError`, "COMMIT"."""
+
+
+@pytest.fixture
+def fail_commit() -> Callable[[Any], None]:
+    """Arms a backend's next COMMIT to fail: its transaction is rolled back, not committed, and
+    `CommitFailed` raised in the COMMIT's place, as a fault that loses the transaction raises."""
+    def arm(backend: Any) -> None:
+        real = backend.db
+
+        class Failing:
+            def __getattr__(self, name: str) -> Any:
+                return getattr(real, name)
+
+            def commit(self) -> None:
+                backend.db = real
+                real.rollback()
+                raise CommitFailed("the COMMIT did not go through")
+
+        backend.db = Failing()
+    return arm

@@ -70,3 +70,28 @@ def test_a_name_that_is_not_a_digest_is_refused(blobs, staged, name):
     with pytest.raises(ValueError):
         blobs.discard(name)
     assert blobs.get(SHA) == DATA and staged(blobs, SHA) == DATA
+
+
+def test_promote_copies_and_its_staged_delete_waits_like_discards(blobs, staged):
+    """storage.md §3.6: the staged delete is handed to `defer`, which the container gives its
+    backend's after-commit work. Until it runs the staged copy stays, so a block that rolled back
+    promotes again and says so; an answer of False queues nothing."""
+    queued: list[str] = []
+    blobs.defer = queued.append
+    blobs.stage(DATA)
+    assert blobs.promote(SHA) is True and queued == [SHA]
+    assert blobs.get(SHA) == DATA and staged(blobs, SHA) == DATA
+    assert blobs.promote(SHA) is True
+    assert blobs.discard(SHA) is True and staged(blobs, SHA) == DATA
+    assert queued == [SHA, SHA, SHA]
+    assert blobs.promote(OTHER_SHA) is False and blobs.discard(OTHER_SHA) is False
+    assert queued == [SHA, SHA, SHA]
+
+
+def test_the_store_lists_its_staged_addresses_for_the_sweep_alone(blobs):
+    """§4: the open-time sweep's listing is the store's own, beside the Protocol, never in it."""
+    assert blobs._staged_names() == []
+    blobs.put(b"promoted")
+    blobs.stage(DATA)
+    blobs.stage(OTHER)
+    assert blobs._staged_names() == sorted([SHA, OTHER_SHA])

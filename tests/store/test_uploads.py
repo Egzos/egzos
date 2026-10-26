@@ -2,10 +2,13 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """Whose an upload is (rest.md §4.4, v0.7 §AC): a person's sixteen take in every agent serving
 them, counted and written as one step whichever of their principals open at once, and a container
-`Token` is a person of its own."""
+`Token` is a person of its own. And when staged bytes go (storage.md §3.6, §4): after the act's
+COMMIT, unless something holds them by then, or at the next open, on each of the harness's blob
+stores."""
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 
@@ -13,7 +16,9 @@ import pytest
 
 from egzos.container import OWNER, Container
 from egzos.identity import principal_id
+from egzos.store.items import StoreError
 from egzos.store.uploads import MAX_HELD, TooManyUploads, person_of
+from egzos.trust import TrustError
 
 KW = {"actor": OWNER, "principal": "interactive"}
 SHAPE = {"name": "n", "mime": "a/b", "size": 1, "sha256": "0" * 64}
@@ -94,3 +99,117 @@ def test_two_principals_of_one_person_never_both_take_the_last_slot(tmp_path, pa
     for t in threads:
         t.join()
     assert sorted(took) == [False, True]
+
+
+# -- staged deletes after the COMMIT, and the open-time sweep (storage.md §3.6, §4; #342) --------
+DATA = b"agent bytes"
+SHA = hashlib.sha256(DATA).hexdigest()
+
+
+class Boom(Exception):
+    """An act failing after its writes."""
+
+
+@pytest.fixture
+def box(tmp_path, monkeypatch, blobs):
+    """A container on the harness's blob store, over sqlite, and an agent serving its person."""
+    monkeypatch.setattr("egzos.binding.BlobStore", lambda root: blobs)
+    c = Container(tmp_path)
+    c.owner = c.init()
+    c.agent = _people(c)["a1"]
+    return c
+
+
+def _staged(c, data=DATA, token=None):
+    record = c.uploads.open(token or c.agent, scope=c.nodes.user_root(), name="n", mime="a/b",
+                            size=len(data), sha256=hashlib.sha256(data).hexdigest())
+    assert c.uploads.put(token or c.agent, record["id"], data) == "staged"
+    return record
+
+
+def _item(c):
+    return c.uploads.item(c.agent, _staged(c)["id"], scope=None, key=None, tags=[])
+
+
+def _since(c, head):
+    return [e["event"] for e in c.backend.audit_iter() if e["seq"] > head["seq"]]
+
+
+def test_a_commit_that_fails_after_a_promote_leaves_the_staged_copy_for_a_retry(
+        box, blobs, staged, fail_commit):
+    """The retried promote copies again and returns True, and its act appends `blob.put`: no
+    verified item's bytes reach the promoted store without one on the chain."""
+    item = _item(box)
+    head = box.backend.audit_last()
+    fail_commit(box.backend)
+    with pytest.raises(ConnectionError, match="COMMIT"):
+        box.trust.promote(item, token=box.owner, actor=OWNER)
+    assert staged(blobs, SHA) == DATA and box.backend.audit_last() == head
+    assert box.backend.get(item.id).status == "unverified"
+    assert box.trust.promote(item, token=box.owner, actor=OWNER).status == "verified"
+    assert _since(box, head) == ["approval.promote", "blob.put"]
+    assert staged(blobs, SHA) is None and blobs.get(SHA) == DATA  # deleted after the COMMIT
+
+
+def test_a_discard_whose_block_rolls_back_discarded_nothing(box, blobs, staged):
+    record = _staged(box)
+    with pytest.raises(Boom), box.backend.atomic():
+        assert box.uploads.discard(box.owner, record["id"], admin=True) is True
+        raise Boom
+    assert staged(blobs, SHA) == DATA and not box.backend.get_upload(record["id"])["discarded"]
+    assert box.uploads.discard(box.owner, record["id"], admin=True) is True
+    assert staged(blobs, SHA) is None
+
+
+def test_a_stage_committed_between_a_commit_and_its_delete_keeps_the_bytes(box, blobs, staged):
+    first = _staged(box)
+    second = box.uploads.open(box.agent, scope=box.nodes.user_root(), name="n", mime="a/b",
+                              size=len(DATA), sha256=SHA)
+    with box.backend.atomic():
+        # Queued ahead of the discard's delete: it commits after the COMMIT, before the delete.
+        box.backend.after_commit(lambda: box.uploads.put(box.agent, second["id"], DATA))
+        assert box.uploads.discard(box.owner, first["id"], admin=True) is True
+    assert box.backend.get_upload(second["id"])["staged"] and staged(blobs, SHA) == DATA
+    assert box.uploads.discard(box.owner, second["id"], admin=True) is True
+    assert staged(blobs, SHA) is None  # nothing holds them now
+
+
+def test_an_approval_whose_bytes_are_gone_is_refused_and_changes_nothing(box, blobs):
+    item = _item(box)
+    blobs._unstage(SHA)  # lost from staging, and never promoted
+    head = box.backend.audit_last()
+    with pytest.raises(TrustError, match="nothing staged"):
+        box.trust.promote(item, token=box.owner, actor=OWNER)
+    assert box.backend.audit_last() == head and box.backend.get(item.id).status == "unverified"
+    blobs.put(DATA)  # held at the promoted address now, as a file's bytes are
+    assert box.trust.promote(item, token=box.owner, actor=OWNER).status == "verified"
+    assert _since(box, head) == ["approval.promote"]  # it moved nothing, and says so
+
+
+def test_a_persons_item_whose_bytes_are_gone_is_refused_and_spends_nothing(box, blobs):
+    record = _staged(box, token=box.owner)
+    blobs._unstage(SHA)
+    head = box.backend.audit_last()
+    with pytest.raises(StoreError, match="nothing staged"):
+        box.uploads.item(box.owner, record["id"], scope=None, key=None, tags=[])
+    assert box.backend.audit_last() == head and box.backend.get_upload(record["id"])["item"] is None
+
+
+def test_the_open_time_sweep_deletes_only_staged_bytes_nothing_holds(box, blobs, staged, tmp_path):
+    """A crash's leftover, or bytes an act staged before its block rolled back, go at the next open,
+    under the lock, and nothing is appended. An open upload's, an orphan's and a staged item's
+    stay."""
+    left = blobs.stage(b"left between a COMMIT and its delete")
+    with pytest.raises(Boom), box.backend.atomic():
+        rolled = blobs.stage(b"staged by an act that rolled back")
+        raise Boom
+    item = _item(box)
+    _staged(box, b"an open upload's")
+    box.uploads.clock = lambda: time.time() - 2 * 3600  # opened two hours ago: an orphan now
+    _staged(box, b"an orphan's")
+    head = box.backend.audit_last()
+    again = Container(tmp_path)
+    assert staged(blobs, left) is None and staged(blobs, rolled) is None
+    for data in (DATA, b"an open upload's", b"an orphan's"):
+        assert staged(blobs, hashlib.sha256(data).hexdigest()) == data
+    assert again.backend.audit_last() == head and again.backend.get(item.id) is not None

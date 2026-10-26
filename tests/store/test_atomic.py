@@ -3,8 +3,9 @@
 """`Transactional` (storage.md §3.6) on every backend: the container's one write lock. A nested
 block joins the outer one, an exception leaving the outermost block undoes every write in it, a
 write outside any block commits alone, a second writer waits for the first's commit and then reads
-it, a writer that cannot take the lock in time raises `StorageBusy` and writes nothing, and no
-grant is spent inside a block (§3.5). Not pinned: how long a writer waits before it raises, which
+it, a writer that cannot take the lock in time raises `StorageBusy` and writes nothing, no grant
+is spent inside a block (§3.5), and work queued for after the commit runs once that commit has gone
+through, never without it. Not pinned: how long a writer waits before it raises, which
 the contract bounds without naming the bound (ten seconds on sqlite)."""
 
 from __future__ import annotations
@@ -137,3 +138,46 @@ def test_a_grant_is_refused_in_a_nested_block_and_the_refusal_spends_nothing(mak
     assert other.get_config() == {"k": 1, "j": 2}
     assert backend.spend_grant("h", WHEN) is True  # the refused spend recorded nothing
     assert other.spend_grant("h", WHEN) is False  # and this one committed alone, at once
+
+
+def test_work_queued_for_after_the_commit_runs_once_the_outermost_block_commits(make_backend):
+    """storage.md §3.6: a block's deletes wait for its COMMIT. A nested block joins the outer one,
+    the work runs in the order queued with no block open, and outside any block it runs at once."""
+    backend, other = make_backend(), make_backend()
+    ran: list[object] = []
+
+    def after() -> None:
+        ran.append(other.get_config().get("k"))  # the commit is there for any connection
+        with backend.atomic():  # no block is open: this one commits on its own
+            backend.put_config("after", len(ran))
+
+    with backend.atomic():
+        backend.put_config("k", 1)
+        with backend.atomic():
+            backend.after_commit(after)
+        backend.after_commit(lambda: ran.append("second"))
+        assert ran == []  # leaving the inner block ran nothing
+    assert ran == [1, "second"] and other.get_config()["after"] == 1
+    backend.after_commit(lambda: ran.append("at once"))
+    assert ran[-1] == "at once"
+    with backend.atomic():
+        pass
+    assert len(ran) == 3  # run once, never again
+
+
+@pytest.mark.parametrize("how", ["rollback", "commit-fails"])
+def test_work_queued_for_after_the_commit_never_runs_without_it(make_backend, fail_commit, how):
+    backend, other = make_backend(), make_backend()
+    ran: list[int] = []
+    if how == "commit-fails":
+        fail_commit(backend)
+    with pytest.raises(Boom if how == "rollback" else ConnectionError), backend.atomic():
+        backend.put_config("k", 1)
+        with backend.atomic():
+            backend.after_commit(lambda: ran.append(1))
+        if how == "rollback":
+            raise Boom
+    assert ran == [] and other.get_config() == {}
+    with backend.atomic():  # dropped with its block, never carried into the next one
+        backend.put_config("j", 2)
+    assert ran == [] and other.get_config() == {"j": 2}

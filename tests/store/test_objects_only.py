@@ -34,8 +34,9 @@ def root(tmp_path: Path) -> Path:
 
 @pytest.mark.parametrize(("make", "by"), [
     (lambda root: opendal.Operator("memory"), "read+write+delete"),
-    (fs_operator, "rename"),
+    (fs_operator, "copy+delete"),
     (lambda root: _without(fs_operator(root), "rename"), "copy+delete"),
+    (lambda root: _without(fs_operator(root), "copy"), "read+write+delete"),
 ])
 def test_promote_moves_bytes_the_way_the_service_can(root, make, by):
     blobs = ObjectBlobStore(make(root))
@@ -47,14 +48,17 @@ def test_promote_moves_bytes_the_way_the_service_can(root, make, by):
     assert blobs.get(SHA) == DATA
 
 
-@pytest.mark.parametrize(("off", "same_file"), [(None, True), ("rename", False)])
-def test_on_a_directory_rename_keeps_the_staged_file_and_copy_writes_another(root, off, same_file):
+@pytest.mark.parametrize("off", [None, "rename"])
+def test_on_a_directory_promote_copies_whether_or_not_the_service_renames(root, off):
+    """storage.md §3.6: never a rename, so a block that rolls back keeps the staged file."""
     op = fs_operator(root)
     blobs = ObjectBlobStore(op if off is None else _without(op, off))
+    blobs.defer = lambda sha: None  # its delete waits for a COMMIT that never comes
     blobs.stage(DATA)
     staged = (root / "staging" / SHA).stat().st_ino
     assert blobs.promote(SHA) is True
-    assert ((root / "sha256" / SHA).stat().st_ino == staged) is same_file
+    assert (root / "sha256" / SHA).stat().st_ino != staged
+    assert (root / "staging" / SHA).stat().st_ino == staged
 
 
 def test_a_promote_cut_short_after_its_copy_is_finished_by_a_retry(root):
