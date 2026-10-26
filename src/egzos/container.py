@@ -27,7 +27,7 @@ from egzos.identity import (
 from egzos.ledger import Ledger
 from egzos.model import Token
 from egzos.resolver import Resolver
-from egzos.store import BlobStore, NodeService, Store
+from egzos.store import NodeService, Store
 from egzos.store.blobs import _is_digest
 from egzos.store.find import shown
 from egzos.store.uploads import Uploads
@@ -55,14 +55,14 @@ class Container:
         # 0700 (no window at the umask's mode), then pinned 0700 if it already existed.
         self.home.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.home, 0o700)
-        # storage.md §3.7: the database EGZOS_DATABASE_URL names, else the home's own egzos.db.
+        # storage.md §3.7: the database EGZOS_DATABASE_URL names, else the home's own egzos.db,
+        # and the object store the EGZOS_BLOBS_S3_* variables name, else the home's blobs/ (§4).
         # The home's binding is checked here, before anything is built that could serve.
         self.binding = HomeBinding(self.home)
-        self.backend = self.binding.open()
+        self.backend, self.blobs = self.binding.open()
         self._closed = False
         self.ledger = Ledger(self.backend)
         self.nodes = NodeService(self.backend, self.ledger)
-        self.blobs = BlobStore(self.home / "blobs")
         self.store = Store(self.backend, self.ledger, self.nodes, self.blobs)
         self.auth = Auth(self.home, self.backend, self.ledger)
         self.trust = TrustEngine(self.backend, self.ledger, self.nodes)

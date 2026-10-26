@@ -4,9 +4,9 @@
 so a second backend runs every module unchanged: none imports `sqlite3`, OpenDAL, a concrete store
 or `Container`, names a `.db` file, or touches a backend's `db` or `path` or a blob store's `root`
 or `op`. Every module is in by default but two older ones, which build a `Store` and a `Container`
-over sqlite above this seam, the postgres-only and object-store-only ones, which reach past the
-harness on purpose, and this one, which names what it forbids and holds the harness to its own
-promise."""
+over sqlite above this seam, the postgres-only, object-store-only and S3-only ones, which reach
+past the harness on purpose, and this one, which names what it forbids and holds the harness to its
+own promise."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import pytest
 
 HERE = Path(__file__).parent
 OUTSIDE = frozenset({"test_items.py", "test_uploads.py", "test_postgres_only.py",
-                     "test_objects_only.py", Path(__file__).name})
+                     "test_objects_only.py", "test_s3_only.py", Path(__file__).name})
 FORBIDDEN = ("sqlite3", "egzos.backends.sqlite", "egzos.backends.SqliteBackend",
              "egzos.store.blobs", "egzos.store.objects", "opendal", "egzos.container", "psycopg",
              "egzos.backends.postgres")

@@ -1,7 +1,9 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""A home stays bound to the database it was made on (storage.md §3.7): each stop an open makes,
-the make's own, and a sqlite home without `EGZOS_DATABASE_URL` as before. The postgres tests run
+"""A home stays bound to the database it was made on, and to its blob root (storage.md §3.7, §4):
+each stop an open makes, the make's own, the object store's, and a sqlite home without
+`EGZOS_DATABASE_URL` as before. The object store's values are fake: building one does no I/O, and
+no test here reaches it (`tests/store/test_s3_only.py` does). The postgres tests run
 when `EGZOS_TEST_POSTGRES` names a database, as `tests/store/conftest.py`'s do, each on schemas
 and roles of its own, named to the container by the variable and by `binding.SCHEMA`."""
 
@@ -19,31 +21,49 @@ import pytest
 from typer.testing import CliRunner
 
 from egzos import binding
-from egzos.binding import BINDING_FILE, DATABASE_URL, HomeBindingError
+from egzos.binding import BINDING_FILE, BLOBS_S3, DATABASE_URL, HOME_BLOBS, HomeBindingError
 from egzos.container import Container
 
 POSTGRES = os.environ.get("EGZOS_TEST_POSTGRES")
 PASSWORD = "hunter2-not-a-real-one"
 REFUSED = f"postgresql://egzos_user:{PASSWORD}@127.0.0.1:1/egzos?connect_timeout=2"
+KEY_ID, SECRET = "AKIA-not-a-real-key-id", "not-a-real-secret-access-key"
+ENDPOINT = "http://127.0.0.1:1/storage/v1/s3"
+STORE = dict(zip(BLOBS_S3, (ENDPOINT, "region-not-real", "bucket-not-real", "prefix/not-real",
+                            KEY_ID, SECRET), strict=True))
+ROOT = {"endpoint": ENDPOINT, "bucket": "bucket-not-real", "prefix": "prefix/not-real"}
+S3_VARS = ("EGZOS_BLOBS_S3_*",)
 
 
 @pytest.fixture(autouse=True)
 def _no_database(monkeypatch):
-    monkeypatch.delenv(DATABASE_URL, raising=False)
+    for name in (DATABASE_URL, *BLOBS_S3):
+        monkeypatch.delenv(name, raising=False)
 
 
-def _stops(case, home, *hidden):
-    """Opening `home` stops for `case`, naming the variable and nothing in `hidden`: not in the
+def _stops(case, home, *hidden, names=(DATABASE_URL,)):
+    """Opening `home` stops for `case`, naming the variables and nothing in `hidden`: not in the
     error, no driver's error chained to it, and not in the locals of any frame it was raised
-    through, which a traceback can print."""
+    through, which a traceback can print. Its message holds no value of the object store's."""
     with pytest.raises(HomeBindingError) as raised:
         Container(home)
     err = raised.value
-    assert err.case == case and DATABASE_URL in str(err)
+    assert err.case == case and all(name in str(err) for name in names)
     assert err.__cause__ is None and err.__context__ is None
     shown = repr(err) + "".join(traceback.TracebackException(
         type(err), err, err.__traceback__.tb_next, capture_locals=True).format())
     assert [h for h in hidden if h in shown] == []
+    assert [v for v in (*STORE.values(), *ROOT.values()) if v in str(err)] == []
+    return err
+
+
+def _name_store(monkeypatch, changed=()):
+    """The object store named in the environment: STORE, with `changed` over it (None unsets)."""
+    for name, value in {**STORE, **dict(changed)}.items():
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
 
 
 def _binding(home):
@@ -141,6 +161,70 @@ def test_an_unreachable_database_stops_and_its_url_is_never_shown(tmp_path, monk
     assert not (tmp_path / "egzos.db").exists()
 
 
+# -- the object store's own stops, before any database is reached ------------------------------
+@pytest.mark.parametrize("changed", [
+    {"EGZOS_BLOBS_S3_SECRET_ACCESS_KEY": None},
+    {"EGZOS_BLOBS_S3_REGION": "", "EGZOS_BLOBS_S3_ACCESS_KEY_ID": None},  # empty is unset
+    dict.fromkeys(BLOBS_S3[1:]),  # the endpoint alone
+])
+def test_an_object_store_named_in_part_stops_naming_the_variables_unset(
+    tmp_path, monkeypatch, changed
+):
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    _name_store(monkeypatch, changed)
+    err = _stops("blobs-partial", tmp_path, KEY_ID, SECRET, PASSWORD, REFUSED, names=tuple(changed))
+    assert [name for name in BLOBS_S3 if name in str(err)] == list(changed)
+
+
+def test_an_object_store_named_without_a_database_stops(tmp_path, monkeypatch):
+    _name_store(monkeypatch)
+    _stops("blobs-alone", tmp_path, KEY_ID, SECRET, names=(DATABASE_URL, *S3_VARS))
+    assert not (tmp_path / "egzos.db").exists() and not (tmp_path / "blobs").exists()
+
+
+@pytest.mark.parametrize("endpoint", [
+    f"https://{KEY_ID}:{SECRET}@127.0.0.1:1/storage/v1/s3", f"{KEY_ID}:{SECRET}@127.0.0.1:1/s3",
+    f"http://{KEY_ID}@127.0.0.1:1", f"http://{SECRET}@127.0.0.1:1?x=1",
+])
+def test_an_endpoint_holding_userinfo_stops_and_is_never_shown(tmp_path, monkeypatch, endpoint):
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    _name_store(monkeypatch, {"EGZOS_BLOBS_S3_ENDPOINT": endpoint})
+    _stops("blobs-userinfo", tmp_path, KEY_ID, SECRET, endpoint, PASSWORD, REFUSED,
+           names=("EGZOS_BLOBS_S3_ENDPOINT", "EGZOS_BLOBS_S3_ACCESS_KEY_ID"))
+
+
+def test_an_object_store_without_opendal_stops_before_the_database_is_reached(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setitem(sys.modules, "opendal", None)  # as if the extra were not installed
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    _name_store(monkeypatch)
+    err = _stops("blobs-driver", tmp_path, KEY_ID, SECRET, PASSWORD, REFUSED, names=S3_VARS)
+    assert 'pip install "egzos[objects]"' in str(err)
+
+
+@pytest.mark.parametrize(("changed", "root"), [
+    ({}, ROOT),
+    ({"EGZOS_BLOBS_S3_ENDPOINT": f"{ENDPOINT}/", "EGZOS_BLOBS_S3_PREFIX": "/prefix/not-real/"},
+     ROOT),  # one root spelled two ways is one root
+    ({"EGZOS_BLOBS_S3_ENDPOINT": "http://127.0.0.1:1/a@b"},
+     {**ROOT, "endpoint": "http://127.0.0.1:1/a@b"}),  # an @ in the path is no userinfo
+    ({"EGZOS_BLOBS_S3_PREFIX": "/"}, {**ROOT, "prefix": ""}),  # the bucket's root
+])
+def test_the_blob_root_named_is_its_endpoint_bucket_and_prefix(monkeypatch, changed, root):
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    _name_store(monkeypatch, changed)
+    assert binding.blob_root() == root
+
+
+def test_the_object_store_never_relies_on_a_create_only_write_and_holds_no_key(monkeypatch):
+    _name_store(monkeypatch)
+    store = binding.object_store(ROOT)  # no I/O: the endpoint refuses every connection
+    assert not store.create_only and store.promotes_by == "copy+delete"
+    shown = repr(vars(store)) + repr(store.op)
+    assert KEY_ID not in shown and SECRET not in shown
+
+
 # -- on a database ----------------------------------------------------------------------------
 class Place(NamedTuple):
     schema: str
@@ -203,7 +287,8 @@ def test_a_home_made_on_a_database_is_bound_and_its_newest_seen_advances(db, tmp
     c.init()
     entries = list(c.backend.audit_iter())
     assert entries[0]["event"] == "container.init"
-    assert _binding(tmp_path) == {"first": entries[0]["hash"], "seen": _seen(entries[-1])}
+    assert _binding(tmp_path) == {"first": entries[0]["hash"], "seen": _seen(entries[-1]),
+                                  "blobs": HOME_BLOBS}
     assert c.init().principal == "interactive"  # made once: init again answers, never remakes
     head = _fetch(db.open(tmp_path))  # another process on the home, never closed cleanly
     assert _binding(tmp_path)["seen"] == _seen(entries[-1])
@@ -211,7 +296,8 @@ def test_a_home_made_on_a_database_is_bound_and_its_newest_seen_advances(db, tmp
     assert _binding(tmp_path)["seen"] == _seen(head)
     head = _fetch(c)
     c.close()  # and so does a clean close
-    assert _binding(tmp_path) == {"first": entries[0]["hash"], "seen": _seen(head)}
+    assert _binding(tmp_path) == {"first": entries[0]["hash"], "seen": _seen(head),
+                                  "blobs": HOME_BLOBS}
     text = (tmp_path / BINDING_FILE).read_text()
     assert place.password not in text and place.schema not in text
 
@@ -298,3 +384,43 @@ def test_a_close_after_the_database_is_lost_keeps_the_newest_seen_it_recorded(db
     c.backend.db.close()  # the connection is lost
     c.close()
     assert _binding(tmp_path) == before
+
+
+def test_a_home_records_its_object_store_and_stops_when_another_root_is_named(
+    db, tmp_path, monkeypatch
+):
+    from egzos.store.objects import ObjectBlobStore
+
+    db.use(place := db.place())
+    _name_store(monkeypatch)
+    c = db.open(tmp_path)
+    assert isinstance(c.blobs, ObjectBlobStore) and not (tmp_path / "blobs").exists()
+    c.init()
+    c.close()
+    assert _binding(tmp_path)["blobs"] == ROOT  # made, and kept by the close
+    shown = (tmp_path / BINDING_FILE).read_text() + repr(vars(c.binding))
+    assert KEY_ID not in shown and SECRET not in shown
+    _name_store(monkeypatch, {  # new keys, another region, the root spelled another way
+        "EGZOS_BLOBS_S3_ACCESS_KEY_ID": "AKIA-rotated", "EGZOS_BLOBS_S3_SECRET_ACCESS_KEY": "new",
+        "EGZOS_BLOBS_S3_REGION": "region-2", "EGZOS_BLOBS_S3_PREFIX": "/prefix/not-real/"})
+    db.open(tmp_path)
+    for changed in ({"EGZOS_BLOBS_S3_PREFIX": "prefix/other"}, {"EGZOS_BLOBS_S3_BUCKET": "other"},
+                    {"EGZOS_BLOBS_S3_ENDPOINT": "http://127.0.0.1:2/s3"}, dict.fromkeys(BLOBS_S3)):
+        _name_store(monkeypatch, changed)
+        _stops("blobs-moved", tmp_path, KEY_ID, SECRET, place.password, place.url, names=S3_VARS)
+    assert _binding(tmp_path)["blobs"] == ROOT  # a stop never writes over the root recorded
+
+
+def test_a_home_made_on_its_own_blobs_or_before_the_root_was_recorded_stays_there(
+    db, tmp_path, monkeypatch
+):
+    db.use(place := db.place())
+    db.open(tmp_path).init()
+    assert _binding(tmp_path)["blobs"] == HOME_BLOBS
+    before = {k: v for k, v in _binding(tmp_path).items() if k != "blobs"}
+    (tmp_path / BINDING_FILE).write_text(json.dumps(before))  # as written before the root was
+    _name_store(monkeypatch)
+    _stops("blobs-moved", tmp_path, KEY_ID, SECRET, place.password, place.url, names=S3_VARS)
+    _name_store(monkeypatch, dict.fromkeys(BLOBS_S3))
+    db.open(tmp_path)  # none named: the home's blobs/, the only root there was
+    assert _binding(tmp_path) == {**before, "blobs": HOME_BLOBS}

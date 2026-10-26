@@ -6,9 +6,13 @@ to one per-test store, so two calls are two connections and a later call is a re
 `blobs` run over `BACKENDS` and `BLOB_STORES`, so a new substrate is one entry. postgres is one
 when `EGZOS_TEST_POSTGRES` names a database as a role that may create roles: each test gets a fresh
 schema, applied as that owner, and a role of its own holding only the container's grants, as which
-every backend connects. The probes are test-only and join no Protocol: `refuses` tries an update or
-a delete of an audit entry (events.md §4 item 1), and `staged` reads what no `BlobStore` reader may
-(storage.md §4)."""
+every backend connects. An object store is one when `EGZOS_TEST_S3` is set beside the six
+`EGZOS_BLOBS_S3_*` variables (storage.md §3.7), built as the binding builds it, each test under a
+prefix of its own, emptied after it. The six are taken out of the environment when this module is
+imported, at collection and so before any test runs, so that no test's container is named a store
+it did not ask for; a run that collects nothing under `tests/store/` keeps them. The probes are
+test-only and join no Protocol: `refuses` tries an update or a delete of an audit entry (events.md
+§4 item 1), and `staged` reads what no `BlobStore` reader may (storage.md §4)."""
 
 from __future__ import annotations
 
@@ -25,11 +29,17 @@ from typing import Any
 import pytest
 
 from egzos.backends.sqlite import SqliteBackend
+from egzos.binding import BLOBS_S3, object_store
 from egzos.store.blobs import BlobStore
 from egzos.store.objects import ObjectBlobStore, fs_operator
 
 #: An owner DSN. Set, the postgres case runs, and a missing psycopg fails the run (v0.7 §AF).
 POSTGRES = os.environ.get("EGZOS_TEST_POSTGRES")
+#: The object store the six name, kept here for the `opendal-s3` case and nowhere else.
+_NAMED = {name: os.environ.pop(name) for name in BLOBS_S3 if name in os.environ}
+S3 = _NAMED if os.environ.get("EGZOS_TEST_S3") else {}
+if os.environ.get("EGZOS_TEST_S3") and len(S3) < len(BLOBS_S3):
+    raise RuntimeError("EGZOS_TEST_S3 is set, and the six EGZOS_BLOBS_S3_* variables are not")
 
 
 @dataclass(frozen=True)
@@ -43,8 +53,9 @@ class BackendKind:
 
 @dataclass(frozen=True)
 class BlobStoreKind:
-    open: Callable[[Path], Any]
+    open: Callable[[Any], Any]  # the store kept at this per-test place
     staged: Callable[[Any, str], bytes | None]  # the bytes staged at this address, if any
+    place: Callable[[Path], contextlib.AbstractContextManager[Any]] = contextlib.nullcontext
 
 
 def _sqlite_refuses(backend: SqliteBackend, act: str, seq: int) -> bool:
@@ -86,6 +97,31 @@ BLOB_STORES: dict[str, BlobStoreKind] = {
                                 staged=_object_staged),
     "opendal-memory": BlobStoreKind(open=_objects_in_memory, staged=_object_staged),
 }
+
+if S3:
+    def _s3_open(root: dict[str, str]) -> ObjectBlobStore:
+        """The store the binding builds at `root`, its keys in the environment only meanwhile."""
+        with pytest.MonkeyPatch.context() as env:
+            for name, value in S3.items():
+                env.setenv(name, value)
+            return object_store(root)
+
+    @contextlib.contextmanager
+    def _s3_place(_: Path) -> Iterator[dict[str, str]]:
+        """A prefix of its own under the one named, emptied after the test, whatever it left."""
+        base = S3["EGZOS_BLOBS_S3_PREFIX"].strip("/")
+        root = {"endpoint": S3["EGZOS_BLOBS_S3_ENDPOINT"].rstrip("/"),
+                "bucket": S3["EGZOS_BLOBS_S3_BUCKET"],
+                "prefix": f"{base}/t-{secrets.token_hex(8)}".strip("/")}
+        try:
+            yield root
+        finally:
+            op = _s3_open(root).op
+            for entry in op.list("", recursive=True):
+                op.delete(entry.path)
+
+    BLOB_STORES["opendal-s3"] = BlobStoreKind(open=_s3_open, staged=_object_staged,
+                                              place=_s3_place)
 
 if POSTGRES:
     from psycopg import connect, errors
@@ -184,8 +220,22 @@ def blob_store_name(request: pytest.FixtureRequest) -> str:
 
 
 @pytest.fixture
-def blobs(blob_store_name: str, tmp_path: Path) -> Any:
-    return BLOB_STORES[blob_store_name].open(tmp_path)
+def blobs(blob_store_name: str, tmp_path: Path) -> Iterator[Any]:
+    kind = BLOB_STORES[blob_store_name]
+    with kind.place(tmp_path) as where:
+        yield kind.open(where)
+
+
+@pytest.fixture
+def s3_root(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[dict[str, str]]:
+    """A prefix of its own on the object store the run names, emptied after the test, with the
+    six variables set for the test, so that `object_store` builds stores on it."""
+    if not S3:
+        pytest.skip("no object store is named (EGZOS_TEST_S3)")
+    for name, value in S3.items():
+        monkeypatch.setenv(name, value)
+    with _s3_place(tmp_path) as root:
+        yield root
 
 
 @pytest.fixture
