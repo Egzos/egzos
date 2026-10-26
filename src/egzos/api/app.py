@@ -40,8 +40,10 @@ from typing import Any
 from fastapi import FastAPI, Request
 from starlette.responses import Response, StreamingResponse
 
+from egzos._types import StorageBusy
 from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
+from egzos.backends.base import holds_nul
 from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of
 from egzos.container import Container
 from egzos.identity import GrantToken, LastAdmin, TooManyAgents, display_name, provider_id
@@ -98,6 +100,11 @@ def invalid() -> Response:
     return _json(400, {"error": "invalid_request"})
 
 
+def busy() -> Response:
+    """§3: the store raised `StorageBusy`, so nothing was written; it names nothing requested."""
+    return _json(503, {"error": "busy"}, {"Retry-After": "1"})
+
+
 def ambiguous(paths: list[str]) -> Response:
     return _json(409, {"error": "ambiguous", "matches": sorted(paths)})
 
@@ -147,8 +154,8 @@ async def _object(request: Request, allowed: set[str], required: set[str]) -> di
         body = json.loads(raw)
     except ValueError as e:
         raise Invalid from e
-    if not isinstance(body, dict) or set(body) - allowed or required - set(body):
-        raise Invalid
+    if not isinstance(body, dict) or set(body) - allowed or required - set(body) or holds_nul(body):
+        raise Invalid  # U+0000 included, in a key or a value at any depth (§3)
     return body
 
 
@@ -293,6 +300,15 @@ def create_app(
             response.headers.update(cors)
             return response
 
+        try:
+            return await admit(request, call_next, out, cors)
+        except StorageBusy:  # §3: the write lock was not taken in time, the token check's included
+            return out(busy())
+        except Exception:  # noqa: BLE001 — never a stack, a path or an exception's text
+            return out(_json(500, {"error": "internal"}))
+
+    async def admit(request: Request, call_next, out, cors: dict[str, str]) -> Response:
+        """Past CORS: the preflight, the metadata, the throttle, the credential, then the route."""
         path = request.url.path
         if request.method == "OPTIONS":
             # identity.md §6: a preflight from an allowed origin gets 204 on every /v1/ path,
@@ -326,13 +342,11 @@ def create_app(
             # identity.md §7: a stateless /mcp opens no stream and has no session to end. The
             # transport's 405, the same for every verified caller; the 401 above came first.
             return out(_json(405, {"error": "method_not_allowed"}, {"Allow": "POST"}))
+        if holds_nul([request.scope["path"], *request.query_params.multi_items()]):
+            return out(invalid())  # §3: a malformed request, answered before any lookup
         request.state.token = token
         with acting_for(getattr(token, "acting_for", None)):
-            try:
-                response = await call_next(request)
-            except Exception:  # noqa: BLE001 — never a stack, a path or an exception's text
-                response = _json(500, {"error": "internal"})
-        return out(response)
+            return out(await call_next(request))
 
     @app.exception_handler(Invalid)
     async def on_invalid(request: Request, exc: Invalid):
