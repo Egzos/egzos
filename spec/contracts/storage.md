@@ -316,7 +316,9 @@ atomic()                                         -> context manager   # every wr
 - **One writer per container.** `atomic()` holds a write lock over the whole container from entry
   to exit, taken before the block's first read, so a read inside sees every earlier commit and a
   check that reads, then writes, still holds at its write. sqlite takes it with `BEGIN IMMEDIATE`;
-  postgres with `pg_advisory_xact_lock` on a key for this container, at READ COMMITTED. A writer
+  postgres with `pg_advisory_xact_lock` at READ COMMITTED, on a key derived from the database and
+  schema it is taken on, never from anything a home holds, so every connection to one substrate
+  takes one lock. A writer
   waits a bounded time for it, then raises; none waits forever. It raises `StorageBusy`, declared in
   `_types.py` beside `ChainConflict`, on every backend, never its driver's own error, so the door
   answers it alike (`rest.md` §3). **a1p** (#331).
@@ -386,8 +388,11 @@ and how a container names its own.
   throttle (§3.1). A home whose state is its own `egzos.db` is bound by being one directory. A home
   makes its container on a named database in one `atomic()` block (§3.6) that finds the chain empty
   and appends its first entry, then records that entry's hash, which is no secret, in a file beside
-  its keys. Every open compares the two before the door serves, and stops the container, naming the
-  variable and never its value, when:
+  its keys. Two homes making a container on one database take that one lock, since its key is the
+  database's, and a chain keeps one successor per entry (§3), so only one first entry is ever
+  appended. A crash between the block's commit and the file leaves a chain with no binding, which
+  stops as below: unavailable, never unsafe. Every open compares the two before the door serves,
+  and stops the container, naming the variable and never its value, when:
   - they differ, the database's chain being empty included: the home belongs to another database;
   - the home holds a binding and the variable is unset: it never falls back to its own `egzos.db`;
   - the named database cannot be reached: it never falls back to a local store;
