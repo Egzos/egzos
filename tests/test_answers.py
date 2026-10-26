@@ -19,6 +19,7 @@ from mcp import Client
 
 from egzos._types import StorageBusy
 from egzos.api.app import Door, create_app
+from egzos.auth import PREFIX
 from egzos.backends.sqlite import SqliteBackend
 from egzos.cli import main
 from egzos.container import OWNER, Container
@@ -135,3 +136,23 @@ def test_the_cli_answers_u0000_and_a_busy_store_with_the_doors_words(tmp_path, m
         assert main(["--json", "add", "note"]) == 1
     out = capsys.readouterr().out
     assert json.loads(out) == {"error": "busy"} and "locked" not in out
+
+
+def test_u0000_in_a_bearer_is_the_one_unauthenticated_answer(c):
+    """§2 item 5: a malformed bearer is the unauthenticated answer, counted as one, never a 500."""
+    agent, door = _agent(c), TestClient(create_app(c))
+    bad = PREFIX + "\0" + agent.secret[len(PREFIX) + 1:]  # the id's first character, U+0000
+    unknown = PREFIX + "0" * 26 + "_" + "x" * 32
+    r_bad = door.get("/v1/fetch", headers={"Authorization": f"Bearer {bad}"})
+    r_unknown = door.get("/v1/fetch", headers={"Authorization": f"Bearer {unknown}"})
+    assert (r_bad.status_code, r_bad.content) == (r_unknown.status_code, r_unknown.content)
+    assert r_bad.status_code == 401
+
+
+def test_a_deeply_nested_body_is_refused_by_its_shape_not_by_recursion(c):
+    agent, door = _agent(c), TestClient(create_app(c))
+    deep: list = []
+    for _ in range(900):
+        deep = [deep]
+    r = door.post("/v1/items", headers=_bearer(agent), json={"body": "b", "tags": deep})
+    assert r.status_code == 400

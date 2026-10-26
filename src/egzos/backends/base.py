@@ -26,11 +26,18 @@ from egzos.model import ContextItem, Node, Token
 def holds_nul(value: Any) -> bool:
     """Whether a string in `value`, a key or an item at any depth, holds U+0000: no store keeps
     one outside a document (storage.md §3.7), so every door refuses it first (rest.md §3)."""
-    if isinstance(value, str):
-        return "\0" in value
-    if isinstance(value, dict):
-        return any(holds_nul(k) or holds_nul(v) for k, v in value.items())
-    return isinstance(value, (list, tuple)) and any(holds_nul(v) for v in value)
+    stack = [value]  # walked, not recursed, so no depth of nesting raises
+    while stack:
+        v = stack.pop()
+        if isinstance(v, str):
+            if "\0" in v:
+                return True
+        elif isinstance(v, dict):
+            stack.extend(v.keys())
+            stack.extend(v.values())
+        elif isinstance(v, (list, tuple)):
+            stack.extend(v)
+    return False
 
 
 def refuse_nul(*values: Any) -> None:
