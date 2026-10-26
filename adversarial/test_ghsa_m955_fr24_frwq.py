@@ -8,11 +8,11 @@ a second connection, as a second process has."""
 from __future__ import annotations
 
 import contextlib
-import sqlite3
 import threading
 
 import pytest
 
+from egzos._types import StorageBusy
 from egzos.backends.sqlite import SqliteBackend
 from egzos.container import OWNER, Container
 from egzos.trust import TrustError
@@ -119,11 +119,11 @@ def test_ghsa_m955_fr24_frwq_a_block_after_a_failed_write_still_holds_the_lock(t
     for backend in (a, b):
         backend.db.execute("PRAGMA busy_timeout = 50")
     b.db.execute("BEGIN IMMEDIATE")  # another process holds the lock
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(StorageBusy):
         a.put_config("first", 1)
     b.db.rollback()
     with a.atomic():
-        with pytest.raises(sqlite3.OperationalError):
+        with pytest.raises(StorageBusy):
             b.put_config("second", 2)  # kept out for as long as the block runs
         a.put_config("third", 3)
     assert a.get_config() == {"third": 3}
