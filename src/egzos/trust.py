@@ -482,18 +482,17 @@ class TrustEngine:
             "reason": reason,
             "created_at": now_iso(),
         }
-        with self.backend.atomic():  # the proposal and its entry, together (GHSA-2478-6jv5-83ff)
-            self.backend.put_proposal(proposal)
-            self.ledger.append(
-                "gate.propose",
-                actor=actor,
-                principal=token.principal,
-                subject=proposal["id"],
-                scope=to.id,
-                items=[item.id],
-                audience_delta=[d["client"] for d in delta],
-                reason=reason,
-            )
+        self.backend.put_proposal(proposal)
+        self.ledger.append(
+            "gate.propose",
+            actor=actor,
+            principal=token.principal,
+            subject=proposal["id"],
+            scope=to.id,
+            items=[item.id],
+            audience_delta=[d["client"] for d in delta],
+            reason=reason,
+        )
         return {"moved": False, "gate": "pending", "proposal": proposal}
 
     def execute(self, proposal_id: str, *, token: Token, actor: str) -> dict[str, Any]:
