@@ -98,16 +98,17 @@ class NodeService:
         if type not in BASELINE_CREATE and not token.has("admin"):
             raise StructureError(f"creating a {type} needs admin at the parent scope")
         node = Node(id=ulid(), type=type, name=name, parent=parent.id)
-        self.backend.put_node(node)
-        self.ledger.append(
-            "node.create",
-            actor=actor,
-            principal=principal,
-            subject=node.id,
-            scope=parent.id,
-            type=type,
-            name=name,
-        )
+        with self.backend.atomic():  # the node and its entry, together (GHSA-2478-6jv5-83ff)
+            self.backend.put_node(node)
+            self.ledger.append(
+                "node.create",
+                actor=actor,
+                principal=principal,
+                subject=node.id,
+                scope=parent.id,
+                type=type,
+                name=name,
+            )
         return node
 
     def reparent(self, node: Node, new_parent: Node) -> None:

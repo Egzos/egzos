@@ -23,6 +23,30 @@ from egzos._types import ChainConflict as ChainConflict
 from egzos.model import ContextItem, Node, Token
 
 
+def holds_nul(value: Any) -> bool:
+    """Whether a string in `value`, a key or an item at any depth, holds U+0000: no store keeps
+    one outside a document (storage.md §3.7), so every door refuses it first (rest.md §3)."""
+    stack = [value]  # walked, not recursed, so no depth of nesting raises
+    while stack:
+        v = stack.pop()
+        if isinstance(v, str):
+            if "\0" in v:
+                return True
+        elif isinstance(v, dict):
+            stack.extend(v.keys())
+            stack.extend(v.values())
+        elif isinstance(v, (list, tuple)):
+            stack.extend(v)
+    return False
+
+
+def refuse_nul(*values: Any) -> None:
+    """storage.md §3.7: a value a backend stores or matches by, outside a document, is refused
+    before any write when it holds U+0000, on every backend alike."""
+    if holds_nul(values):
+        raise ValueError("U+0000 is kept only inside a document")
+
+
 class Backend(Protocol):
     # A human-only act's writes (moves, the proposal's status, the chain) land together or not at
     # all: a failure mid-act leaves nothing half-done for "Nothing changed" to misreport.

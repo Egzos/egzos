@@ -47,6 +47,7 @@ class BackendKind:
     cls: type
     open: Callable[[Any], Any]  # a new connection to the store kept at this per-test place
     refuses: Callable[[Any, str, int], bool]  # True if the store refuses that act on that entry
+    brief: tuple[str, Any]  # the write lock's bound, and a twentieth of a second for it
     place: Callable[[Path], contextlib.AbstractContextManager[Any]] = contextlib.nullcontext
 
 
@@ -87,6 +88,7 @@ def _object_staged(store: ObjectBlobStore, sha: str) -> bytes | None:
 
 BACKENDS: dict[str, BackendKind] = {
     "sqlite": BackendKind(cls=SqliteBackend, refuses=_sqlite_refuses,
+                          brief=("egzos.backends.sqlite.LOCK_TIMEOUT", 0.05),
                           open=lambda where: SqliteBackend(where / "container.db")),
 }
 BLOB_STORES: dict[str, BlobStoreKind] = {
@@ -170,7 +172,8 @@ if POSTGRES:
         return False
 
     BACKENDS["postgres"] = BackendKind(cls=PostgresBackend, open=_postgres_open,
-                                       refuses=_postgres_refuses, place=_postgres_place)
+                                       refuses=_postgres_refuses, place=_postgres_place,
+                                       brief=("egzos.backends.postgres.LOCK_TIMEOUT", "50ms"))
 
 
 @pytest.fixture(params=sorted(BACKENDS))
@@ -198,6 +201,12 @@ def make_backend(backend_name: str, where: Any) -> Callable[[], Any]:
 @pytest.fixture
 def backend(make_backend: Callable[[], Any]) -> Any:
     return make_backend()
+
+
+@pytest.fixture
+def brief_lock(backend_name: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A backend opened after this waits a twentieth of a second for the write lock, not ten."""
+    monkeypatch.setattr(*BACKENDS[backend_name].brief)
 
 
 @pytest.fixture

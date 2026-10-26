@@ -23,7 +23,8 @@ from typing import Any
 import typer
 
 from egzos._term import safe
-from egzos._types import CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY
+from egzos._types import CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY, StorageBusy
+from egzos.backends.base import holds_nul
 from egzos.container import OWNER, Container, HomeBindingError
 from egzos.identity import ConfigError, LastAdmin
 from egzos.model import Node
@@ -1027,9 +1028,21 @@ def _json_requested(args: list[str]) -> bool:
     return "--json" in (args[: args.index("--")] if "--" in args else args)
 
 
+def _answer(args: list[str], word: str, code: int) -> int:
+    """rest.md §3 in the CLI's channel: the door's word, as JSON to a `--json` caller, and a
+    non-zero exit status, never a driver's message."""
+    if _json_requested(args):
+        typer.echo(json.dumps({"error": word}, indent=2))
+    else:
+        typer.echo(f"Error: {word}", err=True)
+    return code
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns an exit code (tests call main([]))."""
     args = sys.argv[1:] if argv is None else argv
+    if holds_nul(args):  # a real argv cannot carry U+0000; a caller in process can (rest.md §3)
+        return _answer(args, "invalid_request", 2)
     try:
         rv = app(args=args or ["--help"], standalone_mode=False)
         return int(rv) if isinstance(rv, int) else 0
@@ -1053,3 +1066,5 @@ def main(argv: list[str] | None = None) -> int:
     except PermissionError as e:
         typer.echo(safe(str(e)), err=True)
         return 2
+    except StorageBusy:  # the write lock was not taken in time, so nothing was written
+        return _answer(args, "busy", 1)

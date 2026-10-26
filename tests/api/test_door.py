@@ -58,8 +58,8 @@ def _events(c, name):
     "headers",
     [{}, {"Authorization": "Basic x"}, {"Authorization": "Bearer "},
      {"Authorization": "Bearer egz_nope"}, {"Authorization": "Bearer a.b.c"},
-     {"Cookie": "session=x"}],
-    ids=["none", "basic", "empty", "unknown", "jwt-shaped", "cookie-only"],
+     {"Cookie": "session=x"}, {"Authorization": "Bearer egz_\0" + "0" * 25 + "_" + "x" * 32}],
+    ids=["none", "basic", "empty", "unknown", "jwt-shaped", "cookie-only", "nul-in-id"],
 )
 def test_every_unauthenticated_case_is_one_answer(door, headers):
     r = door.get("/v1/fetch", headers=headers)
