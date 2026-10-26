@@ -115,7 +115,7 @@ class SqliteBackend:
             try:
                 self.db.execute("BEGIN IMMEDIATE")
             except sqlite3.OperationalError as e:
-                if e.sqlite_errorcode != sqlite3.SQLITE_BUSY:
+                if e.sqlite_errorcode & 0xFF != sqlite3.SQLITE_BUSY:  # and its extended codes
                     raise
                 raise StorageBusy("the container's write lock was not taken in time") from e
         self._depth += 1
