@@ -218,6 +218,8 @@ container (unparseable JSON, a missing required field, a `kind` outside `context
 headers. **a1p**, by `authorization-server.md` §7.1's split between `invalid_scope` and
 `access_denied`. Validation of the request's shape runs **before any lookup**, so a `400` never
 depends on an id the request names.
+A string anywhere in the request that holds U+0000 is one such fact: no store keeps it outside a
+document (`storage.md` §3.7). **a1p** (#331).
 
 **An ambiguous path tail gets the third answer.** A scope parameter or body field accepts a node id
 or a path tail, as `resolve_ref` does (`container.md` §2). A tail that matches more than one node the
@@ -232,6 +234,15 @@ uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as 
 `GET /v1/scopes` would list, and it needs `fetch`. Any other gets §3's refusal and §4's probe
 instead, as for an absent tail, on every route that takes a reference, `POST /v1/items` included,
 and in the MCP tools alike (`egzos_fetch`, `egzos_remember`).
+
+**A store that cannot take the container's write lock in time answers `503`**, with
+`{"error":"busy"}`, `Retry-After: 1` and the same four headers: the store raised `StorageBusy`
+(`storage.md` §3.6), and nothing was written. It depends on the container's load and on no fact the
+request names, so it tells a caller nothing §3's refusal hides. **a1p** (#331).
+
+**Any other failure answers `500` with `{"error":"internal"}`** and the same four headers, never a
+stack, a path, a driver's message or an exception's text. **running** (the door's catch-all);
+**a1p**, binding it (#331).
 
 ## 4 · The v1.0 endpoints
 

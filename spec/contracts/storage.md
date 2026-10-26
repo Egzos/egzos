@@ -317,7 +317,9 @@ atomic()                                         -> context manager   # every wr
   to exit, taken before the block's first read, so a read inside sees every earlier commit and a
   check that reads, then writes, still holds at its write. sqlite takes it with `BEGIN IMMEDIATE`;
   postgres with `pg_advisory_xact_lock` on a key for this container, at READ COMMITTED. A writer
-  waits a bounded time for it, then raises; none waits forever.
+  waits a bounded time for it, then raises; none waits forever. It raises `StorageBusy`, declared in
+  `_types.py` beside `ChainConflict`, on every backend, never its driver's own error, so the door
+  answers it alike (`rest.md` §3). **a1p** (#331).
 - **Nested calls join.** A block opened inside another is part of it, not a savepoint: the act
   commits once, when the outermost block exits, and an exception leaving the outermost block rolls
   back every write to this substrate in it.
@@ -376,10 +378,28 @@ and how a container names its own.
   opens it, never by a config key (`container.md` §8) or a row: a database's connection string and
   an object store's keys are secrets, the host's. egzos never prints, logs or writes them, to a
   file, an agent's launch configuration or the chain, and an error names the variable, never its
-  value. Their names enter here with the code that reads them. **a1p.** `TODO(a1p)`, #283, before
-  that code: how a home stays bound to the substrate it was made on, so that none opens another's
-  database or falls back to a fresh local store, and a missing volume never makes fresh keys that
-  lift a throttle (§3.1).
+  value. **a1p.** The database is named by **`EGZOS_DATABASE_URL`**, a postgres connection string;
+  unset, the container's state stays in its home's `egzos.db`, as before. The object store's
+  variables enter here with the code that reads them. **a1p** (v0.7 §AF).
+- **A home stays bound to the database it was made on**, so that none opens another's database or
+  falls back to a fresh local store, and a missing volume never makes fresh keys that lift a
+  throttle (§3.1). A home whose state is its own `egzos.db` is bound by being one directory. A home
+  opened on a named database records, when the container is made there, the hash of the chain's
+  first entry, which is no secret, in a file beside its keys. Every open compares it with the
+  database's first entry before the door serves, and stops the container, naming the variable and
+  never its value, when:
+  - they differ, the database's chain being empty included: the home belongs to another database;
+  - the named database cannot be reached: the container never falls back to a local store;
+  - the database holds a chain and the home holds no binding, a new or lost volume: its keys would
+    be fresh. The operator restores the home, or rebinds it on the host, an act whose shape enters
+    with its code (`TODO(a1p)`, #283, with the hosted home's provisioning).
+
+  **a1p** (v0.7 §AF).
+- **U+0000 is kept only inside a document.** A document is JSON text, where U+0000 is always
+  written escaped. Every other value a backend stores or matches by, an id, a key, a scope, a kind
+  or a name, is refused with `ValueError` before any write when it holds U+0000, on every backend:
+  postgres `text` cannot hold it, and sqlite refuses it too, so both answer alike. The door refuses
+  it first, as a malformed request (`rest.md` §3). **a1p** (#331).
 
 ## 4 · `BlobStore` — content-addressed, staged
 
