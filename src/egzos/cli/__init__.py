@@ -25,7 +25,7 @@ import typer
 from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY, StorageBusy
 from egzos.backends.base import holds_nul
-from egzos.container import OWNER, Container
+from egzos.container import OWNER, Container, HomeBindingError
 from egzos.identity import ConfigError, LastAdmin
 from egzos.model import Node
 from egzos.store.items import StoreError
@@ -67,7 +67,16 @@ def _fail(msg: str, code: int = 1) -> None:
 
 
 def _container() -> Container:
-    return Container()
+    """The container this command runs on, closed when the command ends, as a door's command ends
+    once its server shuts down: a bound home then records the newest entry it has seen
+    (storage.md §3.7)."""
+    try:
+        c = Container()
+    except HomeBindingError as e:  # its message names the case and the variable, never its value
+        _fail(str(e), 2)
+    if (ctx := _state.get("ctx")) is not None:
+        ctx.call_on_close(c.close)
+    return c
 
 
 def _scope_file() -> Path:
@@ -144,9 +153,11 @@ def _p(c: Container, node_id: str) -> str:
 
 @app.callback()
 def _root(
+    ctx: typer.Context,
     json_: bool = typer.Option(False, "--json", help="Machine-readable output on every command."),
 ):
     _state["json"] = json_
+    _state["ctx"] = ctx  # what `_container` opens is closed when this invocation ends
 
 
 # -- init / whoami ------------------------------------------------------------------------

@@ -99,6 +99,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   grant alone, once, within five minutes, as a download that never renders. The grant is signed
   with a key the container makes in its home (`grant.key`) and never exports. Every grant and
   every download is on the chain, and a refused download is recorded or tallied.
+- **A container can keep its state in Postgres** by setting `EGZOS_DATABASE_URL`
+  (`pip install "egzos[postgres]"`), and its home stays bound to that database
+  (`storage.md` §3.7): another database, an unset variable, an unreachable or restored database, or
+  a new home on a database that already holds a chain stops the container before it serves.
 
 ### Fixed
 
