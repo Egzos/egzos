@@ -527,7 +527,12 @@ R11): past `blobs.staging_retention_days` (30 by default, `container.md` §8) th
 their owner, who promotes the item or tombstones it, and only a tombstone — or the discard of an
 orphaned upload — deletes staged bytes (`rest.md` §4.4), through `discard`, which never touches
 `sha256/`. Staging is content-addressed, so two uploads of the same bytes share one staged copy:
-the caller deletes it only when no other live upload or staged item holds that address. An owner
+the caller deletes it only when no other live upload or staged item holds that address. **The
+open-time sweep (§3.6) is no purge**: it finishes the deletes committed acts already decided, a
+`promote`'s staged copy or a `discard`'s bytes that a crash left between COMMIT and delete. It
+lists `staging/` through the store's own internal listing, which is no `BlobStore` method and no
+reader's (§5), and deletes, under the lock, only addresses that no live upload or staged item
+holds. **a1p** (#341); not running (#342). An owner
 purge act for promoted bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
 
 ## 5 · Silence-not-errors at the storage boundary
