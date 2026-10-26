@@ -92,14 +92,22 @@ class HomeBindingError(RuntimeError):
 
 
 def _endpoint_fault(endpoint: str) -> str | None:
-    """The stop an endpoint calls for, or None: userinfo in its authority, read by urllib's parser
-    with a scheme or without (OpenDAL then adds one), or an endpoint that parser refuses. Never
-    raises, so the endpoint is in no frame a stop passes through (a6 on #345)."""
+    """The stop an endpoint calls for, or None. It fails closed: userinfo is found if either
+    reading of the authority holds an `@`, urllib's (a6 on #345) or the text after the first
+    `://` up to `/?#`, which also catches a scheme urllib does not recognise (a1r on #346); and an
+    endpoint urllib refuses, or reads with no host, stops as no endpoint. Never raises, so the
+    endpoint is in no frame a stop passes through."""
     try:
-        authority = urlsplit(endpoint if "://" in endpoint else "//" + endpoint).netloc
+        parsed = urlsplit(endpoint if "://" in endpoint else "//" + endpoint)
+        host = parsed.hostname
     except ValueError:
         return "blobs-endpoint"
-    return "blobs-userinfo" if "@" in authority else None
+    authority = endpoint.split("://", 1)[-1]
+    for end in "/?#":
+        authority = authority.split(end, 1)[0]
+    if "@" in parsed.netloc or "@" in authority:
+        return "blobs-userinfo"
+    return None if host else "blobs-endpoint"
 
 
 def blob_root() -> str | dict[str, str]:

@@ -193,12 +193,27 @@ def test_an_endpoint_holding_userinfo_stops_and_is_never_shown(tmp_path, monkeyp
            names=("EGZOS_BLOBS_S3_ENDPOINT", "EGZOS_BLOBS_S3_ACCESS_KEY_ID"))
 
 
-def test_an_endpoint_no_url_parser_reads_stops_and_is_never_shown(tmp_path, monkeypatch):
+@pytest.mark.parametrize("endpoint", [
+    f"http://[::1{SECRET}",  # an unclosed IPv6 literal: urlsplit refuses it
+    "1http://127.0.0.1:1",  # a scheme urllib does not recognise: it reads no host
+    "http://",  # no host at all
+])
+def test_an_endpoint_with_no_host_to_read_stops_and_is_never_shown(tmp_path, monkeypatch,
+                                                                    endpoint):
     monkeypatch.setenv(DATABASE_URL, REFUSED)
-    endpoint = f"http://[::1{SECRET}"  # an unclosed IPv6 literal: urlsplit refuses it
     _name_store(monkeypatch, {"EGZOS_BLOBS_S3_ENDPOINT": endpoint})
     _stops("blobs-endpoint", tmp_path, KEY_ID, SECRET, endpoint, PASSWORD, REFUSED,
            names=("EGZOS_BLOBS_S3_ENDPOINT",))
+
+
+def test_userinfo_behind_a_scheme_urllib_does_not_recognise_still_stops(tmp_path, monkeypatch):
+    """a1r on #346: urllib reads such an endpoint's authority as empty, without raising; the text
+    after its `://` still holds the userinfo, so the stop holds."""
+    monkeypatch.setenv(DATABASE_URL, REFUSED)
+    endpoint = f"1http://{KEY_ID}:{SECRET}@127.0.0.1:1"
+    _name_store(monkeypatch, {"EGZOS_BLOBS_S3_ENDPOINT": endpoint})
+    _stops("blobs-userinfo", tmp_path, KEY_ID, SECRET, endpoint, PASSWORD, REFUSED,
+           names=("EGZOS_BLOBS_S3_ENDPOINT", "EGZOS_BLOBS_S3_ACCESS_KEY_ID"))
 
 
 def test_an_object_store_opendal_refuses_to_build_stops_with_nothing_of_its_text(
