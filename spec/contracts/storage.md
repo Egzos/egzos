@@ -341,14 +341,20 @@ atomic()                                         -> context manager   # every wr
 
 **A block's `BlobStore` calls run inside it, and its deletes after its COMMIT.** `put`, `stage` and
 `promote`'s copy run inside the block. The staged copy a `promote` leaves behind, and the bytes a
-`discard` removes, are deleted only once the outermost block has committed. A blob write is not a
+`discard` removes, are deleted only once the outermost block has committed, each in a short block
+of its own that first re-checks that no live upload or staged item still holds the address, so a
+stage of the same bytes committed in between keeps them. A blob write is not a
 write to this substrate and no rollback undoes it, so a COMMIT that fails leaves every staged copy
 in place: a retried `promote` copies again, returns `True` and its act appends `blob.put`, as §4
 says of a crash between copy and delete, so every byte that reaches the promoted store behind a
 verified item has a committed `blob.put`; and a `discard` whose block did not commit discarded
-nothing. Bytes a failed COMMIT leaves at a promoted address with nothing referring to them are never
-served (§4, `rest.md` §6). **a1p** (v0.7 §AF); not running: both stores delete inside the block
-today. A transfer holds the lock for as long as it takes, and a slow one reaches every other writer
+nothing. An approval whose `promote` returns `False` goes on only where the promoted address
+already holds the bytes, which had their `blob.put` when they arrived; otherwise it is refused as
+nothing staged and changes nothing, so no item is ever verified without its bytes. Bytes a failed
+COMMIT leaves at a promoted address with nothing referring to them are never served (§4, `rest.md`
+§6). Staged bytes no live record holds, which a crash between a COMMIT and its delete leaves, are
+deleted by the next open, under the lock, after the same re-check. **a1p** (v0.7 §AF); not
+running: both stores delete inside the block today (#342). A transfer holds the lock for as long as it takes, and a slow one reaches every other writer
 as `StorageBusy`. **a1p**, reading v0.7 §AF's "one person's container bears" synchronous database
 calls as covering transfers too. `TODO(a1p)`, #283, before a container serves more than one
 person: moving transfers out of the lock.
