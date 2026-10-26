@@ -1,11 +1,12 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """The suite under `tests/store/` reaches its substrates only through `conftest.py`, the harness,
-so a second backend runs every module unchanged: none imports `sqlite3`, a concrete store or
-`Container`, names a `.db` file, or touches a backend's `db` or `path` or a blob store's `root`.
-Every module is in by default but two older ones, which build a `Store` and a `Container` over
-sqlite above this seam, the postgres-only one, which reaches past the harness on purpose, and this
-one, which names what it forbids and holds the harness to its own promise."""
+so a second backend runs every module unchanged: none imports `sqlite3`, OpenDAL, a concrete store
+or `Container`, names a `.db` file, or touches a backend's `db` or `path` or a blob store's `root`
+or `op`. Every module is in by default but two older ones, which build a `Store` and a `Container`
+over sqlite above this seam, the postgres-only and object-store-only ones, which reach past the
+harness on purpose, and this one, which names what it forbids and holds the harness to its own
+promise."""
 
 from __future__ import annotations
 
@@ -17,9 +18,10 @@ import pytest
 
 HERE = Path(__file__).parent
 OUTSIDE = frozenset({"test_items.py", "test_uploads.py", "test_postgres_only.py",
-                     Path(__file__).name})
+                     "test_objects_only.py", Path(__file__).name})
 FORBIDDEN = ("sqlite3", "egzos.backends.sqlite", "egzos.backends.SqliteBackend",
-             "egzos.store.blobs", "egzos.container", "psycopg", "egzos.backends.postgres")
+             "egzos.store.blobs", "egzos.store.objects", "opendal", "egzos.container", "psycopg",
+             "egzos.backends.postgres")
 
 
 def _suite() -> list[Path]:
@@ -41,7 +43,8 @@ def _findings(source: str) -> list[str]:
                                                     for f in FORBIDDEN)]
         if isinstance(node, ast.Constant) and str(node.value).endswith(".db"):
             found.append(node.value)
-        if isinstance(node, ast.Attribute) and node.attr in ("db", "path", "root", "SqliteBackend"):
+        if isinstance(node, ast.Attribute) and node.attr in ("db", "path", "root", "op",
+                                                             "SqliteBackend"):
             found.append(f".{node.attr}")
     return found
 
@@ -61,6 +64,8 @@ def test_no_suite_module_reaches_a_substrate_directly():
     "from egzos.store.blobs import BlobStore", "from egzos.container import Container",
     "path = tmp_path / 'container.db'", "backend.db.execute('SELECT 1')", "backend.path",
     "blobs.root / 'staging'", "import psycopg", "from egzos.backends import postgres",
+    "import opendal", "from egzos.store.objects import ObjectBlobStore",
+    "blobs.op.read('staging/' + sha)",
 ])
 def test_the_guard_sees_each_way_past_the_fixtures(source):
     assert _findings(source) != []
