@@ -7,10 +7,11 @@ refusals (storage.md §4) over a synchronous `opendal.Operator`, whose root is t
 importing this module does not.
 
 What each method relies on is read from `capability()`, never assumed:
-- `promote` renames where the service can, else copies and then deletes the staged copy (an
-  S3-style store: one server-side copy, whole or not at all), else reads, writes and deletes
-  (memory, a test fake, has neither). A crash before the delete leaves a staged copy that a
-  retried `promote` or a `discard` removes (§4).
+- `promote` copies where the service can (an S3-style store: one server-side copy, whole or not
+  at all), else reads and writes (memory, a test fake, cannot), and never renames, so a block that
+  rolls back keeps the staged copy. Its delete, as `discard`'s, waits for the act's COMMIT
+  (`defer`, §3.6); a crash before it leaves a staged copy a retried `promote` or the next open's
+  sweep removes (§4).
 - A blob is written as whole bytes in one `write`, never through `open(..., "wb")`, whose exit
   commits what was written so far. On a directory, an `fs_operator` writes to a temporary name on
   the root's own filesystem and renames it into place, so no blob is ever seen part-written.
@@ -26,6 +27,7 @@ Like the directory store it issues nothing: a URL is `grant_url`'s rendering of 
 from __future__ import annotations
 
 import contextlib
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -68,8 +70,8 @@ class ObjectBlobStore:
         self._taken = opendal.exceptions.ConditionNotMatch
         can = op.capability()
         self.create_only = bool(can.write_with_if_not_exists)
-        self.promotes_by = ("rename" if can.rename else "copy+delete" if can.copy
-                            else "read+write+delete")
+        self.promotes_by = "copy+delete" if can.copy else "read+write+delete"
+        self.defer: Callable[[str], object] = self._unstage  # as the directory store's
 
     def put(self, data: bytes) -> str:
         sha = self.digest(data)
@@ -99,12 +101,9 @@ class ObjectBlobStore:
             self.op.write(dst, data)
         elif not self.op.exists(src):
             return False
-        elif self.promotes_by == "rename":
-            self.op.rename(src, dst)
-            return True
         else:
             self.op.copy(src, dst)
-        self.op.delete(src)  # a crash before this leaves a staged copy: promote again or discard
+        self.defer(sha)  # after the COMMIT, a re-check, then the delete
         return True
 
     def get(self, sha: str) -> bytes | None:
@@ -120,10 +119,25 @@ class ObjectBlobStore:
         return _is_digest(sha) and self.op.exists(f"sha256/{sha}")
 
     def discard(self, sha: str) -> bool:
-        """Delete STAGED bytes, never promoted ones ([0.3 · 44]); True if there were any."""
+        """Delete STAGED bytes, never promoted ones ([0.3 · 44]); True if there were any. The
+        delete waits for the act's COMMIT (`defer`)."""
+        _check(sha)
+        if not self.op.exists(f"staging/{sha}"):
+            return False
+        self.defer(sha)
+        return True
+
+    def _unstage(self, sha: str) -> bool:
+        """Delete the bytes staged at `sha` now, True if there were any: what `defer` runs."""
         _check(sha)
         key = f"staging/{sha}"
         if not self.op.exists(key):
             return False
         self.op.delete(key)
         return True
+
+    def _staged_names(self) -> list[str]:
+        """Every address staged here, for the open-time sweep alone (storage.md §4): the store's
+        own listing, no `BlobStore` method and no reader's."""
+        names = (entry.path.rpartition("/")[2] for entry in self.op.list("staging/"))
+        return sorted(name for name in names if _is_digest(name))

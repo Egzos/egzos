@@ -89,6 +89,9 @@ class TrustEngine:
         # Moves a staged artifact's bytes into the promoted store on promotion, True if any moved
         # (storage.md §4); the container wires in its blob store's `promote`.
         self.promote_blob: Callable[[str], bool] = lambda sha: False
+        # Whether the promoted store holds an address already: an approval whose promote moved
+        # nothing goes on only then (§3.6). The container wires in its blob store's `exists`.
+        self.blob_exists: Callable[[str], bool] = lambda sha: False
         # rest.md §6, wired by the container: the grant key, read at every use so a new one
         # reaches every process; the principal a grant names, as it stands now; and the serving
         # predicate a fetch applies (`find.shown`). Unwired, nothing is signed and nothing served.
@@ -267,9 +270,14 @@ class TrustEngine:
                 audience=[a["client"] for a in audience],
             )
             # An agent's artifact waited staged for this (rest.md §4.4): its bytes move now, and
-            # only a promotion that moved bytes says so (storage.md §4, [0.3 · 43]).
+            # only a promotion that moved bytes says so (storage.md §4, [0.3 · 43]). One that moved
+            # none goes on only where the promoted store holds them, which had their `blob.put`
+            # when they arrived; else nothing was staged, and the raise undoes the act (§3.6).
             sha = item.content.get("sha256") if item.kind == "artifact" else None
-            if isinstance(sha, str) and self.promote_blob(sha):
+            if isinstance(sha, str) and not self.promote_blob(sha):
+                if not self.blob_exists(sha):
+                    raise TrustError("nothing staged: the artifact's bytes are not stored")
+            elif isinstance(sha, str):
                 self.ledger.append(
                     "blob.put",
                     actor=actor,

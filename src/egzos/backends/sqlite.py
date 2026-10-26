@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -101,6 +101,7 @@ class SqliteBackend:
         self.db.execute("PRAGMA foreign_keys=ON")
         self.db.executescript(_SCHEMA)
         self._depth = 0  # > 0 inside atomic(): writes wait for its one commit
+        self._after: list[Callable[[], object]] = []  # what waits for that commit
 
     @contextmanager
     def atomic(self):
@@ -124,11 +125,24 @@ class SqliteBackend:
         except BaseException:
             self._depth -= 1
             if self._depth == 0:
+                self._after.clear()  # dropped with the writes it waited for
                 self.db.rollback()
             raise
         self._depth -= 1
         if self._depth == 0:
+            queued, self._after = self._after, []  # a COMMIT that raises drops them
             self.db.commit()
+            for fn in queued:
+                fn()
+
+    def after_commit(self, fn: Callable[[], object]) -> None:
+        """Run `fn` once the outermost block commits, after the COMMIT and with no block open, in
+        the order queued; never if that block rolls back or its COMMIT fails. A nested block joins
+        the outer one, and outside any block `fn` runs at once (storage.md §3.6)."""
+        if self._depth:
+            self._after.append(fn)
+        else:
+            fn()
 
     def _write(self, sql: str, args: Sequence[Any] = ()) -> sqlite3.Cursor:
         """One write under the lock: inside a block it joins it, outside it commits alone."""

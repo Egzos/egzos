@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any
 
@@ -143,6 +143,7 @@ class PostgresBackend:
         self._begin = (f"BEGIN ISOLATION LEVEL READ COMMITTED; SET LOCAL lock_timeout = "
                        f"'{LOCK_TIMEOUT}'; SELECT pg_advisory_xact_lock({key})")
         self._depth = 0  # > 0 inside atomic(): writes wait for its one commit
+        self._after: list[Callable[[], object]] = []  # what waits for that commit
 
     @contextmanager
     def atomic(self) -> Iterator[None]:
@@ -172,6 +173,17 @@ class PostgresBackend:
             self.db.commit()
         finally:
             self._depth = 0
+            queued, self._after = self._after, []  # kept only past a COMMIT that went through
+        for fn in queued:
+            fn()
+
+    def after_commit(self, fn: Callable[[], object]) -> None:
+        """As sqlite's: `fn` runs once the outermost block commits, with no block open, in the
+        order queued; never if it rolls back or its COMMIT fails; at once outside any block."""
+        if self._depth:
+            self._after.append(fn)
+        else:
+            fn()
 
     def _write(self, query: str, args: Sequence[Any] = ()) -> psycopg.Cursor[Any]:
         """One write under the lock: inside a block it joins it, outside it commits alone."""

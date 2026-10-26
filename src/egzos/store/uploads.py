@@ -17,6 +17,7 @@ deletes the staged bytes no other upload or staged item, a copy included, still 
 from __future__ import annotations
 
 import calendar
+import logging
 import re
 import time
 from collections.abc import Callable
@@ -42,6 +43,7 @@ MIME_MAX = 127
 _MIME = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _ISO = "%Y-%m-%dT%H:%M:%SZ"
+log = logging.getLogger(__name__)
 
 
 class Promoted(Exception):
@@ -243,8 +245,8 @@ class Uploads:
                                subject=upload_id, scope=record["scope"], size=record["size"],
                                sha256=record["sha256"], opener=record["actor"],
                                bytes_deleted=delete)
-            if delete:
-                self.blobs.discard(record["sha256"])  # last: a failure before it keeps the bytes
+            if delete:  # the delete waits for this block's COMMIT, then re-checks (`release`)
+                self.blobs.discard(record["sha256"])
         return True
 
     def _shared(self, sha: str, *, upload: str | None = None, item: str | None = None) -> bool:
@@ -254,6 +256,33 @@ class Uploads:
         return any(r["id"] != upload and r["sha256"] == sha and r["staged"] and not r["discarded"]
                    and r["item"] is None for r in self.backend.list_uploads()
                    ) or bool(self._staged_at(sha) - {item})
+
+    # -- the staged deletes that wait for a COMMIT (storage.md §3.6, §4) ---------------------------
+    def release(self, sha: str) -> None:
+        """A staged delete a committed act queued, in a short block of its own: the bytes at `sha`
+        go only if no live upload or staged item holds them now (`_shared`), so a stage of the
+        same bytes committed since keeps them. One that fails leaves them to the next open's sweep,
+        and never reaches the caller whose act has committed."""
+        try:
+            with self.backend.atomic():
+                if not self._shared(sha):
+                    self.blobs._unstage(sha)
+        except Exception as e:
+            log.warning("a staged delete did not run (%s); the next open's sweep deletes it",
+                        type(e).__name__)
+
+    def sweep(self) -> int:
+        """The open-time sweep (§3.6, §4): under the lock, every address the store's own listing
+        has in staging that no live upload or staged item holds is deleted, and how many is
+        returned. The rule is broader than its reason, a crash between a COMMIT and its delete: it
+        also takes bytes staged by an act whose block rolled back, which nothing recorded either,
+        so deleting them completes that rollback. No purge, since nothing is timed, and nothing is
+        appended: each such delete finishes an act the chain already holds, or one it never did."""
+        with self.backend.atomic():
+            gone = [sha for sha in self.blobs._staged_names() if not self._shared(sha)]
+            for sha in gone:
+                self.blobs._unstage(sha)
+        return len(gone)
 
     def _staged_at(self, sha: str) -> set[str]:
         """The live items whose bytes are staged at `sha`: an artifact written from an upload that
@@ -296,10 +325,12 @@ class Uploads:
         """Tombstone the item as it stands under the lock, with its `item.tombstone`, in one step;
         None, and nothing written, where `token` may not. An artifact whose bytes are still staged
         releases them, deleted unless another upload or staged item holds them (`_shared`), and
-        `staged_deleted` records only bytes deleted in fact: another item's promotion may have
-        moved them already. Promoted bytes are never deleted ([0.3 · 44]). Its upload then frees
-        its slot (`holds`). The confirm a promoted item needs is the caller's; with
-        `unpromoted_only`, a promoted item raises `Promoted` under the lock and nothing is written.
+        `staged_deleted` records only bytes there were to delete: another item's promotion may
+        have moved them already. The delete waits for the COMMIT, and a stage of the same bytes
+        committed before it keeps them (`release`). Promoted bytes are never deleted ([0.3 · 44]).
+        Its upload then frees its slot (`holds`). The confirm a promoted item needs is the
+        caller's; with `unpromoted_only`, a promoted item raises `Promoted` under the lock and
+        nothing is written.
         """
         with self.backend.atomic():
             item = self.backend.get(item_id)  # a tombstoned item reads as absent
@@ -312,8 +343,8 @@ class Uploads:
                     and not self._shared(sha, item=item.id)):
                 sha = None
             self.backend.tombstone(item.id)
-            # Before the entry, inside the lock, so the entry claims only a deletion that happened;
-            # a failure from here on rolls the tombstone back with it.
+            # Before the entry, inside the lock, so the entry claims only bytes there were; their
+            # delete waits for the COMMIT, and a failure from here on rolls the tombstone back.
             released = sha is not None and self.blobs.discard(sha)
             details: dict[str, Any] = {"kind": item.kind, "status": item.status}
             if released:
