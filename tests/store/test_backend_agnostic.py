@@ -4,20 +4,22 @@
 so a second backend runs every module unchanged: none imports `sqlite3`, a concrete store or
 `Container`, names a `.db` file, or touches a backend's `db` or `path` or a blob store's `root`.
 Every module is in by default but two older ones, which build a `Store` and a `Container` over
-sqlite above this seam, and this one, which names what it forbids and holds the harness to its
-own promise."""
+sqlite above this seam, the postgres-only one, which reaches past the harness on purpose, and this
+one, which names what it forbids and holds the harness to its own promise."""
 
 from __future__ import annotations
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
 
 HERE = Path(__file__).parent
-OUTSIDE = frozenset({"test_items.py", "test_uploads.py", Path(__file__).name})
+OUTSIDE = frozenset({"test_items.py", "test_uploads.py", "test_postgres_only.py",
+                     Path(__file__).name})
 FORBIDDEN = ("sqlite3", "egzos.backends.sqlite", "egzos.backends.SqliteBackend",
-             "egzos.store.blobs", "egzos.container")
+             "egzos.store.blobs", "egzos.container", "psycopg", "egzos.backends.postgres")
 
 
 def _suite() -> list[Path]:
@@ -58,7 +60,7 @@ def test_no_suite_module_reaches_a_substrate_directly():
     "from egzos.backends import SqliteBackend", "import egzos.backends as b\nb.SqliteBackend(p)",
     "from egzos.store.blobs import BlobStore", "from egzos.container import Container",
     "path = tmp_path / 'container.db'", "backend.db.execute('SELECT 1')", "backend.path",
-    "blobs.root / 'staging'",
+    "blobs.root / 'staging'", "import psycopg", "from egzos.backends import postgres",
 ])
 def test_the_guard_sees_each_way_past_the_fixtures(source):
     assert _findings(source) != []
@@ -70,3 +72,11 @@ def test_make_backend_gives_two_connections_to_one_store(make_backend):
         a.put_config("harness.probe", 1)
         assert "harness.probe" not in b.get_config()  # unseen by b until a commits
     assert b.get_config()["harness.probe"] == 1  # one store
+
+
+def test_every_named_substrate_is_in_the_run_and_no_other(request):
+    """postgres runs exactly when `EGZOS_TEST_POSTGRES` names its database: named, it cannot
+    drop out of a run unseen (v0.7 §AF); unnamed, the suite is sqlite's alone, as before it."""
+    ran = {item.callspec.params.get("backend_name") for item in request.session.items
+           if hasattr(item, "callspec")}
+    assert ("postgres" in ran) is bool(os.environ.get("EGZOS_TEST_POSTGRES"))
