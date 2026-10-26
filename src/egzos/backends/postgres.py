@@ -21,6 +21,14 @@ import psycopg
 from psycopg import pq
 from psycopg.sql import SQL, Identifier
 
+from egzos._types import (
+    AgentRegistration,
+    ConfirmChallenge,
+    ConfirmCredential,
+    ThrottleSurface,
+    UploadRecord,
+    UserGrant,
+)
 from egzos.backends.base import ChainConflict
 from egzos.model import ContextItem, Node, Token
 
@@ -57,13 +65,36 @@ CREATE TABLE tokens (id text PRIMARY KEY, doc text NOT NULL,
   write_order bigint NOT NULL DEFAULT nextval('write_order'));
 CREATE TABLE proposals (id text PRIMARY KEY, status text NOT NULL, doc text NOT NULL,
   write_order bigint NOT NULL DEFAULT nextval('write_order'));
+CREATE TABLE throttle (surface text NOT NULL, bucket_key text COLLATE "C" NOT NULL,
+  window_key text COLLATE "C" NOT NULL, count integer NOT NULL,
+  PRIMARY KEY (surface, bucket_key, window_key));
+CREATE TABLE user_grants (sub text PRIMARY KEY, doc text NOT NULL,
+  write_order bigint NOT NULL DEFAULT nextval('write_order'));
+CREATE TABLE agent_registrations (client_id text NOT NULL, sub text NOT NULL, doc text NOT NULL,
+  write_order bigint NOT NULL DEFAULT nextval('write_order'), PRIMARY KEY (client_id, sub));
+CREATE TABLE config (key text PRIMARY KEY, value text NOT NULL,
+  write_order bigint NOT NULL DEFAULT nextval('write_order'));
+CREATE TABLE challenges (id text PRIMARY KEY, spent boolean NOT NULL DEFAULT false,
+  expires_at text COLLATE "C" NOT NULL, doc text NOT NULL);
+CREATE INDEX challenges_expiry ON challenges (expires_at);
+CREATE TABLE credentials (id text PRIMARY KEY, person text NOT NULL, doc text NOT NULL,
+  write_order bigint NOT NULL DEFAULT nextval('write_order'));
+CREATE INDEX credentials_person ON credentials (person);
+CREATE TABLE uploads (id text PRIMARY KEY, principal text NOT NULL, doc text NOT NULL,
+  bytes_spent boolean NOT NULL DEFAULT false, item_spent boolean NOT NULL DEFAULT false,
+  write_order bigint NOT NULL DEFAULT nextval('write_order'));
+CREATE INDEX uploads_principal ON uploads (principal);
+CREATE TABLE spent_grants (sig_hash text PRIMARY KEY, expires_at text COLLATE "C" NOT NULL);
 -- The container's role holds only what the methods need, and no other role holds anything here:
 -- a new schema grants nothing to PUBLIC, but a new function is PUBLIC's to execute.
 REVOKE ALL ON FUNCTION audit_refuse() FROM PUBLIC;
 GRANT USAGE ON SCHEMA {schema} TO {role};
 GRANT USAGE ON SEQUENCE write_order TO {role};
 GRANT SELECT, INSERT ON audit TO {role};
-GRANT SELECT, INSERT, UPDATE ON nodes, items, tokens, proposals TO {role};
+GRANT SELECT, INSERT, UPDATE ON nodes, items, tokens, proposals, user_grants,
+  agent_registrations, config, credentials, uploads TO {role};
+GRANT SELECT, INSERT, UPDATE, DELETE ON throttle, challenges TO {role};
+GRANT SELECT, INSERT, DELETE ON spent_grants TO {role};
 """
 
 
@@ -89,6 +120,10 @@ _PUT = {table: _upsert(table, keys, cols) for table, keys, cols in [
     ("items", "id", "kind,scope,key,status,tombstoned,created_at,doc"),
     ("tokens", "id", "doc"),
     ("proposals", "id", "status,doc"),
+    ("user_grants", "sub", "doc"),
+    ("agent_registrations", "client_id,sub", "doc"),
+    ("config", "key", "value"),
+    ("credentials", "id", "person,doc"),
 ]}
 _PAGE = 1000  # chain entries `audit_iter` reads at a time
 
@@ -282,3 +317,121 @@ class PostgresBackend:
 
     def list_proposals(self, status: str | None = None) -> list[dict[str, Any]]:
         return self._list("proposals", status=status or None)  # sqlite's `if status:`
+
+    # -- ThrottleState (storage.md §3.1) ----------------------------------------------------
+    def throttle_incr(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        """Increments and returns the new count, atomically, under the lock."""
+        return self._write(
+            "INSERT INTO throttle (surface, bucket_key, window_key, count) VALUES (%s, %s, %s, 1) "
+            "ON CONFLICT (surface, bucket_key, window_key) "
+            "DO UPDATE SET count = throttle.count + 1 RETURNING count",
+            (surface, bucket_key, window_key),
+        ).fetchone()[0]
+
+    def throttle_count(self, surface: ThrottleSurface, bucket_key: str, window_key: str) -> int:
+        rows = self._all(
+            "SELECT count FROM throttle WHERE surface = %s AND bucket_key = %s AND window_key = %s",
+            (surface, bucket_key, window_key),
+        )
+        return rows[0][0] if rows else 0
+
+    def throttle_buckets(self, surface: ThrottleSurface, window_key: str) -> list[tuple[str, int]]:
+        rows = self._all("SELECT bucket_key, count FROM throttle WHERE surface = %s "
+                         "AND window_key = %s ORDER BY bucket_key", (surface, window_key))
+        return [(k, n) for k, n in rows]
+
+    def throttle_windows(self, surface: ThrottleSurface) -> list[str]:
+        rows = self._all("SELECT DISTINCT window_key FROM throttle WHERE surface = %s "
+                         "ORDER BY window_key", (surface,))
+        return [r[0] for r in rows]
+
+    def throttle_forget(self, surface: ThrottleSurface, window_key: str) -> None:
+        self._write("DELETE FROM throttle WHERE surface = %s AND window_key = %s",
+                    (surface, window_key))
+
+    # -- IdentityState (storage.md §3.2) -----------------------------------------------------
+    def put_user_grant(self, grant: UserGrant) -> None:
+        self._write(_PUT["user_grants"], (grant["sub"], json.dumps(grant)))
+
+    def get_user_grant(self, sub: str) -> UserGrant | None:
+        return self._get("user_grants", sub=sub)
+
+    def list_user_grants(self) -> list[UserGrant]:
+        return self._list("user_grants")
+
+    def put_agent_registration(self, registration: AgentRegistration) -> None:
+        self._write(_PUT["agent_registrations"],
+                    (registration["client_id"], registration["sub"], json.dumps(registration)))
+
+    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+        return self._get("agent_registrations", client_id=client_id, sub=sub)
+
+    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+        return self._list("agent_registrations", client_id=client_id)
+
+    # -- ConfigState (storage.md §3.2) -------------------------------------------------------
+    def get_config(self) -> dict[str, Any]:
+        rows = self._all("SELECT key, value FROM config ORDER BY write_order")
+        return {k: json.loads(v) for k, v in rows}
+
+    def put_config(self, key: str, value: Any) -> None:
+        self._write(_PUT["config"], (key, json.dumps(value)))
+
+    # -- ConfirmState (storage.md §3.3) ------------------------------------------------------
+    def put_challenge(self, challenge: ConfirmChallenge) -> None:
+        self._write("INSERT INTO challenges (id, expires_at, doc) VALUES (%s, %s, %s)",
+                    (challenge["id"], challenge["expires_at"], json.dumps(challenge)))
+
+    def forget_challenges(self, expired_before: str) -> None:
+        self._write("DELETE FROM challenges WHERE expires_at < %s", (expired_before,))
+
+    def spend_challenge(self, challenge_id: str) -> ConfirmChallenge | None:
+        """Mark it spent and return it as it stood: of two concurrent spends, one sees it fresh."""
+        with self.atomic():
+            rows = self._all("SELECT spent, doc FROM challenges WHERE id = %s", (challenge_id,))
+            if not rows:
+                return None
+            self.db.execute("UPDATE challenges SET spent = true WHERE id = %s", (challenge_id,))
+        return {**json.loads(rows[0][1]), "spent": rows[0][0]}
+
+    def put_credential(self, credential: ConfirmCredential) -> None:
+        self._write(_PUT["credentials"],
+                    (credential["id"], credential["person"], json.dumps(credential)))
+
+    def get_credential(self, credential_id: str) -> ConfirmCredential | None:
+        return self._get("credentials", id=credential_id)
+
+    def list_credentials(self, person: str | None = None) -> list[ConfirmCredential]:
+        return self._list("credentials", person=person)
+
+    # -- UploadState (storage.md §3.4) -------------------------------------------------------
+    def put_upload(self, upload: UploadRecord) -> None:
+        # Rewritten in place, as sqlite's UPDATE: its open order, principal and spends stand.
+        self._write("INSERT INTO uploads (id, principal, doc) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET doc = excluded.doc",
+                    (upload["id"], upload["principal"], json.dumps(upload)))
+
+    def get_upload(self, upload_id: str) -> UploadRecord | None:
+        return self._get("uploads", id=upload_id)
+
+    def list_uploads(self, principal: str | None = None) -> list[UploadRecord]:
+        return self._list("uploads", principal=principal)
+
+    def spend_upload(self, upload_id: str, step: str) -> bool:
+        column = {"bytes": "bytes_spent", "item": "item_spent"}[step]
+        cur = self._write(f"UPDATE uploads SET {column} = true WHERE id = %s AND NOT {column}",
+                          (upload_id,))
+        return cur.rowcount == 1
+
+    # -- GrantState (storage.md §3.5) --------------------------------------------------------
+    def spend_grant(self, sig_hash: str, expires_at: str) -> bool:
+        """Record a spend, committed at once: of two concurrent spends of one grant, exactly one
+        inserts. Refused inside `atomic()` or any open transaction, whose rollback would undo it."""
+        if self._depth or self.db.info.transaction_status != pq.TransactionStatus.IDLE:
+            raise RuntimeError("a grant is spent outside any transaction")
+        cur = self._write("INSERT INTO spent_grants (sig_hash, expires_at) VALUES (%s, %s) "
+                          "ON CONFLICT DO NOTHING", (sig_hash, expires_at))
+        return cur.rowcount == 1
+
+    def forget_grants(self, expired_before: str) -> None:
+        self._write("DELETE FROM spent_grants WHERE expires_at < %s", (expired_before,))

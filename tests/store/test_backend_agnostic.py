@@ -76,7 +76,11 @@ def test_make_backend_gives_two_connections_to_one_store(make_backend):
 
 def test_every_named_substrate_is_in_the_run_and_no_other(request):
     """postgres runs exactly when `EGZOS_TEST_POSTGRES` names its database: named, it cannot
-    drop out of a run unseen (v0.7 §AF); unnamed, the suite is sqlite's alone, as before it."""
+    drop out of a run unseen (v0.7 §AF); unnamed, the suite is sqlite's alone, as before it. A
+    filtered run selects only some cases, so only a whole run is checked (a1r on #330)."""
+    option = request.config.option
+    if option.keyword or option.markexpr or any("::" in arg for arg in request.config.args):
+        pytest.skip("a filtered run selects only some cases")
     ran = {item.callspec.params.get("backend_name") for item in request.session.items
            if hasattr(item, "callspec")}
     assert ("postgres" in ran) is bool(os.environ.get("EGZOS_TEST_POSTGRES"))
