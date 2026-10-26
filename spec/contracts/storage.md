@@ -339,10 +339,25 @@ atomic()                                         -> context manager   # every wr
   the chain never forks. The store keeps one successor per entry whatever the lock, because an
   append outside a block reads the head before it holds the lock.
 
-`TODO(a1p)`, #283, before an object store runs: where a block's `BlobStore` calls run against its
-COMMIT. A blob write is not a write to this substrate and no rollback undoes it, so a `promote` or
-a `discard` made before a COMMIT that then fails stays made, and a transfer inside a block holds
-the lock for as long as it takes (§4).
+**A block's `BlobStore` calls run inside it, and its deletes after its COMMIT.** `put`, `stage` and
+`promote`'s copy run inside the block. The staged copy a `promote` leaves behind, and the bytes a
+`discard` removes, are deleted only once the outermost block has committed, each in a short block
+of its own that first re-checks that no live upload or staged item still holds the address, so a
+stage of the same bytes committed in between keeps them. A blob write is not a
+write to this substrate and no rollback undoes it, so a COMMIT that fails leaves every staged copy
+in place: a retried `promote` copies again, returns `True` and its act appends `blob.put`, as §4
+says of a crash between copy and delete, so every byte that reaches the promoted store behind a
+verified item has a committed `blob.put`; and a `discard` whose block did not commit discarded
+nothing. An approval whose `promote` returns `False` goes on only where the promoted address
+already holds the bytes, which had their `blob.put` when they arrived; otherwise it is refused as
+nothing staged and changes nothing, so no item is ever verified without its bytes. Bytes a failed
+COMMIT leaves at a promoted address with nothing referring to them are never served (§4, `rest.md`
+§6). Staged bytes no live record holds, which a crash between a COMMIT and its delete leaves, are
+deleted by the next open, under the lock, after the same re-check. **a1p** (v0.7 §AF); not
+running: both stores delete inside the block today (#342). A transfer holds the lock for as long as it takes, and a slow one reaches every other writer
+as `StorageBusy`. **a1p**, reading v0.7 §AF's "one person's container bears" synchronous database
+calls as covering transfers too. `TODO(a1p)`, #283, before a container serves more than one
+person: moving transfers out of the lock.
 
 ## 3.7 · What every substrate keeps, and how it is named
 
@@ -381,18 +396,25 @@ and how a container names its own.
   an object store's keys are secrets, the host's. egzos never prints, logs or writes them, to a
   file, an agent's launch configuration or the chain, and an error names the variable, never its
   value. **a1p.** The database is named by **`EGZOS_DATABASE_URL`**, a postgres connection string;
-  unset, the container's state stays in its home's `egzos.db`, as before. The object store's
-  variables enter here with the code that reads them. **a1p** (v0.7 §AF).
+  unset, the container's state stays in its home's `egzos.db`, as before. The object store is named
+  by six: `EGZOS_BLOBS_S3_ENDPOINT`, `EGZOS_BLOBS_S3_REGION`, `EGZOS_BLOBS_S3_BUCKET` and
+  `EGZOS_BLOBS_S3_PREFIX` name it, and `EGZOS_BLOBS_S3_ACCESS_KEY_ID` and
+  `EGZOS_BLOBS_S3_SECRET_ACCESS_KEY` are its keys, the host's secrets. All six are set or none: some
+  but not all stops the container, naming the ones missing. An endpoint holding userinfo stops it
+  too: the keys travel in their two variables only. An object store is named only beside a
+  named database; named without one, the container stops. None set, blobs stay in the home's
+  `blobs/`, as before; set, the blob root is the prefix (§4). **a1p** (v0.7 §AF).
 - **A home stays bound to the database it was made on**, so that none opens another's database or
   falls back to a fresh local store, and a missing volume never makes fresh keys that lift a
   throttle (§3.1). A home whose state is its own `egzos.db` is bound by being one directory. A home
   makes its container on a named database in one `atomic()` block (§3.6) that finds the chain empty
   and appends its first entry, then records that entry's hash, which is no secret, in a file beside
-  its keys. Two homes making a container on one database take that one lock, since its key is the
-  database's, and a chain keeps one successor per entry (§3), so only one first entry is ever
-  appended. A crash between the block's commit and the file leaves a chain with no binding, which
-  stops as below: unavailable, never unsafe. Every open compares the two before the door serves,
-  and stops the container, naming the variable and never its value, when:
+  its keys, with its blob root: the home's `blobs/`, or the object store's endpoint, bucket and
+  prefix, none of them secret. Two homes making a container on one database take that one lock,
+  since its key is the database's, and a chain keeps one successor per entry (§3), so only one first
+  entry is ever appended. A crash between the block's commit and the file leaves a chain with no
+  binding, which stops as below: unavailable, never unsafe. Every open compares the two before the
+  door serves, and stops the container, naming the variable and never its value, when:
   - they differ, the database's chain being empty included: the home belongs to another database;
   - the home holds a binding and the variable is unset: it never falls back to its own `egzos.db`;
   - the named database cannot be reached: it never falls back to a local store;
@@ -401,6 +423,9 @@ and how a container names its own.
     two homes are pointed at one empty database: one makes it, the other stops;
   - the home's own `egzos.db` holds a chain and the variable is set: that chain, its tokens and its
     counters would be left behind;
+  - the blob root named differs from the one recorded: blobs never move to another store, or back
+    to the home, without the operator's rebind. A binding that records no blob root, written
+    before this clause, records the home's `blobs/`, the only root there was;
   - the database no longer holds the newest entry the home has seen. The file also records that
     entry's `seq` and hash, rewritten at every open once these checks pass and at every clean close,
     so a database restored to an earlier point without its home stops: its counters and revocations
@@ -435,9 +460,9 @@ bytes. `put` is idempotent — an identical write of existing content is a no-op
 address. **running.**
 
 **The blob root is a directory or an object-store prefix**: the home's `blobs/` locally, and for a
-container egzos hosts a prefix in its own project's Storage (§3.7), its own substrate under §1's
-reading of [0.3 · 5]. **decided, not running** (v0.7 §AF) for the hosted store; **a1p** for the
-root.
+container egzos hosts a prefix in its own project's Storage, named by §3.7's variables, its own
+substrate under §1's reading of [0.3 · 5]. **decided, not running** (v0.7 §AF) for the hosted
+store; **a1p** for the root.
 
 **`promote` decides by the staged bytes alone**, never by whether promoted ones exist. Where the
 store has no rename, as an S3-style store has none, it copies, then deletes the staged copy (the
