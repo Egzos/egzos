@@ -138,3 +138,10 @@ def test_chain_conflict_is_the_shared_type_wherever_it_is_imported_from():
     assert base.ChainConflict is t.ChainConflict
     assert sqlite.ChainConflict is t.ChainConflict
     assert ledger.ChainConflict is t.ChainConflict
+
+
+def test_storage_busy_is_declared_beside_chain_conflict():
+    """§3.6: what a writer raises once it has waited its bound, on every backend (#331)."""
+    assert issubclass(t.StorageBusy, Exception)
+    assert t.StorageBusy is not t.ChainConflict
+    assert not issubclass(t.StorageBusy, t.ChainConflict)

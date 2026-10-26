@@ -882,6 +882,11 @@ class ChainConflict(Exception):
     re-reads the head and re-chains; the chain never forks."""
 
 
+class StorageBusy(Exception):
+    """The container's write lock was not taken within its bound (storage.md §3.6). Every backend
+    raises this, never its driver's own error; nothing was written, and the door answers `503`."""
+
+
 class Transactional(Protocol):
     """The container's one write lock, on the `ContainerState` substrate (storage.md §3.6).
 
@@ -970,6 +975,7 @@ __all__ = [
     "Role",
     "RootType",
     "ServingPolicy",
+    "StorageBusy",
     "StructureFloor",
     "TextContent",
     "ThrottleRate",
