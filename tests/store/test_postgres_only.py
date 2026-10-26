@@ -115,19 +115,6 @@ def test_a_writer_waits_a_bounded_time_then_raises_and_leaves_nothing_open(make_
     assert first.get_node("n") == _node("n")
 
 
-def test_a_nested_block_joins_and_an_exception_leaving_the_outermost_undoes_it(make_backend):
-    backend, other = make_backend(), make_backend()  # test_atomic.py's, on part A's methods
-    with pytest.raises(RuntimeError), backend.atomic():
-        backend.put_node(_node("n"))
-        with backend.atomic():
-            backend.put(ContextItem(id="i", kind="memory", scope="n", content={"body": "b"}))
-            _append(backend)
-        assert other.get_node("n") is None and other.audit_last() is None  # nothing committed
-        raise RuntimeError("the act fails")
-    assert other.get_node("n") is None and other.get("i") is None and other.audit_last() is None
-    assert _append(backend)["prev_hash"] == GENESIS_HASH
-
-
 def test_a_block_lets_go_of_a_transaction_left_open(backend):
     backend.db.execute("BEGIN")  # as a lone write that failed leaves one on sqlite (#329)
     backend.db.execute("INSERT INTO nodes (id, type, name, doc) VALUES ('stray', 't', 'n', '{}')")

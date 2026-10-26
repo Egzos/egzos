@@ -121,18 +121,9 @@ if POSTGRES:
     BACKENDS["postgres"] = BackendKind(cls=PostgresBackend, open=_postgres_open,
                                        refuses=_postgres_refuses, place=_postgres_place)
 
-#: Until postgres has the door-state methods (storage.md §3.1-§3.5), it runs these modules, less
-#: their cases on those methods' lists: the rest call them. The PR that brings them drops both.
-POSTGRES_MODULES = frozenset({"test_chain.py", "test_container_state.py", "test_item_store.py"})
-DOOR_STATE_LISTS = frozenset({"agent_registrations", "credentials", "uploads", "user_grants"})
-
 
 @pytest.fixture(params=sorted(BACKENDS))
 def backend_name(request: pytest.FixtureRequest) -> str:
-    if request.param == "postgres" and (request.path.name not in POSTGRES_MODULES
-                                        or request.node.callspec.params.get("kind")
-                                        in DOOR_STATE_LISTS):
-        pytest.skip("postgres runs this case once it has the door-state methods")
     return request.param
 
 
