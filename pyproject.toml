@@ -36,12 +36,17 @@ embed = [
 postgres = [
     "psycopg[binary]>=3.2,<4",
 ]
+# A container's blobs in an object store (storage.md §4): OpenDAL, Apache-2.0 (v0.7 §S).
+objects = [
+    "opendal>=0.47.12,<0.48",
+]
 dev = [
     "pytest>=8",
     "pyyaml>=6",  # tests/governance imports .github/scripts/check_ownership.py
     "ruff>=0.16,<0.17",  # bounded: the tests gate must not move when ruff's defaults change
     "httpx>=0.27",  # FastAPI's TestClient drives the lifeboat in tests
     "httpx2>=2.10",  # the MCP SDK's own client drives /mcp in process, in tests
+    "opendal>=0.47.12,<0.48",  # the blob store's object-store cases run in tests (storage.md §4)
 ]
 
 [project.scripts]

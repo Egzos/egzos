@@ -26,6 +26,7 @@ import pytest
 
 from egzos.backends.sqlite import SqliteBackend
 from egzos.store.blobs import BlobStore
+from egzos.store.objects import ObjectBlobStore, fs_operator
 
 #: An owner DSN. Set, the postgres case runs, and a missing psycopg fails the run (v0.7 §AF).
 POSTGRES = os.environ.get("EGZOS_TEST_POSTGRES")
@@ -63,6 +64,17 @@ def _fs_staged(store: BlobStore, sha: str) -> bytes | None:
     return path.read_bytes() if path.exists() else None
 
 
+def _objects_in_memory(_: Path) -> ObjectBlobStore:
+    import opendal  # the dev extra's; imported here, so a missing one fails only these cases
+
+    return ObjectBlobStore(opendal.Operator("memory"))
+
+
+def _object_staged(store: ObjectBlobStore, sha: str) -> bytes | None:
+    key = f"staging/{sha}"
+    return store.op.read(key) if store.op.exists(key) else None
+
+
 BACKENDS: dict[str, BackendKind] = {
     "sqlite": BackendKind(cls=SqliteBackend, refuses=_sqlite_refuses,
                           brief=("egzos.backends.sqlite.LOCK_TIMEOUT", 0.05),
@@ -70,6 +82,9 @@ BACKENDS: dict[str, BackendKind] = {
 }
 BLOB_STORES: dict[str, BlobStoreKind] = {
     "fs": BlobStoreKind(open=lambda where: BlobStore(where / "blobs"), staged=_fs_staged),
+    "opendal-fs": BlobStoreKind(open=lambda where: ObjectBlobStore(fs_operator(where / "objects")),
+                                staged=_object_staged),
+    "opendal-memory": BlobStoreKind(open=_objects_in_memory, staged=_object_staged),
 }
 
 if POSTGRES:
