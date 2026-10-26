@@ -106,6 +106,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Blobs can live in an object store** through OpenDAL (`pip install "egzos[objects]"`,
   `storage.md` §4): the same content-addressed store, its staging unaddressable until promoted,
   checked on a directory and in memory. No container chooses it yet; the next change wires it.
+- **A container with a named database can keep its blobs in an object store**, such as Supabase
+  Storage, by setting the six `EGZOS_BLOBS_S3_*` variables (`pip install "egzos[objects]"`); its
+  home stays bound to that store (`storage.md` §3.7, §4).
 
 ### Fixed
 
