@@ -400,10 +400,17 @@ and how a container names its own.
     be fresh. So does a home making its container whose block finds a chain already there, as when
     two homes are pointed at one empty database: one makes it, the other stops;
   - the home's own `egzos.db` holds a chain and the variable is set: that chain, its tokens and its
-    counters would be left behind.
+    counters would be left behind;
+  - the database no longer holds the newest entry the home has seen. The file also records that
+    entry's `seq` and hash, rewritten at every open once these checks pass and at every clean close,
+    so a database restored to an earlier point without its home stops: its counters and revocations
+    would be older than the home's (§3.1; `identity.md` §4).
 
   The operator restores the home, or rebinds it on the host, an act whose shape enters with its
-  code (`TODO(a1p)`, #283, with the hosted home's provisioning). **a1p** (v0.7 §AF).
+  code (`TODO(a1p)`, #283, with the hosted home's provisioning). What the binding cannot catch is
+  stated as plainly: a rollback to a point after the newest entry the home recorded, and a rollback
+  of the database and the home together, or by whoever can write both. Those are the outside
+  anchor's (§1), which the Chief has asked to come with sync (v0.7 §V, §AF). **a1p** (v0.7 §AF).
 - **U+0000 is kept only inside a document.** A document is JSON text, where U+0000 is always
   written escaped. Every other value a backend stores or matches by, an id, a key, a scope, a kind
   or a name, is refused with `ValueError` before any write when it holds U+0000, on every backend:
