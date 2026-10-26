@@ -103,6 +103,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`pip install "egzos[postgres]"`), and its home stays bound to that database
   (`storage.md` §3.7): another database, an unset variable, an unreachable or restored database, or
   a new home on a database that already holds a chain stops the container before it serves.
+- **Blobs can live in an object store** through OpenDAL (`pip install "egzos[objects]"`,
+  `storage.md` §4): the same content-addressed store, its staging unaddressable until promoted,
+  checked on a directory and in memory. No container chooses it yet; the next change wires it.
 
 ### Fixed
 
