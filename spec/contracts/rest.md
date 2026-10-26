@@ -238,11 +238,18 @@ and in the MCP tools alike (`egzos_fetch`, `egzos_remember`).
 **A store that cannot take the container's write lock in time answers `503`**, with
 `{"error":"busy"}`, `Retry-After: 1` and the same four headers: the store raised `StorageBusy`
 (`storage.md` §3.6), and nothing was written. It depends on the container's load and on no fact the
-request names, so it tells a caller nothing §3's refusal hides. **a1p** (#331).
+request names, so it tells a caller nothing §3's refusal hides. A request reaches the write lock
+only after authentication and its route's checks, but for §2's token check itself, which every
+well-formed container token value reaches alike, so a `503` there names no token either. **a1p**
+(#331).
 
 **Any other failure answers `500` with `{"error":"internal"}`** and the same four headers, never a
 stack, a path, a driver's message or an exception's text. **running** (the door's catch-all);
 **a1p**, binding it (#331).
+
+**The MCP tools and the CLI answer these alike.** Each carries the same word (`invalid_request`,
+`busy`, `internal`) in its own channel (an MCP tool's error result, the CLI's exit status and
+message), and neither ever shows a driver's message. **a1p** (#331).
 
 ## 4 · The v1.0 endpoints
 

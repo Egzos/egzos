@@ -384,22 +384,28 @@ and how a container names its own.
 - **A home stays bound to the database it was made on**, so that none opens another's database or
   falls back to a fresh local store, and a missing volume never makes fresh keys that lift a
   throttle (§3.1). A home whose state is its own `egzos.db` is bound by being one directory. A home
-  opened on a named database records, when the container is made there, the hash of the chain's
-  first entry, which is no secret, in a file beside its keys. Every open compares it with the
-  database's first entry before the door serves, and stops the container, naming the variable and
-  never its value, when:
+  makes its container on a named database in one `atomic()` block (§3.6) that finds the chain empty
+  and appends its first entry, then records that entry's hash, which is no secret, in a file beside
+  its keys. Every open compares the two before the door serves, and stops the container, naming the
+  variable and never its value, when:
   - they differ, the database's chain being empty included: the home belongs to another database;
-  - the named database cannot be reached: the container never falls back to a local store;
+  - the home holds a binding and the variable is unset: it never falls back to its own `egzos.db`;
+  - the named database cannot be reached: it never falls back to a local store;
   - the database holds a chain and the home holds no binding, a new or lost volume: its keys would
-    be fresh. The operator restores the home, or rebinds it on the host, an act whose shape enters
-    with its code (`TODO(a1p)`, #283, with the hosted home's provisioning).
+    be fresh. So does a home making its container whose block finds a chain already there, as when
+    two homes are pointed at one empty database: one makes it, the other stops;
+  - the home's own `egzos.db` holds a chain and the variable is set: that chain, its tokens and its
+    counters would be left behind.
 
-  **a1p** (v0.7 §AF).
+  The operator restores the home, or rebinds it on the host, an act whose shape enters with its
+  code (`TODO(a1p)`, #283, with the hosted home's provisioning). **a1p** (v0.7 §AF).
 - **U+0000 is kept only inside a document.** A document is JSON text, where U+0000 is always
   written escaped. Every other value a backend stores or matches by, an id, a key, a scope, a kind
   or a name, is refused with `ValueError` before any write when it holds U+0000, on every backend:
   postgres `text` cannot hold it, and sqlite refuses it too, so both answer alike. The door refuses
-  it first, as a malformed request (`rest.md` §3). **a1p** (#331).
+  it first, as a malformed request (`rest.md` §3). A sqlite store written before this clause may
+  already hold such a value: every read that does not name it still returns it, and a read or write
+  naming it is refused. **a1p** (#331).
 
 ## 4 · `BlobStore` — content-addressed, staged
 
