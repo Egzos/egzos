@@ -30,6 +30,7 @@ import secrets
 import sqlite3
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from egzos.backends import SqliteBackend
 from egzos.store.blobs import BlobStore
@@ -75,6 +76,8 @@ _CASES = {
                    "another store, or back to the home, without the operator's rebind",
     "blobs-driver": "the EGZOS_BLOBS_S3_* variables are set, and object store support is not "
                     'installed: pip install "egzos[objects]"',
+    "blobs-endpoint": "EGZOS_BLOBS_S3_ENDPOINT is not an endpoint the object store can use: check "
+                      "its scheme, host and port",
 }
 
 
@@ -88,14 +91,23 @@ class HomeBindingError(RuntimeError):
         super().__init__(f"the container stops ({case}): {_CASES[case]}{', '.join(unset)}")
 
 
-def _userinfo(endpoint: str) -> bool:
-    """Whether the endpoint's authority holds userinfo, with a scheme or without (OpenDAL then adds
-    one). A backslash ends no authority here, so this sees at least what any URL parser would.
-    Never raises, so the endpoint is in no frame a stop passes through."""
+def _endpoint_fault(endpoint: str) -> str | None:
+    """The stop an endpoint calls for, or None. It fails closed: userinfo is found if either
+    reading of the authority holds an `@`, urllib's (a6 on #345) or the text after the first
+    `://` up to `/?#`, which also catches a scheme urllib does not recognise (a1r on #346); and an
+    endpoint urllib refuses, or reads with no host, stops as no endpoint. Never raises, so the
+    endpoint is in no frame a stop passes through."""
+    try:
+        parsed = urlsplit(endpoint if "://" in endpoint else "//" + endpoint)
+        host = parsed.hostname
+    except ValueError:
+        return "blobs-endpoint"
     authority = endpoint.split("://", 1)[-1]
     for end in "/?#":
         authority = authority.split(end, 1)[0]
-    return "@" in authority
+    if "@" in parsed.netloc or "@" in authority:
+        return "blobs-userinfo"
+    return None if host else "blobs-endpoint"
 
 
 def blob_root() -> str | dict[str, str]:
@@ -103,7 +115,7 @@ def blob_root() -> str | dict[str, str]:
     endpoint, bucket and prefix, none of them secret, spelled as OpenDAL roots them, so that one
     root spelled twice is one root. Empty is unset, as for `EGZOS_DATABASE_URL`; a prefix of `/`
     is the bucket's root. Stops when the six are set in part, beside no named database, or the
-    endpoint holds userinfo, before any connection is made."""
+    endpoint holds userinfo or is no endpoint, before any connection is made."""
     unset = tuple(name for name in BLOBS_S3 if not os.environ.get(name))
     if len(unset) == len(BLOBS_S3):
         return HOME_BLOBS
@@ -111,8 +123,8 @@ def blob_root() -> str | dict[str, str]:
         raise HomeBindingError("blobs-partial", unset)
     if not os.environ.get(DATABASE_URL):
         raise HomeBindingError("blobs-alone")
-    if _userinfo(os.environ["EGZOS_BLOBS_S3_ENDPOINT"]):
-        raise HomeBindingError("blobs-userinfo")
+    if (fault := _endpoint_fault(os.environ["EGZOS_BLOBS_S3_ENDPOINT"])) is not None:
+        raise HomeBindingError(fault)
     return {"endpoint": os.environ["EGZOS_BLOBS_S3_ENDPOINT"].rstrip("/"),
             "bucket": os.environ["EGZOS_BLOBS_S3_BUCKET"],
             "prefix": os.environ["EGZOS_BLOBS_S3_PREFIX"].strip("/")}
@@ -135,12 +147,17 @@ def object_store(root: dict[str, str]) -> Any:
         raise HomeBindingError("blobs-driver")
     from egzos.store.objects import ObjectBlobStore
 
-    op = opendal.Operator(
-        "s3", endpoint=root["endpoint"], bucket=root["bucket"], root=f"/{root['prefix']}",
-        region=os.environ["EGZOS_BLOBS_S3_REGION"],
-        access_key_id=os.environ["EGZOS_BLOBS_S3_ACCESS_KEY_ID"],
-        secret_access_key=os.environ["EGZOS_BLOBS_S3_SECRET_ACCESS_KEY"],
-        disable_config_load="true", disable_ec2_metadata="true")
+    try:
+        op = opendal.Operator(
+            "s3", endpoint=root["endpoint"], bucket=root["bucket"], root=f"/{root['prefix']}",
+            region=os.environ["EGZOS_BLOBS_S3_REGION"],
+            access_key_id=os.environ["EGZOS_BLOBS_S3_ACCESS_KEY_ID"],
+            secret_access_key=os.environ["EGZOS_BLOBS_S3_SECRET_ACCESS_KEY"],
+            disable_config_load="true", disable_ec2_metadata="true")
+    except Exception:  # noqa: BLE001 — OpenDAL's own text can carry the endpoint or a key
+        op = None
+    if op is None:  # raised past the except block, so no OpenDAL error is chained (a1r on #345)
+        raise HomeBindingError("blobs-endpoint")
     return ObjectBlobStore(op.layer(CapabilityOverrideLayer("write_with_if_not_exists=false")))
 
 
