@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -25,6 +26,9 @@ class BlobStore:
         self.root = Path(root)
         (self.root / "sha256").mkdir(parents=True, exist_ok=True)
         (self.root / "staging").mkdir(parents=True, exist_ok=True)
+        # What a staged delete waits for (storage.md §3.6): the container hands it to its backend's
+        # after-commit work, which re-checks that nothing holds the address; unwired, it runs now.
+        self.defer: Callable[[str], object] = self._unstage
 
     @staticmethod
     def digest(data: bytes) -> str:
@@ -43,15 +47,17 @@ class BlobStore:
         return sha
 
     def promote(self, sha: str) -> bool:
-        """approve → blob moves from staging to the real store (v0.3 §5). True if staged bytes
-        moved; False if nothing was staged there, missing and already promoted alike ([0.3 · 43]):
-        the internal caller's to know, never an external surface's."""
+        """approve → the staged bytes are copied to the real store (v0.3 §5), and the staged copy
+        deleted once the act commits (`defer`). True if staged bytes moved; False if nothing was
+        staged there, missing and already promoted alike ([0.3 · 43]): the internal caller's to
+        know, never an external surface's."""
         _check(sha)
         src = self.root / "staging" / sha
         if not src.exists():
             return False
+        # A copy, never a rename: a block that rolls back keeps the staged one (storage.md §3.6).
         (self.root / "sha256" / sha).write_bytes(src.read_bytes())
-        src.unlink()
+        self.defer(sha)
         return True
 
     def get(self, sha: str) -> bytes | None:
@@ -67,13 +73,27 @@ class BlobStore:
 
     def discard(self, sha: str) -> bool:
         """Delete STAGED bytes, never promoted ones ([0.3 · 44]): an orphan's discard or a staged
-        item's tombstone (rest.md §4.4). True if there were staged bytes to delete."""
+        item's tombstone (rest.md §4.4). True if there were staged bytes to delete; the delete
+        itself waits for the act's COMMIT (`defer`, storage.md §3.6)."""
+        _check(sha)
+        if not (self.root / "staging" / sha).exists():
+            return False
+        self.defer(sha)
+        return True
+
+    def _unstage(self, sha: str) -> bool:
+        """Delete the bytes staged at `sha` now, True if there were any: what `defer` runs."""
         _check(sha)
         path = self.root / "staging" / sha
-        if path.exists():
-            path.unlink()
-            return True
-        return False
+        if not path.exists():
+            return False
+        path.unlink(missing_ok=True)
+        return True
+
+    def _staged_names(self) -> list[str]:
+        """Every address staged here, for the open-time sweep alone (storage.md §4): the store's
+        own listing, no `BlobStore` method and no reader's."""
+        return sorted(p.name for p in (self.root / "staging").iterdir() if _is_digest(p.name))
 
 
 #: rest.md §6: a grant's fields in its URL's query, in this order; `sha256` is the path's.

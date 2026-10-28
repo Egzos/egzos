@@ -156,25 +156,31 @@ def test_a_copy_keeps_the_staged_bytes_it_shares_until_its_own_tombstone(c, door
 
 
 def test_staged_deleted_records_only_bytes_deleted_in_fact(c, door, notes):
-    """Staging is shared by address, so another item's promotion can move the bytes first. The
-    entry then claims no deletion (a1r on #303): two uploads of one file, a promoted copy, and a
-    person writing the same bytes."""
+    """Staging is shared by address: while another upload or staged item holds the bytes, neither
+    a tombstone nor another item's promotion deletes them (storage.md §3.6, §4), and the entry
+    claims no deletion; the last holder's tombstone deletes them and says so (a1r on #303). Two
+    uploads of one file beside a promoted third, a promoted copy, and a person writing the same
+    bytes."""
     agent = _agent(c)
-    one, two = _artifact(door, agent, notes.id), _artifact(door, agent, notes.id)
+    one, two, three = (_artifact(door, agent, notes.id) for _ in range(3))
     c.trust.promote(c.store.get(one), token=c.owner, actor=OWNER)
-    assert not _staged(c) and _rm(door, c.owner, two).status_code == 200
+    assert _staged(c) and _rm(door, c.owner, two).status_code == 200 and _staged(c)
     assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    assert _rm(door, c.owner, three).status_code == 200 and not _staged(c)
+    assert _events(c, "item.tombstone")[-1]["details"]["staged_deleted"] == SHA
     data = b"copied"
     source = _artifact(door, agent, notes.id, data=data)
     r = door.post(f"/v1/items/{source}/copy", headers=_auth(agent), json={"to": notes.id})
     c.trust.promote(c.store.get(r.json()["item"]["id"]), token=c.owner, actor=OWNER)
-    assert not _staged(c, data) and _rm(door, c.owner, source).status_code == 200
-    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    assert _staged(c, data) and _rm(door, c.owner, source).status_code == 200  # the source's
+    tombstoned = _events(c, "item.tombstone")[-1]["details"]
+    assert not _staged(c, data) and tombstoned["staged_deleted"] == hashlib.sha256(data).hexdigest()
     data = b"written twice"
     theirs = _artifact(door, agent, notes.id, data=data)
     _artifact(door, c.owner, notes.id, data=data)  # a person's write promotes the bytes at once
-    assert not _staged(c, data) and _rm(door, c.owner, theirs).status_code == 200
-    assert "staged_deleted" not in _events(c, "item.tombstone")[-1]["details"]
+    assert _staged(c, data) and _rm(door, c.owner, theirs).status_code == 200  # theirs held them
+    tombstoned = _events(c, "item.tombstone")[-1]["details"]
+    assert not _staged(c, data) and tombstoned["staged_deleted"] == hashlib.sha256(data).hexdigest()
     assert c.blobs.get(SHA) == DATA and c.blobs.get(hashlib.sha256(data).hexdigest()) == data
 
 

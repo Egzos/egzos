@@ -122,6 +122,9 @@ class Store:
                 if upload["size"] <= self.inline_blob_limit and upload["mime"].startswith("text/"):
                     data = self.blobs.get(sha) or b""
                     content["inline"] = data.decode("utf-8", errors="replace")
+            elif promote and not self.blobs.exists(sha):
+                # storage.md §3.6: promoted nowhere and stored nowhere, so nothing was staged.
+                raise StoreError("nothing staged")
             title_body = content.get("inline")
         else:
             content["body"] = body

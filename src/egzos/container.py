@@ -8,6 +8,7 @@ boundary (v0.4 §16): nothing else can serve what it can't.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ from egzos.store.uploads import Uploads
 from egzos.trust import GRANT_KEY_BYTES, GRANT_KEY_FILE, TrustEngine
 
 OWNER = "self"
+log = logging.getLogger(__name__)
 
 __all__ = ["OWNER", "Container", "HomeBindingError", "default_home"]
 
@@ -80,6 +82,7 @@ class Container:
         self.trust.principals = self.identity.audience_tokens
         self.trust.refresh = self._refresh
         self.trust.promote_blob = lambda sha: _is_digest(sha) and self.blobs.promote(sha)
+        self.trust.blob_exists = self.blobs.exists
         # rest.md §6: the grant key, made at first need in the home, never a config key or a row;
         # whom a grant names, as they stand now, an id no record holds any more as a revoked
         # stand-in, so a refusal is still attributed to it; and what is shown.
@@ -90,10 +93,22 @@ class Container:
                      scopes=[], revoked=True))
         self.trust.shown = self.store.shown
         self.uploads = Uploads(self.backend, self.ledger, self.blobs, self.store)
+        # storage.md §3.6: a staged delete waits for its act's COMMIT, then re-checks the address.
+        self.blobs.defer = lambda sha: self.backend.after_commit(lambda: self.uploads.release(sha))
         self.confirm = Confirm(
             self.backend, self.ledger, self.config_value, window_seconds=_step_up_window,
             salt=self._salt,
         )
+        self._sweep()
+
+    def _sweep(self) -> None:
+        """storage.md §3.6, §4: at open, under the lock, staged bytes nothing holds are deleted
+        (`Uploads.sweep`). How many is the operator's log's, never the chain's; a sweep that cannot
+        run, the lock busy or the store unreachable, leaves them to the next open."""
+        try:
+            log.debug("the open-time sweep deleted %d staged addresses", self.uploads.sweep())
+        except Exception as e:
+            log.warning("the open-time sweep did not run (%s)", type(e).__name__)
 
     def _salt(self) -> str:
         """Per container and fixed for its life: the personal root's id. With no root there is
