@@ -61,9 +61,13 @@ own.
 - **TLS at a host's edge. decided** (the Chief, 2026-10-30, v0.7 §AF, amending [0.3 · 9] for a
   container egzos hosts): such a container may serve plain HTTP on its host's private network to the
   host's own TLS-terminating proxy, which alone faces the internet. It opts in by an explicit host
-  setting, never by default; everywhere else the loopback rule stands. That network is shared with
-  the operator's other containers, so the hop is private to the operator, not to one container: every
-  request on it still bears its own credential (§2), and nothing on it is trusted for arriving there.
+  setting, never by default; everywhere else the loopback rule stands. As the loopback rule is, the
+  setting is checked from the socket: the door binds no globally routable address, and refuses to
+  start if any address it binds, or the unspecified address on a host holding a globally routable
+  one, is. It also refuses to start without an explicit `identity.origin` (`identity.md` §2) whose
+  scheme is `https`, the proxy's, never the plain origin it binds. That network is shared with every
+  container in the host's organization, so the hop is not private to one container: every request on
+  it still bears its own credential (§2), and nothing on it is trusted for arriving there.
   No forwarded header decides a caller's identity, scheme or origin, and the throttle's per-source
   bucket sees the proxy's address, as behind a proxy on loopback (§2 item 7). **a1p**, the wording.
 
