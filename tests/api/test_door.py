@@ -11,7 +11,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-from egzos.api import loopback, serve_http
+from egzos.api import EDGE_PROXY, globally_routable, loopback, serve_http
 from egzos.api.app import Door, create_app
 from egzos.api.throttle import RATE, WINDOW_SECONDS, Throttle
 from egzos.container import OWNER, Container
@@ -376,6 +376,108 @@ def test_plain_http_is_for_a_loopback_socket_only(c):
         serve_http(c, host="0.0.0.0")
     with pytest.raises(ValueError):
         serve_http(c, host="0.0.0.0", tls_cert=c.home / "cert.pem")
+
+
+# -- §1: TLS at a host's edge (v0.7 §AF) --------------------------------------------------------
+EDGE = {EDGE_PROXY: "1"}
+
+
+@pytest.fixture
+def served(monkeypatch):
+    """`uvicorn.run`'s arguments, the server never started."""
+    import uvicorn
+
+    calls: list[dict] = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: calls.append({"app": app, **kw}))
+    return calls
+
+
+def _https_origin(c, origin="https://box.egzos.example"):
+    c.set_config("identity.origin", origin, token=c.owner)
+
+
+def test_routable_is_judged_from_the_address():
+    for a in ("10.1.2.3", "172.16.0.1", "192.168.1.1", "127.0.0.1", "169.254.1.1", "::1",
+              "fe80::1%eth0", "fdaa:0:3b2a::2", "fc00::1", "::ffff:10.0.0.1", "0.0.0.0", "::"):
+        assert not globally_routable(a), a
+    for a in ("8.8.8.8", "100.64.0.1", "2a09:8280:1::1", "::ffff:8.8.8.8"):
+        assert globally_routable(a), a
+
+
+def test_the_edge_setting_serves_plain_http_on_a_private_address(c, served):
+    _https_origin(c)
+    serve_http(c, host="fdaa:0:1::2", port=8080, environ=EDGE)
+    (run,) = served
+    assert run["host"] == "fdaa:0:1::2" and run["ssl_certfile"] is None
+    assert run["proxy_headers"] is False
+
+
+@pytest.mark.parametrize("host", ["8.8.8.8", "2a09:8280:1::1", "::ffff:8.8.8.8", "box.example"])
+def test_the_edge_setting_refuses_a_routable_bind(c, served, host):
+    _https_origin(c)
+    with pytest.raises(PermissionError):
+        serve_http(c, host=host, environ=EDGE)
+    assert not served
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "::ffff:0.0.0.0", "::%eth0"])
+def test_the_edge_setting_refuses_the_unspecified_address(c, served, host):
+    """A host's own address list can be incomplete, so the door binds a private address itself."""
+    _https_origin(c)
+    with pytest.raises(PermissionError, match="binds every address"):
+        serve_http(c, host=host, environ=EDGE)
+    assert not served
+
+
+def test_the_edge_setting_refuses_without_an_explicit_https_origin(c, served):
+    with pytest.raises(PermissionError, match="identity.origin"):
+        serve_http(c, host="10.0.0.5", environ=EDGE)
+    _https_origin(c, "http://127.0.0.1:7426")  # plain http, loopback only: still refused
+    with pytest.raises(PermissionError, match="identity.origin"):
+        serve_http(c, host="10.0.0.5", environ=EDGE)
+    assert not served
+
+
+@pytest.mark.parametrize("host", ["10.0.0.5", "127.0.0.1"])  # a typo stops on loopback too
+@pytest.mark.parametrize("value", ["0", "true", "yes", "", " 1"])
+def test_the_edge_setting_takes_1_and_nothing_else(c, served, value, host):
+    _https_origin(c)
+    with pytest.raises(ValueError, match=EDGE_PROXY):
+        serve_http(c, host=host, environ={EDGE_PROXY: value})
+    assert not served
+
+
+def test_without_the_edge_setting_the_loopback_rule_stands(c, served, monkeypatch):
+    monkeypatch.delenv(EDGE_PROXY, raising=False)
+    _https_origin(c)
+    for host in ("10.0.0.5", "fdaa:0:1::2", "0.0.0.0"):
+        with pytest.raises(PermissionError, match="loopback socket only"):
+            serve_http(c, host=host)
+    serve_http(c, host="127.0.0.1")
+    assert [r["host"] for r in served] == ["127.0.0.1"]
+
+
+def test_the_edge_setting_is_read_from_the_host_environment(c, served, monkeypatch):
+    _https_origin(c)
+    monkeypatch.setenv(EDGE_PROXY, "1")
+    serve_http(c, host="10.0.0.5")
+    assert len(served) == 1
+
+
+def test_a_forwarded_header_changes_nothing_at_the_edge(c, served):
+    _https_origin(c)
+    serve_http(c, host="10.0.0.5", port=8080, environ=EDGE)
+    (run,) = served
+    assert run["proxy_headers"] is False
+    client = TestClient(run["app"])
+    forwarded = {"X-Forwarded-Proto": "http", "X-Forwarded-Host": "evil.example",
+                 "X-Forwarded-For": "127.0.0.1", "Forwarded": "for=127.0.0.1;proto=http;host=evil",
+                 "X-Real-IP": "127.0.0.1"}
+    plain = client.get("/.well-known/oauth-protected-resource")
+    spoofed = client.get("/.well-known/oauth-protected-resource", headers=forwarded)
+    assert plain.status_code == spoofed.status_code == 200
+    assert plain.json() == spoofed.json() and spoofed.json()["resource"] == "https://box.egzos.example"
+    assert client.get("/v1/pending", headers=forwarded).content == UNAUTHORIZED
 
 
 # -- a6 on #288 ---------------------------------------------------------------------------------

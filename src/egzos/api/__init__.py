@@ -22,11 +22,22 @@ forwarded header, so the document is the same for every caller.
 from __future__ import annotations
 
 import ipaddress
+import os
+from collections.abc import Mapping
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from egzos.container import Container
 
 DEFAULT_PORT = 7426
+#: The host setting that opts a container into plain HTTP behind its host's TLS-terminating proxy.
+EDGE_PROXY = "EGZOS_EDGE_PROXY"
+#: Not globally routable: private, loopback, link-local and unique-local (fc00::/7 holds Fly's
+#: fdaa::/16 6PN). Anything else is treated as routable, so an address in doubt refuses.
+_NOT_ROUTABLE = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16",
+    "::1/128", "fe80::/10", "fc00::/7",
+))
 
 
 def loopback(host: str) -> bool:
@@ -46,6 +57,54 @@ def bound_origin(host: str, port: int, *, tls: bool) -> str:
     return f"{scheme}://{name}" if port == (443 if tls else 80) else f"{scheme}://{name}:{port}"
 
 
+def edge_proxy(environ: Mapping[str, str] | None = None) -> bool:
+    """Whether the host opted in to TLS at its edge: `EGZOS_EDGE_PROXY=1`, and nothing else."""
+    value = (os.environ if environ is None else environ).get(EDGE_PROXY)
+    if value is None:
+        return False
+    if value != "1":
+        raise ValueError(f"{EDGE_PROXY}: 1, or unset")
+    return True
+
+
+def globally_routable(address: str) -> bool:
+    """Whether `address` (an IP literal, IPv6 with or without a zone) is globally routable: any
+    address outside `_NOT_ROUTABLE`, an IPv4-mapped IPv6 address judged as its IPv4."""
+    ip = ipaddress.ip_address(address.split("%", 1)[0])
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    if ip.is_unspecified:
+        return False
+    return not any(ip.version == n.version and ip in n for n in _NOT_ROUTABLE)
+
+
+def check_edge(container: Container, host: str) -> None:
+    """Refuse (`PermissionError`) a plain-HTTP door at a host's edge unless the socket binds no
+    globally routable address and is no unspecified address, and
+    `identity.origin` is set explicitly with scheme `https` (rest.md §1)."""
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        raise PermissionError(
+            f"{EDGE_PROXY}: bind an address, not a name, so the socket decides (rest.md §1)"
+        ) from None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped  # judged as its IPv4, as globally_routable judges it
+    if ip.is_unspecified:  # a host's own address list can be incomplete, so no list decides
+        raise PermissionError(
+            f"{EDGE_PROXY}: {host} binds every address; bind the host's private address itself"
+        )
+    if globally_routable(host):
+        raise PermissionError(f"{EDGE_PROXY}: {host} is globally routable; bind a private address")
+    origin = container.config_value("identity.origin")
+    parsed = urlsplit(origin) if isinstance(origin, str) else None
+    if parsed is None or parsed.scheme != "https" or not parsed.hostname:
+        raise PermissionError(
+            f"{EDGE_PROXY}: set identity.origin to the proxy's https origin "
+            "(`egzos config set identity.origin https://…`)"
+        )
+
+
 def serve_http(
     container: Container,
     *,
@@ -53,6 +112,7 @@ def serve_http(
     port: int = DEFAULT_PORT,
     tls_cert: Path | None = None,
     tls_key: Path | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> None:
     import uvicorn
 
@@ -60,7 +120,10 @@ def serve_http(
 
     if (tls_cert is None) != (tls_key is None):
         raise ValueError("TLS needs both a certificate and its key")
-    if tls_cert is None and not loopback(host):
+    edge = edge_proxy(environ)  # read first, so a mistyped value stops on every bind (a6 on #353)
+    if tls_cert is None and not loopback(host) and edge:
+        check_edge(container, host)
+    elif tls_cert is None and not loopback(host):
         raise PermissionError(
             "plain HTTP is for a loopback socket only (rest.md §1): give --tls-cert and --tls-key, "
             "or bind 127.0.0.1 behind a TLS-terminating proxy"

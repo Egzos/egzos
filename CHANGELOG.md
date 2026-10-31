@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`egzos serve` can sit behind a host's TLS-terminating proxy** (`EGZOS_EDGE_PROXY=1`), on a
+  private address and with an https `identity.origin`.
 - **The container verifies sign-ins from your identity provider** (Supabase Auth, or a self-hosted
   one): `spec/contracts/identity.md` §3's seven checks, in order, with PyJWT. A person signs in
   once, at egzos.io; the token is bound to this one container, and what it may do is the grant
