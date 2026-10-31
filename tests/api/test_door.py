@@ -11,7 +11,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-from egzos.api import EDGE_PROXY, globally_routable, loopback, serve_http
+from egzos.api import EDGE_PROXY, SHUTDOWN_GRACE, globally_routable, loopback, serve_http
 from egzos.api.app import Door, create_app
 from egzos.api.throttle import RATE, WINDOW_SECONDS, Throttle
 from egzos.container import OWNER, Container
@@ -410,6 +410,13 @@ def test_the_edge_setting_serves_plain_http_on_a_private_address(c, served):
     (run,) = served
     assert run["host"] == "fdaa:0:1::2" and run["ssl_certfile"] is None
     assert run["proxy_headers"] is False
+
+
+def test_a_stopping_door_waits_a_bounded_time_for_requests_in_flight(c, served):
+    """A held request cannot keep a stop waiting until the host kills the process."""
+    serve_http(c, host="127.0.0.1")
+    (run,) = served
+    assert run["timeout_graceful_shutdown"] == SHUTDOWN_GRACE > 0
 
 
 @pytest.mark.parametrize("host", ["8.8.8.8", "2a09:8280:1::1", "::ffff:8.8.8.8", "box.example"])

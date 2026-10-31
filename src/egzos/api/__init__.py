@@ -30,6 +30,10 @@ from urllib.parse import urlsplit
 from egzos.container import Container
 
 DEFAULT_PORT = 7426
+#: Seconds a stopping door waits for requests in flight before it closes them: a held request must
+#: not keep a host's stop waiting until a hard kill, which skips whatever runs after the door exits
+#: (a replicator's last sync, say).
+SHUTDOWN_GRACE = 5
 #: The host setting that opts a container into plain HTTP behind its host's TLS-terminating proxy.
 EDGE_PROXY = "EGZOS_EDGE_PROXY"
 #: Not globally routable: private, loopback, link-local and unique-local (fc00::/7 holds Fly's
@@ -140,4 +144,5 @@ def serve_http(
         ssl_keyfile=str(tls_key) if tls_key else None,
         proxy_headers=False,  # rest.md §1: the socket decides, never a forwarded header
         server_header=False,
+        timeout_graceful_shutdown=SHUTDOWN_GRACE,
     )
