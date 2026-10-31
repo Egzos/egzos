@@ -441,11 +441,12 @@ def test_the_edge_setting_refuses_without_an_explicit_https_origin(c, served):
     assert not served
 
 
+@pytest.mark.parametrize("host", ["10.0.0.5", "127.0.0.1"])  # a typo stops on loopback too
 @pytest.mark.parametrize("value", ["0", "true", "yes", "", " 1"])
-def test_the_edge_setting_takes_1_and_nothing_else(c, served, value):
+def test_the_edge_setting_takes_1_and_nothing_else(c, served, value, host):
     _https_origin(c)
     with pytest.raises(ValueError, match=EDGE_PROXY):
-        serve_http(c, host="10.0.0.5", environ={EDGE_PROXY: value}, addresses=lambda: PRIVATE_HOST)
+        serve_http(c, host=host, environ={EDGE_PROXY: value}, addresses=lambda: PRIVATE_HOST)
     assert not served
 
 

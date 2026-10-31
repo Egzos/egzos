@@ -149,7 +149,8 @@ def serve_http(
 
     if (tls_cert is None) != (tls_key is None):
         raise ValueError("TLS needs both a certificate and its key")
-    if tls_cert is None and not loopback(host) and edge_proxy(environ):
+    edge = edge_proxy(environ)  # read first, so a mistyped value stops on every bind (a6 on #353)
+    if tls_cert is None and not loopback(host) and edge:
         check_edge(container, host, addresses)
     elif tls_cert is None and not loopback(host):
         raise PermissionError(
