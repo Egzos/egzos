@@ -88,6 +88,8 @@ def check_edge(container: Container, host: str) -> None:
         raise PermissionError(
             f"{EDGE_PROXY}: bind an address, not a name, so the socket decides (rest.md §1)"
         ) from None
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped  # judged as its IPv4, as globally_routable judges it
     if ip.is_unspecified:  # a host's own address list can be incomplete, so no list decides
         raise PermissionError(
             f"{EDGE_PROXY}: {host} binds every address; bind the host's private address itself"

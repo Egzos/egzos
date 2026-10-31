@@ -420,7 +420,7 @@ def test_the_edge_setting_refuses_a_routable_bind(c, served, host):
     assert not served
 
 
-@pytest.mark.parametrize("host", ["0.0.0.0", "::"])
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "::ffff:0.0.0.0", "::%eth0"])
 def test_the_edge_setting_refuses_the_unspecified_address(c, served, host):
     """A host's own address list can be incomplete, so the door binds a private address itself."""
     _https_origin(c)
