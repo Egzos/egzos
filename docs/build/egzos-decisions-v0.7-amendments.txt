@@ -449,6 +449,15 @@ AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
           to its database stay synchronous, which one person's container
           bears.
 
+[DECIDED] THE HOST IS FLY.IO, and a container egzos hosts may serve plain
+          HTTP to Fly's own TLS-terminating proxy on Fly's private network
+          (amending [0.3 · 9] for hosted containers). Decided by the Chief
+          on 2026-10-30, after a comparison with Railway, Render, Cloud Run
+          and plain servers. Fly's default private network is shared by
+          every app in an organization, so each hosted container's app
+          gets a custom private network of its own, which only Fly's
+          proxy reaches (a6, GHSA-558w-mv69-53cm). Contract: rest.md §1.
+
 [DECIDED] THE OWNER TOKEN OF A CONTAINER egzos PROVISIONS is minted at
           provisioning and shown once, like recovery codes (§AD). The
           server keeps only its hash, and there is no keychain.json on the

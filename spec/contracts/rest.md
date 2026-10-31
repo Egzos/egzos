@@ -58,6 +58,21 @@ own.
   never from a forwarded header ([0.3 · 9], frozen for the retired AS and owned here now). A door that
   relaxed it would expose bearer tokens on the hop the rule protects. `serve --tls` enforces it
   (a3-doorman).
+- **TLS at a host's edge. decided** (the Chief, 2026-10-30, v0.7 §AF, amending [0.3 · 9] for a
+  container egzos hosts): such a container may serve plain HTTP on its host's private network to the
+  host's own TLS-terminating proxy, which alone faces the internet. It opts in by an explicit host
+  setting, never by default; everywhere else the loopback rule stands. As the loopback rule is, the
+  setting is checked from the socket: the door binds no globally routable address, and refuses to
+  start if any address it binds, or the unspecified address on a host holding a globally routable
+  one, is. It also refuses to start without an explicit `identity.origin` (`identity.md` §2) whose
+  scheme is `https`, the proxy's, never the plain origin it binds. **The private network holds no
+  one but the container and the proxy**, as loopback held no one but the machine: the host gives each
+  hosted container a network of its own (on Fly, a custom private network for its app, never the
+  organization's shared one), so no other container or app can open the socket. Where that does not
+  hold, the setting is not used. Even so, every request still bears its own credential (§2), and
+  nothing is trusted for arriving on that network.
+  No forwarded header decides a caller's identity, scheme or origin, and the throttle's per-source
+  bucket sees the proxy's address, as behind a proxy on loopback (§2 item 7). **a1p**, the wording.
 
 ## 2 · Authentication
 
