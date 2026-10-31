@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import ipaddress
 import os
-import socket
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from egzos.container import Container
 
@@ -78,37 +78,9 @@ def globally_routable(address: str) -> bool:
     return not any(ip.version == n.version and ip in n for n in _NOT_ROUTABLE)
 
 
-def host_addresses() -> list[str]:
-    """The addresses this host holds, as far as the stdlib sees them: its name's addresses, on
-    Linux every IPv6 interface address (`/proc/net/if_inet6`), and the source address the host
-    would use towards the internet (a UDP `connect`, which sends nothing)."""
-    found: list[str] = []
-    try:
-        found += [str(i[4][0]) for i in socket.getaddrinfo(socket.gethostname(), None)]
-    except OSError:
-        pass
-    try:
-        with open("/proc/net/if_inet6") as f:
-            for line in f:
-                h = line.split()[0]
-                found.append(str(ipaddress.IPv6Address(bytes.fromhex(h))))
-    except (OSError, ValueError, IndexError):
-        pass
-    for family, probe in ((socket.AF_INET, "192.0.2.1"), (socket.AF_INET6, "2001:db8::1")):
-        try:
-            with socket.socket(family, socket.SOCK_DGRAM) as s:
-                s.connect((probe, 9))
-                found.append(str(s.getsockname()[0]))
-        except OSError:
-            pass
-    return list(dict.fromkeys(found))
-
-
-def check_edge(
-    container: Container, host: str, addresses: Callable[[], Iterable[str]] = host_addresses
-) -> None:
+def check_edge(container: Container, host: str) -> None:
     """Refuse (`PermissionError`) a plain-HTTP door at a host's edge unless the socket binds no
-    globally routable address, the unspecified one only on a host holding none, and
+    globally routable address and is no unspecified address, and
     `identity.origin` is set explicitly with scheme `https` (rest.md §1)."""
     try:
         ip = ipaddress.ip_address(host.split("%", 1)[0])
@@ -116,17 +88,15 @@ def check_edge(
         raise PermissionError(
             f"{EDGE_PROXY}: bind an address, not a name, so the socket decides (rest.md §1)"
         ) from None
+    if ip.is_unspecified:  # a host's own address list can be incomplete, so no list decides
+        raise PermissionError(
+            f"{EDGE_PROXY}: {host} binds every address; bind the host's private address itself"
+        )
     if globally_routable(host):
         raise PermissionError(f"{EDGE_PROXY}: {host} is globally routable; bind a private address")
-    if ip.is_unspecified:
-        routable = sorted(a for a in addresses() if globally_routable(a))
-        if routable:
-            raise PermissionError(
-                f"{EDGE_PROXY}: {host} would bind {', '.join(routable)}, globally routable; "
-                "bind a private address"
-            )
     origin = container.config_value("identity.origin")
-    if not isinstance(origin, str) or not origin.startswith("https://"):
+    parsed = urlsplit(origin) if isinstance(origin, str) else None
+    if parsed is None or parsed.scheme != "https" or not parsed.hostname:
         raise PermissionError(
             f"{EDGE_PROXY}: set identity.origin to the proxy's https origin "
             "(`egzos config set identity.origin https://…`)"
@@ -141,7 +111,6 @@ def serve_http(
     tls_cert: Path | None = None,
     tls_key: Path | None = None,
     environ: Mapping[str, str] | None = None,
-    addresses: Callable[[], Iterable[str]] = host_addresses,
 ) -> None:
     import uvicorn
 
@@ -151,7 +120,7 @@ def serve_http(
         raise ValueError("TLS needs both a certificate and its key")
     edge = edge_proxy(environ)  # read first, so a mistyped value stops on every bind (a6 on #353)
     if tls_cert is None and not loopback(host) and edge:
-        check_edge(container, host, addresses)
+        check_edge(container, host)
     elif tls_cert is None and not loopback(host):
         raise PermissionError(
             "plain HTTP is for a loopback socket only (rest.md §1): give --tls-cert and --tls-key, "

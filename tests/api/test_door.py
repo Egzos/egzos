@@ -380,7 +380,6 @@ def test_plain_http_is_for_a_loopback_socket_only(c):
 
 # -- §1: TLS at a host's edge (v0.7 §AF) --------------------------------------------------------
 EDGE = {EDGE_PROXY: "1"}
-PRIVATE_HOST = ("127.0.0.1", "10.0.0.5", "fdaa:0:1::2", "fe80::1")
 
 
 @pytest.fixture
@@ -407,37 +406,35 @@ def test_routable_is_judged_from_the_address():
 
 def test_the_edge_setting_serves_plain_http_on_a_private_address(c, served):
     _https_origin(c)
-    serve_http(c, host="fdaa:0:1::2", port=8080, environ=EDGE, addresses=lambda: PRIVATE_HOST)
+    serve_http(c, host="fdaa:0:1::2", port=8080, environ=EDGE)
     (run,) = served
     assert run["host"] == "fdaa:0:1::2" and run["ssl_certfile"] is None
     assert run["proxy_headers"] is False
-    serve_http(c, host="0.0.0.0", port=8080, environ=EDGE, addresses=lambda: PRIVATE_HOST)
-    assert len(served) == 2
 
 
 @pytest.mark.parametrize("host", ["8.8.8.8", "2a09:8280:1::1", "::ffff:8.8.8.8", "box.example"])
 def test_the_edge_setting_refuses_a_routable_bind(c, served, host):
     _https_origin(c)
     with pytest.raises(PermissionError):
-        serve_http(c, host=host, environ=EDGE, addresses=lambda: PRIVATE_HOST)
+        serve_http(c, host=host, environ=EDGE)
     assert not served
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "::"])
-def test_the_edge_setting_refuses_the_unspecified_address_on_a_routable_host(c, served, host):
+def test_the_edge_setting_refuses_the_unspecified_address(c, served, host):
+    """A host's own address list can be incomplete, so the door binds a private address itself."""
     _https_origin(c)
-    with pytest.raises(PermissionError, match="2a09:8280:1::1"):
-        serve_http(c, host=host, environ=EDGE,
-                   addresses=lambda: [*PRIVATE_HOST, "2a09:8280:1::1"])
+    with pytest.raises(PermissionError, match="binds every address"):
+        serve_http(c, host=host, environ=EDGE)
     assert not served
 
 
 def test_the_edge_setting_refuses_without_an_explicit_https_origin(c, served):
     with pytest.raises(PermissionError, match="identity.origin"):
-        serve_http(c, host="10.0.0.5", environ=EDGE, addresses=lambda: PRIVATE_HOST)
+        serve_http(c, host="10.0.0.5", environ=EDGE)
     _https_origin(c, "http://127.0.0.1:7426")  # plain http, loopback only: still refused
     with pytest.raises(PermissionError, match="identity.origin"):
-        serve_http(c, host="10.0.0.5", environ=EDGE, addresses=lambda: PRIVATE_HOST)
+        serve_http(c, host="10.0.0.5", environ=EDGE)
     assert not served
 
 
@@ -446,7 +443,7 @@ def test_the_edge_setting_refuses_without_an_explicit_https_origin(c, served):
 def test_the_edge_setting_takes_1_and_nothing_else(c, served, value, host):
     _https_origin(c)
     with pytest.raises(ValueError, match=EDGE_PROXY):
-        serve_http(c, host=host, environ={EDGE_PROXY: value}, addresses=lambda: PRIVATE_HOST)
+        serve_http(c, host=host, environ={EDGE_PROXY: value})
     assert not served
 
 
@@ -455,7 +452,7 @@ def test_without_the_edge_setting_the_loopback_rule_stands(c, served, monkeypatc
     _https_origin(c)
     for host in ("10.0.0.5", "fdaa:0:1::2", "0.0.0.0"):
         with pytest.raises(PermissionError, match="loopback socket only"):
-            serve_http(c, host=host, addresses=lambda: PRIVATE_HOST)
+            serve_http(c, host=host)
     serve_http(c, host="127.0.0.1")
     assert [r["host"] for r in served] == ["127.0.0.1"]
 
@@ -463,13 +460,13 @@ def test_without_the_edge_setting_the_loopback_rule_stands(c, served, monkeypatc
 def test_the_edge_setting_is_read_from_the_host_environment(c, served, monkeypatch):
     _https_origin(c)
     monkeypatch.setenv(EDGE_PROXY, "1")
-    serve_http(c, host="10.0.0.5", addresses=lambda: PRIVATE_HOST)
+    serve_http(c, host="10.0.0.5")
     assert len(served) == 1
 
 
 def test_a_forwarded_header_changes_nothing_at_the_edge(c, served):
     _https_origin(c)
-    serve_http(c, host="10.0.0.5", port=8080, environ=EDGE, addresses=lambda: PRIVATE_HOST)
+    serve_http(c, host="10.0.0.5", port=8080, environ=EDGE)
     (run,) = served
     assert run["proxy_headers"] is False
     client = TestClient(run["app"])
