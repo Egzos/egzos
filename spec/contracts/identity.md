@@ -44,7 +44,7 @@ requires.
 | key | default | what it is |
 |---|---|---|
 | `identity.issuer` | absent | the provider's issuer URL, e.g. `https://<project>.supabase.co/auth/v1`. Absent: no provider (§1) |
-| `identity.client_id` | absent | this container's own OAuth client at the provider (§3a), registered when the container is linked to it |
+| `identity.client_id` | absent | this container's own OAuth client at the provider (§3a), registered at the provider first and recorded here when the container is provisioned or linked (§4) |
 | `identity.audience` | `authenticated` | the `aud` value an access token must carry |
 | `identity.algorithms` | `ES256 RS256` | the signing algorithms accepted. Never `none`, never a symmetric `HS*` |
 | `identity.browser_origins` | `https://egzos.io` | origins the REST door answers CORS for (§6). While §3a's stand-in holds (v0.7 §AE), it is set to the stand-in origin, never left at the default |
@@ -92,10 +92,11 @@ apart; the provider issues no resource indicators. A container that received a p
 therefore present it at another container the same person can reach. So no container accepts a bare
 session. Each token is bound to one container through the provider's own OAuth 2.1 server:
 
-- **Each container is a public OAuth client of the provider** (`identity.client_id`), registered when the
-  container is linked to it. Its redirect URIs are exactly two full URIs, matched exactly — egzos.io's
-  callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`,
-  where the container origin is §2's `identity.origin` (#294)
+- **Each container is a public OAuth client of the provider** (`identity.client_id`), registered at the
+  provider when egzos provisions the container, or before its owner links it (§4). Its redirect URIs
+  are exactly two full URIs, matched exactly — egzos.io's callback, `https://egzos.io/oauth/callback`,
+  and the container's own, `<container origin>/oauth/callback`, where the container origin is §2's
+  `identity.origin` (#294)
   — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
   a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
   Until egzos.io is bought, `https://egzos-site.vercel.app` stands in for it here and in
@@ -106,6 +107,13 @@ session. Each token is bound to one container through the provider's own OAuth 2
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
   no second password, no second login (§T). The token is presented only to the container it names.
+- **egzos.io takes a container's client from egzos's own record, never from the container.** The pair
+  it runs the flow for, a container's origin and its `client_id`, comes from the record egzos keeps of
+  the containers it hosts. It is never taken from the container's own answers, a URL or a paste, and
+  the flow goes only to the provider egzos.io signs people in with, whatever issuer a container's
+  metadata (§7) names. **a1p** (#283). `TODO(a1p)`, #283: how a self-hosted container's link reaches
+  that record, and from what trusted source; until then, egzos.io reaches only the containers egzos
+  hosts.
 - **An agent's token is bound by its own registration, and a `client_id` is registered on one container
   only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
@@ -152,8 +160,9 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
 - **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
   created it, all six capabilities, `["*"]`. A container made by `init` (a local, or a self-hosted one)
   has no provider user until its owner links it: the link is run by the holder of the owner `Token`
-  (the CLI), and it registers the container's client (§3a) and writes the owner's grant for the `sub`
-  the owner signs in as. **a1p.**
+  (the CLI). The container's client is registered at the provider first (§3a); the link records it
+  (`identity.issuer`, `identity.client_id`) and writes the owner's grant for the `sub` the owner signs
+  in as. **a1p.**
 - **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
   revoked; the owner `Token` from `init` stays the way back in. **a1p.** The owner of a container
   egzos provisions, who never ran `init`, gets that `Token`, the recovery factor (§AD; Revocation
