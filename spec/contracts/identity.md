@@ -94,8 +94,9 @@ session. Each token is bound to one container through the provider's own OAuth 2
 
 - **Each container is a public OAuth client of the provider** (`identity.client_id`), registered at the
   provider when egzos provisions the container, or before its owner links it (§4). Its redirect URIs
-  are exactly two full URIs, matched exactly — egzos.io's callback, `https://egzos.io/oauth/callback`, and the container's own, `<container origin>/oauth/callback`,
-  where the container origin is §2's `identity.origin` (#294)
+  are exactly two full URIs, matched exactly — egzos.io's callback, `https://egzos.io/oauth/callback`,
+  and the container's own, `<container origin>/oauth/callback`, where the container origin is §2's
+  `identity.origin` (#294)
   — never an origin, a prefix or a pattern, so an open redirect elsewhere on either origin cannot receive
   a code. PKCE with `code_challenge_method=S256` is required; `plain` is refused. **a1p** (a6 on #282).
   Until egzos.io is bought, `https://egzos-site.vercel.app` stands in for it here and in
