@@ -106,6 +106,14 @@ session. Each token is bound to one container through the provider's own OAuth 2
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
   no second password, no second login (§T). The token is presented only to the container it names.
+- **egzos.io takes a container's client from egzos's own record, never from the container.** The pair
+  it runs the flow for, a container's origin and its `client_id`, comes from the record egzos makes
+  when it provisions a container or a person links one, or is checked against the provider's own
+  registration of that `client_id`, whose redirect URIs name the container's callback. It is never
+  taken from the container's own answers, a URL or a paste alone, and the flow goes only to the
+  provider egzos.io signs people in with, whatever issuer a container's metadata (§7) names. **a1p**
+  (#283). `TODO(a1p)`, #283: how a self-hosted container's link reaches that record; until it does,
+  the record holds only the containers egzos hosts.
 - **An agent's token is bound by its own registration, and a `client_id` is registered on one container
   only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
@@ -152,8 +160,9 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
 - **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
   created it, all six capabilities, `["*"]`. A container made by `init` (a local, or a self-hosted one)
   has no provider user until its owner links it: the link is run by the holder of the owner `Token`
-  (the CLI), and it registers the container's client (§3a) and writes the owner's grant for the `sub`
-  the owner signs in as. **a1p.**
+  (the CLI). The container's client is registered at the provider first (§3a); the link records it
+  (`identity.issuer`, `identity.client_id`) and writes the owner's grant for the `sub` the owner signs
+  in as. **a1p.**
 - **The owner cannot be locked out.** The last live grant holding `admin` over `["*"]` cannot be
   revoked; the owner `Token` from `init` stays the way back in. **a1p.** The owner of a container
   egzos provisions, who never ran `init`, gets that `Token`, the recovery factor (§AD; Revocation
