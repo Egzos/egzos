@@ -21,9 +21,12 @@ forwarded header, so the document is the same for every caller.
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import os
-from collections.abc import Mapping
+import signal
+import threading
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -109,6 +112,26 @@ def check_edge(container: Container, host: str) -> None:
         )
 
 
+@contextlib.contextmanager
+def _sigterm_as_sigint() -> Iterator[None]:
+    """While the door runs, SIGTERM (how Docker, systemd and Kubernetes stop a process) ends it as
+    SIGINT (Ctrl-C) does. uvicorn drains on either, then raises the signal again under the handler
+    it found: under this one that is KeyboardInterrupt, which `uvicorn.run` ends on, so the command
+    returns and closes its container (storage.md §3.7), as it does on Ctrl-C. A uvicorn that does
+    not raise it again never calls this handler. Only the main thread takes a signal; elsewhere,
+    or where the handler was set outside Python and could not be put back, nothing changes
+    (GHSA-wf2m-wg6h-v6wf)."""
+    previous = signal.getsignal(signal.SIGTERM)
+    if previous is None or threading.current_thread() is not threading.main_thread():
+        yield
+        return
+    signal.signal(signal.SIGTERM, signal.default_int_handler)
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
+
+
 def serve_http(
     container: Container,
     *,
@@ -134,15 +157,16 @@ def serve_http(
         )
     origin = bound_origin(host, port, tls=tls_cert is not None)
     print(f"egzos REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
-    uvicorn.run(
-        create_app(container, origin=origin),
-        host=host,
-        port=port,
-        log_level="warning",
-        access_log=False,  # a URL is not logged: the door's own record is the chain
-        ssl_certfile=str(tls_cert) if tls_cert else None,
-        ssl_keyfile=str(tls_key) if tls_key else None,
-        proxy_headers=False,  # rest.md §1: the socket decides, never a forwarded header
-        server_header=False,
-        timeout_graceful_shutdown=SHUTDOWN_GRACE,
-    )
+    with _sigterm_as_sigint():
+        uvicorn.run(
+            create_app(container, origin=origin),
+            host=host,
+            port=port,
+            log_level="warning",
+            access_log=False,  # a URL is not logged: the door's own record is the chain
+            ssl_certfile=str(tls_cert) if tls_cert else None,
+            ssl_keyfile=str(tls_key) if tls_key else None,
+            proxy_headers=False,  # rest.md §1: the socket decides, never a forwarded header
+            server_header=False,
+            timeout_graceful_shutdown=SHUTDOWN_GRACE,
+        )
