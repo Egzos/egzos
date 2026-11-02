@@ -25,6 +25,7 @@ import threading
 import time
 import webbrowser
 
+from egzos._signals import sigterm_as_sigint
 from egzos.authz.presence import is_terminal
 from egzos.container import Container
 
@@ -82,4 +83,5 @@ def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool
         _launch(url, open_browser)
 
     threading.Thread(target=launch_when_up, daemon=True).start()
-    uvicorn.run(app, host=host, port=port, log_level="warning", access_log=False)
+    with sigterm_as_sigint():  # a SIGTERM stop closes the container as Ctrl-C does
+        uvicorn.run(app, host=host, port=port, log_level="warning", access_log=False)

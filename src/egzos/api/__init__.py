@@ -21,15 +21,13 @@ forwarded header, so the document is the same for every caller.
 
 from __future__ import annotations
 
-import contextlib
 import ipaddress
 import os
-import signal
-import threading
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from egzos._signals import sigterm_as_sigint
 from egzos.container import Container
 
 DEFAULT_PORT = 7426
@@ -112,26 +110,6 @@ def check_edge(container: Container, host: str) -> None:
         )
 
 
-@contextlib.contextmanager
-def _sigterm_as_sigint() -> Iterator[None]:
-    """While the door runs, SIGTERM (how Docker, systemd and Kubernetes stop a process) ends it as
-    SIGINT (Ctrl-C) does. uvicorn drains on either, then raises the signal again under the handler
-    it found: under this one that is KeyboardInterrupt, which `uvicorn.run` ends on, so the command
-    returns and closes its container (storage.md §3.7), as it does on Ctrl-C. A uvicorn that does
-    not raise it again never calls this handler. Only the main thread takes a signal; elsewhere,
-    or where the handler was set outside Python and could not be put back, nothing changes
-    (GHSA-wf2m-wg6h-v6wf)."""
-    previous = signal.getsignal(signal.SIGTERM)
-    if previous is None or threading.current_thread() is not threading.main_thread():
-        yield
-        return
-    signal.signal(signal.SIGTERM, signal.default_int_handler)
-    try:
-        yield
-    finally:
-        signal.signal(signal.SIGTERM, previous)
-
-
 def serve_http(
     container: Container,
     *,
@@ -157,7 +135,7 @@ def serve_http(
         )
     origin = bound_origin(host, port, tls=tls_cert is not None)
     print(f"egzos REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
-    with _sigterm_as_sigint():
+    with sigterm_as_sigint():  # a SIGTERM stop closes the container as Ctrl-C does
         uvicorn.run(
             create_app(container, origin=origin),
             host=host,

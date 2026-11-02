@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """GHSA-wf2m-wg6h-v6wf: a door stopped with SIGTERM, as Docker, systemd and Kubernetes stop a
 process, ends as one stopped with SIGINT (Ctrl-C) does: its command closes the container and exits
-0, so a home bound to a database records the newest entry it has seen (storage.md §3.7). Each door
-runs as `egzos serve --http` in a process of its own, so a stop that ends that process cannot end
-the test run. The postgres case runs when `EGZOS_TEST_POSTGRES` names a database, as
+0, so a home bound to a database records the newest entry it has seen (storage.md §3.7). Each door,
+`egzos serve --http` and `egzos web`, runs in a process of its own, so a stop that ends that process
+cannot end the test run. The postgres case runs when `EGZOS_TEST_POSTGRES` names a database, as
 `tests/test_home_binding.py`'s do, on a schema and a role of its own."""
 
 from __future__ import annotations
@@ -33,6 +33,9 @@ pytestmark = [pytest.mark.adversarial,
 
 POSTGRES = os.environ.get("EGZOS_TEST_POSTGRES")
 STOPS = pytest.mark.parametrize("stop", [signal.SIGINT, signal.SIGTERM], ids=["SIGINT", "SIGTERM"])
+#: The two doors that run uvicorn, as their commands start them on a port.
+DOORS = pytest.mark.parametrize("door", [("serve", "--http"), ("web", "--no-open")],
+                                ids=["serve-http", "web"])
 #: `egzos`, as its console script runs it, with the stops a host's process starts with, on the
 #: schema the test's database names, and `Container.close` leaving a mark once it has run.
 DOOR = """
@@ -67,8 +70,9 @@ def _port() -> int:
         return s.getsockname()[1]
 
 
-def _stop(tmp_path: Path, stop: int, *, schema: str = "egzos", named=None, serving=None):
-    """Serve `tmp_path/home`'s door until it answers, call `serving(port)`, then send `stop`: the
+def _stop(tmp_path: Path, stop: int, *, door=("serve", "--http"), schema: str = "egzos",
+          named=None, serving=None):
+    """Serve `tmp_path/home`'s `door` until it answers, call `serving(port)`, then send `stop`: the
     door's exit code, whether `Container.close` ran, and what it printed. Its environment holds
     no `EGZOS_*` setting but its home and those `named`, and finds the egzos under test first."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("EGZOS_")}
@@ -77,7 +81,7 @@ def _stop(tmp_path: Path, stop: int, *, schema: str = "egzos", named=None, servi
     env.update(EGZOS_HOME=str(tmp_path / "home"), **(named or {}))
     port, mark = _port(), tmp_path / "closed"
     door = subprocess.Popen(
-        [sys.executable, "-c", DOOR, schema, str(mark), "serve", "--http", "--port", str(port)],
+        [sys.executable, "-c", DOOR, schema, str(mark), *door, "--port", str(port)],
         cwd=tmp_path, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:
         deadline = time.monotonic() + 60
@@ -100,13 +104,14 @@ def _stop(tmp_path: Path, stop: int, *, schema: str = "egzos", named=None, servi
     return door.returncode, mark.exists(), out
 
 
+@DOORS
 @STOPS
-def test_ghsa_wf2m_wg6h_v6wf_a_stopped_door_closes_its_container(tmp_path, stop):
-    """SIGTERM ends the door as SIGINT does: its command closes the container and exits 0."""
+def test_ghsa_wf2m_wg6h_v6wf_a_stopped_door_closes_its_container(tmp_path, door, stop):
+    """SIGTERM ends either door as SIGINT does: its command closes the container and exits 0."""
     c = Container(tmp_path / "home")
     c.init()
     c.close()
-    code, closed, out = _stop(tmp_path, stop)
+    code, closed, out = _stop(tmp_path, stop, door=door)
     assert (code, closed) == (0, True), out
 
 
@@ -167,14 +172,15 @@ def test_ghsa_wf2m_wg6h_v6wf_a_stopped_door_records_the_newest_entry_seen(tmp_pa
 
 
 def test_ghsa_wf2m_wg6h_v6wf_sigterm_is_sigints_only_while_a_door_runs(tmp_path, monkeypatch):
-    """The door takes SIGTERM as SIGINT while it runs and puts back the handler it found, after a
-    run that fails too; on any other thread than the main one, which takes no signal, it changes
-    nothing."""
+    """The door takes SIGTERM as SIGINT while it runs, in place of SIGTERM's default handler only,
+    and puts the default back, after a run that fails too. An ignored SIGTERM, or a handler set by
+    whatever embeds the door, is left as it is; on any other thread than the main one, which takes
+    no signal, nothing changes."""
     import uvicorn
 
     from egzos.api import serve_http
 
-    during, errors, before = [], [], signal.getsignal(signal.SIGTERM)
+    during, errors, kept, found = [], [], [], signal.getsignal(signal.SIGTERM)
 
     def run(app, **kw):
         during.append(signal.getsignal(signal.SIGTERM))
@@ -187,14 +193,28 @@ def test_ghsa_wf2m_wg6h_v6wf_sigterm_is_sigints_only_while_a_door_runs(tmp_path,
         except Exception as e:  # noqa: BLE001 — reported by the assert below
             errors.append(e)
 
+    def embedder(signum, frame):  # a handler set by whatever embeds the door
+        pass
+
     monkeypatch.setattr(uvicorn, "run", run)
     monkeypatch.setattr("egzos.api.app.create_app", lambda container, origin: None)
     c = Container(tmp_path)
-    with pytest.raises(OSError):
-        serve_http(c)
-    thread = threading.Thread(target=off_main)
-    thread.start()
-    thread.join()
-    c.close()
-    assert (during, errors) == ([signal.default_int_handler, before], [])
-    assert signal.getsignal(signal.SIGTERM) == before
+    try:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        with pytest.raises(OSError):
+            serve_http(c)
+        after = signal.getsignal(signal.SIGTERM)
+        thread = threading.Thread(target=off_main)
+        thread.start()
+        thread.join()
+        for handler in (signal.SIG_IGN, embedder):
+            signal.signal(signal.SIGTERM, handler)
+            with pytest.raises(OSError):
+                serve_http(c)
+            kept.append(signal.getsignal(signal.SIGTERM))
+    finally:
+        signal.signal(signal.SIGTERM, signal.SIG_DFL if found is None else found)
+        c.close()
+    assert (during, errors, after) == (
+        [signal.default_int_handler, signal.SIG_DFL, signal.SIG_IGN, embedder], [], signal.SIG_DFL)
+    assert kept == [signal.SIG_IGN, embedder]
