@@ -114,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`egzos serve --http` and `egzos web` stop on SIGTERM as on Ctrl-C.** A host's stop (Docker, systemd, Kubernetes) now ends the command normally, so it closes its container before it exits.
 - **A stopping door no longer waits without limit for requests in flight.** `egzos serve` gives them 5 seconds (uvicorn's `timeout_graceful_shutdown`), then closes them, so one held request cannot keep a host's stop waiting until a hard kill skips what runs after the door exits, such as a replicator's last sync.
 
 - `POST /v1/scopes` serves a created node's path only to a token that may read (`fetch`); any

@@ -27,6 +27,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from egzos._signals import sigterm_as_sigint
 from egzos.container import Container
 
 DEFAULT_PORT = 7426
@@ -134,15 +135,16 @@ def serve_http(
         )
     origin = bound_origin(host, port, tls=tls_cert is not None)
     print(f"egzos REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
-    uvicorn.run(
-        create_app(container, origin=origin),
-        host=host,
-        port=port,
-        log_level="warning",
-        access_log=False,  # a URL is not logged: the door's own record is the chain
-        ssl_certfile=str(tls_cert) if tls_cert else None,
-        ssl_keyfile=str(tls_key) if tls_key else None,
-        proxy_headers=False,  # rest.md §1: the socket decides, never a forwarded header
-        server_header=False,
-        timeout_graceful_shutdown=SHUTDOWN_GRACE,
-    )
+    with sigterm_as_sigint():  # a SIGTERM stop closes the container as Ctrl-C does
+        uvicorn.run(
+            create_app(container, origin=origin),
+            host=host,
+            port=port,
+            log_level="warning",
+            access_log=False,  # a URL is not logged: the door's own record is the chain
+            ssl_certfile=str(tls_cert) if tls_cert else None,
+            ssl_keyfile=str(tls_key) if tls_key else None,
+            proxy_headers=False,  # rest.md §1: the socket decides, never a forwarded header
+            server_header=False,
+            timeout_graceful_shutdown=SHUTDOWN_GRACE,
+        )
