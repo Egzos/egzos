@@ -536,6 +536,13 @@ AG. AMENDMENT — THE DRAWING SYSTEM: HAIRLINE FIGURES AND PELE DIAGRAMS (amends
           Egzos/egzos-platform asks for that placement and for the figure on
           the sign-in screen.
 
+[DECIDED] THE EMPTY SPACE'S FIGURE IS THE ORB ITSELF, drawn from the mark
+          (BRAND.md D0) with hairline-adopt, since the object that holds
+          nothing in egzos is the orb. The Drawer placed there first was
+          withdrawn by the Chief the same day, on seeing it; until the orb
+          figure lands, the empty space shows its copy alone. (The Chief,
+          2026-11-04.)
+
 
 ================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
