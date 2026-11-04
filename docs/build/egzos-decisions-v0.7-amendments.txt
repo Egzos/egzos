@@ -1,12 +1,12 @@
 ================================================================================
 EGZOS — DECISIONS LOG · v0.7 AMENDMENT SET
 Delta on top of the v0.4 log and the v0.5 and v0.6 amendment sets. Records
-the Chief's calls of 2026-10-22/23 and 2026-10-25: buy, don't build;
-Supabase for the platform services; one login; the Face ID / Touch ID
+the Chief's calls of 2026-10-22/23, 2026-10-25 and 2026-11-04: buy, don't
+build; Supabase for the platform services; one login; the Face ID / Touch ID
 confirm; places and git-like sync; the egzosux experience; Stripe; the
-repository's visibility; where a hosted container's state lives and runs. Sections
-not mentioned carry forward unchanged. Compiled 2026-10-23; §AF added
-2026-10-25.
+repository's visibility; where a hosted container's state lives and runs; the
+drawing system. Sections not mentioned carry forward unchanged. Compiled
+2026-10-23; §AF added 2026-10-25; §AG added 2026-11-04.
 Read together with: egzos-decisions-log-v0.4.txt · egzos-decisions-v0.5-
 amendments.txt · egzos-decisions-v0.6-amendments.txt · egzos-handoff.txt ·
 egzos-build-plan-v1.2.txt
@@ -468,6 +468,76 @@ AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
 
 
 ================================================================================
+AG. AMENDMENT — THE DRAWING SYSTEM: HAIRLINE FIGURES AND PELE DIAGRAMS (amends
+    v0.6 §P's catalogue sources, DESIGN-PRINCIPLES.md principle 6 and
+    DESIGN-SOURCES.md's inspiration canon; Egzos/egzos-platform, the
+    drawing-system PR)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-04 in a working session with the
+          operator; recorded by the operator, enacted by the merge of the PR
+          that carries this text; the Chief may veto by reverting. Why: an
+          illustration and a diagram renderer are commodity pieces (§R), and
+          each exists as a maintained MIT library, so both are bought.
+
+[DECIDED] HAIRLINE IS THE ILLUSTRATION CANON: lucasmarkes/hairline (MIT),
+          isometric line figures that answer the pointer, taken as the npm
+          package @lucasmarkes/hairline, pinned exactly (0.5.1 at this
+          writing) — bought, not built (§R). Figures go first to the states
+          where nothing needs a human: the empty live space, the unreachable
+          card, the connect failure; then to the sign-in screen and the
+          other security surfaces (Egzos/egzos-platform's CLAUDE.md, §6),
+          each under a6's review. Every figure enters through the tokens:
+          its six variables (plate, hi, edge, mid, lo, stroke) are bound to
+          --egz-* tokens and nothing else, so a figure is ink only under the
+          two-colours law — blue asks, red fails, a drawing does neither. A
+          figure never autoplays, carries no state, and means nothing by its
+          motion; at rest it is its own still equivalent, and under reduced
+          motion its springs land at once.
+
+[DECIDED] PRINCIPLE 6 READS WITH ONE MORE SENTENCE: "An illustration may
+          answer the hand; it carries no state, its motion means nothing,
+          and it never plays on its own." A2 carries it into
+          DESIGN-PRINCIPLES.md at that file's next revision: its versioned
+          Principles: pointer sits in three public spec headers, so the bump
+          is A2's to batch, not a drive-by here. Until then this log wins
+          where the older text disagrees.
+
+[DECIDED] NEW FIGURES COME FROM THE hairline-create SKILL UNDER ITS TEN
+          RULES, run by A2 studio or the Chief: one figure, one idea; no
+          words inside a figure; an empty state shows the object holding
+          nothing; a figure made from the egzos mark follows BRAND.md and
+          TRADEMARKS.md. A figure ships into the product only as a package
+          component or as a vendored figure with provenance in
+          DESIGN-SOURCES.md, never fetched at build time. The limit, so
+          nobody re-finds it: the skill hands over one self-contained HTML
+          file, and the package exports only its named figures, so a new
+          figure cannot be dropped into the React app from that file. It
+          ships either upstream (a PR to lucasmarkes/hairline, then the pin
+          moves) or as a vendored figure on the skill's MIT kernel, with
+          its provenance recorded.
+
+[DECIDED] PELE DRAWS THE DIAGRAMS: obsidianmd/pele (MIT), Mermaid text to
+          SVG, synchronous and without runtime dependencies, taken as the
+          npm package pele, pinned exactly (1.13.0 at this writing) —
+          bought, not built (§R). It is themed through its own variables,
+          bound to the tokens and nothing else, the accent included: a
+          diagram asks nothing of a human, so it is ink. In the product it
+          draws the Map of a container's structure; in specs and docs it
+          draws flows. Rules: links and images off; the SVG sanitised before
+          it enters the DOM; every container string through the label
+          encoder, and a node id never from data; a diagram that fails to
+          draw draws nothing (silence-not-errors). It is not a force graph
+          and does not replace the space: the 3D space (§W) is the
+          topology, the Map is its record on paper.
+
+[LEAN]    THE MAP'S PLACEMENT — the right panel's container and project
+          detail — is provisional until A2 places it. A design-gap issue in
+          Egzos/egzos-platform asks for that placement and for the figure on
+          the sign-in screen.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -479,7 +549,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      one login, the confirm, places and sync, the experience, Stripe,
      visibility, retention, token binding, own agents, kept uploads,
      confirm credentials, where the app lives, where a hosted
-     container's state lives and runs
+     container's state lives and runs, the drawing system
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
