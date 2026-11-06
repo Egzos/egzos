@@ -2,7 +2,7 @@
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
 Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB,
-§AD and §AE) and of 2026-10-25 (§AF) into the contract set, and **retires `authorization-server.md`**
+§AD and §AE), of 2026-10-25 (§AF) and of 2026-11-05 (§AG, #361) into the contract set, and **retires `authorization-server.md`**
 (§9). One login takes effect with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform`
 points here.
 
@@ -135,9 +135,11 @@ session. Each token is bound to one container through the provider's own OAuth 2
   not bind the terminal's port. **decided** (v0.7 §AG), **a1p** the binding. **Accepted residual**
   (§AG): the paste path has a device flow's phishing shape, since a person could be sent a start URL
   made on someone else's terminal and asked to read the code back. The page says, in words, that the
-  code belongs to the terminal `egzos login` was run on and to no one else; the code is single-use and
-  lives ten minutes at the provider; the loopback path, the default, never leaves the machine; and the
-  page is a security surface, so a6 reviews its copy.
+  code belongs to the terminal `egzos login` was run on and to no one else; the start page asks
+  before the flow leaves, in words of the shape "a terminal is asking to sign in as you; continue only
+  if you just ran `egzos login`", so no flow starts on a visit alone; the code is single-use and lives
+  ten minutes at the provider; the loopback path, the default, never leaves the machine; and the pages
+  are a security surface, so a6 reviews their copy.
 - **An agent's token is bound by its own registration, and a `client_id` is registered on one container
   only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
@@ -379,7 +381,8 @@ pull from its cloud (§V), its owner signs in through the cloud's provider like 
 login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p** the rest:
 
 - **What the login yields** is a person's token bound to the cloud container (§3a), `principal:
-  interactive`, with a refresh token. The terminal presents it at that container alone (`/v1/`, and
+  interactive`, with a refresh token where the provider issues one to a public client (the check §AG
+  owes); without one the access token runs to its `exp` and `egzos login` runs again. The terminal presents it at that container alone (`/v1/`, and
   `/mcp` as §7 admits a person's token), and §3, §4 and §5 decide the rest. It is not a container
   `Token`: `token ls` does not list it, and nothing mints one from it. A person egzos hosts no
   container for has nothing to log in to, and the terminal says so in one line.
@@ -389,6 +392,16 @@ login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p*
   (`0600`). It never enters the container's own state or its chain, and never a URL, a log or a
   child process's arguments. The access token is held in memory and refreshed silently; `egzos
   whoami` says who is signed in and to which cloud.
+- **A stored token is a held token.** Any process running as the machine's user can read what that
+  user's store holds, so a refresh token at rest is §5's admitted gap (software that holds a
+  person's token can press the button) made durable: the second **accepted residual** (§AG), named
+  beside the paste path's. The container cannot tell this token from the browser's, since both are
+  the person's, issued to the same client, so nothing here refuses it anything. What bounds it: the
+  CLI never offers the button, and a human-only act begun from a terminal is finished in the browser,
+  where the biometric runs; the owner who wants the biometric everywhere sets `confirm.allow_button`
+  to `false` (§5), and `egzos login` says so once, on first use; the token is bound to one container
+  (§3a) and ends with its grant (§4). The backstop is §5's biometric, as for any software that
+  holds a person's token.
 - **`egzos logout` forgets the token on this machine.** The provider publishes no revocation endpoint,
   so the refresh token is deleted here and the access token runs to its `exp`; a cloud's admin
   revokes a grant, never a token (§4). The line says exactly that.
