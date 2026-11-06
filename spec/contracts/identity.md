@@ -114,6 +114,30 @@ session. Each token is bound to one container through the provider's own OAuth 2
   metadata (§7) names. **a1p** (#283). `TODO(a1p)`, #283: how a self-hosted container's link reaches
   that record, and from what trusted source; until then, egzos.io reaches only the containers egzos
   hosts.
+- **A terminal reaches a cloud through egzos.io's callback.** `egzos login` (§8) is the person's own
+  browser flow with the terminal holding the PKCE verifier: the CLI makes the pair and a `state` and
+  opens the browser at egzos.io, which runs the flow above for the person's cloud container's client,
+  from its own record, with the terminal's `code_challenge` in place of its own. The redirect URIs do
+  not change: the code returns to egzos.io's callback. What changes is what that page may do with a
+  code from a flow it started for a terminal, and only such a flow, known by the pending record this
+  browser wrote when it left: hand it on to `http://127.0.0.1:<port>/oauth/callback`, the port the
+  terminal named when it started and the path fixed, with the `state` and the record's triple (the
+  container's origin, its `client_id`, the issuer); or, when the terminal said it cannot listen, show
+  the `code` and the `state` on the page for the person to paste into the terminal that asked. A
+  callback with no such record hands on and shows nothing (a cold arrival, as today). The page never
+  exchanges the code and never holds the token: the code is spent only with the verifier the terminal
+  kept, so read off the page or out of a redirect it is worth nothing. The terminal accepts a hand-off
+  only with the `state` it made, pins the issuer to the provider it is configured for, and after the
+  exchange checks the token's `client_id` claim against the `client_id` it was handed and the
+  container's metadata (§7) against the origin, so a hand-off naming another container or provider
+  fails closed, and the terminal never names a container or a client to egzos.io (the record rule
+  above holds). The provider never sees a loopback redirect, so its exact match on redirect URIs does
+  not bind the terminal's port. **decided** (v0.7 §AG), **a1p** the binding. **Accepted residual**
+  (§AG): the paste path has a device flow's phishing shape, since a person could be sent a start URL
+  made on someone else's terminal and asked to read the code back. The page says, in words, that the
+  code belongs to the terminal `egzos login` was run on and to no one else; the code is single-use and
+  lives ten minutes at the provider; the loopback path, the default, never leaves the machine; and the
+  page is a security surface, so a6 reviews its copy.
 - **An agent's token is bound by its own registration, and a `client_id` is registered on one container
   only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
@@ -351,8 +375,29 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
 ## 8 · Places
 
 A local (a laptop, a desktop) with no provider keeps working offline on its own `Token`. To push to or
-pull from its cloud (§V), its owner signs in through the cloud's provider like any client. Push and pull
-are `storage.md`'s, in the contract version that carries §V. **a1p.**
+pull from its cloud (§V), its owner signs in through the cloud's provider like any client: `egzos
+login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p** the rest:
+
+- **What the login yields** is a person's token bound to the cloud container (§3a), `principal:
+  interactive`, with a refresh token. The terminal presents it at that container alone (`/v1/`, and
+  `/mcp` as §7 admits a person's token), and §3, §4 and §5 decide the rest. It is not a container
+  `Token`: `token ls` does not list it, and nothing mints one from it. A person egzos hosts no
+  container for has nothing to log in to, and the terminal says so in one line.
+- **Where it lives.** The refresh token goes in the operating system's credential store (the Keychain
+  on macOS, the Secret Service on Linux, the Credential Manager on Windows), through a maintained
+  library (§R); where none can be reached, a file under `EGZOS_HOME` readable by its owner alone
+  (`0600`). It never enters the container's own state or its chain, and never a URL, a log or a
+  child process's arguments. The access token is held in memory and refreshed silently; `egzos
+  whoami` says who is signed in and to which cloud.
+- **`egzos logout` forgets the token on this machine.** The provider publishes no revocation endpoint,
+  so the refresh token is deleted here and the access token runs to its `exp`; a cloud's admin
+  revokes a grant, never a token (§4). The line says exactly that.
+- **What the login supplies the link.** A local its owner links (§4) needs the owner's `sub`; the
+  login's token carries it, so `egzos link` takes it from the login in place of a typed value. The
+  login does not register the local's own client at the provider: §3a's `TODO(a1p)` on how a
+  self-hosted container's link reaches egzos's record stays open, and until it closes a local without
+  a cloud links by hand, as today.
+- **Push and pull** are `storage.md`'s, in the contract version that carries §V, and run on this token.
 
 ## 9 · What this retires, and what it does not fix
 
