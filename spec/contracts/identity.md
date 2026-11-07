@@ -138,11 +138,13 @@ session. Each token is bound to one container through the provider's own OAuth 2
   terminal prints a matching code derived from its `state` before the browser opens, and egzos.io's
   start page shows the same code, so the person can see that the page belongs to the terminal they
   are at. **decided** (v0.7 §AH). Until the confirmation lands, in R1's PR after #364, the terminal
-  keeps without asking, a stated and dated gap, and no code presents the stored token (§8). The provider never sees a loopback redirect, so its exact match on redirect URIs does
+  keeps without asking, a stated gap recorded on 2026-11-07, and no code presents the stored token (§8). The provider never sees a loopback redirect, so its exact match on redirect URIs does
   not bind the terminal's port. **decided** (v0.7 §AG), **a1p** the binding. **Accepted residual**
   (§AG): the paste path has a device flow's phishing shape, since a person could be sent a start URL
   made on someone else's terminal and asked to read the code back. The page says, in words, that the
-  code belongs to the terminal `egzos login` was run on and to no one else; the terminal and the start page show the same matching code (v0.7 §AH); the start page asks
+  code belongs to the terminal `egzos login` was run on and to no one else; the terminal and the start page show the same matching code (v0.7 §AH), which lets a person at
+  their own terminal see the page is theirs but does not help one sent a start URL made on someone
+  else's terminal; the start page asks
   before the flow leaves, in words of the shape "a terminal is asking to sign in as you; continue only
   if you just ran `egzos login`", so no flow starts on a visit alone; the code is single-use and lives
   ten minutes at the provider; the loopback path, the default, never leaves the machine; and the pages
