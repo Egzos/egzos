@@ -19,9 +19,9 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    failed; each field once, no other. The listener takes one GET at that path with its own state and
    Host 127.0.0.1:<port>, exchanges and checks (5, 6), answers with a 302 to <site>/connect/cli/done
    (?nowhere=1, ?failed=1 for any other miss) and stops; until then anything else gets an empty 404.
-4. Hand-off, paste. The page shows one token, <code>.<state>.<triple>, <triple> the unpadded
-   base64url of origin=…&client_id=…&issuer=… form-encoded as in 3, or nowhere.<state>. It stays
-   under 1000 characters (macOS takes 1024 to a terminal line); the terminal reads standard input.
+4. Hand-off, paste (&paste=1 alone: a listening terminal reads none). The page shows one token for
+   standard input, <code>.<state>.<triple>, <triple> the unpadded base64url of origin=…&client_id=…
+   &issuer=… form-encoded as in 3, or nowhere.<state>, under 1000 characters (macOS: 1024 a line).
 5. Exchange, at the pinned issuer alone (the local container's identity.issuer, else ISSUER), which
    a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client: code,
    grant_type=authorization_code, redirect_uri=<site>/oauth/callback, code_verifier, client_id.
@@ -64,7 +64,7 @@ SITE = "https://egzos-site.vercel.app"
 ISSUER = "https://kvdhimpnqatnidpmzvga.supabase.co/auth/v1"
 PORT = 7427  # not 7420, nor the lifeboat's 7425, nor serve's 7426
 CALLBACK, METADATA = "/oauth/callback", "/.well-known/oauth-protected-resource"
-WAIT_SECONDS = 600  # a code lives ten minutes at the provider
+WAIT_SECONDS = 600  # a code's ten minutes; checked between requests, so a held connection delays it
 RECORD, SECRET, SERVICE = "login.json", "login.secret", "egzos"
 HANDED = {"code", "state", "origin", "client_id", "issuer"}  # protocol 3's fields, each once
 _STAY = urllib.request.HTTPRedirectHandler()  # every request's: a redirect is an error status,
@@ -88,8 +88,7 @@ def matching_code(state: str) -> str:
 
 
 def _site() -> str:
-    """SITE, or for tests EGZOS_SITE as plain http, which `validate` holds to a loopback host: a
-    pasted `EGZOS_SITE=… egzos login` cannot aim a sign-in anywhere else."""
+    """SITE, or for tests EGZOS_SITE as plain http, which `validate` holds to a loopback host."""
     test = os.environ.get("EGZOS_SITE")
     with contextlib.suppress(ConfigError):
         if not test or test.startswith("http://") and validate("identity.origin", test):
@@ -98,8 +97,7 @@ def _site() -> str:
 
 
 def _open(url: str) -> bool:
-    """Whether a browser took the URL. A Linux with no display has only text browsers, which would
-    take this terminal and wait: none is started there, and the URL is printed instead."""
+    """Whether a browser took it; none on a Linux with no display (a text one takes the tty)."""
     if sys.platform.startswith("linux") and not os.environ.keys() & {"DISPLAY", "WAYLAND_DISPLAY"}:
         return False
     return webbrowser.open(url)
@@ -184,9 +182,9 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
             {"challenge": s256.decode(), "state": state, **where})
         print(f"matching code {matching_code(state)} — any code the page shows must be this one",
               file=sys.stderr)
-        if not (browser and _open(url)):
-            print(f"open this in a browser{' on this machine' if srv else ''}:\n  {url}",
-                  file=sys.stderr)  # stderr: under --json, stdout carries the one payload
+        if not (browser and _open(url)):  # stderr: under --json, stdout carries the one payload
+            here = " on this machine (none here? Ctrl-C, then `egzos login --paste`)" if srv else ""
+            print(f"open this in a browser{here}:\n  {url}", file=sys.stderr)
         if srv is None:
             print("paste the code the page shows:", file=sys.stderr)
             line = sys.stdin.readline(2048)
@@ -238,15 +236,14 @@ def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
     return _keep(home, {
         "origin": origin, "client_id": client_id, "issuer": issuer, "sub": sub,
         "email": claims["email"] if isinstance(claims.get("email"), str) else None,
-        "expires_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(exp))},
+        "access_expires_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(exp))},
         tokens.get("refresh_token"))
 
 
 # -- where the sign-in is kept (identity.md §8) --------------------------------------------------
 def _vault(account: str, secret: str | None) -> bool:
-    """The refresh token into the OS store, or out of it (None): True only when the store then reads
-    back exactly that. A store keyring ranks below 1 (its fail and null ones, keyrings.alt's files;
-    its chainer, ranked 10, by the first it chains) is not the system's: nothing is kept there."""
+    """The token into the OS store, or out (None): True when the store then reads back exactly that.
+    One ranked below 1 (fail, null, keyrings.alt's files; a chainer, by its first) keeps nothing."""
     try:
         import keyring  # MIT, maintained (v0.7 §R); here, so no other command pays to find a store
 
@@ -277,7 +274,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def _keep(home: Path, record: dict[str, Any], refresh: Any) -> dict[str, Any]:
-    """Protocol 7, after every check; a failure here (full disk, Ctrl-C) keeps no sign-in at all."""
+    """Protocol 7, after the checks; a failure here keeps no sign-in the store lets it delete."""
     refresh = refresh if isinstance(refresh, str) and refresh else None
     account, secret, path = f"login:{home.resolve()}", home / SECRET, home / RECORD
     try:
@@ -287,7 +284,7 @@ def _keep(home: Path, record: dict[str, Any], refresh: Any) -> dict[str, Any]:
         else:
             secret.unlink(missing_ok=True)
         if where != "keyring":
-            _vault(account, None)  # no earlier sign-in's token outlives this one
+            _vault(account, None)  # an earlier sign-in's token goes, where the store lets it
         record = {**record, "refresh": where}
         _write(path, json.dumps(record))
     except BaseException:

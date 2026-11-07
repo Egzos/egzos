@@ -191,12 +191,10 @@ def whoami():
 
 
 # -- the cloud sign-in (identity.md §3a, §8) ---------------------------------------------------
-#: identity.md §8, once per home. Here: egzos.cli.signin names nothing of the confirm (its tests).
-_BUTTON_NOTE = (
-    "note: software holding this sign-in can press the confirm's button where your cloud still "
-    "takes it; to require Face ID / Touch ID everywhere, set confirm.allow_button to false on "
-    "your cloud"
-)
+#: identity.md §8, once per home. `login` and egzos.cli.signin name nothing of the confirm (a6).
+_BUTTON_NOTE = ("note: software holding this sign-in can press the confirm's button where your "
+                "cloud still takes it; to require Face ID / Touch ID everywhere, set "
+                "confirm.allow_button to false on your cloud")
 
 
 @app.command()
@@ -212,8 +210,8 @@ def login(
     c = _container()
     try:
         _owner(c, "signing in to a cloud")
-    except PermissionError:  # require_token's own text points back at `egzos login`
-        _fail("`egzos login` signs a local container in: run `egzos init` first", 2)
+    except PermissionError:  # no owner token, or a dead EGZOS_TOKEN: not require_token's own text
+        _fail("`egzos login` needs the owner's token — run `egzos init`, or unset EGZOS_TOKEN", 2)
     try:
         held = signin.login(c.home, c.config_value("identity.issuer") or signin.ISSUER,
                             port=port, paste=paste, browser=not no_browser)
@@ -224,8 +222,8 @@ def login(
     told = c.home / "login.told"  # once per home: a logout and a new login do not say it again
     note = {} if told.exists() else {"note": _BUTTON_NOTE}
     told.touch(mode=0o600)
-    _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']} · "
-         f"until {held['expires_at']}" + (f"\n  {_BUTTON_NOTE}" if note else ""))
+    _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']}"
+         + (f"\n  {_BUTTON_NOTE}" if note else ""))
 
 
 # -- capture ------------------------------------------------------------------------------
