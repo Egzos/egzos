@@ -13,7 +13,7 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    all of it: unless standard input, output and error are each a terminal (7 shows on error and
    reads input; output is the CLI's own test) and input takes a line at a time (canonical mode;
    on Windows, line input), the terminal refuses in one line, starting nothing: on standard error
-   too when output is not a terminal, so the person at it reads the line.
+   too when output is not a terminal and error is, so the person at it reads the line.
 2. Matching code: the first six characters of the RFC 4648 base32 (A-Z, 2-7) of the first five
    bytes of SHA-256 over the state's ASCII bytes; state `egzos-test-state` gives `N7XOBA`.
 3. Hand-off, loopback. The page navigates its tab (top level: never a fetch, an image or a frame) to
@@ -32,7 +32,8 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    &issuer=… form-encoded as in 3, or nowhere.<state>, under 1000 characters (macOS: 1024 a line).
    The terminal reads it as one line at standard input's descriptor, below any buffering, as 7
    reads its answer, and refuses it whole when it is 2048 characters or more, or the read holds a
-   line end before its last: never a page's token, and nothing of it answers 7.
+   line end before its last: never a page's token, and nothing of it answers 7. A login that
+   ends before 7 drops what is left in the terminal, so no other line of a paste reaches the shell.
 5. Exchange, at the pinned issuer alone (the local container's identity.issuer, else ISSUER), which
    a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client: code,
    grant_type=authorization_code, redirect_uri=<site>/oauth/callback, code_verifier, client_id.
@@ -46,14 +47,14 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
        cloud    <origin>
        keep this sign-in on this machine? only if both are yours [y/N]
    each character of the account past ASCII shown as its escape. Keys pressed before the question
-   are then dropped where the terminal allows, and one line is read from standard input, typed
-   after the question shows (on the paste path, too: nothing pasted or typed before it counts).
-   y or yes, in any case, keeps; anything else, an empty line, end of input or Ctrl-C keeps
-   nothing and leaves an earlier sign-in as it was. No flag, variable or setting stands in for
-   the yes. Only then is it kept: the refresh token in the OS credential store through `keyring`
-   (service `egzos`, account `login:<EGZOS_HOME>`), else in SECRET (0600); who and where in
-   RECORD (0600). The access token stays in this process. No token is printed, logged, or put in
-   a URL or argv.
+   are then dropped (a drop that fails keeps nothing), and one line is read from standard input,
+   typed after the question shows (on the paste path, too: nothing pasted or typed before it
+   counts). y or yes, in any case, with spaces or tabs around it, on a line ended by Enter, keeps;
+   anything else (y with no Enter, an empty line, end of input or Ctrl-C) keeps nothing and leaves
+   an earlier sign-in as it was. No flag, variable or setting stands in for the yes. Only then is
+   it kept: the refresh token in the OS credential store through `keyring` (service `egzos`,
+   account `login:<EGZOS_HOME>`), else in SECRET (0600); who and where in RECORD (0600). The
+   access token stays in this process. No token is printed, logged, or put in a URL or argv.
 """
 
 from __future__ import annotations
@@ -156,7 +157,8 @@ def _cooked() -> bool:
 def _read() -> bytes:
     """One line of standard input, read at its descriptor, below Python's buffer: the terminal
     hands over one of its lines a read (`_cooked`), so a read leaves nothing in this process for a
-    later one to take, and what stays in the terminal is for 7's drop (protocol 4, 7)."""
+    later one to take; what stays in the terminal is dropped at 7, or as a login that ends before
+    it exits (protocol 4, 7)."""
     return os.read(sys.stdin.fileno(), LINE)
 
 
@@ -239,7 +241,11 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
             if not is_terminal() and sys.stderr.isatty():  # so the screen is told as well
                 print(NO_TERMINAL, file=sys.stderr)
         raise Failed(NO_TERMINAL, 2)
-    record, refresh = _hand_off(issuer, port=port, paste=paste, browser=browser)
+    try:
+        record, refresh = _hand_off(issuer, port=port, paste=paste, browser=browser)
+    except BaseException:  # what is left of a refused paste is no command for the shell either
+        _drop_typed_ahead()
+        raise
     if not _yes(record):  # nothing before _keep touches what an earlier sign-in kept
         raise Failed(NOT_KEPT)
     return _keep(home, record, refresh)
@@ -336,26 +342,26 @@ def account(record: dict[str, Any]) -> str:
 
 def _yes(record: dict[str, Any]) -> bool:
     """Protocol 7's question and the one line read for it, after the drop: True for y or yes, in
-    any case, alone on a line the person ended with Enter."""
+    any case, with spaces or tabs around it, alone on a line the person ended with Enter."""
     print(f"account  {account(record)}\ncloud    {record['origin']}\n{ASK}", end="",
           file=sys.stderr, flush=True)
-    _drop_typed_ahead()
     line = b""
-    try:
-        line = _read()
+    try:  # a drop that failed reads no line: a y typed ahead could still be there
+        line = _read() if _drop_typed_ahead() else b""
     finally:  # after Ctrl-C or end of input, the next line starts on its own
         if not line.endswith(b"\n"):
             print(file=sys.stderr)
     said = line.removesuffix(b"\n").removesuffix(b"\r")  # Enter, or Windows' too
     whole = line.endswith(b"\n") and b"\n" not in said and b"\r" not in said  # one line, ended
     # as bytes, only ASCII y and yes: casefold would read "ye\u017f" as "yes"
-    return whole and said.strip().lower() in (b"y", b"yes")
+    return whole and said.strip(b" \t").lower() in (b"y", b"yes")
 
 
-def _drop_typed_ahead() -> None:
+def _drop_typed_ahead() -> bool:
     """Keys pressed before 7's question showed are no answer to it: a stray Enter, a y typed while
-    the browser was open, a second line in a paste. Dropped, as readpassphrase(3) drops them."""
-    with contextlib.suppress(Exception):  # no terminal driver behind standard input: none to drop
+    the browser was open, a second line in a paste. Dropped, as readpassphrase(3) drops them; False
+    when they could not be, and 7 then keeps nothing."""
+    with contextlib.suppress(Exception):  # no terminal driver behind standard input: no drop
         if sys.platform == "win32":
             import msvcrt
 
@@ -365,6 +371,8 @@ def _drop_typed_ahead() -> None:
             import termios
 
             termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
+        return True
+    return False
 
 
 # -- where the sign-in is kept (identity.md §8) --------------------------------------------------

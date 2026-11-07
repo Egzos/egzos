@@ -17,6 +17,7 @@ import socket
 import sys
 import threading
 import time
+from collections.abc import MutableMapping
 from types import SimpleNamespace
 from unittest.mock import Mock
 from urllib.parse import parse_qsl, urlencode, urlsplit
@@ -32,7 +33,7 @@ from egzos.container import Container
 SITE, ORIGIN, CLIENT, OTHER = "http://127.0.0.1:9", "https://cloud.example", "c-1", "https://x.ex"
 TOKEN = "https://kvdhimpnqatnidpmzvga.supabase.co/auth/v1/oauth/token"  # the pin, as shipped
 REFRESH, META = "r/1", ORIGIN + signin.METADATA  # '/' is not base64url: no state can hold it
-READ = signin._read  # standard input's descriptor, read for real: before any fixture plays it
+READ, DROP = signin._read, signin._drop_typed_ahead  # for real: before any fixture plays them
 
 
 class Memory(backend.KeyringBackend):
@@ -128,6 +129,7 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr("egzos.cli.signin.WAIT_SECONDS", 5)  # a lost hand-off fails, never hangs
     monkeypatch.setattr("egzos.cli.signin._at_terminal", lambda: True)  # a person at a terminal
     monkeypatch.setattr("egzos.cli.signin._read", lambda: w.stdin.readline(signin.LINE).encode())
+    monkeypatch.setattr("egzos.cli.signin._drop_typed_ahead", lambda: True)  # typed ahead: dropped
     monkeypatch.setattr("sys.stdin", SimpleNamespace())  # no buffered read: each line is _read's
     return w
 
@@ -301,7 +303,7 @@ def _held(world, memory):
 
 
 @pytest.mark.parametrize("argv", [LOOP, PASTE])
-@pytest.mark.parametrize("typed", ["y", "Y", "yes", "YES", " Yes\t"])
+@pytest.mark.parametrize("typed", ["y", "Y", "yes", "YES", " Yes\t", "y\r", "Yes\r"])  # CRLF, too
 def test_a_yes_typed_here_keeps_it_once_who_and_where_are_shown(world, capsys, argv, typed):
     code, out, err = _run(capsys, world, "login", *argv, typed=typed)
     assert (code, _kept(world), world.store.held) == (
@@ -314,7 +316,7 @@ def test_a_yes_typed_here_keeps_it_once_who_and_where_are_shown(world, capsys, a
 @pytest.mark.parametrize("store", [None, fail.Keyring()])  # the earlier one in the store, or a file
 @pytest.mark.parametrize("argv", [LOOP, PASTE])
 @pytest.mark.parametrize("typed", ["n", "no", "", "maybe", "ye", "yes please", "ye\u017f", CUT,
-                                   None, "^C"])  # U+017F, long s: casefold would read it as "yes"
+                                   None, "^C", "\ry"])  # U+017F, long s: casefold reads it as "yes"
 def test_anything_but_a_yes_keeps_nothing_and_an_earlier_sign_in_stays_whole(
         world, capsys, monkeypatch, store, argv, typed):
     memory, world.store = world.store, store or world.store
@@ -330,6 +332,15 @@ def test_anything_but_a_yes_keeps_nothing_and_an_earlier_sign_in_stays_whole(
     assert err.endswith(ASKED.format("you@x.ex", ORIGIN) + "\n" * (typed in (CUT, None, "^C")))
     assert [url for url, _ in world.provider.calls] == [TOKEN, META] * 2  # checked, then asked
     assert _held(world, memory) == before and "r/2" not in err + json.dumps(out)
+
+
+@pytest.mark.parametrize("line, dropped", [(b"\ny\n", True), (b"y\n\n", True), (b"y\n", False)])
+def test_two_lines_in_one_read_and_keys_typed_ahead_that_stay_are_no_yes(
+        world, capsys, line, dropped):
+    world.patch(signin, "_read", lambda: line)  # what one read of the terminal hands over
+    world.patch(signin, "_drop_typed_ahead", lambda: dropped)  # False: the drop failed
+    code, out, _ = _run(capsys, world, "login", "--port", "0")
+    assert (code, out, _kept(world)) == (1, {"error": signin.NOT_KEPT}, [])
 
 
 @pytest.mark.parametrize("claims, shown", [
@@ -395,14 +406,20 @@ def test_a_terminal_to_ask_at_is_one_on_standard_input_output_and_error(
         with monkeypatch.context() as m:  # each has its say: the CLI's test, a line at a time
             m.setattr(seam, lambda: False)
             assert signin._at_terminal() is False
+    for error in (OSError, pytest.importorskip("termios").error):  # any error: no terminal
+        monkeypatch.setattr(signin, "_cooked", Mock(side_effect=error))  # Windows', POSIX'
+        assert signin._at_terminal() is False
 
 
 @pytest.mark.parametrize("whole", [True, False])
-def test_a_terminal_hands_over_a_line_at_a_time_only_in_canonical_mode(monkeypatch, whole):
+def test_a_terminal_hands_over_a_line_at_a_time_only_in_canonical_mode(monkeypatch, request, whole):
     termios = pytest.importorskip("termios")
-    flags = termios.ECHO | termios.ICANON * whole  # cooked, or raw as a full-screen program sets
-    monkeypatch.setattr(termios, "tcgetattr", lambda fd: [0, 0, 0, flags, 0, 0, []])
-    monkeypatch.setattr("sys.stdin", SimpleNamespace(fileno=lambda: 0))
+    master, slave = os.openpty()  # a real terminal's flags, read at its own descriptor
+    request.addfinalizer(lambda: [os.close(fd) for fd in (master, slave)])
+    attrs = termios.tcgetattr(slave)  # cooked, or raw as a full-screen program sets it
+    attrs[3] = attrs[3] | termios.ICANON if whole else attrs[3] & ~termios.ICANON
+    termios.tcsetattr(slave, termios.TCSANOW, attrs)
+    monkeypatch.setattr("sys.stdin", SimpleNamespace(fileno=lambda: slave))
     assert signin._cooked() is whole
 
 
@@ -433,11 +450,13 @@ def test_no_flag_variable_or_setting_answers_for_the_person(world, capsys, monke
         "home", "issuer", "port", "paste", "browser"}
     variables, settings, sign_in, value = set(), set(), signin.login, Container.config_value
 
-    class Environ(dict):  # the environment, noting each name the sign-in reads
-        def get(self, k, default=None): return variables.add(k) or super().get(k, default)
-        def __getitem__(self, k): return variables.add(k) or super().__getitem__(k)
-        def __contains__(self, k): return variables.add(k) or super().__contains__(k)
-        def keys(self): return variables.add("*") or super().keys()
+    class Environ(MutableMapping):  # the environment, noting each name read ("*": all of them)
+        def __init__(self, real): self.real = real
+        def __getitem__(self, k): return variables.add(k) or self.real[k]
+        def __iter__(self): return variables.add("*") or iter(self.real)
+        def __len__(self): return len(self.real)
+        def __setitem__(self, k, v): self.real[k] = v
+        def __delitem__(self, k): del self.real[k]
 
     def watched(*args, **kwargs):
         with monkeypatch.context() as m:
@@ -476,7 +495,9 @@ def test_the_browser_is_answered_and_the_listener_gone_before_the_terminal_asks(
 @pytest.mark.parametrize("argv", [LOOP, PASTE])
 def test_keys_pressed_before_the_question_showed_are_dropped(world, capsys, argv):
     termios, order, read = pytest.importorskip("termios"), [], signin._read
+    assert DROP() is False  # no terminal driver behind standard input: no drop, so no yes read
     world.patch("sys.stdin", SimpleNamespace(fileno=lambda: 0))  # a terminal's, its driver played
+    world.patch(signin, "_drop_typed_ahead", DROP)
     world.patch(signin, "_read", lambda: order.append("read") or read())
     world.patch(termios, "tcflush", lambda fd, how: order.append(
         (fd, how, len(world.provider.calls), "[y/N]" in sys.stderr.getvalue())))
@@ -489,8 +510,8 @@ def test_on_windows_the_keys_pressed_before_the_question_are_dropped(monkeypatch
     with monkeypatch.context() as m:  # the helper alone: no CLI run on a patched platform
         m.setattr(sys, "platform", "win32")
         m.setitem(sys.modules, "msvcrt", SimpleNamespace(kbhit=lambda: bool(keys), getwch=keys.pop))
-        signin._drop_typed_ahead()
-    assert keys == []
+        dropped = signin._drop_typed_ahead()
+    assert (dropped, keys) == (True, [])
 
 
 @pytest.mark.parametrize("handed, refused", [
@@ -499,6 +520,7 @@ def test_on_windows_the_keys_pressed_before_the_question_are_dropped(monkeypatch
     (lambda token: token.rjust(2048) + "\n", True),  # 2048 or more: never one, refused whole
     (lambda token: f"{token}\ny\n", True),  # one read holding more than one line: refused whole
     (lambda token: f"{token}\n\n", True),  # though the token alone would read
+    (lambda token: f"\r{token}\n", True),  # a carriage return before its Enter: refused whole
 ])
 def test_the_paste_is_one_line_under_2048_characters_or_refused_whole(
         world, capsys, handed, refused):
@@ -527,14 +549,19 @@ def _token(url):
 
 
 @pytest.mark.parametrize("argv", [LOOP, PASTE])
-@pytest.mark.parametrize("answer, kept", [(b"n\n", False), (b"y\n", True)])
+@pytest.mark.parametrize("answer, kept", [
+    (b"n\n", False), (b"y\n", True), (b"\x16\ny\n", False),  # ^V Enter: a line end in the line
+    pytest.param(b"n" + b" " * 4094 + b"\n", False, marks=pytest.mark.skipif(  # all in one read
+        sys.platform != "linux", reason="a line of 4096 bytes: macOS holds 1024")),
+])
 def test_at_a_real_terminal_only_a_line_typed_after_the_question_answers_it(
         world, request, argv, answer, kept):
     termios = pytest.importorskip("termios")
     master, slave = os.openpty()
     request.addfinalizer(lambda: [os.close(fd) for fd in (master, slave)])
     attrs = termios.tcgetattr(slave)
-    attrs[3] &= ~termios.ECHO  # what is typed is not read back as typed
+    attrs[3] = attrs[3] & ~termios.ECHO | termios.ICANON | termios.IEXTEN  # not read back as typed
+    attrs[6][termios.VLNEXT] = b"\x16"  # ^V: the key after it is taken as it is, Enter too
     termios.tcsetattr(slave, termios.TCSANOW, attrs)
     world.patch(signin, "_read", READ)
     world.patch("sys.stdin", SimpleNamespace(fileno=lambda: slave))  # and no buffered read
@@ -542,15 +569,16 @@ def test_at_a_real_terminal_only_a_line_typed_after_the_question_answers_it(
         world.patch(signin, "_open", lambda url: os.write(master, f"{_token(url)}\ny\n".encode()))
     else:
         os.write(master, b"y\n")  # typed while the browser was open
-    drop = signin._drop_typed_ahead
 
     def drop_then_answer():  # Linux hands a pty's input on later: the y is waited for
         assert select.select([slave], [], [], 5)[0]
-        drop()
-        os.write(master, answer)  # typed once the question shows
+        dropped = DROP()
+        assert os.write(master, answer) == len(answer)  # typed once the question shows
+        return dropped
 
     world.patch(signin, "_drop_typed_ahead", drop_then_answer)
     code = main(["--json", "login", *argv])
     if world.page.thread:
         world.page.thread.join(5)
     assert (code == 0, _kept(world) != []) == (kept, kept)
+    assert not select.select([slave], [], [], 0.5)[0]  # and nothing left for the shell to run

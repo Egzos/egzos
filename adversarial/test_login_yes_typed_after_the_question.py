@@ -34,7 +34,14 @@ def _request(url, form=None):
     return {"resource": ORIGIN, "authorization_servers": [signin.ISSUER]}
 
 
-def test_nothing_in_the_pasted_line_answers_the_question(tmp_path, monkeypatch, request):
+@pytest.mark.parametrize("pasted", [
+    lambda token: token + b"\x16\ny\n",  # the page's token, and a yes held in its line by ^V
+    lambda token: b"k1.not-it.e30\necho PWNED\n",  # a stale one: none of it reaches the shell
+    pytest.param(lambda token: b"k" * 3000 + b"\n", marks=pytest.mark.skipif(  # 2048 or more
+        os.uname().sysname != "Linux", reason="a line of 3001 bytes: macOS holds 1024")),
+])
+def test_nothing_in_the_pasted_line_answers_the_question(
+        tmp_path, monkeypatch, request, capsys, pasted):
     monkeypatch.setenv("EGZOS_HOME", str(home := tmp_path / ".egzos"))
     monkeypatch.setenv("EGZOS_SITE", "http://127.0.0.1:9")
     monkeypatch.delenv("EGZOS_TOKEN", raising=False)
@@ -43,21 +50,23 @@ def test_nothing_in_the_pasted_line_answers_the_question(tmp_path, monkeypatch, 
     request.addfinalizer(lambda: [os.close(fd) for fd in (master, slave)])
     attrs = termios.tcgetattr(slave)
     attrs[3] = attrs[3] & ~termios.ECHO | termios.ICANON | termios.IEXTEN
+    attrs[6][termios.VLNEXT] = b"\x16"  # ^V: the key after it is taken as it is, Enter too
     termios.tcsetattr(slave, termios.TCSANOW, attrs)
-    held = attrs[6][termios.VLNEXT]
 
-    def page(url):  # the page's token, pasted with a yes in the same line
+    def page(url):  # what the person pastes at the terminal's prompt
         state = dict(parse_qsl(urlsplit(url).query))["state"].encode()
         triple = urlencode({"origin": ORIGIN, "client_id": CLIENT, "issuer": signin.ISSUER})
         b64 = base64.urlsafe_b64encode(triple.encode()).rstrip(b"=")
-        os.write(master, b"k1.%s.%s%s\ny\n" % (state, b64, held))
+        os.write(master, pasted(b"k1.%s.%s" % (state, b64)))
         return True
 
     drop = signin._drop_typed_ahead
 
     def drop_then_no():  # if the question is asked, the person at the terminal says no
-        drop()
-        os.write(master, b"n\n")
+        dropped = drop()
+        if "[y/N]" in capsys.readouterr().err:  # only when asked: not as a refused paste ends
+            os.write(master, b"n\n")
+        return dropped
 
     monkeypatch.setattr(signin, "_request", _request)
     monkeypatch.setattr(signin, "_open", page)
