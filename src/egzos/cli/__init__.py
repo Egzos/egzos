@@ -219,14 +219,13 @@ def login(
                             port=port, paste=paste, browser=not no_browser)
     except signin.Failed as e:
         _fail(*e.args)
-    except KeyboardInterrupt:  # anywhere in the sign-in: one line, never a traceback
-        _fail(signin.STOPPED)
+    except (KeyboardInterrupt, Exception) as e:  # one line, never a traceback, whatever stopped it
+        _fail(signin.STOPPED if isinstance(e, KeyboardInterrupt) else signin.FAILED)
     told = c.home / "login.told"  # once per home: a logout and a new login do not say it again
     note = {} if told.exists() else {"note": _BUTTON_NOTE}
     told.touch(mode=0o600)
-    then = "renews silently" if held["refresh"] else "then `egzos login` again"
     _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']} · "
-         f"until {held['expires_at']}, {then}" + (f"\n  {_BUTTON_NOTE}" if note else ""))
+         f"until {held['expires_at']}" + (f"\n  {_BUTTON_NOTE}" if note else ""))
 
 
 # -- capture ------------------------------------------------------------------------------

@@ -16,16 +16,15 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
        http://127.0.0.1:<port>/oauth/callback?code=…&state=…&origin=…&client_id=…&issuer=…
    with its record's triple (the cloud container's origin, its client_id, the issuer), or with
    ?state=…&nowhere=1 for a person egzos hosts no container for, ?state=…&error=1 for a flow that
-   failed. The listener takes one GET at that path, Host 127.0.0.1:<port>, with its own state,
-   exchanges and checks (5, 6), answers with a 302 to <site>/connect/cli/done (?nowhere=1, or
-   ?failed=1 for any other miss) and stops; anything else gets an empty 404 while it waits.
+   failed; each field once, no other. The listener takes one GET at that path with its own state and
+   Host 127.0.0.1:<port>, exchanges and checks (5, 6), answers with a 302 to <site>/connect/cli/done
+   (?nowhere=1, ?failed=1 for any other miss) and stops; until then anything else gets an empty 404.
 4. Hand-off, paste. The page shows one token, <code>.<state>.<triple>, <triple> the unpadded
    base64url of origin=…&client_id=…&issuer=… form-encoded as in 3, or nowhere.<state>. It stays
    under 1000 characters (macOS takes 1024 to a terminal line); the terminal reads standard input.
 5. Exchange, at the pinned issuer alone (the local container's identity.issuer, else ISSUER), which
-   a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client:
-   grant_type=authorization_code, code, redirect_uri=<site>/oauth/callback, code_verifier,
-   client_id.
+   a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client: code,
+   grant_type=authorization_code, redirect_uri=<site>/oauth/callback, code_verifier, client_id.
 6. Checks, before anything is kept: the access token's `iss` is the pinned issuer and its
    `client_id` claim the handed one, and GET <origin>/.well-known/oauth-protected-resource names
    that issuer in `authorization_servers` and that origin as `resource`. Any miss is one line, and
@@ -48,7 +47,6 @@ import sys
 import time
 import urllib.request
 import webbrowser
-from http.client import HTTPException
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Any
@@ -68,6 +66,9 @@ PORT = 7427  # not 7420, nor the lifeboat's 7425, nor serve's 7426
 CALLBACK, METADATA = "/oauth/callback", "/.well-known/oauth-protected-resource"
 WAIT_SECONDS = 600  # a code lives ten minutes at the provider
 RECORD, SECRET, SERVICE = "login.json", "login.secret", "egzos"
+HANDED = {"code", "state", "origin", "client_id", "issuer"}  # protocol 3's fields, each once
+_STAY = urllib.request.HTTPRedirectHandler()  # every request's: a redirect is an error status,
+_STAY.redirect_request = lambda *args: None  # so nothing is ever sent on to where one points
 
 FAILED = "the sign-in did not go through — nothing was kept; run `egzos login` again"
 NOWHERE = "nothing to log in to — egzos hosts no cloud for this account"
@@ -109,10 +110,10 @@ def _request(url: str, form: dict[str, str] | None = None) -> dict[str, Any] | N
     data = None if form is None else urlencode(form).encode()
     req = urllib.request.Request(url, data=data, headers={"Accept": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:  # https, or http to loopback
+        with urllib.request.build_opener(_STAY).open(req, timeout=10) as r:  # https, loopback http
             body = r.read(64 * 1024 + 1)
         doc = json.loads(body) if len(body) <= 64 * 1024 else None
-    except (OSError, ValueError, HTTPException):
+    except Exception:  # refused, cut off, not JSON, nested too deep to read: no answer
         return None
     return doc if isinstance(doc, dict) else None
 
@@ -125,10 +126,10 @@ def _pasted(line: str) -> dict[str, str]:
     code, _, state = head.rpartition(".")
     try:
         raw = base64.b64decode(last + "=" * (-len(last) % 4), b"-_", validate=True)
-        triple = dict(parse_qsl(raw.decode("ascii")))
+        triple = dict(pairs := parse_qsl(raw.decode("ascii"), keep_blank_values=True))
     except ValueError:
         return {}
-    ok = code and set(triple) == {"origin", "client_id", "issuer"}
+    ok = code and len(pairs) == 3 and set(triple) == {"origin", "client_id", "issuer"}
     return {**triple, "code": code, "state": state} if ok else {}
 
 
@@ -139,13 +140,13 @@ class _Callback(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         s, url = self.server, urlsplit(self.path)
-        got = dict(parse_qsl(url.query))
+        got = dict(pairs := parse_qsl(url.query, keep_blank_values=True))
         if (url.path != CALLBACK or s.outcome is not None or self.headers.get("Host") != s.host
                 or self.headers.get("Sec-Fetch-Dest", "document") != "document"
                 or not same(got.get("state"), s.state)):
             return self._send(404)
-        try:
-            s.outcome, tail = s.finish(got), ""
+        try:  # a field given twice is no hand-off: {} is a miss, never the last one read
+            s.outcome, tail = s.finish(got if len(got) == len(pairs) else {}), ""
         except Exception as e:  # every miss is one line, and the browser is told the truth
             s.outcome = e if isinstance(e, Failed) else Failed(FAILED)
             tail = "?nowhere=1" if s.outcome.args[0] == NOWHERE else "?failed=1"
@@ -175,7 +176,7 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
         try:
             srv = HTTPServer(("127.0.0.1", port), _Callback)
         except OSError:  # taken, or no loopback here: the paste path
-            print(f"port {port} is taken — the page will show a code to paste", file=sys.stderr)
+            print(f"cannot use port {port} — the page will show a code to paste", file=sys.stderr)
     try:
         s256 = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=")
         where = {"port": srv.server_address[1]} if srv else {"paste": 1}
@@ -189,8 +190,7 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
         if srv is None:
             print("paste the code the page shows:", file=sys.stderr)
             line = sys.stdin.readline(2048)
-            got = _pasted(line)
-            if not same(got.get("state"), state):
+            if not same((got := _pasted(line)).get("state"), state):
                 raise Failed(NOT_YOURS if line.strip() else STOPPED)
             return _finish(home, got, issuer=issuer, site=site, verifier=verifier)
         srv.finish = lambda got: _finish(home, got, issuer=issuer, site=site, verifier=verifier)
@@ -211,14 +211,13 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
 def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
             verifier: str) -> dict[str, Any]:
     """Protocol 5-7, for a hand-off that carries this terminal's state."""
-    if got.get("nowhere") == "1" and "code" not in got:
+    if got.keys() == {"state", "nowhere"} and got["nowhere"] == "1":
         raise Failed(NOWHERE)
     try:  # each as the door holds it (identity.md §2): https, or http on a loopback host
-        origin = validate("identity.origin", got.get("origin"))
-        client_id = validate("identity.client_id", got.get("client_id"))
+        origin, client_id = (validate(f"identity.{k}", got.get(k)) for k in ("origin", "client_id"))
     except ConfigError:
         raise Failed(FAILED) from None
-    if not (got.get("code") and origin and client_id) or got.get("issuer") != issuer:
+    if got.keys() != HANDED or got["issuer"] != issuer or not got["code"]:  # validate held the rest
         raise Failed(FAILED)  # before any request: the code is never spent at another issuer
     tokens = _request(f"{issuer.rstrip('/')}/oauth/token", {
         "grant_type": "authorization_code", "code": got["code"], "client_id": client_id,
@@ -230,16 +229,15 @@ def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
     except (jwt.PyJWTError, ValueError):
         raise Failed(FAILED) from None
     if (claims.get("iss") != issuer or claims.get("client_id") != client_id
-            or isinstance(exp, bool) or not isinstance(exp, int | float) or exp <= time.time()):
-        raise Failed(FAILED)
+            or not isinstance(exp, int | float) or not time.time() < exp < 2**40):
+        raise Failed(FAILED)  # past, NaN, or beyond any date written below: not a token's exp
     meta = _request(origin + METADATA) or {}
     servers = meta.get("authorization_servers")  # a list: `in` on a string would match a part
     if meta.get("resource") != origin or not isinstance(servers, list) or issuer not in servers:
         raise Failed(FAILED)
-    email = claims.get("email")
     return _keep(home, {
         "origin": origin, "client_id": client_id, "issuer": issuer, "sub": sub,
-        "email": email if isinstance(email, str) else None,
+        "email": claims["email"] if isinstance(claims.get("email"), str) else None,
         "expires_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(exp))},
         tokens.get("refresh_token"))
 
@@ -247,13 +245,14 @@ def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
 # -- where the sign-in is kept (identity.md §8) --------------------------------------------------
 def _vault(account: str, secret: str | None) -> bool:
     """The refresh token into the OS store, or out of it (None): True only when the store then reads
-    back exactly that. keyring ranks below 1 the backends it does not recommend (its fail and null
-    ones, keyrings.alt's files): none of them is the system's store, so nothing is kept there."""
+    back exactly that. A store keyring ranks below 1 (its fail and null ones, keyrings.alt's files;
+    its chainer, ranked 10, by the first it chains) is not the system's: nothing is kept there."""
     try:
         import keyring  # MIT, maintained (v0.7 §R); here, so no other command pays to find a store
 
         store = keyring.get_keyring()
-        if store.priority < 1:
+        store = next((b for b in getattr(store, "backends", [store]) if b.priority >= 1), None)
+        if store is None:
             return secret is None
         if secret is None:
             with contextlib.suppress(Exception):  # one not there raises: the read below decides
@@ -278,16 +277,22 @@ def _write(path: Path, text: str) -> None:
 
 
 def _keep(home: Path, record: dict[str, Any], refresh: Any) -> dict[str, Any]:
-    """Protocol 7, after every check: a sign-in that fails leaves the last one whole."""
+    """Protocol 7, after every check; a failure here (full disk, Ctrl-C) keeps no sign-in at all."""
     refresh = refresh if isinstance(refresh, str) and refresh else None
-    account, secret = f"login:{Path(home).resolve()}", Path(home) / SECRET
-    where = None if refresh is None else "keyring" if _vault(account, refresh) else "file"
-    if where == "file":
-        _write(secret, refresh)
-    else:
+    account, secret, path = f"login:{home.resolve()}", home / SECRET, home / RECORD
+    try:
+        where = None if refresh is None else "keyring" if _vault(account, refresh) else "file"
+        if where == "file":
+            _write(secret, refresh)
+        else:
+            secret.unlink(missing_ok=True)
+        if where != "keyring":
+            _vault(account, None)  # no earlier sign-in's token outlives this one
+        record = {**record, "refresh": where}
+        _write(path, json.dumps(record))
+    except BaseException:
+        _vault(account, None)
         secret.unlink(missing_ok=True)
-    if where != "keyring":
-        _vault(account, None)  # no earlier sign-in's token outlives this one
-    record = {**record, "refresh": where}
-    _write(Path(home) / RECORD, json.dumps(record))
+        path.unlink(missing_ok=True)
+        raise
     return record
