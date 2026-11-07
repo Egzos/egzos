@@ -2,7 +2,7 @@
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
 Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB,
-§AD and §AE), of 2026-10-25 (§AF) and of 2026-11-05 (§AG, #361) into the contract set, and **retires `authorization-server.md`**
+§AD and §AE), of 2026-10-25 (§AF), of 2026-11-05 (§AG, #361) and of 2026-11-07 (§AH, #366) into the contract set, and **retires `authorization-server.md`**
 (§9). One login takes effect with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform`
 points here.
 
@@ -123,19 +123,28 @@ session. Each token is bound to one container through the provider's own OAuth 2
   browser wrote when it left: hand it on to `http://127.0.0.1:<port>/oauth/callback`, the port the
   terminal named when it started and the path fixed, with the `state` and the record's triple (the
   container's origin, its `client_id`, the issuer); or, when the terminal said it cannot listen, show
-  the `code` and the `state` on the page for the person to paste into the terminal that asked. A
+  one token holding the `code`, the `state` and the record's triple on the page, for the person to paste into the
+  terminal that asked (the terminal needs the triple to exchange the code and to run the checks below; **a1p**). A
   callback with no such record hands on and shows nothing (a cold arrival, as today). The page never
   exchanges the code and never holds the token: the code is spent only with the verifier the terminal
   kept, so read off the page or out of a redirect it is worth nothing. The terminal accepts a hand-off
   only with the `state` it made, pins the issuer to the provider it is configured for, and after the
   exchange checks the token's `client_id` claim against the `client_id` it was handed and the
-  container's metadata (§7) against the origin, so a hand-off naming another container or provider
-  fails closed, and the terminal never names a container or a client to egzos.io (the record rule
-  above holds). The provider never sees a loopback redirect, so its exact match on redirect URIs does
+  container's metadata (§7) against the origin, so a hand-off naming another provider fails closed,
+  and the terminal never names a container or a client to egzos.io (the record rule above holds).
+  **Before keeping anything, the terminal shows the account the token names, its email first, and
+  the cloud's origin, and keeps them only on the person's explicit yes typed at that terminal.** It
+  refuses a login with no terminal to ask at, and no flag or variable stands in for the yes. The
+  terminal prints a matching code derived from its `state` before the browser opens, and egzos.io's
+  start page shows the same code, so the person can see that the page belongs to the terminal they
+  are at. **decided** (v0.7 §AH). Until the confirmation lands, in R1's PR after #364, the terminal
+  keeps without asking, a stated gap recorded on 2026-11-07, and no code presents the stored token (§8). The provider never sees a loopback redirect, so its exact match on redirect URIs does
   not bind the terminal's port. **decided** (v0.7 §AG), **a1p** the binding. **Accepted residual**
   (§AG): the paste path has a device flow's phishing shape, since a person could be sent a start URL
   made on someone else's terminal and asked to read the code back. The page says, in words, that the
-  code belongs to the terminal `egzos login` was run on and to no one else; the start page asks
+  code belongs to the terminal `egzos login` was run on and to no one else; the terminal and the start page show the same matching code (v0.7 §AH), which lets a person at
+  their own terminal see the page is theirs but does not help one sent a start URL made on someone
+  else's terminal; the start page asks
   before the flow leaves, in words of the shape "a terminal is asking to sign in as you; continue only
   if you just ran `egzos login`", so no flow starts on a visit alone; the code is single-use and lives
   ten minutes at the provider; the loopback path, the default, never leaves the machine; and the pages
@@ -380,7 +389,8 @@ A local (a laptop, a desktop) with no provider keeps working offline on its own 
 pull from its cloud (§V), its owner signs in through the cloud's provider like any client: `egzos
 login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p** the rest:
 
-- **What the login yields** is a person's token bound to the cloud container (§3a), `principal:
+- **What the login yields**, once the person has said yes to the account and the cloud it shows
+  (§3a), is a person's token bound to the cloud container, `principal:
   interactive`, with a refresh token where the provider issues one to a public client (the check §AG
   owes); without one the access token runs to its `exp` and `egzos login` runs again. The terminal presents it at that container alone (`/v1/`, and
   `/mcp` as §7 admits a person's token), and §3, §4 and §5 decide the rest. It is not a container
