@@ -11,7 +11,9 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    (&paste=1 in place of &port=<port> on the paste path), naming nothing else: no container, client
    or issuer. <site> is SITE; EGZOS_SITE replaces it for tests, a loopback origin only. Before
    all of it: unless standard input, output and error are each a terminal (7 shows on error and
-   reads input; output is the CLI's own test), the terminal refuses in one line, starting nothing.
+   reads input; output is the CLI's own test) and input takes a line at a time (canonical mode;
+   on Windows, line input), the terminal refuses in one line, starting nothing: on standard error
+   too when output is not a terminal, so the person at it reads the line.
 2. Matching code: the first six characters of the RFC 4648 base32 (A-Z, 2-7) of the first five
    bytes of SHA-256 over the state's ASCII bytes; state `egzos-test-state` gives `N7XOBA`.
 3. Hand-off, loopback. The page navigates its tab (top level: never a fetch, an image or a frame) to
@@ -28,7 +30,9 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
 4. Hand-off, paste (&paste=1 alone: a listening terminal reads none). The page shows one token for
    standard input, <code>.<state>.<triple>, <triple> the unpadded base64url of origin=…&client_id=…
    &issuer=… form-encoded as in 3, or nowhere.<state>, under 1000 characters (macOS: 1024 a line).
-   The terminal refuses a line of 2048 characters or more whole, so no part of it can answer 7.
+   The terminal reads it as one line at standard input's descriptor, below any buffering, as 7
+   reads its answer, and refuses it whole when it is 2048 characters or more, or the read holds a
+   line end before its last: never a page's token, and nothing of it answers 7.
 5. Exchange, at the pinned issuer alone (the local container's identity.issuer, else ISSUER), which
    a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client: code,
    grant_type=authorization_code, redirect_uri=<site>/oauth/callback, code_verifier, client_id.
@@ -42,13 +46,14 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
        cloud    <origin>
        keep this sign-in on this machine? only if both are yours [y/N]
    each character of the account past ASCII shown as its escape. Keys pressed before the question
-   are then dropped where the terminal allows, and one line is read from standard input: on the
-   paste path, the line after the paste. y or yes, in any case, keeps; anything else, an empty
-   line, end of input or Ctrl-C keeps nothing and leaves an earlier sign-in as it was. No flag,
-   variable or setting stands in for the yes. Only then is it kept: the refresh
-   token in the OS credential store through `keyring` (service `egzos`, account
-   `login:<EGZOS_HOME>`), else in SECRET (0600); who and where in RECORD (0600). The access token
-   stays in this process. No token is printed, logged, or put in a URL or argv.
+   are then dropped where the terminal allows, and one line is read from standard input, typed
+   after the question shows (on the paste path, too: nothing pasted or typed before it counts).
+   y or yes, in any case, keeps; anything else, an empty line, end of input or Ctrl-C keeps
+   nothing and leaves an earlier sign-in as it was. No flag, variable or setting stands in for
+   the yes. Only then is it kept: the refresh token in the OS credential store through `keyring`
+   (service `egzos`, account `login:<EGZOS_HOME>`), else in SECRET (0600); who and where in
+   RECORD (0600). The access token stays in this process. No token is printed, logged, or put in
+   a URL or argv.
 """
 
 from __future__ import annotations
@@ -83,6 +88,9 @@ CALLBACK, METADATA = "/oauth/callback", "/.well-known/oauth-protected-resource"
 WAIT_SECONDS = 600  # a code's ten minutes; checked between requests, so a held connection delays it
 RECORD, SECRET, SERVICE = "login.json", "login.secret", "egzos"
 HANDED = {"code", "state", "origin", "client_id", "issuer"}  # protocol 3's fields, each once
+#: One read of standard input takes a whole line, the longest a terminal holds (Linux: 4095 and
+#: Enter; macOS: 1024), so nothing typed on it is left for the shell once egzos exits.
+LINE = 4096
 _STAY = urllib.request.HTTPRedirectHandler()  # every request's: a redirect is an error status,
 _STAY.redirect_request = lambda *args: None  # so nothing is ever sent on to where one points
 
@@ -118,13 +126,38 @@ def _site() -> str:
 
 def _at_terminal() -> bool:
     """Whether 7 can ask: standard error shows the question and standard input takes the answer,
-    each a terminal, and standard output is one by the CLI's own test (presence.is_terminal)."""
+    each a terminal, input a line at a time, and standard output is one by the CLI's own test
+    (presence.is_terminal)."""
     from egzos.authz.presence import is_terminal  # here, as `connect` reads it
 
     try:
-        return is_terminal() and sys.stdin.isatty() and sys.stderr.isatty()
-    except (AttributeError, ValueError):  # no stream at all, or a closed one
+        return is_terminal() and sys.stdin.isatty() and sys.stderr.isatty() and _cooked()
+    except Exception:  # no stream at all, a closed one, no terminal driver behind it
         return False
+
+
+def _cooked() -> bool:
+    """Whether standard input's terminal hands over a line at a time, as `_read` takes it: canonical
+    mode (ICANON), or on Windows a console's line input."""
+    if sys.platform == "win32":
+        import ctypes
+        import msvcrt
+
+        mode = ctypes.c_ulong()
+        handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+        if not ctypes.windll.kernel32.GetConsoleMode(handle, ctypes.pointer(mode)):
+            return False  # NUL, a file: no console
+        return bool(mode.value & 0x0002)  # ENABLE_LINE_INPUT
+    import termios
+
+    return bool(termios.tcgetattr(sys.stdin.fileno())[3] & termios.ICANON)
+
+
+def _read() -> bytes:
+    """One line of standard input, read at its descriptor, below Python's buffer: the terminal
+    hands over one of its lines a read (`_cooked`), so a read leaves nothing in this process for a
+    later one to take, and what stays in the terminal is for 7's drop (protocol 4, 7)."""
+    return os.read(sys.stdin.fileno(), LINE)
 
 
 def _open(url: str) -> bool:
@@ -200,6 +233,11 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
           browser: bool = True) -> dict[str, Any]:
     """Protocol 1-7: the record kept, or `Failed`."""
     if not _at_terminal():
+        from egzos.authz.presence import is_terminal
+
+        with contextlib.suppress(Exception):  # the CLI prints it on output: a pipe or a file here,
+            if not is_terminal() and sys.stderr.isatty():  # so the screen is told as well
+                print(NO_TERMINAL, file=sys.stderr)
         raise Failed(NO_TERMINAL, 2)
     record, refresh = _hand_off(issuer, port=port, paste=paste, browser=browser)
     if not _yes(record):  # nothing before _keep touches what an earlier sign-in kept
@@ -229,9 +267,10 @@ def _hand_off(issuer: str, *, port: int, paste: bool, browser: bool) -> tuple[di
             print(f"open this in a browser{here}:\n  {url}", file=sys.stderr)
         if srv is None:
             print("paste the code the page shows:", file=sys.stderr)
-            line = sys.stdin.readline(2048)
-            if len(line) == 2048 and not line.endswith("\n"):  # longer than any page's token: its
-                raise Failed(NOT_YOURS)  # rest, buffered past 7's drop, would answer 7's question
+            raw = _read().removesuffix(b"\n").removesuffix(b"\r")  # Enter, or Windows' too
+            if len(raw) >= 2048 or b"\n" in raw or b"\r" in raw:  # no page's token: refused
+                raise Failed(NOT_YOURS)  # whole, so nothing of it is a paste or 7's answer
+            line = raw.decode("ascii", "replace")
             if not same((got := _pasted(line)).get("state"), state):
                 raise Failed(NOT_YOURS if line.strip() else STOPPED)
             return _finish(got, issuer=issuer, site=site, verifier=verifier)
@@ -288,23 +327,29 @@ def _finish(got: dict[str, str], *, issuer: str, site: str,
     }, tokens.get("refresh_token")
 
 
+def account(record: dict[str, Any]) -> str:
+    """The account as 7 shows it, and the CLI's line after the yes: the email an id's rule holds,
+    else the sub. It is the one value from the token a person judges, so past ASCII each character
+    shows as its escape: a look-alike letter cannot pass for one in their own address."""
+    return (record["email"] or record["sub"]).encode("ascii", "backslashreplace").decode()
+
+
 def _yes(record: dict[str, Any]) -> bool:
-    """Protocol 7's question and the one line read for it: True for y or yes, in any case, alone
-    on a line the person ended with Enter. The account is the one value from the token a person
-    judges, so past ASCII each character shows as its escape: a look-alike letter cannot pass for
-    one in their own address."""
-    who = (record["email"] or record["sub"]).encode("ascii", "backslashreplace").decode()
-    print(f"account  {who}\ncloud    {record['origin']}\n{ASK}", end="", file=sys.stderr,
-          flush=True)
+    """Protocol 7's question and the one line read for it, after the drop: True for y or yes, in
+    any case, alone on a line the person ended with Enter."""
+    print(f"account  {account(record)}\ncloud    {record['origin']}\n{ASK}", end="",
+          file=sys.stderr, flush=True)
     _drop_typed_ahead()
-    line = ""
+    line = b""
     try:
-        line = sys.stdin.readline(64)
+        line = _read()
     finally:  # after Ctrl-C or end of input, the next line starts on its own
-        if not line.endswith("\n"):
+        if not line.endswith(b"\n"):
             print(file=sys.stderr)
-    # a whole line, ended by Enter; lower, not casefold, which reads "ye\u017f" as "yes"
-    return line.endswith("\n") and line.strip().lower() in ("y", "yes")
+    said = line.removesuffix(b"\n").removesuffix(b"\r")  # Enter, or Windows' too
+    whole = line.endswith(b"\n") and b"\n" not in said and b"\r" not in said  # one line, ended
+    # as bytes, only ASCII y and yes: casefold would read "ye\u017f" as "yes"
+    return whole and said.strip().lower() in (b"y", b"yes")
 
 
 def _drop_typed_ahead() -> None:

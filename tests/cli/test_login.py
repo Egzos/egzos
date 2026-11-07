@@ -5,11 +5,14 @@
 from __future__ import annotations
 
 import base64
+import ctypes
 import hashlib
 import http.client
 import inspect
 import io
 import json
+import os
+import select
 import socket
 import sys
 import threading
@@ -29,6 +32,7 @@ from egzos.container import Container
 SITE, ORIGIN, CLIENT, OTHER = "http://127.0.0.1:9", "https://cloud.example", "c-1", "https://x.ex"
 TOKEN = "https://kvdhimpnqatnidpmzvga.supabase.co/auth/v1/oauth/token"  # the pin, as shipped
 REFRESH, META = "r/1", ORIGIN + signin.METADATA  # '/' is not base64url: no state can hold it
+READ = signin._read  # standard input's descriptor, read for real: before any fixture plays it
 
 
 class Memory(backend.KeyringBackend):
@@ -123,7 +127,8 @@ def world(tmp_path, monkeypatch):
     monkeypatch.setattr("egzos.cli.signin._open", w.page)
     monkeypatch.setattr("egzos.cli.signin.WAIT_SECONDS", 5)  # a lost hand-off fails, never hangs
     monkeypatch.setattr("egzos.cli.signin._at_terminal", lambda: True)  # a person at a terminal
-    monkeypatch.setattr("sys.stdin", stdin)
+    monkeypatch.setattr("egzos.cli.signin._read", lambda: w.stdin.readline(signin.LINE).encode())
+    monkeypatch.setattr("sys.stdin", SimpleNamespace())  # no buffered read: each line is _read's
     return w
 
 
@@ -286,7 +291,7 @@ def test_only_this_containers_owner_signs_in_and_only_through_the_site(world, ca
 # -- protocol 7: asked, then kept (identity.md §3a, §8; v0.7 §AH) --------------------------------
 ASKED = ("account  {}\ncloud    {}\n"
          "keep this sign-in on this machine? only if both are yours [y/N] ")  # as a person reads it
-CUT = "y" + " " * 63 + "x"  # a line past the 64 characters read: what is read alone is no yes
+CUT = "y".ljust(signin.LINE) + "x"  # a line past what one read takes: what is read is no yes
 
 
 def _held(world, memory):
@@ -327,65 +332,125 @@ def test_anything_but_a_yes_keeps_nothing_and_an_earlier_sign_in_stays_whole(
     assert _held(world, memory) == before and "r/2" not in err + json.dumps(out)
 
 
-@pytest.mark.parametrize("email, shown", [
-    ("me@x.ex", "me@x.ex"),  # the email, first
-    (None, "u-1"), ("", "u-1"), (7, "u-1"),  # none, or none an id's rule holds: the sub
-    ("me @x.ex", "u-1"),  # a space
-    ("me@x.ex\ncloud    https://x.ex", "u-1"),  # a second cloud line forged in the claim
-    ("\u202eme@x.ex", "u-1"),  # a bidi override
-    ("me@x.ex\x1b[8m", "u-1"),  # an escape a terminal acts on, or answers into standard input
-    ("m" * 251 + "@x.ex", "u-1"),  # 256 characters, past an id's 255
-    ("m\u0435@x.ex", "m\\u0435@x.ex"),  # a look-alike letter (Cyrillic): shown as its escape
+@pytest.mark.parametrize("claims, shown", [
+    ({"email": "me@x.ex"}, "me@x.ex"),  # the email, first
+    ({"email": None}, "u-1"), ({"email": ""}, "u-1"), ({"email": 7}, "u-1"),  # none: the sub
+    ({"email": "me @x.ex"}, "u-1"),  # a space: none an id's rule holds
+    ({"email": "me@x.ex\ncloud    https://x.ex"}, "u-1"),  # a second cloud line forged in it
+    ({"email": "\u202eme@x.ex"}, "u-1"),  # a bidi override
+    ({"email": "me@x.ex\x1b[8m"}, "u-1"),  # an escape a terminal acts on, or answers into stdin
+    ({"email": "m" * 251 + "@x.ex"}, "u-1"),  # 256 characters, past an id's 255
+    ({"email": "m\u0435@x.ex"}, "m\\u0435@x.ex"),  # a look-alike letter (Cyrillic): its escape
+    ({"email": None, "sub": "u\u0430"}, "u\\u0430"),  # one in the sub, shown the same way
 ])
 def test_the_account_shown_is_the_email_else_the_sub_and_reads_as_what_it_is(
-        world, capsys, email, shown):
-    world.provider.claims = {"email": email}
-    code, out, err = _run(capsys, world, "login", "--port", "0")
+        world, capsys, claims, shown):
+    world.provider.claims = claims
+    code, out, err = _run(capsys, world, "login", "--port", "0", human=True)
     assert err.endswith(ASKED.format(shown, ORIGIN))  # no line forged, no escape run, no look-alike
-    assert (code, out["email"]) == (0, None if shown == "u-1" else email)  # kept as judged
+    assert (code, out.splitlines()[0]) == (0, f"signed in to {ORIGIN} as {shown}")  # as asked
+    kept = json.loads((world.home / signin.RECORD).read_text())["email"]
+    assert kept == (claims["email"] if "@" in shown else None)  # kept as judged
 
 
 @pytest.mark.parametrize("argv", [LOOP, PASTE, BLIND])
-def test_with_no_terminal_to_ask_at_nothing_starts(world, capsys, argv):
+@pytest.mark.parametrize("output, error", [
+    (False, False),  # neither a terminal: the line goes where output goes
+    (False, True),  # `egzos login > file`: the screen is told as well
+    (True, True),  # `echo y | egzos login`: output is the screen, told once
+])
+def test_with_no_terminal_to_ask_at_nothing_starts(world, capsys, argv, output, error):
     real, bound = signin.HTTPServer, []
     world.patch(signin, "HTTPServer", lambda a, h: bound.append(a) or real(a, h))
     world.patch(signin, "_at_terminal", lambda: False)  # a pipe, a file, a script's stream
+    world.patch("egzos.authz.presence.is_terminal", lambda: output)
+    world.patch(sys.stderr, "isatty", lambda: error)
     code, out, err = _run(capsys, world, "login", *argv)
-    assert (code, out, err) == (2, {"error": signin.NO_TERMINAL}, "")  # no matching code shown
+    told = signin.NO_TERMINAL + "\n" if error and not output else ""  # no matching code shown
+    assert (code, out, err) == (2, {"error": signin.NO_TERMINAL}, told)
     assert (bound, world.page.start, world.provider.calls) == ([], None, [])  # nothing started
     assert world.stdin.read() == "y\n" and _kept(world) == [] and world.store.held == {}
 
 
+CLOSED, TTY, PIPE = io.StringIO(), SimpleNamespace(isatty=lambda: True), SimpleNamespace(
+    isatty=lambda: False)
+CLOSED.close()
+
+
 @pytest.mark.parametrize("stdin, stdout, stderr, asked", [
-    (True, True, True, True),
-    (False, True, True, False),  # `echo y | egzos login`: a pipe types no yes
-    (True, False, True, False),  # `egzos login > file`: the CLI's own test (presence.is_terminal)
-    (True, True, False, False),  # `egzos login 2>log`: the account would be shown to no one
-    (None, True, True, False),  # no standard input at all
-    ("closed", True, True, False),
+    (TTY, TTY, TTY, True),
+    (PIPE, TTY, TTY, False),  # `echo y | egzos login`: a pipe types no yes
+    (TTY, PIPE, TTY, False),  # `egzos login > file`: the CLI's own test (presence.is_terminal)
+    (TTY, TTY, PIPE, False),  # `egzos login 2>log`: the account would be shown to no one
+    (None, TTY, TTY, False), (TTY, None, TTY, False), (TTY, TTY, None, False),  # none at all
+    (CLOSED, TTY, TTY, False), (TTY, TTY, CLOSED, False),
 ])
 def test_a_terminal_to_ask_at_is_one_on_standard_input_output_and_error(
         monkeypatch, stdin, stdout, stderr, asked):
-    closed = io.StringIO()
-    closed.close()
-    streams = {True: SimpleNamespace(isatty=lambda: True), None: None, "closed": closed,
-               False: SimpleNamespace(isatty=lambda: False)}
-    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: stdout)  # connect's seam
-    monkeypatch.setattr("sys.stdin", streams[stdin])
-    monkeypatch.setattr("sys.stderr", streams[stderr])
+    monkeypatch.setattr(signin, "_cooked", lambda: True)
+    for name, stream in {"stdin": stdin, "stdout": stdout, "stderr": stderr}.items():
+        monkeypatch.setattr(sys, name, stream)
     assert signin._at_terminal() is asked
+    for seam in ("egzos.authz.presence.is_terminal", "egzos.cli.signin._cooked"):
+        with monkeypatch.context() as m:  # each has its say: the CLI's test, a line at a time
+            m.setattr(seam, lambda: False)
+            assert signin._at_terminal() is False
 
 
-def test_no_flag_variable_or_setting_answers_for_the_person(world, capsys):
+@pytest.mark.parametrize("whole", [True, False])
+def test_a_terminal_hands_over_a_line_at_a_time_only_in_canonical_mode(monkeypatch, whole):
+    termios = pytest.importorskip("termios")
+    flags = termios.ECHO | termios.ICANON * whole  # cooked, or raw as a full-screen program sets
+    monkeypatch.setattr(termios, "tcgetattr", lambda fd: [0, 0, 0, flags, 0, 0, []])
+    monkeypatch.setattr("sys.stdin", SimpleNamespace(fileno=lambda: 0))
+    assert signin._cooked() is whole
+
+
+@pytest.mark.parametrize("mode, whole", [(0x7, True), (0x5, False), (None, False)])
+def test_on_windows_a_console_hands_over_a_line_at_a_time_only_with_line_input(
+        monkeypatch, mode, whole):
+    def console_mode(handle, into):  # GetConsoleMode: 0 with no console behind it (NUL, a file)
+        if mode is not None:
+            into.contents.value = mode
+        return int(mode is not None)
+
+    with monkeypatch.context() as m:  # the helper alone: no CLI run on a patched platform
+        m.setattr(sys, "platform", "win32")
+        m.setitem(sys.modules, "msvcrt", SimpleNamespace(get_osfhandle=lambda fd: 7))
+        m.setattr(ctypes, "windll", SimpleNamespace(kernel32=SimpleNamespace(
+            GetConsoleMode=console_mode)), raising=False)
+        m.setattr(sys, "stdin", SimpleNamespace(fileno=lambda: 0))
+        got = signin._cooked()
+    assert got is whole
+
+
+def test_no_flag_variable_or_setting_answers_for_the_person(world, capsys, monkeypatch):
     for flag in ("--yes", "-y", "--assume-yes"):
         code, out, _ = _run(capsys, world, "login", flag)
         assert code == 2 and out["error"].startswith(f"No such option: {flag}")
     assert set(inspect.signature(login).parameters) == {"port", "paste", "no_browser"}
     assert set(inspect.signature(signin.login).parameters) == {
         "home", "issuer", "port", "paste", "browser"}
-    source = inspect.getsource(signin) + inspect.getsource(login)
-    reads = source.count("environ") + source.count("getenv"), source.count("config_value")
-    assert reads == (2, 1)  # EGZOS_SITE, a display, the issuer pin: none of them is a yes
+    variables, settings, sign_in, value = set(), set(), signin.login, Container.config_value
+
+    class Environ(dict):  # the environment, noting each name the sign-in reads
+        def get(self, k, default=None): return variables.add(k) or super().get(k, default)
+        def __getitem__(self, k): return variables.add(k) or super().__getitem__(k)
+        def __contains__(self, k): return variables.add(k) or super().__contains__(k)
+        def keys(self): return variables.add("*") or super().keys()
+
+    def watched(*args, **kwargs):
+        with monkeypatch.context() as m:
+            m.setattr(os, "environ", Environ(os.environ))
+            return sign_in(*args, **kwargs)
+
+    world.patch(signin, "login", watched)
+    world.patch(Container, "config_value", lambda c, key: settings.add(key) or value(c, key))
+    assert [_run(capsys, world, "login", "--port", "0", typed=t)[0] for t in "ny"] == [1, 0]
+    assert (variables, settings) == ({"EGZOS_SITE"}, {"identity.issuer"})  # neither is a yes
+
+
+def test_a_refused_login_leaves_the_first_use_note_for_a_kept_one(world, capsys):
     code, out, _ = _run(capsys, world, "login", "--port", "0", typed=None)  # end of input: a no
     assert (code, out, _kept(world)) == (1, {"error": signin.NOT_KEPT}, [])  # nor §8's note told
     assert "note" in _run(capsys, world, "login", "--port", "0")[1]  # it waits for a kept one
@@ -403,7 +468,6 @@ def test_the_browser_is_answered_and_the_listener_gone_before_the_terminal_asks(
             return super().readline(size)
 
     world.stdin = Asked()
-    world.patch("sys.stdin", world.stdin)
     assert _run(capsys, world, "login", "--port", "0")[0] == 0
     assert seen == [((302, f"{SITE}/connect/cli/done", b""), [])]  # finish here; none kept yet
     assert _kept(world) == ["login.json", "login.told"]
@@ -411,14 +475,13 @@ def test_the_browser_is_answered_and_the_listener_gone_before_the_terminal_asks(
 
 @pytest.mark.parametrize("argv", [LOOP, PASTE])
 def test_keys_pressed_before_the_question_showed_are_dropped(world, capsys, argv):
-    termios, order = pytest.importorskip("termios"), []
-    read = world.stdin.readline
-    world.patch(world.stdin, "fileno", lambda: 0)  # a terminal's, whose driver is played here
-    world.patch(world.stdin, "readline", lambda size=-1: order.append("read") or read(size))
-    world.patch(termios, "tcflush",
-                lambda fd, how: order.append((fd, how, len(world.provider.calls))))
-    assert _run(capsys, world, "login", *argv)[0] == 0  # after the paste and 6, before the answer
-    assert order == ["read"] * (argv == PASTE) + [(0, termios.TCIFLUSH, 2), "read"]
+    termios, order, read = pytest.importorskip("termios"), [], signin._read
+    world.patch("sys.stdin", SimpleNamespace(fileno=lambda: 0))  # a terminal's, its driver played
+    world.patch(signin, "_read", lambda: order.append("read") or read())
+    world.patch(termios, "tcflush", lambda fd, how: order.append(
+        (fd, how, len(world.provider.calls), "[y/N]" in sys.stderr.getvalue())))
+    assert _run(capsys, world, "login", *argv)[0] == 0  # after the paste, 6 and the question
+    assert order == ["read"] * (argv == PASTE) + [(0, termios.TCIFLUSH, 2, True), "read"]
 
 
 def test_on_windows_the_keys_pressed_before_the_question_are_dropped(monkeypatch):
@@ -430,14 +493,64 @@ def test_on_windows_the_keys_pressed_before_the_question_are_dropped(monkeypatch
     assert keys == []
 
 
-def test_a_paste_past_any_token_is_refused_so_nothing_behind_it_answers(world, capsys):
-    def padded(url, page=world.page):  # the page's token right-aligned to the read, a yes behind
-        page(url)
-        world.stdin.write(world.stdin.getvalue().rstrip("\n").rjust(2048) + "y\n")  # over it
-        world.stdin.seek(0)
+@pytest.mark.parametrize("handed, refused", [
+    (lambda token: token.rjust(2047) + "\n", False),  # under 2048 characters: a page's, read
+    (lambda token: token + "\r\n", False),  # Windows' Enter
+    (lambda token: token.rjust(2048) + "\n", True),  # 2048 or more: never one, refused whole
+    (lambda token: f"{token}\ny\n", True),  # one read holding more than one line: refused whole
+    (lambda token: f"{token}\n\n", True),  # though the token alone would read
+])
+def test_the_paste_is_one_line_under_2048_characters_or_refused_whole(
+        world, capsys, handed, refused):
+    reads = []
+
+    def page(url):  # what one read of the terminal hands over, then a yes typed when asked
+        world.page(url)
+        reads.extend([handed(world.stdin.readline().rstrip("\n")).encode(), b"y\n"])
         return True
 
-    world.patch(signin, "_open", padded)
+    world.patch(signin, "_open", page)
+    world.patch(signin, "_read", lambda: reads.pop(0))
     code, out, err = _run(capsys, world, "login", "--paste", typed=None)
-    assert (code, out, "[y/N]" in err) == (1, {"error": signin.NOT_YOURS}, False)
-    assert world.provider.calls == [] and _kept(world) == []
+    if refused:
+        assert (code, out, "[y/N]" in err) == (1, {"error": signin.NOT_YOURS}, False)
+        assert world.provider.calls == [] and _kept(world) == []
+    else:
+        assert (code, "[y/N]" in err, _kept(world)) == (0, True, ["login.json", "login.told"])
+
+
+def _token(url):
+    """The paste token the page shows (protocol 4) to the terminal that opened `url`."""
+    triple = urlencode({"origin": ORIGIN, "client_id": CLIENT, "issuer": signin.ISSUER})
+    b64 = base64.urlsafe_b64encode(triple.encode()).rstrip(b"=").decode()
+    return f"k1.{dict(parse_qsl(urlsplit(url).query))['state']}.{b64}"
+
+
+@pytest.mark.parametrize("argv", [LOOP, PASTE])
+@pytest.mark.parametrize("answer, kept", [(b"n\n", False), (b"y\n", True)])
+def test_at_a_real_terminal_only_a_line_typed_after_the_question_answers_it(
+        world, request, argv, answer, kept):
+    termios = pytest.importorskip("termios")
+    master, slave = os.openpty()
+    request.addfinalizer(lambda: [os.close(fd) for fd in (master, slave)])
+    attrs = termios.tcgetattr(slave)
+    attrs[3] &= ~termios.ECHO  # what is typed is not read back as typed
+    termios.tcsetattr(slave, termios.TCSANOW, attrs)
+    world.patch(signin, "_read", READ)
+    world.patch("sys.stdin", SimpleNamespace(fileno=lambda: slave))  # and no buffered read
+    if argv == PASTE:  # the page's token, and a y behind it, pasted before the question
+        world.patch(signin, "_open", lambda url: os.write(master, f"{_token(url)}\ny\n".encode()))
+    else:
+        os.write(master, b"y\n")  # typed while the browser was open
+    drop = signin._drop_typed_ahead
+
+    def drop_then_answer():  # Linux hands a pty's input on later: the y is waited for
+        assert select.select([slave], [], [], 5)[0]
+        drop()
+        os.write(master, answer)  # typed once the question shows
+
+    world.patch(signin, "_drop_typed_ahead", drop_then_answer)
+    code = main(["--json", "login", *argv])
+    if world.page.thread:
+        world.page.thread.join(5)
+    assert (code == 0, _kept(world) != []) == (kept, kept)

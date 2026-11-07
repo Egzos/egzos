@@ -223,7 +223,7 @@ def login(
     told = c.home / "login.told"  # once per home: a logout and a new login do not say it again
     note = {} if told.exists() else {"note": _BUTTON_NOTE}
     told.touch(mode=0o600)
-    _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']}"
+    _out({**held, **note}, f"signed in to {held['origin']} as {signin.account(held)}"  # as asked
          + (f"\n  {_BUTTON_NOTE}" if note else ""))
 
 
