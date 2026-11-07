@@ -552,6 +552,32 @@ AG. AMENDMENT — HOW A TERMINAL SIGNS IN TO A CLOUD, AND WHAT SIGNS PEOPLE IN
 
 
 ================================================================================
+AH. AMENDMENT — THE TERMINAL ASKS BEFORE IT KEEPS A SIGN-IN (amends §AG's
+    terminal sign-in; identity.md §3a, §8; Egzos/egzos#366)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-07, answering the operator's
+          question on a review finding against #364, tracked privately;
+          recorded by the operator, enacted by #366's merge; the Chief may
+          veto by reverting.
+
+[DECIDED] BEFORE IT KEEPS ANYTHING, `egzos login` SHOWS WHO AND WHERE AND
+          ASKS: the account the token names, its email first, and the
+          cloud's origin. It keeps them only on the person's explicit yes,
+          typed at that terminal. A login with no terminal to ask at is
+          refused, and no flag or variable stands in for the yes.
+
+[DECIDED] THE MATCHING CODE IS SHOWN ON BOTH SCREENS: the terminal prints
+          it before the browser opens, and egzos.io's start page shows the
+          same code, so the person can see that the page belongs to the
+          terminal they are at (a6's question on egzos-platform#152).
+
+[DECIDED] UNTIL THE CONFIRMATION LANDS, in R1's PR after #364, the
+          terminal keeps without asking, and no code presents the stored
+          token.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -563,7 +589,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      one login, the confirm, places and sync, the experience, Stripe,
      visibility, retention, token binding, own agents, kept uploads,
      confirm credentials, where the app lives, where a hosted
-     container's state lives and runs, how a terminal signs in to a cloud
+     container's state lives and runs, how a terminal signs in to a cloud,
+     the terminal asking before it keeps a sign-in
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
