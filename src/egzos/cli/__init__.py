@@ -204,7 +204,8 @@ def login(
     no_browser: bool = typer.Option(False, "--no-browser", help="Print the URL; open no browser."),
 ):
     """Sign in to your cloud through egzos.io (identity.md §3a, §8): the browser opens and hands
-    the sign-in back to this terminal. This container keeps its own token for everything local."""
+    the sign-in back to this terminal, which shows the account and the cloud and keeps it only if
+    you type yes. This container keeps its own token for everything local."""
     from egzos.cli import signin
 
     c = _container()
@@ -222,7 +223,7 @@ def login(
     told = c.home / "login.told"  # once per home: a logout and a new login do not say it again
     note = {} if told.exists() else {"note": _BUTTON_NOTE}
     told.touch(mode=0o600)
-    _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']}"
+    _out({**held, **note}, f"signed in to {held['origin']} as {signin.account(held)}"  # as asked
          + (f"\n  {_BUTTON_NOTE}" if note else ""))
 
 
