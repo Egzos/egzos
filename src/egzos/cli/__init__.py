@@ -204,7 +204,8 @@ def login(
     no_browser: bool = typer.Option(False, "--no-browser", help="Print the URL; open no browser."),
 ):
     """Sign in to your cloud through egzos.io (identity.md §3a, §8): the browser opens and hands
-    the sign-in back to this terminal. This container keeps its own token for everything local."""
+    the sign-in back to this terminal, which shows the account and the cloud and keeps it only if
+    you type yes. This container keeps its own token for everything local."""
     from egzos.cli import signin
 
     c = _container()

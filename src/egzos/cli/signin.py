@@ -9,7 +9,9 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    --port; when it cannot, or with --paste, the paste path), prints the matching code and opens
        <site>/connect/cli?challenge=<challenge>&state=<state>&port=<port>
    (&paste=1 in place of &port=<port> on the paste path), naming nothing else: no container, client
-   or issuer. <site> is SITE; EGZOS_SITE replaces it for tests, a loopback origin only.
+   or issuer. <site> is SITE; EGZOS_SITE replaces it for tests, a loopback origin only. Before
+   all of it: unless standard input, output and error are each a terminal (7 shows on error and
+   reads input; output is the CLI's own test), the terminal refuses in one line, starting nothing.
 2. Matching code: the first six characters of the RFC 4648 base32 (A-Z, 2-7) of the first five
    bytes of SHA-256 over the state's ASCII bytes; state `egzos-test-state` gives `N7XOBA`.
 3. Hand-off, loopback. The page navigates its tab (top level: never a fetch, an image or a frame) to
@@ -19,9 +21,14 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    failed; each field once, no other. The listener takes one GET at that path with its own state and
    Host 127.0.0.1:<port>, exchanges and checks (5, 6), answers with a 302 to <site>/connect/cli/done
    (?nowhere=1, ?failed=1 for any other miss) and stops; until then anything else gets an empty 404.
+   The 302 goes before the terminal asks (7), so the bare done page knows only that the checks
+   passed, keeps nothing, and says exactly: "Finish in your terminal: it shows the account you
+   signed in as and the cloud, and keeps this sign-in only if you type yes there. Until then,
+   nothing is kept. You can close this tab."
 4. Hand-off, paste (&paste=1 alone: a listening terminal reads none). The page shows one token for
    standard input, <code>.<state>.<triple>, <triple> the unpadded base64url of origin=…&client_id=…
    &issuer=… form-encoded as in 3, or nowhere.<state>, under 1000 characters (macOS: 1024 a line).
+   The terminal refuses a line of 2048 characters or more whole, so no part of it can answer 7.
 5. Exchange, at the pinned issuer alone (the local container's identity.issuer, else ISSUER), which
    a handed issuer must equal: POST <issuer>/oauth/token, form-encoded, as a public client: code,
    grant_type=authorization_code, redirect_uri=<site>/oauth/callback, code_verifier, client_id.
@@ -30,7 +37,16 @@ PKCE verifier (identity.md §3a, §8; v0.7 §AG). egzos.io's pages are built fro
    that issuer in `authorization_servers` and that origin as `resource`. Any miss is one line, and
    nothing is kept. The claims are read unverified: the terminal is not the resource server, and
    the container checks the signature on every request (identity.md §3).
-7. Kept: the refresh token in the OS credential store through `keyring` (service `egzos`, account
+7. Asked, then kept. Once 6 passes and the listener is closed, standard error shows
+       account  <the email claim, if an id's rule holds it (identity.provider_id); else the sub>
+       cloud    <origin>
+       keep this sign-in on this machine? only if both are yours [y/N]
+   each character of the account past ASCII shown as its escape. Keys pressed before the question
+   are then dropped where the terminal allows, and one line is read from standard input: on the
+   paste path, the line after the paste. y or yes, in any case, keeps; anything else, an empty
+   line, end of input or Ctrl-C keeps nothing and leaves an earlier sign-in as it was. No flag,
+   variable or setting stands in for the yes. Only then is it kept: the refresh
+   token in the OS credential store through `keyring` (service `egzos`, account
    `login:<EGZOS_HOME>`), else in SECRET (0600); who and where in RECORD (0600). The access token
    stays in this process. No token is printed, logged, or put in a URL or argv.
 """
@@ -76,6 +92,10 @@ NOT_YOURS = "that is not the code this terminal's page shows — nothing was kep
 LATE = "no sign-in came back in ten minutes — nothing was kept"
 STOPPED = "stopped — nothing was kept"
 BAD_SITE = "EGZOS_SITE is for tests: a loopback origin such as http://127.0.0.1:8000, or unset"
+NO_TERMINAL = ("`egzos login` asks at a terminal before it keeps a sign-in — run it in one, "
+               "with no pipe or redirect (over SSH, `ssh -t`)")
+NOT_KEPT = "nothing was kept — only y or yes keeps a sign-in; any earlier one here stays as it was"
+ASK = "keep this sign-in on this machine? only if both are yours [y/N] "
 
 
 class Failed(Exception):
@@ -94,6 +114,17 @@ def _site() -> str:
         if not test or test.startswith("http://") and validate("identity.origin", test):
             return test or SITE
     raise Failed(BAD_SITE, 2)
+
+
+def _at_terminal() -> bool:
+    """Whether 7 can ask: standard error shows the question and standard input takes the answer,
+    each a terminal, and standard output is one by the CLI's own test (presence.is_terminal)."""
+    from egzos.authz.presence import is_terminal  # here, as `connect` reads it
+
+    try:
+        return is_terminal() and sys.stdin.isatty() and sys.stderr.isatty()
+    except (AttributeError, ValueError):  # no stream at all, or a closed one
+        return False
 
 
 def _open(url: str) -> bool:
@@ -168,6 +199,17 @@ class _Callback(BaseHTTPRequestHandler):
 def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
           browser: bool = True) -> dict[str, Any]:
     """Protocol 1-7: the record kept, or `Failed`."""
+    if not _at_terminal():
+        raise Failed(NO_TERMINAL, 2)
+    record, refresh = _hand_off(issuer, port=port, paste=paste, browser=browser)
+    if not _yes(record):  # nothing before _keep touches what an earlier sign-in kept
+        raise Failed(NOT_KEPT)
+    return _keep(home, record, refresh)
+
+
+def _hand_off(issuer: str, *, port: int, paste: bool, browser: bool) -> tuple[dict[str, Any], Any]:
+    """Protocol 1-6: who and where, and the refresh token, checked; the listener is closed on
+    return, so the browser has had its 302 before 7 asks."""
     site, srv = _site(), None
     verifier, state = secrets.token_urlsafe(48), secrets.token_urlsafe(32)
     if not paste:
@@ -188,27 +230,30 @@ def login(home: Path, issuer: str, *, port: int = PORT, paste: bool = False,
         if srv is None:
             print("paste the code the page shows:", file=sys.stderr)
             line = sys.stdin.readline(2048)
+            if len(line) == 2048 and not line.endswith("\n"):  # longer than any page's token: its
+                raise Failed(NOT_YOURS)  # rest, buffered past 7's drop, would answer 7's question
             if not same((got := _pasted(line)).get("state"), state):
                 raise Failed(NOT_YOURS if line.strip() else STOPPED)
-            return _finish(home, got, issuer=issuer, site=site, verifier=verifier)
-        srv.finish = lambda got: _finish(home, got, issuer=issuer, site=site, verifier=verifier)
+            return _finish(got, issuer=issuer, site=site, verifier=verifier)
+        srv.finish = lambda got: _finish(got, issuer=issuer, site=site, verifier=verifier)
         srv.state, srv.site, srv.timeout, srv.outcome = state, site, 0.5, None
         srv.host = f"127.0.0.1:{srv.server_address[1]}"
         srv.handle_error = lambda *args: None  # a browser that hung up prints no traceback
         deadline = time.monotonic() + WAIT_SECONDS
         while srv.outcome is None and time.monotonic() < deadline:
             srv.handle_request()
-        if not isinstance(srv.outcome, dict):
+        if not isinstance(srv.outcome, tuple):
             raise srv.outcome or Failed(LATE)
         return srv.outcome
     finally:
         if srv:
-            srv.server_close()
+            srv.server_close()  # before 7 asks: no request is read while the terminal waits
 
 
-def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
-            verifier: str) -> dict[str, Any]:
-    """Protocol 5-7, for a hand-off that carries this terminal's state."""
+def _finish(got: dict[str, str], *, issuer: str, site: str,
+            verifier: str) -> tuple[dict[str, Any], Any]:
+    """Protocol 5 and 6, for a hand-off that carries this terminal's state: the record and, apart
+    from it (the record is printed), the refresh token. Nothing is kept here."""
     if got.keys() == {"state", "nowhere"} and got["nowhere"] == "1":
         raise Failed(NOWHERE)
     try:  # each as the door holds it (identity.md §2): https, or http on a loopback host
@@ -233,11 +278,48 @@ def _finish(home: Path, got: dict[str, str], *, issuer: str, site: str,
     servers = meta.get("authorization_servers")  # a list: `in` on a string would match a part
     if meta.get("resource") != origin or not isinstance(servers, list) or issuer not in servers:
         raise Failed(FAILED)
-    return _keep(home, {
-        "origin": origin, "client_id": client_id, "issuer": issuer, "sub": sub,
-        "email": claims["email"] if isinstance(claims.get("email"), str) else None,
-        "access_expires_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(exp))},
-        tokens.get("refresh_token"))
+    try:  # 7 shows it: a space or a hidden character could make another account read as yours
+        email = provider_id(claims.get("email"))
+    except ValueError:  # so it is held as absent, and the sub is shown
+        email = None
+    return {
+        "origin": origin, "client_id": client_id, "issuer": issuer, "sub": sub, "email": email,
+        "access_expires_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(exp)),
+    }, tokens.get("refresh_token")
+
+
+def _yes(record: dict[str, Any]) -> bool:
+    """Protocol 7's question and the one line read for it: True for y or yes, in any case, alone
+    on a line the person ended with Enter. The account is the one value from the token a person
+    judges, so past ASCII each character shows as its escape: a look-alike letter cannot pass for
+    one in their own address."""
+    who = (record["email"] or record["sub"]).encode("ascii", "backslashreplace").decode()
+    print(f"account  {who}\ncloud    {record['origin']}\n{ASK}", end="", file=sys.stderr,
+          flush=True)
+    _drop_typed_ahead()
+    line = ""
+    try:
+        line = sys.stdin.readline(64)
+    finally:  # after Ctrl-C or end of input, the next line starts on its own
+        if not line.endswith("\n"):
+            print(file=sys.stderr)
+    # a whole line, ended by Enter; lower, not casefold, which reads "ye\u017f" as "yes"
+    return line.endswith("\n") and line.strip().lower() in ("y", "yes")
+
+
+def _drop_typed_ahead() -> None:
+    """Keys pressed before 7's question showed are no answer to it: a stray Enter, a y typed while
+    the browser was open, a second line in a paste. Dropped, as readpassphrase(3) drops them."""
+    with contextlib.suppress(Exception):  # no terminal driver behind standard input: none to drop
+        if sys.platform == "win32":
+            import msvcrt
+
+            while msvcrt.kbhit():
+                msvcrt.getwch()
+        else:
+            import termios
+
+            termios.tcflush(sys.stdin.fileno(), termios.TCIFLUSH)
 
 
 # -- where the sign-in is kept (identity.md §8) --------------------------------------------------
@@ -274,7 +356,7 @@ def _write(path: Path, text: str) -> None:
 
 
 def _keep(home: Path, record: dict[str, Any], refresh: Any) -> dict[str, Any]:
-    """Protocol 7, after the checks; a failure here keeps no sign-in the store lets it delete."""
+    """Protocol 7, after the yes; a failure here keeps no sign-in the store lets it delete."""
     refresh = refresh if isinstance(refresh, str) and refresh else None
     account, secret, path = f"login:{home.resolve()}", home / SECRET, home / RECORD
     try:
