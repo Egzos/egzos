@@ -190,6 +190,42 @@ def whoami():
     )
 
 
+# -- the cloud sign-in (identity.md §3a, §8) ---------------------------------------------------
+#: identity.md §8, once per home. `login` and egzos.cli.signin name nothing of the confirm (a6).
+_BUTTON_NOTE = ("note: software holding this sign-in can press the confirm's button where your "
+                "cloud still takes it; to require Face ID / Touch ID everywhere, set "
+                "confirm.allow_button to false on your cloud")
+
+
+@app.command()
+def login(
+    port: int = typer.Option(7427, "--port", min=0, max=65535, help="Loopback port to return to."),
+    paste: bool = typer.Option(False, "--paste", help="Paste the page's code (SSH, headless)."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Print the URL; open no browser."),
+):
+    """Sign in to your cloud through egzos.io (identity.md §3a, §8): the browser opens and hands
+    the sign-in back to this terminal. This container keeps its own token for everything local."""
+    from egzos.cli import signin
+
+    c = _container()
+    try:
+        _owner(c, "signing in to a cloud")
+    except PermissionError:  # no owner token, or a dead EGZOS_TOKEN: not require_token's own text
+        _fail("`egzos login` needs the owner's token — run `egzos init`, or unset EGZOS_TOKEN", 2)
+    try:
+        held = signin.login(c.home, c.config_value("identity.issuer") or signin.ISSUER,
+                            port=port, paste=paste, browser=not no_browser)
+    except signin.Failed as e:
+        _fail(*e.args)
+    except (KeyboardInterrupt, Exception) as e:  # one line, never a traceback, whatever stopped it
+        _fail(signin.STOPPED if isinstance(e, KeyboardInterrupt) else signin.FAILED)
+    told = c.home / "login.told"  # once per home: a logout and a new login do not say it again
+    note = {} if told.exists() else {"note": _BUTTON_NOTE}
+    told.touch(mode=0o600)
+    _out({**held, **note}, f"signed in to {held['origin']} as {held['email'] or held['sub']}"
+         + (f"\n  {_BUTTON_NOTE}" if note else ""))
+
+
 # -- capture ------------------------------------------------------------------------------
 @app.command()
 def add(

@@ -24,6 +24,8 @@ dependencies = [
     "pyjwt[crypto]>=2.10",
     # identity.md §5: the biometric confirm is verified with a maintained WebAuthn library (§R)
     "webauthn>=3.0",
+    # identity.md §8: `egzos login` keeps the refresh token in the OS credential store (§R)
+    "keyring>=25",
 ]
 
 [project.optional-dependencies]
