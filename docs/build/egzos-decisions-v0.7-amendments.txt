@@ -468,6 +468,117 @@ AF. AMENDMENT — WHERE A HOSTED CONTAINER'S STATE LIVES AND RUNS, AND ITS
 
 
 ================================================================================
+AG. AMENDMENT — HOW A TERMINAL SIGNS IN TO A CLOUD, AND WHAT SIGNS PEOPLE IN
+    (gives §S's "the CLI … signs in to a cloud through Supabase" its shape;
+    amends §AE's sign-in list; identity.md §3a, §8; Egzos/egzos#361)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-05, on the operator's research
+          into how Claude Code and GitHub's CLIs hand a browser sign-in
+          back to a terminal, how their MCP services authenticate, and
+          what the provider's OAuth 2.1 server offers (authorization code
+          with PKCE and refresh tokens; no device grant; redirect URIs
+          matched exactly); recorded by the operator, enacted by #361's
+          merge; the Chief may veto by reverting.
+
+[DECIDED] `egzos login` SIGNS A TERMINAL IN THROUGH egzos.io (option A of
+          three). The CLI makes the PKCE pair and a state and opens the
+          browser at egzos.io. egzos.io, signed in as the person (§T),
+          runs the authorization-code flow for the person's cloud
+          container's own client, from its own record (§AA; identity.md
+          §3a), with the terminal's challenge in place of its own. Its
+          callback page hands the code back to the terminal: to 127.0.0.1
+          on the port the terminal named, when the terminal listens, or
+          shown on the page to paste when it cannot (SSH, a headless
+          machine). The terminal exchanges the code with the verifier it
+          kept; the token is the person's, bound to that cloud, principal
+          interactive, exactly identity.md §3a's sentence. The page never
+          holds a usable credential, and the provider never sees a
+          loopback redirect, so its exact match on redirect URIs does not
+          bind the terminal's port. This is how Claude Code signs in; the
+          paste path is its fallback for a terminal no browser can reach.
+
+[DECIDED] REJECTED: B, the local registering itself as its own OAuth client
+          with a loopback redirect (the token then names the local, which
+          the cloud refuses under §AA; making the cloud accept it yields a
+          client principal, which cannot confirm). C, a device flow, which
+          is how GitHub's CLI signs in (the provider has none, §S retired
+          ours, §R forbids building one). Device code stays retired.
+
+[DECIDED] THE TERMINAL'S EXPERIENCE: one command; the browser opens; a
+          paste path when it cannot come back; the refresh token in the
+          operating system's credential store, a 0600 file when there is
+          none; silent refresh; `egzos whoami` says who is signed in and
+          where; `egzos logout` forgets the token on this machine (the
+          provider publishes no revocation endpoint, so it can do no
+          more). The CLI keeps the local owner Token for everything local
+          (§S). The verbs: `egzos login` is for the person; `egzos
+          connect` stays for agents (an MCP client's token: stdio today,
+          the HTTP header one-liner for hosts without OAuth next).
+
+[DECIDED] WHAT THE LOGIN IS FOR, IN ORDER: the local's link (the sign-in
+          supplies the `sub` identity.md §4's owner grant needs, so no one
+          types it), then §V's push and pull on the token it holds. The
+          login needs a cloud: egzos.io runs the flow for the person's
+          hosted container, and a person without one is told so in one
+          line. The local's own client registration is not this login's
+          (identity.md §3a's TODO on how a self-hosted container's link
+          reaches egzos's record stays open; a local with no cloud links
+          by hand, as today).
+
+[DECIDED] AGENTS FROM ANY PLATFORM: the door built (#293, #310) is the
+          design and no new one is drawn: /mcp over Streamable HTTP with
+          RFC 9728 metadata, the provider's dynamic client registration,
+          consent at egzos.io, and a client Token in the Authorization
+          header for hosts without OAuth (identity.md §7). What remains:
+          the agent consent page (egzos-platform#117), a connect page with
+          each host's one-liner, and two checks before anyone relies on
+          it: that Claude Code's registration path reaches /mcp on this
+          provider (its loopback port must be pinned, since the provider
+          matches redirect URIs exactly and has no port exemption), and
+          that a public client is issued a refresh token.
+
+[DECIDED] SIGN-IN: GOOGLE JOINS §AE's LIST NOW: an email one-time code,
+          GitHub and Google, all through Supabase Auth; Apple and passkeys
+          stay later. Identities with the same verified email are linked
+          to one user automatically (the provider's default), so one
+          person keeps one `sub` and one grant; manual linking stays off.
+          The Chief registers the GitHub OAuth App and the Google OAuth
+          client and enters both at the provider; nothing in either
+          repository holds their secrets.
+
+[LEAN]    A custom domain for the provider (auth.egzos.io) once egzos.io is
+          bought, so Google's consent screen names egzos, not the project.
+
+
+================================================================================
+AH. AMENDMENT — THE TERMINAL ASKS BEFORE IT KEEPS A SIGN-IN (amends §AG's
+    terminal sign-in; identity.md §3a, §8; Egzos/egzos#366)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-07, answering the operator's
+          question on a review finding against #364, tracked privately;
+          recorded by the operator, enacted by #366's merge; the Chief may
+          veto by reverting.
+
+[DECIDED] BEFORE IT KEEPS ANYTHING, `egzos login` SHOWS WHO AND WHERE AND
+          ASKS: the account the token names, its email first, and the
+          cloud's origin. It keeps them only on the person's explicit yes,
+          typed at that terminal. A login with no terminal to ask at is
+          refused, and no flag or variable stands in for the yes.
+
+[DECIDED] THE MATCHING CODE IS SHOWN ON BOTH SCREENS: the terminal prints
+          it before the browser opens, and egzos.io's start page shows the
+          same code, so the person can see that the page belongs to the
+          terminal they are at (a6's question on egzos-platform#152).
+
+[DECIDED] UNTIL THE CONFIRMATION LANDS, in R1's PR after #364, the
+          terminal keeps without asking, and no code presents the stored
+          token. (It landed in #367 on 2026-11-07; the account
+          line shows the `sub` when the email fails the provider-id rule.)
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -479,7 +590,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      one login, the confirm, places and sync, the experience, Stripe,
      visibility, retention, token binding, own agents, kept uploads,
      confirm credentials, where the app lives, where a hosted
-     container's state lives and runs
+     container's state lives and runs, how a terminal signs in to a cloud,
+     the terminal asking before it keeps a sign-in
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
