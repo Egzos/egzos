@@ -574,7 +574,8 @@ AH. AMENDMENT — THE TERMINAL ASKS BEFORE IT KEEPS A SIGN-IN (amends §AG's
 
 [DECIDED] UNTIL THE CONFIRMATION LANDS, in R1's PR after #364, the
           terminal keeps without asking, and no code presents the stored
-          token.
+          token. (It landed in #367 on 2026-11-07; the account
+          line shows the `sub` when the email fails the provider-id rule.)
 
 
 ================================================================================

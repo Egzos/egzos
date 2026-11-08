@@ -132,13 +132,14 @@ session. Each token is bound to one container through the provider's own OAuth 2
   exchange checks the token's `client_id` claim against the `client_id` it was handed and the
   container's metadata (§7) against the origin, so a hand-off naming another provider fails closed,
   and the terminal never names a container or a client to egzos.io (the record rule above holds).
-  **Before keeping anything, the terminal shows the account the token names, its email first, and
+  **Before keeping anything, the terminal shows the account the token names, its email first (the
+  `sub` when the email fails the provider-id rule, so nothing the token carries can rewrite the
+  person's screen), and
   the cloud's origin, and keeps them only on the person's explicit yes typed at that terminal.** It
   refuses a login with no terminal to ask at, and no flag or variable stands in for the yes. The
   terminal prints a matching code derived from its `state` before the browser opens, and egzos.io's
   start page shows the same code, so the person can see that the page belongs to the terminal they
-  are at. **decided** (v0.7 §AH). Until the confirmation lands, in R1's PR after #364, the terminal
-  keeps without asking, a stated gap recorded on 2026-11-07, and no code presents the stored token (§8). The provider never sees a loopback redirect, so its exact match on redirect URIs does
+  are at. **decided** (v0.7 §AH); landed in #367. The provider never sees a loopback redirect, so its exact match on redirect URIs does
   not bind the terminal's port. **decided** (v0.7 §AG), **a1p** the binding. **Accepted residual**
   (§AG): the paste path has a device flow's phishing shape, since a person could be sent a start URL
   made on someone else's terminal and asked to read the code back. The page says, in words, that the
