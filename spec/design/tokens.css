@@ -2,7 +2,30 @@
  * Copyright 2026 Ali Sasanian
  * SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
  *
- * egzos design tokens · v0.12 · 2026-09-23 (v0.11 · v0.10 · v0.9: same day · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: 2026-09-22 · v0.3: 2026-09-11)
+ * egzos design tokens · v0.13 · 2026-11-08 (v0.12 · v0.11 · v0.10 · v0.9: 2026-09-23 · v0.8 · v0.7 · v0.6 · v0.5 · v0.4: 2026-09-22 · v0.3: 2026-09-11)
+ *
+ * v0.13 re-values the file to direction A′ (Blueprint, quieter lines), decided by the Chief on
+ * 2026-11-08. No token is renamed, so components re-skin by value. The eight colours are the kit's
+ * (Egzos/egzos-platform, design/concepts/lib/blueprint.mjs — a proprietary sibling repository): canvas
+ * and paper are its ground, ink its text, ink-2 and ink-3 its muted text, rule its edge, rule-soft its
+ * lo (a plate's one inner crease), act its lit thing. Strokes are hairlines (--egz-bw 1px), corners are
+ * round (--egz-radius-plate 14px, -control 8px, -pill 20px) and nothing is offset: --egz-off and
+ * --egz-off-lg are 0px and not 0, because a calc() adds them to a length and calc(16px + 0) is invalid,
+ * which drops the whole declaration. Motion is two clocks: a discrete change is 700ms on
+ * cubic-bezier(.32, .72, 0, 1), with --egz-motion-discrete as the one shared value for a CSS
+ * transition, and a continuous one is a spring, k 100, c 18, m 1 (UX-METHOD §3, R8). Added:
+ * --egz-mid, --egz-grid, the three radii, --egz-motion-discrete, --egz-spring-k / -c / -m, and the six
+ * --hairline-* properties, declared below the shadcn bridge as aliases so no scheme block copies them.
+ * Both schemes carry the A′ values for now: the Chief has not picked a light palette (direction B
+ * Vellum is the candidate), the violet canvas repeats them, and color-scheme is dark in both because
+ * the ground is. OPEN, for the Chief: A′ names no failure colour, so --egz-alarm keeps its dark-scheme
+ * red, which is 4.0:1 on the ground, under the 4.5:1 the tap spec asks of red text (hsl(0 100% 66%)
+ * is the first lightness that reaches it).
+ *
+ * Re-checked against v0.13, as README.md's Version rule asks. Type on a solid ink fill is
+ * --egz-canvas, the claim four specs cite at v0.12, holds: ink is the text colour, canvas the ground
+ * (11.9:1), and --egz-act-on still equals --egz-canvas. So does the §5 claim that this file carries no
+ * size scale: v0.13 adds corners and clocks, no dimension.
  *
  * v0.12 is the FOURTH failure of the line above, and the worst-behaved: the seven versions
  * v0.10 … v0.4 were re-dated to 2026-09-23 as a side effect of v0.11's bump. Nothing edited
@@ -39,33 +62,39 @@
  * (src/egzos/web, src/egzos/authz templates) and mapped into the Tailwind theme by the
  * flagship (Egzos/egzos-platform). The platform consumes this file; it never forks it.
  *
- * Direction: Docket v2 (bound 2026-09-11). Colour law: two colours — --act asks a human,
- * --alarm reports a failure. No yellow, lime or acid anywhere. Structure: radius 0, 2px ink
- * borders, 4px hard offset. Schemes: light is the record; dark is the same record at night,
- * with two canvases the user may choose between (neutral, violet).
+ * Direction: A′, Blueprint with quieter lines (decided by the Chief 2026-11-08; it replaced Docket v2,
+ * bound 2026-09-11). Colour law: one lit thing — --egz-act, the single bright mark, which asks a
+ * human — over one ground (--egz-canvas), three steps of line (--egz-rule, --egz-mid, --egz-rule-soft)
+ * and two of type (--egz-ink, then --egz-ink-2 and --egz-ink-3, which coincide); --egz-alarm reports
+ * a failure, and A′ names no colour for it yet. No yellow, lime or acid anywhere. Structure: 1px
+ * hairline strokes, round corners (plate 14px, control 8px, pill 20px), no shadow, no offset, no glow,
+ * no gradient. Schemes: both carry the A′ values for now (see v0.13).
  *
  * Scheme selection (both UIs):
- *   <html data-scheme="light">                          the record (default)
- *   <html data-scheme="dark" data-canvas="neutral">     the record at night
- *   <html data-scheme="dark" data-canvas="violet">      the record at night, violet-black cast
+ *   <html data-scheme="light">                          the light scheme (default; A′ values for now)
+ *   <html data-scheme="dark" data-canvas="neutral">     the dark scheme
+ *   <html data-scheme="dark" data-canvas="violet">      the dark scheme; the canvas setting stays, no cast under A′
  * data-canvas is a USER SETTING (decided 2026-09-11), persisted per client; it has no effect
  * in the light scheme. prefers-color-scheme picks the initial scheme when none is stored.
  */
 
 :root {
   /* ── canvas & ink ─────────────────────────────────────────────── */
-  --egz-canvas:      #FFFFFF;   /* page */
-  --egz-paper:       #F5F5F2;   /* queue rail, inset fields, secondary surfaces */
-  --egz-ink:         #000000;   /* text, borders, offsets, verified fill */
-  --egz-ink-2:       #333333;   /* secondary text */
-  --egz-ink-3:       #6B6B6B;   /* labels, metadata (≥ 4.5:1 on canvas) */
-  --egz-rule:        #000000;   /* 2px structural borders */
-  --egz-rule-soft:   #D6D6D2;   /* 1px hairlines inside tables and lists */
-  --egz-shadow-ink:  #000000;   /* the hard offset */
+  /* LIGHT SCHEME: the Chief has not picked a light palette; it carries the A′ values for now (direction B Vellum is the candidate). */
+  --egz-canvas:      #0E2A47;   /* page: the ground */
+  --egz-paper:       #0E2A47;   /* queue rail, inset fields, secondary surfaces: the ground again; a plate is told from the page by its edge, not its fill */
+  --egz-ink:         #DCEAF7;   /* text */
+  --egz-ink-2:       #9CBBD9;   /* secondary text: muted */
+  --egz-ink-3:       #9CBBD9;   /* labels, metadata: muted (≥ 4.5:1 on canvas; 7.3:1) */
+  --egz-rule:        #7FA3C8;   /* the edge: structural borders, a plate's outline */
+  --egz-rule-soft:   #2F5478;   /* the lo: a plate's one inner crease, hairlines inside tables and lists, a disabled edge */
+  --egz-mid:         #557A9F;   /* the mid: a crease inside a solid, a secondary stroke (v0.13) */
+  --egz-grid:        #1C3C5F;   /* the grid: the ground's faint lattice (v0.13) */
+  --egz-shadow-ink:  #0E2A47;   /* the offset's colour: the ground, so a stray offset is invisible on it (v0.13) */
 
-  /* ── the two colours ──────────────────────────────────────────── */
-  --egz-act:         #1D3FA8;   /* a human is asked: sign, approve, open a window, focus, the outward arrow */
-  --egz-act-on:      #FFFFFF;
+  /* ── the lit thing and the failure colour ─────────────────────── */
+  --egz-act:         #FFFFFF;   /* the lit thing, the one bright mark: a human is asked: sign, approve, open a window, focus, the outward arrow */
+  --egz-act-on:      #0E2A47;
   /* --egz-act-on is the type colour ON --egz-act, and on nothing else.
    *
    * TYPE ON AN INK FILL IS --egz-canvas (v0.9). Five specs render a word inside a solid ink
@@ -81,16 +110,19 @@
    * --egz-canvas is correct by construction: ink is the opposite of the canvas in every scheme,
    * so type in the canvas colour is always legible on an ink fill and always will be. Same for
    * --egz-alarm-on: it is the type colour on --egz-alarm, never on ink. */
-  --egz-alarm:       hsl(0 100% 43%);  /* Swiss Red: quarantine, presence lapsed, quota, unreachable, anomaly */
-  --egz-alarm-on:    #FFFFFF;
+  --egz-alarm:       hsl(0 100% 60%);  /* Swiss Red: quarantine, presence lapsed, quota, unreachable, anomaly. A′ names no failure colour: the dark scheme's red in both schemes until the Chief picks (4.0:1 on canvas) */
+  --egz-alarm-on:    #0E2A47;
 
-  /* ── structure (Neo Brutalism, bones only) ────────────────────── */
-  --egz-radius:      0;
-  --egz-bw:          2px;       /* structural border weight */
+  /* ── structure (A′: hairline, round, flat) ────────────────────── */
+  --egz-radius:         var(--egz-radius-control);   /* the default corner. Was 0 */
+  --egz-radius-plate:   14px;   /* a plate: panel, card, sheet (v0.13) */
+  --egz-radius-control: 8px;    /* a control: button, field (v0.13) */
+  --egz-radius-pill:    20px;   /* a pill: the floating control, a chip (v0.13) */
+  --egz-bw:          1px;       /* structural border weight: a hairline, as --egz-hair. Was 2px */
   --egz-hair:        1px;       /* hairlines inside tables and lists; skeleton borders (v0.4) */
-  --egz-off:         4px;       /* hard offset: box-shadow var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink) */
-  --egz-off-lg:      8px;       /* the page frame */
-  --egz-focus:       var(--egz-bw) solid var(--egz-act);  /* outline; outline-offset 3px */
+  --egz-off:         0px;       /* no offset: box-shadow var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink) paints nothing. 0px, not 0: a calc() adds it to a length. Was 4px */
+  --egz-off-lg:      0px;       /* the page frame's offset, the same. Was 8px */
+  --egz-focus:       var(--egz-bw) solid var(--egz-act);  /* outline; outline-offset 3px; 1px under A′ */
 
   /* ── type ─────────────────────────────────────────────────────── */
   --egz-font-ui:     "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -118,12 +150,18 @@
   --egz-sp-1: 4px;  --egz-sp-2: 8px;   --egz-sp-3: 12px;  --egz-sp-4: 16px;
   --egz-sp-5: 24px; --egz-sp-6: 40px;  --egz-sp-7: 64px;
 
-  /* ── motion (law B · meaningful) ──────────────────────────────── */
-  --egz-motion-state:    0ms;    /* state changes are instantaneous — a stamp lands */
-  --egz-motion-reveal:   120ms;  /* reveal: expand, fan, slide; linear */
-  --egz-motion-arrival:  200ms;  /* arrival: new items pill, triage ring step */
-  --egz-motion-presence: 4000ms; /* presence: one full circuit of the window beam along the frame */
-  --egz-ease:            linear;
+  /* ── motion (A′: two clocks, R8) ──────────────────────────────── */
+  --egz-motion-state:    700ms;  /* a discrete change: a state change. v0.13: was 0ms, a stamp lands */
+  --egz-motion-reveal:   700ms;  /* a discrete change: expand, fan, slide, a panel opening. Was 120ms */
+  --egz-motion-arrival:  700ms;  /* a discrete change: an item arrives. Was 200ms */
+  --egz-motion-presence: 4000ms; /* presence: one full circuit of the window beam along the frame. Unchanged: the beam is
+     a Docket v2 artefact and a CSS animation, which UX-METHOD §7.1 will reject in time; the Chief decides */
+  --egz-ease:            cubic-bezier(.32, .72, 0, 1);   /* v0.13: was linear, which R8 rejects */
+  --egz-motion-discrete: var(--egz-motion-state) var(--egz-ease);   /* the ONE shared value for a CSS transition (UX-METHOD §4):
+     700ms cubic-bezier(.32, .72, 0, 1), and 0ms under reduced motion because it is built from --egz-motion-state */
+  --egz-spring-k:        100;    /* a continuous input (the pointer, the camera, a drag) is a spring: k 100, c 18, m 1 (R8). */
+  --egz-spring-c:        18;     /* Unitless, read by the motion kernel with getComputedStyle; CSS never animates with them */
+  --egz-spring-m:        1;
   --egz-t-hold:          700ms;  /* v0.5: press-and-hold fill (flagship enhancement only). The other
      interaction timeouts — the two-step arm, the lifeboat's fragment refresh, the new-items debounce — are
      deliberately NOT tokens: the arm is validated server-side and the refresh is an htmx trigger, so a CSS
@@ -132,7 +170,7 @@
   /* ── media (moodboard imagery, marketing only) ────────────────── */
   --egz-img-filter:  grayscale(.15) contrast(1.02);
 
-  color-scheme: light;
+  color-scheme: dark;   /* the ground is dark in every scheme under A′, so native controls and scrollbars are too (was light) */
 }
 
 /* NOTE — this comment annotates the block BELOW it, which is the rule a CSS comment binds to.
@@ -144,37 +182,40 @@
    was missing --egz-img-filter. (Placement corrected in v0.8; it had sat above the violet block,
    where the default reading made 'this block' the wrong one.) */
 html[data-scheme="dark"] {
-  --egz-canvas:      #0B0B0B;
-  --egz-paper:       #151515;
-  --egz-ink:         #F4F4F0;
-  --egz-ink-2:       #CFCFC9;
-  --egz-ink-3:       #9A9A94;
-  --egz-rule:        #F4F4F0;
-  --egz-rule-soft:   #3A3A3A;
-  --egz-shadow-ink:  #F4F4F0;   /* offsets go white: the record as a paper cutout */
-  --egz-act:         #6B9BFF;
-  --egz-act-on:      #0B0B0B;
+  --egz-canvas:      #0E2A47;
+  --egz-paper:       #0E2A47;
+  --egz-ink:         #DCEAF7;
+  --egz-ink-2:       #9CBBD9;
+  --egz-ink-3:       #9CBBD9;
+  --egz-rule:        #7FA3C8;
+  --egz-rule-soft:   #2F5478;
+  --egz-mid:         #557A9F;
+  --egz-grid:        #1C3C5F;
+  --egz-shadow-ink:  #0E2A47;   /* the ground: a stray offset is invisible on it (was the ink: the record as a paper cutout) */
+  --egz-act:         #FFFFFF;
+  --egz-act-on:      #0E2A47;
   --egz-alarm:       hsl(0 100% 60%);
-  --egz-alarm-on:    #0B0B0B;
+  --egz-alarm-on:    #0E2A47;
   --egz-img-filter:  grayscale(.2) brightness(.82) contrast(1.06);
   color-scheme: dark;
 }
 
 html[data-scheme="dark"][data-canvas="violet"] {
-  /* the one thing taken from the Neon Cyber family: a cast, not a colour */
-  --egz-canvas:      #0B0716;
-  --egz-paper:       #150E24;
-  --egz-ink-3:       #9A96A8;
-  --egz-rule-soft:   #3A3350;
-  --egz-act-on:      #0B0716;
-  --egz-alarm-on:    #0B0716;
+  /* v0.13: A′ has no violet cast. The canvas setting stays (scheme.ts still writes it); this block repeats
+     the A′ values until the Chief decides whether the setting survives. */
+  --egz-canvas:      #0E2A47;
+  --egz-paper:       #0E2A47;
+  --egz-ink-3:       #9CBBD9;
+  --egz-rule-soft:   #2F5478;
+  --egz-act-on:      #0E2A47;
+  --egz-alarm-on:    #0E2A47;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-scheme]) {
-    --egz-canvas: #0B0B0B; --egz-paper: #151515; --egz-ink: #F4F4F0; --egz-ink-2: #CFCFC9; --egz-ink-3: #9A9A94;
-    --egz-rule: #F4F4F0; --egz-rule-soft: #3A3A3A; --egz-shadow-ink: #F4F4F0;
-    --egz-act: #6B9BFF; --egz-act-on: #0B0B0B; --egz-alarm: hsl(0 100% 60%); --egz-alarm-on: #0B0B0B;
+    --egz-canvas: #0E2A47; --egz-paper: #0E2A47; --egz-ink: #DCEAF7; --egz-ink-2: #9CBBD9; --egz-ink-3: #9CBBD9;
+    --egz-rule: #7FA3C8; --egz-rule-soft: #2F5478; --egz-mid: #557A9F; --egz-grid: #1C3C5F; --egz-shadow-ink: #0E2A47;
+    --egz-act: #FFFFFF; --egz-act-on: #0E2A47; --egz-alarm: hsl(0 100% 60%); --egz-alarm-on: #0E2A47;
     --egz-img-filter: grayscale(.2) brightness(.82) contrast(1.06);   /* v0.4: was missing, so an OS-dark
        viewer with no stored scheme got the light filter on imagery */
     color-scheme: dark;
@@ -221,18 +262,19 @@ html[data-scheme="dark"][data-canvas="violet"] {
   --accent-foreground:       var(--egz-ink);
 
   /* edges */
-  --border:                  var(--egz-rule-soft);
-  --input:                   var(--egz-rule);     /* the field's 2px ink edge, not a hairline */
+  --border:                  var(--egz-rule);     /* v0.13: the plate's edge; rule-soft is now the inner crease */
+  --input:                   var(--egz-rule);     /* the field's edge: 1px under A′ (v0.13); was the 2px ink edge, not a hairline */
   --ring:                    var(--egz-act);
 
-  /* radius. shadcn derives --radius-sm/md/lg/xl with calc(var(--radius) ∓ 2px|4px), which at
-   * radius 0 yields NEGATIVE lengths — invalid, so the component silently falls back to the
-   * browser default and a rounded corner appears in a square system. Each is pinned flat. */
-  --radius:                  var(--egz-radius);   /* 0 */
-  --radius-sm:               0;
-  --radius-md:               0;
-  --radius-lg:               0;
-  --radius-xl:               0;
+  /* radius. The A′ set is three values (control 8, plate 14, pill 20), and shadcn derives
+   * --radius-sm/md/lg/xl with calc(var(--radius) ∓ 2px|4px), which at 8px would invent 4, 6, 10 and 12:
+   * four more. Each is pinned to one of the three (v0.13). Until then they were pinned to 0, because
+   * the same calc went NEGATIVE at radius 0 and the component fell back to the browser default. */
+  --radius:                  var(--egz-radius);   /* 8px */
+  --radius-sm:               var(--egz-radius-control);
+  --radius-md:               var(--egz-radius-control);
+  --radius-lg:               var(--egz-radius-plate);
+  --radius-xl:               var(--egz-radius-pill);
 
   /* sidebar family — the flagship app shell's primary pick
    * (Egzos/egzos-platform · spec/design/search-list.md §17 — a proprietary sibling repository,
@@ -267,11 +309,31 @@ html[data-scheme="dark"][data-canvas="violet"] {
    * `calc(0.625rem - 4px)` and a rounded corner appears in a square system, which is the
    * failure this block exists to prevent, arriving by a different door. A2 states the
    * requirement; where in the platform's CSS entry it is satisfied is a4s's to implement and
-   * a2-conformance's to check. */
+   * a2-conformance's to check. Since v0.13 the symptom of getting it wrong is a radius outside the A′
+   * set (14, 8, 20), not a rounded corner in a square system; the requirement is unchanged. */
+}
+
+/* ---------------------------------------------------------------------------
+ * Hairline figures — six custom properties, DECLARED (UX-METHOD §3 and §8, tokens v0.13)
+ *
+ * A Hairline figure themes through exactly these six, "set once from the app's tokens". They are
+ * aliases, so — like the shadcn bridge above, and for the same reason — the block is
+ * scheme-independent by construction: var() resolves against whichever scheme block is winning on
+ * <html>, and there is no scheme copy of this list and must never be one. The kit sets the same six on
+ * each figure (blueprint.mjs, figure()); a figure inside the page inherits them from here instead.
+ * --------------------------------------------------------------------------- */
+:root {
+  --hairline-plate:  var(--egz-canvas);      /* the plate's fill: it hides what is behind it (R6) */
+  --hairline-hi:     var(--egz-act);         /* lit: the one bright thing (R4) */
+  --hairline-edge:   var(--egz-rule);        /* a silhouette's outline */
+  --hairline-mid:    var(--egz-mid);         /* a crease inside it */
+  --hairline-lo:     var(--egz-rule-soft);   /* the dimmest line: an inner outline, a guide, an off state */
+  --hairline-stroke: 1;                      /* stroke width, unitless: SVG user units, non-scaling */
 }
 
 @media (prefers-reduced-motion: reduce) {
   :root {
+    --egz-motion-state:    0ms;   /* v0.13: the discrete clock is no longer instantaneous, so it is zeroed here, and --egz-motion-discrete with it */
     --egz-motion-reveal:   0ms;
     --egz-motion-arrival:  0ms;
     --egz-motion-presence: 0ms;   /* the beam becomes a static marked segment; the countdown stays numeric */
@@ -281,12 +343,12 @@ html[data-scheme="dark"][data-canvas="violet"] {
 /*
  * Tailwind mapping (flagship; A4s wires this in tailwind config / @theme):
  *   colors.canvas → var(--egz-canvas)   colors.paper → var(--egz-paper)   colors.ink → var(--egz-ink)
- *   colors.ink-2 / ink-3 / rule / rule-soft / act / act-on / alarm / alarm-on likewise
- *   borderRadius.DEFAULT → var(--egz-radius) (0)   borderWidth.structural → var(--egz-bw)
- *   borderWidth.hair → var(--egz-hair)
- *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)
+ *   colors.ink-2 / ink-3 / rule / rule-soft / mid / grid / act / act-on / alarm / alarm-on likewise
+ *   borderRadius.DEFAULT → var(--egz-radius) (8px)   borderRadius.plate / control / pill → --egz-radius-plate / -control / -pill
+ *   borderWidth.structural → var(--egz-bw)   borderWidth.hair → var(--egz-hair)
+ *   boxShadow.off → var(--egz-off) var(--egz-off) 0 var(--egz-shadow-ink)   (paints nothing from v0.13: --egz-off is 0px)
  *   fontFamily.ui / mono → the two stacks above   fontSize.1…7 → --egz-fs-1…7
- *   transitionDuration.state / reveal / arrival / presence → the motion tokens
+ *   transitionDuration.state / reveal / arrival / presence → the motion tokens   transition (shorthand) → var(--egz-motion-discrete)
  * shadcn/ui bridge: DECLARED ABOVE (D-T3, v0.6), not listed here. The block above this comment
  * is the bridge; it was a comment in v0.4–v0.5 and nothing declared the keys. A pick needing a
  * key the block does not declare is a design-gap against THIS file, never a literal in the
