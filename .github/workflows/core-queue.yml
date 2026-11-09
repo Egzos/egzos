@@ -228,7 +228,7 @@ jobs:
           echo "::warning::Bun from npm failed; the action downloads it itself"
 
       - id: build
-        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+        uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1
         timeout-minutes: 80  # ends the session before the job's limit, so salvage can save its work
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
