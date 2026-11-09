@@ -180,7 +180,7 @@ jobs:
           done
           echo "::warning::Bun from npm failed; the action downloads it itself"
 
-      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+      - uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
@@ -616,7 +616,7 @@ jobs:
           done
           echo "::warning::Bun from npm failed; the action downloads it itself"
 
-      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+      - uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1
         id: sweep
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
@@ -769,7 +769,7 @@ jobs:
           done
           echo "::warning::Bun from npm failed; the action downloads it itself"
 
-      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+      - uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1
         id: file
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
