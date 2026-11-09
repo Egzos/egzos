@@ -164,10 +164,27 @@ jobs:
           mkdir -p docs/build
           git show "${B}:docs/build/REVIEW-DECISIONS.md" > docs/build/REVIEW-DECISIONS.md
 
+      # Bun for the session, from the npm registry. The action's own download comes from GitHub's release CDN, which
+      # answered 504 on 2026-11-09 and failed runs before they began. On any failure the path stays empty and the
+      # action downloads Bun itself, as before.
+      - name: bun
+        id: bun1
+        run: |
+          set -u
+          for i in 1 2 3; do
+            if npm install --no-save --no-audit --no-fund --ignore-scripts --prefix "$RUNNER_TEMP/bun-npm" bun@1.4.4 >/dev/null 2>&1; then
+              p="$RUNNER_TEMP/bun-npm/node_modules/@oven/bun-linux-x64/bin/bun"
+              if [ -x "$p" ] && "$p" --version >/dev/null 2>&1; then echo "path=$p" >> "$GITHUB_OUTPUT"; exit 0; fi
+            fi
+            sleep $((i * 10))
+          done
+          echo "::warning::Bun from npm failed; the action downloads it itself"
+
       - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
         id: review
         if: steps.scope.outputs.applicable == 'true' && github.event.pull_request.draft == false
         with:
+          path_to_bun_executable: ${{ steps.bun1.outputs.path }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ github.token }}
@@ -583,11 +600,28 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
+      # Bun for the session, from the npm registry. The action's own download comes from GitHub's release CDN, which
+      # answered 504 on 2026-11-09 and failed runs before they began. On any failure the path stays empty and the
+      # action downloads Bun itself, as before.
+      - name: bun
+        id: bun2
+        run: |
+          set -u
+          for i in 1 2 3; do
+            if npm install --no-save --no-audit --no-fund --ignore-scripts --prefix "$RUNNER_TEMP/bun-npm" bun@1.4.4 >/dev/null 2>&1; then
+              p="$RUNNER_TEMP/bun-npm/node_modules/@oven/bun-linux-x64/bin/bun"
+              if [ -x "$p" ] && "$p" --version >/dev/null 2>&1; then echo "path=$p" >> "$GITHUB_OUTPUT"; exit 0; fi
+            fi
+            sleep $((i * 10))
+          done
+          echo "::warning::Bun from npm failed; the action downloads it itself"
+
       - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
         id: sweep
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:
+          path_to_bun_executable: ${{ steps.bun2.outputs.path }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ steps.forge.outputs.token }}
@@ -719,11 +753,28 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter-a6-adversary.md
           test -s /tmp/charter-a6-adversary.md
 
+      # Bun for the session, from the npm registry. The action's own download comes from GitHub's release CDN, which
+      # answered 504 on 2026-11-09 and failed runs before they began. On any failure the path stays empty and the
+      # action downloads Bun itself, as before.
+      - name: bun
+        id: bun3
+        run: |
+          set -u
+          for i in 1 2 3; do
+            if npm install --no-save --no-audit --no-fund --ignore-scripts --prefix "$RUNNER_TEMP/bun-npm" bun@1.4.4 >/dev/null 2>&1; then
+              p="$RUNNER_TEMP/bun-npm/node_modules/@oven/bun-linux-x64/bin/bun"
+              if [ -x "$p" ] && "$p" --version >/dev/null 2>&1; then echo "path=$p" >> "$GITHUB_OUTPUT"; exit 0; fi
+            fi
+            sleep $((i * 10))
+          done
+          echo "::warning::Bun from npm failed; the action downloads it itself"
+
       - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
         id: file
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
         with:
+          path_to_bun_executable: ${{ steps.bun3.outputs.path }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_code_oauth_token: ${{ secrets.ANTHROPIC_API_KEY == '' && secrets.CLAUDE_CODE_OAUTH_TOKEN || '' }}
           github_token: ${{ steps.forge.outputs.token }}
