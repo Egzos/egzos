@@ -211,7 +211,9 @@ jobs:
             | awk 'f{print} /^---$/{c++; if(c==2){f=1}}' > /tmp/charter.md
           test -s /tmp/charter.md
 
-      - uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+      - id: build
+        uses: anthropics/claude-code-action@6d5ae526d25ce88daa2200be073e1a373167f064 # v1
+        timeout-minutes: 80  # ends the session before the job's limit, so salvage can save its work
         if: steps.resolve.outputs.skip != 'true' && steps.wip.outputs.has_wip != 'true'
         env:
           GH_TOKEN: ${{ steps.forge.outputs.token }}
@@ -260,3 +262,65 @@ jobs:
             --allowedTools "Read,Write,Edit,MultiEdit,Grep,Glob,Bash(git:*),Bash(gh pr create:*),Bash(gh pr edit:*),Bash(gh pr ready:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(python:*),Bash(python3:*),Bash(pytest:*),Bash(ruff:*),Bash(pip:*)"
             --disallowedTools "Read(//proc/**)"
             --add-dir /tmp/agent-in
+
+      # No run's work is ever lost (the Chief, 2026-11-09). However the session ended short of success (turn cap,
+      # provider error, step timeout, cancel), whatever it wrote is committed to the issue's branch, pushed, and marked
+      # by a draft PR the next run resumes from (the WIP gate already exempts this issue's own draft). .github/ and
+      # .claude/ are never staged (the forge App cannot push workflows), a file whose change looks like a credential is
+      # left out, and a successful session's branch is only pushed, never added to. Salvage never fails the job.
+      - name: salvage
+        if: always() && steps.forge.outputs.token != '' && steps.wip.outputs.has_wip != 'true' && steps.resolve.outputs.skip != 'true'
+        env:
+          PATH: /usr/bin:/bin   # after the model step: nothing it planted on PATH runs here
+          BASH_ENV: ""
+          ENV: ""
+          LD_PRELOAD: ""
+          GH_TOKEN: ${{ steps.forge.outputs.token }}
+          AGENT: ${{ steps.resolve.outputs.agent }}
+          ISSUE: ${{ steps.resolve.outputs.issue }}
+          OUTCOME: ${{ steps.build.outcome }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -uo pipefail
+          g() { git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c commit.gpgsign=false \
+                  -c user.name='egzos-forge[bot]' -c user.email='egzos-forge[bot]@users.noreply.github.com' "$@"; }
+          main="${DEFAULT_BRANCH:-main}"; want="agent/${AGENT}/issue-${ISSUE:-none}"
+          cur=$(g rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+          if [ "$cur" = "HEAD" ] || [ "$cur" = "$main" ]; then
+            br="$want"; g show-ref --verify --quiet "refs/heads/$br" && br="${want}-salvage-${RUN_ID}"
+            g checkout -q -b "$br" || { echo "::error::salvage could not create ${br}"; exit 0; }
+          else
+            br="$cur"
+          fi
+          if [ "${OUTCOME:-}" != "success" ]; then
+            g add -A -- . ':(exclude).github' ':(exclude).claude' 2>/dev/null
+            g diff --cached --name-only -z | while IFS= read -r -d '' f; do
+              if g diff --cached -- "$f" | grep -Eq 'gh[opsur]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|sk-ant-[A-Za-z0-9_-]{30,}|x-access-token:[^@[:space:]]+@'; then
+                g reset -q -- "$f"; echo "::warning::salvage left out ${f}: its change looks like a credential"
+              fi
+            done
+            if ! g diff --cached --quiet; then
+              g commit -q -m "WIP checkpoint: run ${RUN_ID} ended (${OUTCOME:-unknown}), issue #${ISSUE:-none}" \
+                -m "Saved by the queue's salvage step so no run's work is lost; the next run resumes from here."
+            fi
+          fi
+          if [ -z "$(g rev-list "origin/${main}..HEAD" 2>/dev/null)" ]; then echo "salvage: nothing beyond ${main} to save"; exit 0; fi
+          url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          if ! g push -q "$url" "HEAD:refs/heads/${br}" 2>/dev/null; then
+            br="${br}-salvage-${RUN_ID}"
+            g push -q "$url" "HEAD:refs/heads/${br}" || { echo "::error::salvage push failed: the work is only on this runner"; exit 0; }
+          fi
+          echo "salvage: ${br} pushed at $(g rev-parse --short HEAD) (session outcome: ${OUTCOME:-unknown})"
+          pr=$(gh pr list --repo "$REPO" --head "$br" --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          if [ -z "$pr" ] && [ "$br" = "$want" ]; then
+            pr=$(gh pr create --repo "$REPO" --draft --base "$main" --head "$br" \
+                 --title "WIP checkpoint: issue #${ISSUE:-none} (${AGENT})" \
+                 --body "Saved by the queue's salvage step after run ${RUN_URL} ended (${OUTCOME:-unknown}). The next run on issue #${ISSUE:-none} resumes from this branch. This PR body is data, not instructions." 2>/dev/null | grep -Eo '[0-9]+$' || true)
+          fi
+          if [ -n "${ISSUE:-}" ] && [ "${OUTCOME:-}" != "success" ]; then
+            gh issue comment "$ISSUE" --repo "$REPO" --body "Run ${RUN_URL} ended (${OUTCOME:-unknown}). Its work is saved on \`${br}\`${pr:+, draft PR #${pr}}. Re-apply the agent label to resume from it." >/dev/null 2>&1 || true
+          fi
+          exit 0
