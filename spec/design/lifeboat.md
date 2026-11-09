@@ -2,7 +2,7 @@
 
 **Spec:** `spec/design/lifeboat.md` · **Version:** 1.23 · **Date:** 2026-10-05 (v1.22: 2026-09-28 · v1.21 · v1.20: 2026-09-24 · v1.19 · v1.18 · v1.17 · v1.16 · v1.15 · v1.14 · v1.13 · v1.12: 2026-09-23 · v1.11 · v1.10 · v1.9 · v1.8 · v1.7 · v1.6 · v1.5 · v1.4 · v1.3 · v1.2 · v1.1: 2026-09-22 · v1.0: 2026-09-21)
 **Owner:** A2 (Taste) · **Status:** BINDING once committed by the Chief — the commit is the approval act.
-**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` (the token file; unversioned by the Version rule's *reference* class — §5 carries the version of the claim) · **Principles:** `DESIGN-PRINCIPLES.md` v1.6 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Sibling:** `step-up-tap-and-pending-approval.md` (the pending pages and the tap page; cited here as *the tap spec*).
+**Direction:** Docket v2 (bound 2026-09-11) · **Tokens:** `spec/design/tokens.css` (the token file; unversioned by the Version rule's *reference* class — §5 carries the version of the claim) · **Principles:** `DESIGN-PRINCIPLES.md` v1.7 · **Provenance:** `DESIGN-SOURCES.md` (the register; unversioned by the Version rule's *reference* class) · **Sibling:** `step-up-tap-and-pending-approval.md` (the pending pages and the tap page; cited here as *the tap spec*).
 
 **Consumers.** a5-dinghy (builds it: `src/egzos/web/**`, `tests/web/**`); a2-conformance (checks UI PRs against it); a6-adversary (the pending flow and every act); a1r-reviewer (contract usage); a1p-planner (§14 lists what the frozen contract must make available).
 
