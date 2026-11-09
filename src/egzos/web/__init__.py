@@ -15,7 +15,8 @@ on 127.0.0.1 the owner's browser visits. The label is minted in this process and
 to do when the browser does not (`LOCALHOST_HINT`). The keyed URL is printed only when no
 browser was opened AND stdout is a terminal: an agent's shell tool is not a terminal. To reopen
 the lifeboat after closing the browser, restart `egzos web`.
-`tokens.css` (spec/design/tokens.css, vendored byte-for-byte) lives in this package.
+`tokens.css` lives in this package: spec/design/tokens.css as of v0.12 (Docket v2). It stays there, not
+re-vendored to v0.13 (direction A′), until the lifeboat and tap-page specs are revised for A′.
 """
 
 from __future__ import annotations
