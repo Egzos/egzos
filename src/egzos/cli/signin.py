@@ -79,9 +79,10 @@ import jwt
 from egzos.authz.values import same
 from egzos.identity import ConfigError, provider_id, validate
 
-#: egzos.io's stand-in while v0.7 §AE holds (identity.md §3a). EGZOS_SITE replaces it for tests,
-#: a loopback origin only: never a flag, nor a value a pasted command could aim elsewhere.
-SITE = "https://egzos-site.vercel.app"
+#: egzos.io itself: the stand-in of v0.7 §AE ended when the domain was bought (identity.md §3a).
+#: EGZOS_SITE replaces it for tests, a loopback origin only: never a flag, nor a value a pasted
+#: command could aim elsewhere.
+SITE = "https://egzos.io"
 #: The identity project's issuer: public, and the platform ships the same.
 ISSUER = "https://kvdhimpnqatnidpmzvga.supabase.co/auth/v1"
 PORT = 7427  # not 7420, nor the lifeboat's 7425, nor serve's 7426
