@@ -277,8 +277,8 @@ def test_only_this_containers_owner_signs_in_and_only_through_the_site(world, ca
         assert _run(capsys, world, "login", "--port", "0")[:2] == (2, {"error": signin.BAD_SITE})
     assert main(["login", "--site", SITE]) == 2  # and no flag moves it
     assert inspect.signature(login).parameters["port"].default.default == signin.PORT  # one 7427
-    monkeypatch.delenv("EGZOS_SITE")  # unset: egzos.io's stand-in while §AE holds, as shipped
-    assert signin._site() == "https://egzos-site.vercel.app"
+    monkeypatch.delenv("EGZOS_SITE")  # unset: egzos.io, as shipped (§AE's stand-in has ended)
+    assert signin._site() == "https://egzos.io"
     monkeypatch.setenv("EGZOS_SITE", SITE)
     monkeypatch.setenv("EGZOS_TOKEN", Container(world.home).auth.mint(
         principal="client", owner="self", client="a", role="admin", scopes=["*"], actor="self",
