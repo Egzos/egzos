@@ -579,6 +579,66 @@ AH. AMENDMENT — THE TERMINAL ASKS BEFORE IT KEEPS A SIGN-IN (amends §AG's
 
 
 ================================================================================
+AI. AMENDMENT — THE COMMAND LINE MOVES TO ITS OWN REPOSITORY, AND THE CORE
+    TAKES THE NAME egzoscore (amends §Y's repositories and what §AG and §AH
+    call "the terminal"; identity.md §8; rest.md §4)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-13 and 2026-11-14; recorded by the
+          operator; the Chief may veto by reverting.
+
+[DECIDED] THE COMMAND PEOPLE TYPE IS ITS OWN PROGRAM IN ITS OWN REPOSITORY,
+          Egzos/cli: MIT-licensed, written in TypeScript, shipped as one
+          file per platform (npm `egzos`, an installer; Homebrew later). It
+          keeps the name `egzos`. It reaches a container only through the
+          door (rest.md) and holds no part of the core.
+
+[DECIDED] THE DOOR CLIENT IS PUBLISHED WITH IT, under MIT, as
+          `@egzos/client`: the code that presents a person's token to a
+          container's door. It carries nothing of the flagship.
+
+[DECIDED] THE PYTHON PACKAGE BECOMES `egzoscore`: the container (`init`,
+          `serve`, `web`, `token`, `audit`, `config`, `link`) and the
+          store, trust and ledger behind it. The rename waits until the new
+          command covers the everyday commands; until then both exist, and
+          `egzos` 0.1.x on PyPI is left as it is.
+
+[DECIDED] WHAT MOVES TO THE NEW COMMAND: `login`, `logout`, `whoami` for a
+          cloud, the everyday verbs on a cloud (ls, find, fetch, cat, get,
+          add, mk, mv, cp, rm), and later people, agents, keys and
+          `connect` on a cloud. §AG and §AH bind the new program exactly
+          as they bound the old one: the hand-off, its checks, the
+          question before a sign-in is kept, and no flag or variable that
+          stands in for the yes.
+
+[DECIDED] `login` LEAVES THE CORE AT ONCE (the Chief, 2026-11-14). The
+          core's `egzos login` is removed, with its tests; nothing in the
+          core signs a terminal in to a cloud. One program does: the new
+          command, which keeps a sign-in under names of its own. A sign-in
+          the core's command kept on a machine is removed there by hand;
+          the new command never reads it.
+
+[DECIDED] A COMMAND NAMES ITS PLACE. `cloud:` in front of a path is the
+          person's cloud; no prefix is this machine. The first line of
+          every answer says which place it came from, and as whom; a
+          command that prints an item's own text (`cat`) prints that text
+          alone, so it can be piped. A command that names the cloud and
+          cannot reach it stops: it never falls back to this machine.
+
+[DECIDED] THE TERMINAL STILL NEVER GIVES A CONFIRM (identity.md §8). A
+          human-only act begun in a terminal is finished in the browser.
+
+[LATER]   The new command driving a container on this machine through
+          `egzoscore`; a place that sticks to a directory (`cd`); push and
+          pull (§V); signing in on Windows, where the new command says it
+          cannot yet.
+
+[OPEN→CHIEF] The new command's first version number. Whether its macOS
+          builds are signed with a Developer ID (unsigned, the Keychain
+          asks again after every upgrade).
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -591,7 +651,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      visibility, retention, token binding, own agents, kept uploads,
      confirm credentials, where the app lives, where a hosted
      container's state lives and runs, how a terminal signs in to a cloud,
-     the terminal asking before it keeps a sign-in
+     the terminal asking before it keeps a sign-in, the command line's own
+     repository and the core's new name
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
@@ -606,7 +667,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   8. Per-scope E2EE key design (post-v1).
   9. Price points for BYOC vs hosted; relay pricing shape.
 
-  [OPEN→CHIEF]: none.
+  [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
+  macOS builds).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET
