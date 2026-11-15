@@ -233,9 +233,10 @@ class Uploads:
 
     # -- the orphan's discard -------------------------------------------------------------------
     def discard(self, token: Token, upload_id: str, *, admin: bool) -> bool:
-        """Discard an upload no item was written from — the caller's own, an orphan an agent serving
-        the caller opened, or as an admin anyone's — with its staged bytes, unless another upload
-        or staged item still holds them (`_shared`). False is §3's refusal."""
+        """Discard an upload no item was written from — the caller's own, an orphan an agent or a
+        terminal serving the caller opened (`answers_to`), or as an admin anyone's — with its staged
+        bytes, unless another upload or staged item still holds them (`_shared`). False is §3's
+        refusal."""
         with self.backend.atomic():
             record = self.backend.get_upload(upload_id)
             if (record is None or record["discarded"] or record["item"] is not None
@@ -357,8 +358,8 @@ class Uploads:
 
     # -- what `GET /v1/pending` lists ------------------------------------------------------------
     def orphans(self, token: Token, *, admin: bool) -> list[UploadRecord]:
-        """The orphans the caller may see: its own and its agents', or as an admin every
-        principal's."""
+        """The orphans the caller may see: its own and, for a person's own sign-in, its agents'
+        and its terminals' (`answers_to`), or as an admin every principal's."""
         return [r for r in self.backend.list_uploads()
                 if self.orphan(r) and (admin or self.answers_to(token, r))]
 
