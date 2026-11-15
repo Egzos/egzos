@@ -496,6 +496,41 @@ def test_ending_someone_elses_terminal_takes_the_confirm_bound_to_the_pair(c, do
     assert door.get("/v1/fetch", headers=sign("bob", client_id="laptop")).status_code == 401
 
 
+@pytest.mark.parametrize("since", ["revoked", "no longer an admin", "ended already"])
+def test_the_second_leg_reads_the_caller_and_the_terminal_again_under_the_lock(
+        c, door, sign, monkeypatch, since):
+    _terminal(c, "laptop", "bob")
+    first = door.delete("/v1/terminals/laptop?sub=bob", headers=sign()).json()
+    verify, conclude = c.identity.verify, c.confirm.conclude
+
+    def verified_then_changed(value, **kw):  # the caller's grant changes after the door
+        token = verify(value, **kw)
+        if since == "revoked":
+            c.identity.revoke_user("alice", **KW)
+        else:
+            c.identity.grant_user("alice", name="Alice", role="reader", scopes=["*"], **KW)
+        return token
+
+    def racing(*args, **kwargs):  # bob ended it himself before this one's lock
+        c.identity.revoke_terminal("laptop", "bob", actor="user:bob", principal="interactive")
+        return conclude(*args, **kwargs)
+
+    if since == "ended already":
+        monkeypatch.setattr(c.confirm, "conclude", racing)
+    else:
+        monkeypatch.setattr(c.identity, "verify", verified_then_changed)
+    reads = len(_events(c, "context.fetch"))
+    r = door.request("DELETE", "/v1/terminals/laptop?sub=bob", headers=sign(), json=_button(first))
+    assert r.content == NOT_FOUND and len(_events(c, "context.fetch")) == reads + 1  # its probe
+    revokes = [e for e in _events(c, "identity.revoke") if e["details"]["kind"] == "terminal"]
+    if since == "ended already":  # concluded, so audited; and nothing ends twice
+        assert _events(c, "step_up")[-1]["details"]["outcome"] == "confirmed"
+        assert [e["actor"] for e in revokes] == ["user:bob"]
+    else:
+        assert not _events(c, "step_up") and not revokes
+        assert not c.backend.get_agent_registration("laptop", "bob")["revoked"]
+
+
 def test_a_grant_revoke_names_the_terminals_it_ends_and_ends_them(c, door, sign):
     _agent(c, "helper", "bob")
     _terminal(c, "laptop", "bob")

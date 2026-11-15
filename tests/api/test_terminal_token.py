@@ -19,7 +19,8 @@ from authenticator import SoftAuthenticator
 from cryptography.hazmat.primitives.asymmetric import ec
 from fastapi.testclient import TestClient
 
-from egzos.api.app import create_app
+from egzos.api.app import Door, create_app
+from egzos.api.throttle import PER_TOKEN, Throttle
 from egzos.container import OWNER, Container
 from egzos.identity import Jwks
 from egzos.store.uploads import UPLOAD_TTL_SECONDS
@@ -332,3 +333,24 @@ def test_a_grant_minted_through_a_terminal_is_its_own_and_ends_with_it(c, door, 
     (refused,) = _since(c, head)
     assert (refused["event"], refused["actor"], refused["details"]["terminal"],
             refused["details"]["check"]) == ("context.fetch", "user:bob", "bob-laptop", 5)
+
+
+def test_a_terminals_refusals_spend_its_own_bucket_never_its_persons(c, sign, tmp_path):
+    """rest.md §2, §6: the per-token bucket is keyed on the grant's token id, a terminal's own."""
+    throttle = Throttle(c.backend, c.ledger, b"k" * 32, clock=Clock())
+    client = TestClient(create_app(c, door=Door(c, throttle)))
+    path = tmp_path / "a.bin"
+    path.write_bytes(b"\x01" * 4096)
+    item = c.store.add(file=path, scope=_node(c, "project", "p"), token=c.owner, **KW)
+
+    def url(h):
+        return client.get(f"/v1/items/{item.id}", headers=h).json()["grant_url"]
+
+    laptop = sign(client_id="laptop")
+    spent = url(laptop)
+    assert client.get(spent).status_code == 200
+    for _ in range(PER_TOKEN):  # replays: refusals of a verified descriptor, the laptop's own
+        assert client.get(spent).content == NOT_FOUND
+    held, desk, browser = url(laptop), url(sign(client_id="desk")), url(sign())
+    assert client.get(held).content == NOT_FOUND  # its bucket holds
+    assert client.get(desk).status_code == client.get(browser).status_code == 200
