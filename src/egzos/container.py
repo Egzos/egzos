@@ -216,6 +216,6 @@ class Container:
         token = self.auth.interactive_token()
         if not token:
             raise PermissionError(
-                "no token — run `egzos init` (skeleton) / `egzos login` (Phase 2)"
+                "no token — run `egzos init`"
             )
         return token
