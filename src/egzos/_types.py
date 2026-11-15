@@ -265,8 +265,9 @@ Event = Literal[
 #: [0.3 · 29, 31, 33, 36], #140, #144), with no AS in this tree to emit them; so is `config.set`
 #: (container.md §8, [0.3 · 40]), with no config surface; and so is `rest.tally`, the REST door's
 #: per-window tally (rest.md §2, the Chief on #165 items 2 and 3), with no REST door in this tree.
-#: `config.set` runs since `egzos config set` and `egzos link` (contract v1.1); `identity.grant` and
-#: `identity.revoke` are `identity.md` §4's, running with the grants they record.
+#: `config.set` runs since `egzoscore config set` and `egzoscore link` (contract v1.1);
+#: `identity.grant` and `identity.revoke` are `identity.md` §4's, running with the grants they
+#: record.
 #: events.md §1 says the same thing from the contract's side.
 EVENTS: tuple[Event, ...] = get_args(Event)
 

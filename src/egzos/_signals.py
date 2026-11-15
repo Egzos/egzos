@@ -5,8 +5,8 @@
 Docker, systemd and Kubernetes stop a process with SIGTERM; a terminal stops it with SIGINT
 (Ctrl-C). uvicorn drains on either, then raises the signal again under the handler it found. Under
 SIGTERM's default handler that ends the process before `uvicorn.run` returns, so the command never
-closes its container (storage.md §3.7). Both doors that run uvicorn, `egzos serve --http` and
-`egzos web`, run it inside `sigterm_as_sigint`, so `uvicorn.run` returns on either stop and the
+closes its container (storage.md §3.7). Both doors that run uvicorn, `egzoscore serve --http` and
+`egzoscore web`, run it inside `sigterm_as_sigint`, so `uvicorn.run` returns on either stop and the
 close runs.
 """
 

@@ -119,5 +119,5 @@ def test_it_imports_without_opendal_and_names_the_extra_when_used(monkeypatch, r
     code = "import sys; sys.modules['opendal'] = None; import egzos.store.objects"
     subprocess.run([sys.executable, "-c", code], check=True)
     monkeypatch.setitem(sys.modules, "opendal", None)
-    with pytest.raises(ImportError, match=r"egzos\[objects\]"):
+    with pytest.raises(ImportError, match=r"egzoscore\[objects\]"):
         fs_operator(root)

@@ -1,10 +1,12 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`egzos connect` mints a client principal and prints the Claude Code wiring."""
+"""`egzoscore connect` mints a client principal and prints the Claude Code wiring."""
 
 from __future__ import annotations
 
 import json
+
+import pytest
 
 from egzos.cli import main
 
@@ -140,3 +142,13 @@ def test_find_refuses_an_unknown_prefix_and_names_nothing(tmp_path, monkeypatch,
     out = capsys.readouterr().out
     assert "a note" not in out
     assert main(["find", "kind:memory"]) == 0
+
+
+def test_connect_prints_the_executable_as_egzoscore(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: True)
+    monkeypatch.setattr("egzos.cli.shutil.which", lambda name: None)  # not installed on PATH
+    assert main(["init"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "connect"]) == 0
+    assert json.loads(capsys.readouterr().out)["command"][-3:] == ["egzoscore", "serve", "--mcp"]

@@ -1,7 +1,7 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The lifeboat (spec/design/lifeboat.md): `egzos web` — FastAPI + Jinja + htmx, server-rendered,
+The lifeboat (spec/design/lifeboat.md): `egzoscore web` — FastAPI + Jinja + htmx, server-rendered,
 in-process with the container, loopback only, no JS toolchain, tokens as CSS variables only.
 
 Pages: home / search (`/`), item detail (`/items/<id>`), the scheme switch (`/prefs`), the uniform
@@ -174,7 +174,7 @@ class Lifeboat:
         # - the form key is in every page, and is never a credential on its own.
         # Cursors are signed with a secret that never leaves this process.
         #
-        # Two hosts when `launch_host` is set (`egzos web` always sets it). A browser does not
+        # Two hosts when `launch_host` is set (`egzoscore web` always sets it). A browser does not
         # isolate cookies by port, so a cookie for 127.0.0.1 would also reach any other server
         # on 127.0.0.1 the owner's browser visits. The session therefore lives on `host`, a
         # per-launch random `<label>.localhost`, minted here and never printed or put in argv:

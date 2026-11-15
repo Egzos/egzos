@@ -786,7 +786,7 @@ def test_the_launch_says_what_to_do_when_localhost_does_not_resolve(capsys):
     assert _launch("http://127.0.0.1:1/?k=x", True, opener=lambda u: True)
     assert _launch("http://127.0.0.1:1/?k=x", False, terminal=True) is False
     out = capsys.readouterr().out
-    assert out.count(LOCALHOST_HINT) == 2 and "egzos web --no-open" in LOCALHOST_HINT
+    assert out.count(LOCALHOST_HINT) == 2 and "egzoscore web --no-open" in LOCALHOST_HINT
 
 
 def test_the_promoted_line_sits_with_the_stamp_unlabelled(lb):

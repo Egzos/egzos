@@ -1,6 +1,6 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`egzos link`, `config` and `grant`: the owner links the container to a provider (identity.md
+"""`egzoscore link`, `config` and `grant`: the owner links the container to a provider (identity.md
 §4)."""
 
 from __future__ import annotations

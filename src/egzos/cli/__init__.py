@@ -32,8 +32,14 @@ from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
 from egzos.trust import TrustError
 
+#: The command this program installs. The cloud's command line is a different program, `egzos`.
+PROG = "egzoscore"
+#: The name `connect` registers the server under in an agent's configuration. It stays `egzos`
+#: (the product's name), so a second `connect` replaces the first entry and adds no other.
+MCP_NAME = "egzos"
+
 app = typer.Typer(
-    add_completion=False, no_args_is_help=False, help="egzos — your context, your container."
+    add_completion=False, no_args_is_help=False, help="egzoscore — the container for your context."
 )
 trust_app = typer.Typer(help="Trust: pending queue, promotion, quarantine.")
 audit_app = typer.Typer(help="Audit: the hash-chained ledger.")
@@ -438,7 +444,7 @@ def mv(
             f"GATE — this move widens the audience.\n  {p['from_path']}  →  {p['to_path']}\n"
             f"  new audience: {who}\n"
             f"  inheritance: {p['blast_radius']} container(s) under the target inherit it\n"
-            f"  parked as proposal {p['id']}  ·  `egzos trust approve {p['id']}` to confirm",
+            f"  parked as proposal {p['id']}  ·  `egzoscore trust approve {p['id']}` to confirm",
         )
 
 
@@ -665,7 +671,7 @@ def token_create(
 
 @token_app.command("revoke")
 def token_revoke(
-    token_id: str = typer.Argument(..., help="A client token's id (`egzos token ls`)"),
+    token_id: str = typer.Argument(..., help="A client token's id (`egzoscore token ls`)"),
 ):
     """Take a client token back: it stops working at once, and leaves every audience it was in."""
     c = _container()
@@ -919,8 +925,8 @@ def serve(
 ):
     """Open a door. `--mcp` speaks MCP over stdio as the CLIENT principal it was started with —
     never as you. `--http` serves the REST door, and MCP over HTTP at `/mcp`, where every request
-    brings its own credential: a container token, or a sign-in from the provider `egzos link` set
-    (rest.md, identity.md)."""
+    brings its own credential: a container token, or a sign-in from the provider
+    `egzoscore link` set (rest.md, identity.md)."""
     if mcp == http:
         _fail("choose one door: --mcp (stdio) or --http (the REST door)", 2)
     c = _container()
@@ -935,7 +941,7 @@ def serve(
     tid = token or os.environ.get("EGZOS_TOKEN")
     if not tid:
         _fail(
-            "serve needs a client token: `egzos token create --client <name>` "
+            "serve needs a client token: `egzoscore token create --client <name>` "
             "then --token / EGZOS_TOKEN",
             2,
         )
@@ -977,7 +983,7 @@ def connect(
     if not token.has("admin"):
         _fail("minting a token needs `admin`")
     if role == "admin":
-        _fail("connect never mints admin for an agent; use `egzos token create` deliberately")
+        _fail("connect never mints admin for an agent; use `egzoscore token create` deliberately")
     from egzos.authz.presence import is_terminal
 
     if not apply and not is_terminal():
@@ -999,9 +1005,9 @@ def connect(
         actor=OWNER,
         by_principal=token.principal,
     )
-    egzos_bin = shutil.which("egzos") or "egzos"
+    egzos_bin = shutil.which(PROG) or PROG
     cmd = [
-        "claude", "mcp", "add", "--scope", "user", "egzos",
+        "claude", "mcp", "add", "--scope", "user", MCP_NAME,
         "-e", f"EGZOS_TOKEN={t.secret}",
         "-e", f"EGZOS_HOME={c.home}",
         "--", egzos_bin, "serve", "--mcp",
@@ -1052,7 +1058,7 @@ def main(argv: list[str] | None = None) -> int:
     if holds_nul(args):  # a real argv cannot carry U+0000; a caller in process can (rest.md §3)
         return _answer(args, "invalid_request", 2)
     try:
-        rv = app(args=args or ["--help"], standalone_mode=False)
+        rv = app(args=args or ["--help"], prog_name=PROG, standalone_mode=False)
         return int(rv) if isinstance(rv, int) else 0
     except typer.Exit as e:
         return int(e.exit_code)
@@ -1066,7 +1072,7 @@ def main(argv: list[str] | None = None) -> int:
             typer.echo(safe(json.dumps({"error": msg}, indent=2, ensure_ascii=False), json=True))
         else:
             ctx = getattr(e, "ctx", None)
-            path = safe(ctx.command_path if ctx else "egzos")
+            path = safe(ctx.command_path if ctx else PROG)
             typer.echo(f"Error: {safe(msg)}\nTry '{path} --help'.", err=True)
         return int(getattr(e, "exit_code", 2))
     except SystemExit as e:

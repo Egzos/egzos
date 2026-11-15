@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "egzos"
+name = "egzoscore"
 version = "0.1.2"
 description = "MCP-first, CLI-first personal context layer"
 readme = "README.md"
@@ -27,7 +27,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Local ONNX embeddings (lazy download via egzos[embed]).
+# Local ONNX embeddings (lazy download via egzoscore[embed]).
 # Never torch in the base install.
 embed = [
     "onnxruntime",
@@ -50,7 +50,7 @@ dev = [
 ]
 
 [project.scripts]
-egzos = "egzos.cli:main"
+egzoscore = "egzos.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/egzos"]

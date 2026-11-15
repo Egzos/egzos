@@ -3,9 +3,9 @@
 """GHSA-wf2m-wg6h-v6wf: a door stopped with SIGTERM, as Docker, systemd and Kubernetes stop a
 process, ends as one stopped with SIGINT (Ctrl-C) does: its command closes the container and exits
 0, so a home bound to a database records the newest entry it has seen (storage.md §3.7). Each door,
-`egzos serve --http` and `egzos web`, runs in a process of its own, so a stop that ends that process
-cannot end the test run. The postgres case runs when `EGZOS_TEST_POSTGRES` names a database, as
-`tests/test_home_binding.py`'s do, on a schema and a role of its own."""
+`egzoscore serve --http` and `egzoscore web`, runs in a process of its own, so a stop that ends
+that process cannot end the test run. The postgres case runs when `EGZOS_TEST_POSTGRES` names a
+database, as `tests/test_home_binding.py`'s do, on a schema and a role of its own."""
 
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ STOPS = pytest.mark.parametrize("stop", [signal.SIGINT, signal.SIGTERM], ids=["S
 #: The two doors that run uvicorn, as their commands start them on a port.
 DOORS = pytest.mark.parametrize("door", [("serve", "--http"), ("web", "--no-open")],
                                 ids=["serve-http", "web"])
-#: `egzos`, as its console script runs it, with the stops a host's process starts with, on the
+#: `egzoscore`, as its console script runs it, with the stops a host's process starts with, on the
 #: schema the test's database names, and `Container.close` leaving a mark once it has run.
 DOOR = """
 import signal, sys
