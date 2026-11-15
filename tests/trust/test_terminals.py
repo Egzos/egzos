@@ -68,6 +68,20 @@ def test_a_person_registers_a_terminal_and_it_is_recorded(box):
                                 "authorization_id": "auth-t1-bob-sub", "for": f"user:{BOB}"}
 
 
+def test_a_terminals_machine_is_kept_only_when_given(box):
+    plain = _sign_in(box, "t1")
+    assert "machine" not in plain
+    assert "machine" not in box.backend.get_agent_registration("t1", BOB)
+    said = box.identity.register_terminal(
+        _person(box), "t2", authorization_id="auth-t2", name="a laptop",
+        machine="laptop · macOS 15")
+    assert said["machine"] == "laptop · macOS 15"
+    assert box.backend.get_agent_registration("t2", BOB) == said
+    (entry,) = [e for e in _events(box, "identity.grant") if e["subject"] == "t2"]
+    assert entry["details"] == {"kind": "terminal", "outcome": "granted",
+                                "authorization_id": "auth-t2", "for": f"user:{BOB}"}
+
+
 def test_only_a_person_in_a_browser_registers_a_terminal(box):
     _sign_in(box, "t1")
     _agent(box, "a1")

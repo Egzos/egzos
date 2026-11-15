@@ -93,10 +93,10 @@ def test_the_two_registrations_carry_the_fields_identity_md_names():
     assert set(hints[AgentRegistration]) == {
         "client_id", "sub", "kind", "name", "capabilities", "scopes", "created_at", "revoked"}
     assert set(hints[TerminalRegistration]) == {
-        "client_id", "sub", "kind", "name", "created_at", "revoked"}
+        "client_id", "sub", "kind", "name", "machine", "created_at", "revoked"}
     optional = {shape: {k for k, v in h.items() if typing.get_origin(v) is typing.NotRequired}
                 for shape, h in hints.items()}
-    assert optional == {AgentRegistration: {"kind"}, TerminalRegistration: set()}
+    assert optional == {AgentRegistration: {"kind"}, TerminalRegistration: {"machine"}}
 
 
 def test_config_absence_is_absence_and_an_empty_value_is_a_value(backend):

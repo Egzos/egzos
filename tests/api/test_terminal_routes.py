@@ -246,6 +246,86 @@ def test_a_second_leg_naming_any_other_terminal_is_mismatch(c, door, sign, chang
     assert c.backend.list_agent_registrations() == []
 
 
+MACHINE = "laptop · macOS 15"
+WITH_MACHINE = {**LAPTOP, "machine": MACHINE}
+
+
+def test_a_terminal_that_says_its_machine_is_shown_it_and_kept_with_it(c, door, sign):
+    bob = sign("bob")
+    first = door.post("/v1/terminals", headers=bob, json=WITH_MACHINE).json()
+    signs_in = {"client_id": "laptop", "name": "Bob's laptop", "machine": MACHINE}
+    assert (first["result"], first["newly"], first["signs_in"]) == ("confirm", [], signs_in)
+    assert _events(c, "context.fetch")[-1]["details"]["signs_in"] == signs_in
+    assert c.backend.get_agent_registration("laptop", "bob") is None
+    made = door.post("/v1/terminals", headers=bob, json=_button(first, **WITH_MACHINE)).json()
+    shown = {"client_id": "laptop", "name": "Bob's laptop", "machine": MACHINE, "sub": "bob",
+             "created_at": made["terminal"]["created_at"], "last_seen": None}
+    assert made["terminal"] == shown
+    assert c.backend.get_agent_registration("laptop", "bob")["machine"] == MACHINE
+    # identity.grant does not carry the machine: it is written on the first leg only (rest.md §4.3).
+    assert c.ledger.tail(1)[-1]["details"] == {"kind": "terminal", "outcome": "granted",
+                                               "authorization_id": "auth-1", "for": "user:bob"}
+    assert door.get("/v1/terminals", headers=bob).json()["terminals"] == [shown]
+    ended = door.delete("/v1/terminals/laptop", headers=bob)
+    assert ended.status_code == 200
+    gone = door.get("/v1/terminals?ended=1", headers=bob).json()["terminals"]
+    assert gone == [{**shown, "ended_at": gone[0]["ended_at"]}]
+    assert gone[0]["ended_at"] is not None
+
+
+def test_a_terminal_that_says_no_machine_never_gains_one(c, door, sign):
+    bob = sign("bob")
+    first = door.post("/v1/terminals", headers=bob, json=LAPTOP).json()
+    assert "machine" not in first["signs_in"]
+    assert "machine" not in _events(c, "context.fetch")[-1]["details"]["signs_in"]
+    made = door.post("/v1/terminals", headers=bob, json=_button(first, **LAPTOP)).json()
+    assert "machine" not in made["terminal"]
+    assert "machine" not in c.ledger.tail(1)[-1]["details"]
+    assert "machine" not in c.backend.get_agent_registration("laptop", "bob")
+    listed = door.get("/v1/terminals", headers=bob).json()["terminals"]
+    assert listed and all("machine" not in t for t in listed)
+    door.delete("/v1/terminals/laptop", headers=bob)
+    gone = door.get("/v1/terminals?ended=1", headers=bob).json()["terminals"]
+    assert gone and all("machine" not in t for t in gone)
+
+
+@pytest.mark.parametrize("first_machine, second_machine", [
+    (MACHINE, "desktop · Linux"), (None, MACHINE), (MACHINE, None)])
+def test_a_second_leg_naming_another_machine_is_mismatch(c, door, sign, first_machine,
+                                                         second_machine):
+    def body(machine):
+        return {**LAPTOP, **({"machine": machine} if machine is not None else {})}
+
+    first = door.post("/v1/terminals", headers=sign(), json=body(first_machine)).json()
+    again = door.post("/v1/terminals", headers=sign(),
+                      json=_button(first, **body(second_machine)))
+    assert again.json()["result"] == "confirm"
+    assert again.json()["challenge"] != first["challenge"]
+    assert again.json()["signs_in"].get("machine") == second_machine
+    assert _events(c, "step_up")[-1]["details"]["reason"] == "mismatch"
+    assert c.backend.list_agent_registrations() == []
+
+
+@pytest.mark.parametrize("bad", [None, 7, ["laptop"], "", "   ", "x" * 129, "lap‮top",
+                                 "lap\ntop", "lap\u2028top", "lap\x1b[2Jtop", "lap\u200btop"])
+def test_a_machine_is_held_to_the_names_rule(c, door, sign, bad):
+    reads = len(_events(c, "context.fetch"))
+    challenges = len(_events(c, "step_up"))
+    r = door.post("/v1/terminals", headers=sign(), json={**LAPTOP, "machine": bad})
+    assert (r.status_code, r.content) == (400, INVALID)
+    assert len(_events(c, "context.fetch")) == reads
+    assert len(_events(c, "step_up")) == challenges
+    assert c.backend.list_agent_registrations() == []
+
+
+def test_a_machine_of_exactly_128_characters_is_accepted(c, door, sign):
+    machine = "m" * 128
+    made = _register(door, sign("bob"), machine=machine)
+    assert made.status_code == 200
+    assert made.json()["terminal"]["machine"] == machine
+    assert c.backend.get_agent_registration("laptop", "bob")["machine"] == machine
+
+
 def test_the_button_registers_no_terminal_without_a_fresh_sign_in(c, door, sign):
     stale = sign(signed_in_ago=3600)
     first = door.post("/v1/terminals", headers=stale, json=LAPTOP).json()

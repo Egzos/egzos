@@ -111,8 +111,53 @@ def test_grant_ls_lists_agents_and_terminals_each_apart(home, capsys):
     capsys.readouterr()
     assert main(["grant", "ls"]) == 0
     text = capsys.readouterr().out
-    assert "agent a1 for me" in text and "terminal t1 for me" in text and "ENDED" in text
+    assert "agent a1 for me" in text and "terminal t1 [ended] for me" in text
     assert "agent t1" not in text
+
+
+def test_grant_ls_shows_a_terminals_machine_and_never_a_raw_control_character(
+        home, capsys):
+    _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c-1", "--sub", "me"])
+    c = Container(home)
+    for client_id, extra in (("t1", {"machine": "laptop · macOS 15"}),
+                             ("t2", {"machine": "desk\x1b[2Jtop"}), ("t3", {})):
+        c.backend.put_agent_registration({
+            "client_id": client_id, "sub": "me", "kind": "terminal", "name": "Bob's laptop",
+            "created_at": "2026-11-14T00:00:00Z", "revoked": False, **extra})
+    capsys.readouterr()
+    assert main(["grant", "ls"]) == 0
+    text = capsys.readouterr().out
+    assert "\x1b" not in text
+    lines = {ln.split()[1]: ln for ln in text.splitlines() if ln.startswith("terminal ")}
+    assert "Bob's laptop" in lines["t1"] and "laptop · macOS 15" in lines["t1"]
+    assert lines["t1"].index("Bob's laptop") < lines["t1"].index("laptop · macOS 15")
+    assert "desk" in lines["t2"]
+    assert lines["t3"].rstrip().endswith("Bob's laptop") and "machine=" not in lines["t3"]
+    assert "machine=laptop · macOS 15" in lines["t1"]
+    code, out = _json(capsys, ["grant", "ls"])
+    assert code == 0
+    assert {t["client_id"]: t.get("machine") for t in out["terminals"]} == {
+        "t1": "laptop · macOS 15", "t2": "desk\x1b[2Jtop", "t3": None}
+
+
+def test_grant_ls_marks_an_ended_terminal_where_a_claimed_machine_cannot_imitate_it(
+        home, capsys):
+    _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c-1", "--sub", "me"])
+    c = Container(home)
+    for client_id, revoked, extra in (("t1", False, {"machine": "ENDED"}),
+                                      ("t2", True, {"machine": "macOS 15"}),
+                                      ("t3", True, {}), ("t4", False, {})):
+        c.backend.put_agent_registration({
+            "client_id": client_id, "sub": "me", "kind": "terminal", "name": "Bob's laptop",
+            "created_at": "2026-11-14T00:00:00Z", "revoked": revoked, **extra})
+    capsys.readouterr()
+    assert main(["grant", "ls"]) == 0
+    lines = {ln.split()[1]: ln for ln in capsys.readouterr().out.splitlines()
+             if ln.startswith("terminal ")}
+    assert lines["t1"] == "terminal t1 for me  Bob's laptop    machine=ENDED"
+    assert lines["t2"] == "terminal t2 [ended] for me  Bob's laptop    machine=macOS 15"
+    assert lines["t3"].startswith("terminal t3 [ended] for me")
+    assert "[ended]" not in lines["t1"] and "[ended]" not in lines["t4"]
 
 
 def test_a_client_token_cannot_link(home, capsys, monkeypatch):

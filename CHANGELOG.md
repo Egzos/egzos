@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A terminal may say what kind of machine it is** (`rest.md` §4.3, `identity.md` §8; #394):
+  `POST /v1/terminals` takes an optional `machine` line beside the name, held to the name's rule
+  and kept as the terminal's own claim. A terminal that gave one is listed with it
+  (`GET /v1/terminals`); the confirm that registers it shows the line and is bound to it; and
+  nothing is decided on it.
+
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 
 ### Added

@@ -1250,11 +1250,14 @@ def create_app(
     # -- terminals (§4.3) -----------------------------------------------------------------------
     def terminal(r: dict[str, Any], seen: dict[tuple[str, str], str],
                  ended: dict[tuple[str, str], str] | None = None) -> dict[str, Any]:
-        """§4.3's `<terminal>`, `last_seen` read from the chain, null for one not used yet; an
-        ended one also carries `ended_at`, read from its `identity.revoke`."""
+        """§4.3's `<terminal>`, `last_seen` read from the chain, null for one not used yet; one
+        that gave a `machine` carries it, and an ended one also carries `ended_at`, read from its
+        `identity.revoke`."""
         pair = (r["client_id"], r["sub"])
         out = {**{k: r[k] for k in ("client_id", "name", "sub", "created_at")},
                "last_seen": seen.get(pair)}
+        if "machine" in r:
+            out["machine"] = r["machine"]
         if ended is not None:
             out["ended_at"] = ended.get(pair)
         return out
@@ -1291,13 +1294,15 @@ def create_app(
         if not registrant(token) or at_terminal(token):
             d.probe(token, "terminals")
             return refusal()
-        body = await _object(request, {"authorization_id", "client_id", "name", "confirm"},
+        body = await _object(request,
+                             {"authorization_id", "client_id", "name", "machine", "confirm"},
                              {"authorization_id", "client_id", "name"})
         proof = presented(body)
-        try:  # what the hand-off's page relays; the name is the terminal's own claim
+        try:  # what the hand-off's page relays; the name and the machine are the terminal's own
             authorization = provider_id(body["authorization_id"])
             client_id = provider_id(body["client_id"])
             name = display_name(body["name"])
+            machine = display_name(body["machine"]) if "machine" in body else None
         except ValueError as e:
             raise Invalid from e
         # This container's own client names a person, and that id is no secret; an authorization
@@ -1309,12 +1314,15 @@ def create_app(
         if c.identity.terminals_full(token.sub):  # the caller's own fact, before any leg
             return _json(429, {"error": "too_many_terminals"})
         # The challenge binds the registration as it would land, beside its client (the subject).
-        terms = json.dumps({"authorization_id": authorization, "name": name}, sort_keys=True)
+        bound = {"authorization_id": authorization, "name": name}
+        shown = {"client_id": client_id, "name": name}
+        if machine is not None:
+            bound["machine"] = shown["machine"] = machine
+        terms = json.dumps(bound, sort_keys=True)
 
         def first() -> Response:  # nobody newly sees anything: the terminal is named apart
             return first_leg(token, act="terminal.add", subject=client_id, destination=terms,
-                             delta=[], origin=origin,
-                             signs_in={"client_id": client_id, "name": name})
+                             delta=[], origin=origin, signs_in=shown)
 
         if proof is None:
             return first()
@@ -1335,7 +1343,7 @@ def create_app(
                     try:
                         made = c.identity.register_terminal(
                             token, client_id, authorization_id=authorization, name=name,
-                            after=head)
+                            machine=machine, after=head)
                     except TooManyTerminals:  # a 16th landed since the door; its step_up commits
                         return _json(429, {"error": "too_many_terminals"})
         if reason is not None:

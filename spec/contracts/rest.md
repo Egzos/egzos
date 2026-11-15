@@ -559,8 +559,9 @@ lifeboat (`identity.md` §4).
 - **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
   `{"client_id", "name", "sub", "capabilities", "scopes", "created_at", "last_seen"}`, `last_seen` read
   from the ledger. `<terminal>` is `{"client_id", "name", "sub", "created_at", "last_seen"}`, its
-  `last_seen` read the same way, null for a terminal not used yet; an ended one also carries
-  `"ended_at"`, read from its `identity.revoke`. `<credential>` is
+  `last_seen` read the same way, null for a terminal not used yet; one that said what kind of
+  machine it is also carries `"machine"` (below), and an ended one `"ended_at"`, read from its
+  `identity.revoke`. `<credential>` is
   `{"id", "name", "created_at", "last_used"}` — never the public key
   or the credential id's bytes. `<entry-line>` is `{"ts", "event", "subject", "scope"}`, with no
   chain position, which would count the lines the reader cannot see (the log's omission rule
@@ -572,8 +573,10 @@ lifeboat (`identity.md` §4).
   "confirm"?}`. `POST /v1/agents`: `{"authorization_id", "client_id", "name", "role"? |
   "capabilities"?, "scopes", "confirm"?}`; the registration serves the caller; `name` is at most 128
   characters, untrusted display data. `POST /v1/terminals`: `{"authorization_id", "client_id",
-  "name", "confirm"?}`; it serves the caller too, and its `name` is held to the same rule. A role
-  bundle expands at grant time (`capabilities.md` §2). No
+  "name", "machine"?, "confirm"?}`; it serves the caller too, and its `name` is held to the same
+  rule, as is its `machine`, the line a terminal may give for the kind of machine it is (below):
+  the key is left out when the terminal gives none, and a `machine` that is null or not a string
+  is §3's `400`. A role bundle expands at grant time (`capabilities.md` §2). No
   grant or registration exceeds the caller's own grant: wider capabilities or scopes are §3's refusal.
 - **Who registers an agent: each person, their own.** Anyone holding a user grant registers agents
   that serve themselves, an admin the same way, with the confirm and never beyond their own grant
@@ -602,6 +605,17 @@ lifeboat (`identity.md` §4).
     a confirm and is on the ledger.
   - A person holds at most 16 live terminal registrations, counted apart from their agents: a 17th
     answers `429` with `{"error":"too_many_terminals"}` and §3's headers before any leg.
+  - **A terminal may say what kind of machine it is.** `machine` is one line beside the name
+    (`identity.md` §8), there to help the person recognise their terminals: the terminal's own
+    claim, kept on the registration and served in `<terminal>`. Nothing checks it and nothing is
+    decided on it. A registration made without one never gains one. On the chain it is written
+    where the name is, in `details.signs_in` of each first leg's `context.fetch` (below), the
+    fresh first leg that answers a refused second leg included, and in no other entry: the
+    `identity.grant` that records the registration does not carry it, and every entry made at a
+    terminal already names the terminal (`identity.md` §3a). A door from before `machine` answers
+    §3's `400` to a body that carries the key, as to any key it does not name, and a page that
+    gets that answer registers the terminal without it. **a1p** (v0.7 §AJ, the Chief's ask of
+    2026-11-15; #394).
 - **Each family of routes reads and acts on its own kind.** `GET /v1/agents` never lists a terminal
   and `GET /v1/terminals` never an agent, and a `client_id` of the other kind is §3's refusal on
   every agent and terminal route, the revoke and the log included. `GET /v1/terminals` lists live
@@ -631,9 +645,11 @@ lifeboat (`identity.md` §4).
   still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
   as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. **a1p** (a6
   and a1r on #285). A terminal's first leg answers `newly: []` too and, in its own field,
-  `"signs_in": {"client_id", "name"}`, with the same `details.signs_in` on its `context.fetch`:
-  the name is the terminal's own claim, escaped and labelled as an agent's is. Its challenge is
-  bound to the body's `client_id` and `name`. **a1p** (v0.7 §AJ).
+  `"signs_in": {"client_id", "name"}`, with `"machine"` beside them where the body gave one, and
+  the same `details.signs_in` on its `context.fetch`: the name and the machine are the terminal's
+  own claims, escaped and labelled as an agent's name is. Its challenge is bound to the body's
+  `client_id`, its `name` and its `machine`, a body that gives none included, so a second leg that
+  names another machine, adds one or drops one is §4.2's `mismatch`. **a1p** (v0.7 §AJ).
 - **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
   authorization, at most one registers, as an agent or as a terminal, and every later request
   naming it, on either route, is §3's refusal.

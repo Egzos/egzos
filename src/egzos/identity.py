@@ -1012,13 +1012,15 @@ class Identity:
 
     # -- terminal registrations (§4, rest.md §4.3) ----------------------------------------------
     def register_terminal(self, person: GrantToken, client_id: str, *, authorization_id: str,
-                          name: str, after: int | None = None) -> TerminalRegistration | None:
+                          name: str, machine: str | None = None,
+                          after: int | None = None) -> TerminalRegistration | None:
         """Write a terminal registration serving `person` and append `identity.grant` attributed
         to them: `kind: terminal`, `for` the person, `authorization_id` as the caller claimed it,
-        and no capabilities or scopes, since it holds none (§4). Each person registers their own,
-        in a browser: a terminal's token registers nothing. The caller has judged the act, the
-        confirm included, in the transaction this joins, and may have read the chain through seq
-        `after`. Under one lock: an authorization registers once, as an agent or as a terminal
+        and no capabilities or scopes, since it holds none (§4). `machine`, the terminal's own
+        claim of what kind of machine it is, is kept only when given. Each person registers their
+        own, in a browser: a terminal's token registers nothing. The caller has judged the act,
+        the confirm included, in the transaction this joins, and may have read the chain through
+        seq `after`. Under one lock: an authorization registers once, as an agent or as a terminal
         (None for every later one); a `client_id` any registration here names is never a
         terminal's (`Registered`); and a 17th live terminal is refused before anything is written
         (`TooManyTerminals`). This container's own client names a person (`ValueError`)."""
@@ -1030,6 +1032,8 @@ class Identity:
             "client_id": client_id, "sub": person.sub, "kind": "terminal", "name": name,
             "created_at": now_iso(), "revoked": False,
         }
+        if machine is not None:
+            registration["machine"] = machine
         with self.atomic():
             if self.claimed(authorization_id, after):
                 return None
