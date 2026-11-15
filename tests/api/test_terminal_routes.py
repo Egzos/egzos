@@ -393,10 +393,19 @@ def test_a_terminal_ended_never_returns(c, door, sign):
 @pytest.mark.parametrize("ended", [False, True])
 def test_a_terminals_client_id_is_never_registered_as_an_agent(c, door, sign, ended):
     _terminal(c, "helper", "bob", revoked=ended)
-    first = door.post("/v1/agents", headers=sign("bob"), json=HELPER)
-    assert first.json()["registers"] == {"client_id": "helper", "name": "Helper"}  # a first leg
-    again = door.post("/v1/agents", headers=sign("bob"), json=_button(first.json(), **HELPER))
-    assert again.json()["result"] == "confirm"
+    bob = sign("bob")
+    # The first leg: as for a client id never seen here.
+    fresh = door.post("/v1/agents", headers=bob, json={**HELPER, "client_id": "newbie",
+                                                       "authorization_id": "auth-0"})
+    first = door.post("/v1/agents", headers=bob, json=HELPER)
+    (status, headers, body, size), seen = _bare(first), _bare(fresh)
+    assert (status, headers, size) == (seen[0], seen[1], seen[3])
+    assert body == {**seen[2], "registers": {"client_id": "helper", "name": "Helper"}}
+    # A good proof is answered as a wrong one is: only the ledger says which case it was.
+    wrong = door.post("/v1/agents", headers=bob, json={**HELPER, "confirm": {
+        "challenge": "no-such-challenge", "proof": "button"}})
+    again = door.post("/v1/agents", headers=bob, json=_button(first.json(), **HELPER))
+    assert _bare(again) == _bare(wrong) and again.json()["result"] == "confirm"
     assert _events(c, "step_up")[-1]["details"]["reason"] == "registered"
     record = c.backend.get_agent_registration("helper", "bob")
     assert (record["kind"], record["revoked"]) == ("terminal", ended)
@@ -638,6 +647,18 @@ def test_the_log_serves_what_came_through_that_terminal_and_the_persons_own_acce
     assert door.delete("/v1/terminals/laptop", headers=sign("bob")).json()["result"] == "revoked"
     assert log(sign("bob")) == own
     assert door.get("/v1/terminals/laptop/log", headers=laptop).content == UNAUTHORIZED
+
+
+def test_the_log_omits_a_registration_that_serves_someone_else(c, door, sign):
+    _terminal(c, "laptop", "bob")
+    _terminal(c, "tower", "carol")  # carol's alone: bob holds no registration under this id
+    with through_terminal("laptop"):
+        for subject in ("laptop", "tower"):
+            c.ledger.append("context.fetch", actor="user:bob", principal="interactive",
+                            subject=subject, items=[], layers=[], withheld=0)
+    for reader in (sign("bob"), sign()):  # bob himself, then an admin reading bob's
+        lines = door.get("/v1/terminals/laptop/log?sub=bob", headers=reader).json()["entries"]
+        assert [(e["event"], e["subject"]) for e in lines] == [("context.fetch", "laptop")]
 
 
 def test_an_upload_of_the_persons_shows_in_the_log_and_anothers_does_not(c, door, sign):
