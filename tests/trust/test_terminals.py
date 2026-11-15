@@ -145,20 +145,25 @@ def test_one_authorization_registers_once_as_either_kind(box, first):
 
 
 def test_a_person_holds_at_most_sixteen_terminals_counted_apart_from_agents(box):
-    for n in range(MAX_AGENTS):
-        _agent(box, f"a{n}")
-    for n in range(MAX_TERMINALS):  # sixteen agents leave every terminal slot open
+    # Bob signs in at sixteen terminals first, then registers sixteen agents; Alice the other way
+    # round. Each kind's slots stay open whatever the other kind holds.
+    for n in range(MAX_TERMINALS):
         _sign_in(box, f"t{n}")
+    for n in range(MAX_AGENTS):
+        assert _agent(box, f"a{n}") is not None
+        assert _agent(box, f"alice-a{n}", ALICE) is not None
+    for n in range(MAX_TERMINALS):
+        assert _sign_in(box, f"alice-t{n}", ALICE) is not None
     head = len(box.ledger.tail(1000))
-    with pytest.raises(TooManyTerminals):
-        _sign_in(box, "t-extra")
-    with pytest.raises(TooManyAgents):  # and sixteen terminals are not counted as agents
-        _agent(box, "a-extra")
-    assert len(box.ledger.tail(1000)) == head
-    assert box.backend.list_agent_registrations(client_id="t-extra") == []
-    assert not box.identity.full(ALICE, "x") and not box.identity.terminals_full(ALICE)
+    for who in (BOB, ALICE):
+        with pytest.raises(TooManyTerminals):
+            _sign_in(box, f"t-extra-{who}", who)
+        with pytest.raises(TooManyAgents):
+            _agent(box, f"a-extra-{who}", who)
+    assert len(box.ledger.tail(1000)) == head  # refused before anything is written
+    assert box.backend.list_agent_registrations(client_id=f"t-extra-{BOB}") == []
     box.identity.revoke_terminal("t0", BOB, **KW)  # an ended one frees its slot, not its id
-    assert _sign_in(box, "t-extra") is not None
+    assert _sign_in(box, f"t-extra-{BOB}") is not None
     with pytest.raises(Registered):
         _sign_in(box, "t0", authorization_id="back")
 
