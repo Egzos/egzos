@@ -115,6 +115,30 @@ def test_grant_ls_lists_agents_and_terminals_each_apart(home, capsys):
     assert "agent t1" not in text
 
 
+def test_grant_ls_shows_a_terminals_machine_and_never_a_raw_control_character(
+        home, capsys):
+    _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c-1", "--sub", "me"])
+    c = Container(home)
+    for client_id, extra in (("t1", {"machine": "laptop · macOS 15"}),
+                             ("t2", {"machine": "desk\x1b[2Jtop"}), ("t3", {})):
+        c.backend.put_agent_registration({
+            "client_id": client_id, "sub": "me", "kind": "terminal", "name": "Bob's laptop",
+            "created_at": "2026-11-14T00:00:00Z", "revoked": False, **extra})
+    capsys.readouterr()
+    assert main(["grant", "ls"]) == 0
+    text = capsys.readouterr().out
+    assert "\x1b" not in text
+    lines = {ln.split()[1]: ln for ln in text.splitlines() if ln.startswith("terminal ")}
+    assert "Bob's laptop" in lines["t1"] and "laptop · macOS 15" in lines["t1"]
+    assert lines["t1"].index("Bob's laptop") < lines["t1"].index("laptop · macOS 15")
+    assert "desk" in lines["t2"]
+    assert lines["t3"].rstrip().endswith("Bob's laptop")
+    code, out = _json(capsys, ["grant", "ls"])
+    assert code == 0
+    assert {t["client_id"]: t.get("machine") for t in out["terminals"]} == {
+        "t1": "laptop · macOS 15", "t2": "desk\x1b[2Jtop", "t3": None}
+
+
 def test_a_client_token_cannot_link(home, capsys, monkeypatch):
     c = Container(home)
     agent = c.auth.mint(principal="client", owner="self", client="a", role="admin", scopes=["*"],
