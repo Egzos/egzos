@@ -150,7 +150,7 @@ class Auth:
         os.chmod(self.keychain, 0o600)
 
     def interactive_token(self) -> Token | None:
-        """The owner's interactive token from the keychain — `login` is what puts it there."""
+        """The owner's interactive token: `EGZOS_TOKEN` when set, else the keychain `init` wrote."""
         env = os.environ.get("EGZOS_TOKEN")
         if env:
             return self.use(env)

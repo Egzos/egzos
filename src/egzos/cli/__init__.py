@@ -1,8 +1,8 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The CLI — first surface, doubles as the test harness (v0.3 §10). Daily one-worders: login, fetch,
-add, ls, serve, find; noun-verb for the rest; --json everywhere; sticky scope (v0.4 §9).
+The CLI — first surface, doubles as the test harness (v0.3 §10). Daily one-worders: fetch, add,
+ls, serve, find; noun-verb for the rest; --json everywhere; sticky scope (v0.4 §9).
 
 Walking skeleton verbs: init · whoami · add · ls · fetch · find · cd · pwd · mk · mv · trust
 (pending / approve / deny / quarantine) · token (create / ls) · audit (tail / verify) · serve --mcp.
@@ -675,7 +675,7 @@ def token_revoke(
     target = c.backend.get_token(token_id)
     if target is None or target.principal != "client":
         # Never the owner's interactive token: it is the key to this container, and nothing
-        # re-mints it until `login` lands (Phase 2).
+        # re-mints it.
         _fail("no client token with that id")
     if target.revoked:
         _fail(f"{target.id} is already revoked")
