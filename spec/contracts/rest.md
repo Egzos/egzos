@@ -283,7 +283,7 @@ spec's job).
 | `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
 | `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
 | `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
-| `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener; for an orphan, also the person an agent opener serves (v0.7 §AC); or an admin | — (new) | `upload.discard` |
+| `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener; for an orphan, also the person an agent or a terminal opener serves (v0.7 §AC, §AJ); or an admin | — (new) | `upload.discard` |
 | `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
 | `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
 | `POST /v1/pending/{proposal}/approve` | approve a parked proposal, with the confirm (§4.2) | an `interactive` principal that decides over it | `egzos trust approve` | `context.fetch` (first leg); `step_up`, then `approval.execute` or `approval.stale` |
@@ -314,7 +314,8 @@ entry, as the running doors write it. Cursor pages are `[v1.1 · #137 7, 10]`.
 **Attribution.** Every entry this door appends names its caller, never `none` (`events.md` §2). For a
 container `Token`: `actor` = its `owner`, `principal` its principal. For a provider token: as
 `identity.md` §3a's attribution clause — a person is `actor: user:<sub>`; an agent is `actor:
-agent:<client_id>` with `details.for: user:<sub>`. **decided.**
+agent:<client_id>` with `details.for: user:<sub>`. **decided.** A person at a terminal is `actor:
+user:<sub>` too, with `details.terminal` naming the terminal (`identity.md` §3a; **a1p**, v0.7 §AJ).
 
 **Artifacts arrive through an upload** (§4.4): the staging rule for an agent-proposed artifact
 (`storage.md` §4) and the dedup rule ([0.3 · 41]) apply to it.
@@ -491,7 +492,8 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    <WebAuthn assertion>}`, or `"proof": "button"` with no assertion where `confirm.allow_button` is
    `true` **and the person has no registered credential** — once they have one, the button is refused
    for them (`identity.md` §5) — and, on §4.3's acts on grants and registrations, a fresh sign-in
-   (§4.3). The container then, as **one atomic step** — of two concurrent requests presenting one
+   (§4.3). A terminal's token concludes no second leg, whatever the proof (`identity.md` §5). The
+   container then, as **one atomic step** — of two concurrent requests presenting one
    challenge, at most one proceeds past it, as §6's grant spend:
    - finds the challenge live, unspent and **bound to this request**: the same principal (the
      `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
@@ -504,10 +506,12 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    `approval.stale`, `approval.deny`, `approval.promote`), and `item.move` or `item.copy` where one
    moved.
 4. **Every proof that is presented and concludes is audited, success or failure.** A stale, spent,
-   foreign or mismatched challenge, a failed assertion, a button where buttons are off, and a delta
+   foreign or mismatched challenge, a failed assertion, a button where buttons are off, any proof
+   from a terminal's token, and a delta
    that changed since the challenge append `step_up` with `outcome: refused`, `details.proof` as
    presented and `details.reason` (`stale`, `spent`, `foreign`, `mismatch`, `assertion`, `button_off`,
-   `delta_changed`, and §4.3's `not_fresh`), as `events.md` §1 requires of every concluded presence
+   `delta_changed`, `terminal`, and §4.3's `not_fresh`), as `events.md` §1 requires of every concluded
+   presence
    check. The answer to the caller is the same whatever the reason: `{"result": "confirm", …}` with a
    fresh challenge (and the new `newly`, where the delta changed). The ledger says which case it was;
    the response does not (`capabilities.md` §6 clause 3).
@@ -520,34 +524,44 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    nothing beyond the route's own refusal or proposal. **decided** (§U).
 7. **`webauthn` is `null`** when the person has registered no credential with this container: only
    the button is then possible, and an owner who set `confirm.allow_button` to `false` must register
-   one (§4.3) before any confirm-gated act.
+   one (§4.3) before any confirm-gated act. A first leg served to a terminal's token answers
+   `webauthn: null` whatever the person has registered: no proof is possible from it, and the act is
+   finished in a browser (`identity.md` §5, §8).
 
-### 4.3 · Grants, agents and confirm credentials
+### 4.3 · Grants, agents, terminals and confirm credentials
 
 The routes behind `identity.md` §4–§5. **a1p**, every clause that cites no decision, binding those
 records onto HTTP. Every route here needs an **`interactive` principal**: a `client` principal gets
 §3's refusal on all of them, reads included, because who else holds access is credential metadata an
 agent is never served. Every list is viewer-scoped and complete (§4). Every read appends
-`context.fetch` with `items: []` and `details.read` naming what was read. The `/v1/grants` and
-`/v1/agents` routes need a person holding a provider token: a container `Token` names no `sub`, so it
-gets §3's refusal there, and its holder acts on grants from the CLI or the lifeboat (`identity.md` §4).
+`context.fetch` with `items: []` and `details.read` naming what was read. The `/v1/grants`,
+`/v1/agents` and `/v1/terminals` routes need a person holding a provider token: a container `Token`
+names no `sub`, so it gets §3's refusal there, and its holder acts on grants from the CLI or the
+lifeboat (`identity.md` §4).
 
 | method · path | does | needs | `200` body | events |
 |---|---|---|---|---|
 | `GET /v1/grants` | the user grants | `admin` over `["*"]` | `{"grants": [<grant>]}` | `context.fetch` (`read: grants`) |
 | `POST /v1/grants` | grant a provider user access, with the confirm (§4.2) | `admin` over `["*"]` | `confirm`, then `{"grant": <grant>}` | first leg; `step_up`, `identity.grant` |
-| `DELETE /v1/grants/{sub}` | revoke a user grant and every registration serving that `sub`; another person's with the confirm (below) | `admin` over `["*"]` | `{"result": "revoked"}`; another person's: `confirm` first | `identity.revoke`, and one per registration it ends (`kind: agent`); another person's: first leg; `step_up`, then each `identity.revoke` |
-| `GET /v1/agents` | registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
+| `DELETE /v1/grants/{sub}` | revoke a user grant and every registration serving that `sub`; another person's with the confirm (below) | `admin` over `["*"]` | `{"result": "revoked"}`; another person's: `confirm` first | `identity.revoke`, and one per registration it ends (`kind: agent` or `terminal`); another person's: first leg; `step_up`, then each `identity.revoke` |
+| `GET /v1/agents` | agent registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
 | `POST /v1/agents` | register an agent to serve the caller, from the consent page's flow, with the confirm | any grant; the registration within it | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
 | `DELETE /v1/agents/{client_id}?sub=` | revoke one registration; one serving someone else with the confirm (below) | the person it serves, or an admin | `{"result": "revoked"}`; someone else's: `confirm` first | `identity.revoke`; someone else's: first leg; `step_up`, `identity.revoke` |
 | `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | the person it serves, or an admin | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
+| `GET /v1/terminals?ended=` | the live terminals signed in as this person, or with `ended=1` the ended ones; all of them for an admin | any grant | `{"terminals": [<terminal>]}` | `context.fetch` (`read: terminals`) |
+| `POST /v1/terminals` | register a terminal as the caller's own, from the hand-off's flow, with the confirm | any grant | `confirm`, then `{"terminal": <terminal>}` | first leg; `step_up`, `identity.grant` |
+| `DELETE /v1/terminals/{client_id}?sub=` | end one terminal's sign-in; one serving someone else with the confirm (below) | the person it serves, or an admin | `{"result": "revoked"}`; someone else's: `confirm` first | `identity.revoke`; someone else's: first leg; `step_up`, `identity.revoke` |
+| `GET /v1/terminals/{client_id}/log?sub=&limit=` | what was done through that terminal, newest first | the person it serves, or an admin | `{"entries": [<entry-line>]}` | `context.fetch` (`read: terminal_log`) |
 | `GET /v1/credentials?sub=` | confirm credentials | the person; an admin with `sub` | `{"credentials": [<credential>]}` | `context.fetch` (`read: credentials`) |
 | `POST /v1/credentials` | register a WebAuthn credential for this person | any grant, and the rules below | `register`, then `{"credential": <credential>}` | `context.fetch` where the first leg issues a confirm challenge; `step_up` where a proof was presented; `identity.credential` |
 | `DELETE /v1/credentials/{id}?sub=` | remove one, with a biometric confirm only, from the caller's own credential: an admin's recovery uses the admin's (below) | the person; an admin with `sub` (recovery) | `confirm`, then `{"result": "removed"}` | first leg; `step_up`, `identity.credential` |
 
 - **Shapes.** `<grant>` is `{"sub", "name", "capabilities", "scopes", "created_at"}`. `<agent>` is
   `{"client_id", "name", "sub", "capabilities", "scopes", "created_at", "last_seen"}`, `last_seen` read
-  from the ledger. `<credential>` is `{"id", "name", "created_at", "last_used"}` — never the public key
+  from the ledger. `<terminal>` is `{"client_id", "name", "sub", "created_at", "last_seen"}`, its
+  `last_seen` read the same way, null for a terminal not used yet; an ended one also carries
+  `"ended_at"`, read from its `identity.revoke`. `<credential>` is
+  `{"id", "name", "created_at", "last_used"}` — never the public key
   or the credential id's bytes. `<entry-line>` is `{"ts", "event", "subject", "scope"}`, with no
   chain position, which would count the lines the reader cannot see (the log's omission rule
   below). The log's `limit` is 1 to 200, 50 when absent; any other value is §3's `400`. **a1p.**
@@ -557,23 +571,54 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
 - **Request bodies.** `POST /v1/grants`: `{"sub", "name", "role"? | "capabilities"?, "scopes",
   "confirm"?}`. `POST /v1/agents`: `{"authorization_id", "client_id", "name", "role"? |
   "capabilities"?, "scopes", "confirm"?}`; the registration serves the caller; `name` is at most 128
-  characters, untrusted display data. A role bundle expands at grant time (`capabilities.md` §2). No
+  characters, untrusted display data. `POST /v1/terminals`: `{"authorization_id", "client_id",
+  "name", "confirm"?}`; it serves the caller too, and its `name` is held to the same rule. A role
+  bundle expands at grant time (`capabilities.md` §2). No
   grant or registration exceeds the caller's own grant: wider capabilities or scopes are §3's refusal.
 - **Who registers an agent: each person, their own.** Anyone holding a user grant registers agents
   that serve themselves, an admin the same way, with the confirm and never beyond their own grant
   (above), and needs no `publish`; `identity.md` §4's intersection still applies at check time. Nobody
   registers an agent to serve someone else. The person it serves, or an admin, revokes it. **decided**
-  (v0.7 §AB). A person holds at most 16 live registrations: a 17th answers `429` with
+  (v0.7 §AB). A person holds at most 16 live agent registrations: a 17th answers `429` with
   `{"error":"too_many_agents"}` and §3's headers before any leg, a fact about the caller's own, so the
   audience the gate computes over registrations (`identity.md` §4) stays bounded. A `client_id` equal
   to `identity.client_id` is §3's refusal: it names a person here, never an agent. **a1p.**
+- **Who registers a terminal: each person, their own.** A terminal registration is the person's own
+  sign-in at a terminal (`identity.md` §4): it holds no capabilities or scopes, and its token holds
+  the person's grant as it stands at each request. **decided** (v0.7 §AJ). **a1p**, the rest:
+  - Anyone holding a user grant registers their own, with the confirm, and nobody registers one for
+    someone else. The person it serves, or an admin, ends it, and so does the terminal itself,
+    whose token is its person's.
+  - **A `client_id` is registered as a terminal once.** One equal to `identity.client_id`, or one
+    that names any registration here, an agent's or a terminal's, live or revoked, for any person,
+    is §3's refusal on `POST /v1/terminals`, and one that names a terminal's is §3's refusal on
+    `POST /v1/agents`; the check runs inside the registration's atomic step. A terminal that was
+    ended never returns. The refusal differs from a first leg, so a caller who already holds a
+    `client_id` learns that someone registered it here; a `client_id` is the provider's random id,
+    listed to no one but the person it serves and an admin.
+  - A person holds at most 16 live terminal registrations, counted apart from their agents: a 17th
+    answers `429` with `{"error":"too_many_terminals"}` and §3's headers before any leg.
+- **Each family of routes reads and acts on its own kind.** `GET /v1/agents` never lists a terminal
+  and `GET /v1/terminals` never an agent, and a `client_id` of the other kind is §3's refusal on
+  every agent and terminal route, the revoke and the log included. `GET /v1/terminals` lists live
+  registrations; with `ended=1` it lists the ended ones instead, so that a terminal's log can still
+  be read after it is ended, and egzos.io can withdraw the person's consent to it at the provider
+  (`identity.md` §4). **a1p** (v0.7 §AJ).
+- **A terminal's token gives no one access.** `POST /v1/grants`, `POST /v1/agents`,
+  `POST /v1/terminals`, `POST /v1/credentials` and `DELETE /v1/credentials/{id}` are §3's refusal to
+  a terminal's token before any leg: access is given, and a confirm credential kept or removed,
+  from a browser. On every other confirm-gated act it is served the first leg and concludes no
+  second (§4.2 item 3). **a1p** (v0.7 §AJ).
 - **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
   §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
   instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
   first-party session, and calls this route only for one that is pending, was requested by the
   person whose container token makes the call, is for the body's `client_id`, and asks for no scopes
   beyond the body's; and it refuses a `client_id` registered on another container (`identity.md`
-  §3a). **a1p** (a1r and a6 on #285).
+  §3a). **a1p** (a1r and a6 on #285). For a terminal it owes one more check: it calls
+  `POST /v1/terminals` only for a client it registered at the provider itself, in this browser, for
+  a sign-in the person continued, with egzos.io's callback that client's one redirect URI
+  (`identity.md` §3a). **a1p** (v0.7 §AJ).
 - **What the container holds to is the registrant's confirm.** The first leg answers `newly: []` and, in
   its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
   the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
@@ -581,9 +626,13 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
   `details.registers` (the `name` as escaped display data), so a first leg the person walks away from
   still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
   as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. **a1p** (a6
-  and a1r on #285).
+  and a1r on #285). A terminal's first leg answers `newly: []` too and, in its own field,
+  `"signs_in": {"client_id", "name"}`, with the same `details.signs_in` on its `context.fetch`:
+  the name is the terminal's own claim, escaped and labelled as an agent's is. Its challenge is
+  bound to the body's `client_id` and `name`. **a1p** (v0.7 §AJ).
 - **`authorization_id` keys the registration, atomically**: of two concurrent requests naming one
-  authorization, at most one registers, and every later request naming it is §3's refusal.
+  authorization, at most one registers, as an agent or as a terminal, and every later request
+  naming it, on either route, is §3's refusal.
   `identity.grant` records it as `details.authorization_id`, so the consent page's record and the
   container's join; it is **what the caller claimed**, which the container cannot check, never a
   verified fact. Only after the registration is written does egzos.io tell the provider to issue.
@@ -591,12 +640,18 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
   person (`details.for`), and omits every entry that was a refusal — a probe's `context.fetch` with
   `items: []`, a refused act — and every entry whose `subject` the reader's grant does not cover
   **today**. An omitted line leaves no marker and no count, so the log cannot tell a reader what exists
-  outside their sight, or whether a probed target existed.
+  outside their sight, or whether a probed target existed. The terminal log is the same reader over
+  the entries whose `actor` is that person and whose `details.terminal` is that `client_id`
+  (`identity.md` §3a), with the same omissions but one: it also serves an entry whose subject is
+  the person's own `sub`, a registration serving them or an upload of theirs, so what a terminal did
+  to its person's other access shows in its log. An ended terminal's log stays readable to the
+  person it served and to an admin.
 - **Ending someone else's access takes the confirm; narrowing your own does not.** Granting and
   registering are gated (§4.2), so ending a grant or a registration that serves another person is
   gated the same way: `DELETE /v1/grants/{sub}` for a `sub` other than the caller's own, and an
-  admin's `DELETE /v1/agents/{client_id}?sub=` for a registration serving someone else, answer §4.2's
-  first leg and revoke nothing until its second leg confirms. The first leg answers `newly: []` and,
+  admin's `DELETE /v1/agents/{client_id}?sub=` or `DELETE /v1/terminals/{client_id}?sub=` for a
+  registration serving someone else, answer §4.2's first leg and revoke nothing until its second
+  leg confirms. The first leg answers `newly: []` and,
   in `"revokes"` (and its `context.fetch`'s `details.revokes`), the grant or registration it ends and
   every registration a grant takes with it; its challenge is bound to the `sub`, or to the pair
   `(client_id, sub)`, so a second leg naming another is `mismatch`. `last_admin` (below) is the
@@ -604,8 +659,9 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
   leg's atomic step. An admin revoking their own grant, or a person revoking a registration that
   serves them, narrows only their own access: it is never gated, answers `{"result": "revoked"}` at
   once, and appends only its `identity.revoke`s. **a1p** (GHSA-c3gg-hwx9-473g).
-- **On `POST /v1/grants`, `POST /v1/agents` and a gated revoke, the button also needs a fresh
-  sign-in**, as a first credential does (below): the provider token's `amr` within the last 300
+- **On `POST /v1/grants`, `POST /v1/agents`, `POST /v1/terminals` and a gated revoke, the button
+  also needs a fresh sign-in**, as a first credential does (below): the provider token's `amr`
+  within the last 300
   seconds; a stale one concludes `step_up` refused `not_fresh` (§4.2 item 4). **What stays open, on
   the record:** for a person with no credential, where buttons are on, these acts rest on a fresh
   sign-in and the button; a credential of their own, or `confirm.allow_button` at `false`, closes it.
@@ -668,7 +724,8 @@ gets §3's refusal there, and its holder acts on grants from the CLI or the life
     owner) too, since a removal reopens the button for that person. A `sub` the admin does not cover is
     §3's refusal before any leg, and follows §4's rule for a refusal. **decided** (v0.7 §AD), the
     audit of every add and remove; **a1p**, its details.
-- **New events**: `identity.grant` and `identity.revoke` (`details.kind`: `user` or `agent`), as
+- **New events**: `identity.grant` and `identity.revoke` (`details.kind`: `user`, `agent` or
+  `terminal`), as
   `identity.md` §4 names them, and `identity.credential` (`details.op`: `add` or `remove`; never key
   material). They enter `events.md` §1 with their code (§5).
 
@@ -719,9 +776,10 @@ storage (v0.7 §S).
 
 - **An orphan** is an upload whose bytes were staged but which expired before an item was written. It
   is listed in `GET /v1/pending` under `"uploads": [{"upload", "name", "size", "sha256", "scope",
-  "opened_at"}]` to its opener, an agent's to the person the agent serves (an agent reads no
+  "opened_at"}]` to its opener, an agent's or a terminal's to the person it serves (an agent reads no
   `GET /v1/pending`, §4), and to an admin; it counts toward the 16, and is removed only by
-  `DELETE /v1/uploads/{id}` (its opener, the person an agent opener serves, or a person with `admin`
+  `DELETE /v1/uploads/{id}` (its opener, the person an agent or a terminal opener serves, or a person
+  with `admin`
   over the whole container), which deletes the staged bytes and appends **`upload.discard`**
   (`opener`, and `bytes_deleted`: false when another live upload or staged item holds the same bytes,
   which then stay). Its opener may discard an open upload the same way, to free its slot before the
@@ -784,20 +842,30 @@ with the code that appends them, because the conformance tests pin that table to
 ```
 
 `token` is the `Token.id`, an identifier and not a value (`capabilities.md` §5); for a provider
-token, its grant's: `user:<sub>`, or `agent:<client_id>:<sub>`, which check 5 re-derives from
-`identity.md` §4's records. `expires_at` is written to the microsecond, `%Y-%m-%dT%H:%M:%S.%fZ`,
+token, its grant's: `user:<sub>`, or `agent:<client_id>:<sub>`, or for a terminal's token
+`terminal:<client_id>:<sub>` (v0.7 §AJ), each of which check 5 re-derives from `identity.md` §4's
+records. `expires_at` is written to the microsecond, `%Y-%m-%dT%H:%M:%S.%fZ`,
 fixed width, so two compare as the times they are; two mints for one token and item within one
 tick of the clock are one grant. **a1p.**
 
 **A provider token's id names exactly one `(client_id, sub)` pair. a1p** (GHSA-9g46-638p-v4xm,
 #316). The id is a kind followed by each part, joined by `:`. Where no part holds `%` or `:`, the
-kind is `user` or `agent` and each part is written as it is: the form above. Every Supabase-issued
+kind is `user`, `agent` or `terminal` and each part is written as it is: the form above. Every
+Supabase-issued
 id has that form, since a UUID holds neither character. Where any part holds `%` or `:`, the kind
-is `user%` or `agent%`, and in each part every `%` is written `%25` and every `:` is written `%3A`:
-`user%:<sub>` or `agent%:<client_id>:<sub>`, with each part so escaped. A string is read back only
+is `user%`, `agent%` or `terminal%`, and in each part every `%` is written `%25` and every `:` is
+written `%3A`: `user%:<sub>`, `agent%:<client_id>:<sub>` or `terminal%:<client_id>:<sub>`, with each
+part so escaped. A string is read back only
 where its parts, none empty, decode to a pair that writes the same string, so no other spelling
 names a pair, and a container `Token`'s id, which holds no `:`, names none. This id is not
 attribution: `actor` and `details.for` carry their one part raw (`identity.md` §3a).
+
+**A terminal's token is told apart by its id, and is still its person. a1p** (v0.7 §AJ). What is
+issued to a token is issued to that id: a challenge (§4.2 item 3), a `BlobGrant`, an upload (§4.4)
+and the per-token bucket (§2) are that terminal's alone, so the browser's token and another
+terminal's get `foreign`, or §3's refusal, on them, and a grant minted through a terminal that has
+since been ended is refused at check 5. What is counted or kept per person stays per person, under
+`user:<sub>`: confirm credentials, the cap on uploads, the audience and `actor`.
 
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token

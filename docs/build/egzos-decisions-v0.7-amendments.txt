@@ -639,6 +639,78 @@ AI. AMENDMENT — THE COMMAND LINE MOVES TO ITS OWN REPOSITORY, AND THE CORE
 
 
 ================================================================================
+AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
+    principal mapping, with a third: a registered terminal's client →
+    interactive; §AG's terminal sign-in and its `egzos logout` sentence; and
+    the second accepted residual identity.md §8 records under §AG.
+    identity.md §3, §3a, §4, §5, §8; rest.md §4.2, §4.3, §6; Egzos/egzos#388)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-14, choosing the third of three
+          ways the operator set out for the app to show a terminal that is
+          signed in (Egzos/egzos-platform#379): a note the browser keeps; a
+          record the container keeps on the terminal's own word; or each
+          terminal a client of its own. Recorded by the operator, enacted
+          by #388's merge; the Chief may veto by reverting.
+
+[DECIDED] EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN AT THE PROVIDER,
+          AND THE PERSON'S CONTAINER HOLDS IT AS THAT PERSON'S OWN DEVICE:
+          a third kind of record beside a person's grant and an agent's
+          registration. It keeps the person's powers. What changes is
+          that the container can tell it from the browser and from every
+          other terminal: every request is attributable to that terminal
+          on the chain, the app lists terminals with when each was last
+          used, and revoking one works: its next request is refused.
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts):
+
+          - egzos.io registers the terminal's client, when the person
+            continues on the start page. The option as put to the Chief
+            said `egzos login` registers it. Bound this way the provider
+            still sees no loopback redirect and the hand-off of §AG and
+            §AH keeps its shape, which is also why this is not the B that
+            §AG rejected (the local registering itself with a loopback
+            redirect, for a token the cloud refuses under §AA or accepts
+            only as a client principal).
+          - The person confirms the terminal at their container before
+            the provider issues, as they confirm an agent (§AB, §U). For
+            a person with no confirm credential that takes a sign-in at
+            most five minutes old, so `egzos login` may ask them to sign
+            in again.
+          - The person stays the actor of what is done at a terminal;
+            each entry names the terminal beside them.
+          - A terminal has a name, shown before it is kept.
+          - The person, an admin, or the terminal itself ends it. The
+            last is `egzos logout`, which now ends the terminal at the
+            cloud before it forgets the token: that amends §AG's "it can
+            do no more".
+          - A terminal's token concludes no confirm and gives no one
+            access, which holds §AI's "the terminal still never gives a
+            confirm" at the container.
+          - At a person's first registered terminal, egzos.io ends the
+            sign-ins terminals kept before this, which name the
+            container's own client.
+          - It is what the app draws as the house beside the orb, which
+            the Chief asked for on 2026-11-13.
+
+          UNTIL THE CODE LANDS (this repository's door, egzos.io's
+          hand-off pages, the command in Egzos/cli), a terminal signs in
+          as §AG has it, with a token issued to the container's own
+          client.
+
+[LATER]   A terminal that holds less than its person (one project, or
+          reading only). Removing the provider's record of a client that
+          no registration names any more.
+
+[OPEN→CHIEF] The name a terminal shows by default: the machine's name,
+          which then leaves the machine and is kept at the cloud, or a
+          name typed at `egzos login`. The operator's draft takes the
+          machine's name, printed before the browser opens and shown
+          before it is kept, with `--name` to give another.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -652,7 +724,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      confirm credentials, where the app lives, where a hosted
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
-     repository and the core's new name
+     repository and the core's new name, each terminal a client of its own
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
@@ -668,7 +740,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   9. Price points for BYOC vs hosted; relay pricing shape.
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
-  macOS builds).
+  macOS builds); §AJ's one (the name a terminal shows by default).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

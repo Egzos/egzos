@@ -2,7 +2,7 @@
 
 **Status: contract v1.1, law from the Chief's merge of the commit that adds this file.** It carries the
 Chief's decisions of 2026-10-22/23 (`docs/build/egzos-decisions-v0.7-amendments.txt` §R–§U, §AA, §AB,
-§AD and §AE), of 2026-10-25 (§AF), of 2026-11-05 (§AG, #361) and of 2026-11-07 (§AH, #366) into the contract set, and **retires `authorization-server.md`**
+§AD and §AE), of 2026-10-25 (§AF), of 2026-11-05 (§AG, #361), of 2026-11-07 (§AH, #366) and of 2026-11-14 (§AJ, #388) into the contract set, and **retires `authorization-server.md`**
 (§9). One login takes effect with this merge: `CLAUDE.md`'s transition clause in `Egzos/egzos-platform`
 points here.
 
@@ -27,8 +27,9 @@ retired). A request reaches it with one of two:
    door. Unchanged. **carried.**
 2. **An access token signed by the container's identity provider**: Supabase Auth, the egzos project for
    a container egzos hosts, the owner's own for a self-hosted one (§S). A person's token, issued to this
-   container's own client, and an agent's OAuth token are both this kind, and each is bound to this one
-   container (§3a). **decided** (§S, §T, and §AA for the binding).
+   container's own client or to a terminal of theirs (§3a), and an agent's OAuth token are both this
+   kind, and each is bound to this one container (§3a). **decided** (§S, §T, §AA for the binding, and
+   §AJ for a terminal's own client).
 
 A container with no identity provider configured (§2) accepts only the first, and is exactly the
 container that runs today. **a1p.**
@@ -70,11 +71,12 @@ for the order.
 3. **Audience.** `aud` is, or contains, `identity.audience`.
 4. **Time.** `exp` is in the future and `iat` is not, each with at most 60 seconds of skew.
 5. **Subject.** `sub` is present: the provider's user id.
-6. **Binding.** The token carries `client_id`, and it names **this** container: either it equals
+6. **Binding.** The token carries `client_id`, and it names **this** container: it equals
    `identity.client_id` (a person using this container), or it names a live agent registration made
-   here (§4). A token with no `client_id` — a provider session issued to egzos.io itself — is refused,
-   because it is not bound to any one container (§3a).
-7. **Grant.** §4 finds a live user grant for `sub`; for an agent, its registration is live too.
+   here, or a live terminal registration made here (§4). A token with no `client_id` — a provider
+   session issued to egzos.io itself — is refused, because it is not bound to any one container (§3a).
+7. **Grant.** §4 finds a live user grant for `sub`; for an agent or a terminal, its registration for
+   that `sub` is live too.
 
 **Every failure is one answer**: `rest.md` §2's `401`, byte-identical whether the header was missing,
 the signature bad, the issuer foreign, the audience wrong, the token expired, the token bound to another
@@ -107,23 +109,28 @@ session. Each token is bound to one container through the provider's own OAuth 2
   authorization-code flow with PKCE for the container's `client_id`; the consent page egzos.io hosts
   approves a person's own containers without asking again. One sign-in still covers every container:
   no second password, no second login (§T). The token is presented only to the container it names.
+  A person at a terminal holds a token issued to that terminal's own client (below).
 - **egzos.io takes a container's client from egzos's own record, never from the container.** The pair
   it runs the flow for, a container's origin and its `client_id`, comes from the record egzos keeps of
-  the containers it hosts. It is never taken from the container's own answers, a URL or a paste, and
+  the containers it hosts; for a terminal the origin comes from that record and the client is one
+  egzos.io registered itself (below). It is never taken from the container's own answers, a URL or a
+  paste, and
   the flow goes only to the provider egzos.io signs people in with, whatever issuer a container's
   metadata (§7) names. **a1p** (#283). `TODO(a1p)`, #283: how a self-hosted container's link reaches
   that record, and from what trusted source; until then, egzos.io reaches only the containers egzos
   hosts.
 - **A terminal reaches a cloud through egzos.io's callback.** `egzos login` (§8) is the person's own
   browser flow with the terminal holding the PKCE verifier: the CLI makes the pair and a `state` and
-  opens the browser at egzos.io, which runs the flow above for the person's cloud container's client,
-  from its own record, with the terminal's `code_challenge` in place of its own. The redirect URIs do
-  not change: the code returns to egzos.io's callback. What changes is what that page may do with a
+  opens the browser at egzos.io, which runs the flow for the person's cloud container, taken from its
+  own record, and for a client it registers for that terminal (the next clause), with the terminal's
+  `code_challenge` in place of its own. The code returns to egzos.io's callback, that client's one
+  redirect URI. What is particular to a terminal is what that page may do with a
   code from a flow it started for a terminal, and only such a flow, known by the pending record this
   browser wrote when it left: hand it on to `http://127.0.0.1:<port>/oauth/callback`, the port the
-  terminal named when it started and the path fixed, with the `state` and the record's triple (the
-  container's origin, its `client_id`, the issuer); or, when the terminal said it cannot listen, show
-  one token holding the `code`, the `state` and the record's triple on the page, for the person to paste into the
+  terminal named when it started and the path fixed, with the `state` and the triple (the
+  container's origin from that record, the terminal's `client_id`, the issuer); or, when the terminal
+  said it cannot listen, show one token holding the `code`, the `state` and that triple on the page,
+  for the person to paste into the
   terminal that asked (the terminal needs the triple to exchange the code and to run the checks below; **a1p**). A
   callback with no such record hands on and shows nothing (a cold arrival, as today). The page never
   exchanges the code and never holds the token: the code is spent only with the verifier the terminal
@@ -150,6 +157,43 @@ session. Each token is bound to one container through the provider's own OAuth 2
   if you just ran `egzos login`", so no flow starts on a visit alone; the code is single-use and lives
   ten minutes at the provider; the loopback path, the default, never leaves the machine; and the pages
   are a security surface, so a6 reviews their copy.
+- **Each terminal is a client of its own.** When the person continues on the start page, egzos.io
+  registers a new public client at the provider for that one sign-in, through the provider's dynamic
+  client registration, as an MCP client registers itself (§7). Its one redirect URI is egzos.io's
+  callback, matched exactly, and PKCE with `S256` is required of it as of every client. The terminal
+  registers nothing and names no client: it learns its `client_id` from the hand-off, as it learns
+  the cloud's origin, and holds the token to both, as above. **decided** (v0.7 §AJ) that a terminal
+  is a client of its own, registered at the provider; **a1p** that egzos.io registers it, which keeps
+  the hand-off's shape, and the rest of this clause.
+  - **The page binds the flow to itself.** It gives the provider a `state` of its own making for
+    each such flow, unguessable and used once, and keeps it in the pending record with the
+    terminal's `state` and the `client_id` it registered. Its callback hands a code on only when the
+    `state` that comes back is that one, and passes the terminal the terminal's own `state` from the
+    record. An authorization the page did not start therefore matches no record, whoever knows the
+    terminal's `state`; the consent page follows an approval the provider gave without asking only
+    for the flow in this browser's record; and the page hands a terminal no code for a container's
+    own client.
+  - **Before the provider is told to issue, the person registers the terminal at their cloud
+    container, with the confirm** (§4, §5; `rest.md` §4.3). The page makes that call with the
+    person's own token for that container, for the authorization it read with egzos.io's first-party
+    session, and a sign-in the person does not confirm issues nothing. For a person with no confirm
+    credential the button needs a sign-in at most 300 seconds old (`rest.md` §4.3): the page reads
+    its own sign-in's age and asks the person to sign in again before the confirm. At the cap of
+    live terminals (`rest.md` §4.3) it says to end one first.
+  - **The name** the terminal asked to be known by (§8) travels in the start URL as display data,
+    the terminal's own claim; the start page and the confirm show it.
+  - **A terminal's client is used for one sign-in and never again.** The provider remembers a
+    consent and approves a later authorization for the same client and person without asking. So
+    egzos.io starts no second flow for a client, a container registers a `client_id` as a terminal
+    once and never again (§4), and a code that comes back without the page's own `state` is handed
+    to no one.
+  - **This is not the shape §AG rejected**, a local registering itself with a loopback redirect:
+    egzos.io registers the client, for the person's cloud container; the provider still sees no
+    loopback redirect; and the container accepts the token as the person's own (§4), not as a client
+    principal's.
+  - **Not running until its code lands** (the door here, egzos.io's pages, the command): until then
+    egzos.io runs the flow for the container's own client, as §AG had it, and a container holds no
+    terminal registration.
 - **An agent's token is bound by its own registration, and a `client_id` is registered on one container
   only.** MCP clients register with the provider per resource (`/mcp` of one container, §7), but the
   binding cannot rest on clients behaving: every agent authorization passes through the consent page
@@ -157,7 +201,9 @@ session. Each token is bound to one container through the provider's own OAuth 2
   `client_id` for any other container, and a container registers a `client_id` only from that page's
   request, under the confirm (§4). A self-hosted provider with its own consent page owes the same
   rule, and the checks `rest.md` §4.3 lists before it calls the container. **a1p** (a1r on #282). A
-  container accepts only a `client_id` registered here.
+  container accepts only a `client_id` registered here. A terminal's client is bound the same way:
+  egzos.io registers it for one sign-in to one container, and that container accepts it only once
+  the person has registered it there (§4).
 - **A token for one container is refused at every other**, at check 6, with the one `401`.
 - **A container-bound token is not a provider session.** It is presented only to the container it
   names: never to the provider's authorization, consent or account endpoints, and a container never
@@ -169,7 +215,11 @@ session. Each token is bound to one container through the provider's own OAuth 2
   caller's token (`rest.md` §4.3). **a1p** (a6 on #285). `TODO(a1p)`, #283: confirm, before the door
   ships, that Supabase's consent endpoints refuse an access token carrying a `client_id`; if they
   accept one, this binding does not hold against a hostile container, and the Chief decides before
-  the door ships.
+  the door ships. The same check gates terminals (v0.7 §AJ): a terminal's token is such a token, kept
+  at rest on a machine, so before a container accepts a terminal registration it is confirmed,
+  against the project that container trusts, that the provider's authorization, consent, grant and
+  account endpoints refuse it. What a client's token may still read at the provider, the person's
+  own profile, is the provider's, and §8 names it.
 
 **A failed check appends no entry of its own**: the request is unauthenticated (`rest.md` §2 clauses 5
 and 6), and the container appends no entry naming a caller it could not verify, whichever check failed.
@@ -178,20 +228,30 @@ sweep with forged, foreign, unbound or ungranted tokens leaves its trace there. 
 request at `/mcp` (§7) counts under the same surface word, `rest`: one door, one throttle. **a1p.**
 
 **Attribution of a verified provider token** (`events.md` §2: every entry names its `actor`). A person:
-`actor` is `user:<sub>`. An agent: `actor` is `agent:<client_id>`, and `details.for` is `user:<sub>`,
-the user it acted for, so "who read this" names both. `principal` is `interactive` or `client` as §4
-maps it. A container `Token` keeps its owner as `actor`, as today. **a1p** (a1r on #282).
+`actor` is `user:<sub>`. A person at a terminal: `actor` is `user:<sub>` as well, since the act is
+the person's, and `details.terminal` is the terminal's `client_id` on every entry appended for the
+request, `step_up` included, added as `details.for` is; a `BlobGrant` redeemed with no bearer takes
+it from the token its descriptor names (`rest.md` §6). So the chain says which terminal an act came
+through (**a1p**, v0.7 §AJ). An agent: `actor` is
+`agent:<client_id>`, and `details.for` is `user:<sub>`, the user it acted for, so "who read this"
+names both. `principal` is `interactive` or `client` as §4 maps it. A container `Token` keeps its
+owner as `actor`, as today. **a1p** (a1r on #282).
 
 ## 4 · Grants: who may do what here
 
 The provider proves *who*; the container alone decides *what*. **decided** (§T: a subscription is not an
-authorization; the container decides what a session may do). Two records, kept in `ContainerState` and
-never delegated (F3):
+authorization; the container decides what a session may do). Three records, kept in `ContainerState`
+and never delegated (F3):
 
 ```
-UserGrant          { sub, name, capabilities, scopes, created_at, revoked }
-AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, revoked }
+UserGrant             { sub, name, capabilities, scopes, created_at, revoked }
+AgentRegistration     { client_id, sub, name, capabilities, scopes, created_at, revoked }
+TerminalRegistration  { client_id, sub, name, created_at, revoked }
 ```
+
+The two registrations are kept apart by their kind (`storage.md` §3.2), and each route reads its own
+kind only (`rest.md` §4.3). Below, "an agent registration" is an agent's alone, and "a registration"
+is either.
 
 - **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
   created it, all six capabilities, `["*"]`. A container made by `init` (a local, or a self-hosted one)
@@ -235,35 +295,65 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   vocabulary; approving it (with the confirm) writes the registration here before the provider is told
   to issue. Its route is `rest.md` §4.3. Without the registration the provider's token is refused at
   checks 6 and 7. **a1p.**
+- **A terminal registration is the person at a terminal of theirs.** It carries the person's `sub`,
+  the terminal's `client_id` and the name the terminal asked to be known by, and no capabilities or
+  scopes of its own: at check time a terminal's token holds exactly what its person's grant holds
+  then, so a grant that narrows, widens or ends does so at every terminal of that person at once. A
+  token naming a terminal's `client_id` with any other `sub` is refused at check 7. **decided**
+  (v0.7 §AJ): a terminal is its person, with the person's powers, told apart from the browser and
+  from every other terminal. **a1p**, the rest of this clause:
+  - Each person registers their own, from an interactive principal, in a browser and with the
+    confirm (§5), inside the hand-off (§3a). Nobody registers a terminal for someone else, and a
+    terminal's token registers nothing (`rest.md` §4.3).
+  - **A `client_id` is registered as a terminal once.** One that names any registration here, an
+    agent's or a terminal's, live or revoked, for any person, is never registered as a terminal, and
+    one that names a terminal's is never registered as an agent; `identity.client_id` is neither.
+    So a terminal that was ended never returns, and an agent's client never becomes a terminal's.
+  - Its routes are `rest.md` §4.3.
 - **Principal.** A token whose `client_id` is this container's own (`identity.client_id`) is a person:
-  `principal: interactive`. A token whose `client_id` names a registered agent is that agent acting for
-  the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
+  `principal: interactive`. A token whose `client_id` names a registered terminal is that person at
+  that terminal: `principal: interactive` too, under an id of its own (`rest.md` §6), so what is
+  issued to it is not the browser's. A token whose `client_id` names a registered agent is that
+  agent acting for the user: `principal: client`. **a1p**, onto `capabilities.md` §3.
 - **An agent registration serves the one user who approved it.** It carries that user's `sub`, and a
   token naming the registration's `client_id` with any other `sub` is refused at check 7: another user
   who authorizes the same agent at the provider gets nothing until they register it for themselves
   (above). **a1p** (a1r on #282).
-- **What a request may do.** For a session: the user grant's capabilities and scopes. For an agent: the
-  registration's, **intersected** with the user grant's — an agent never holds more than the user it acts
-  for. Coverage is computed down the path at check time, as for a `Token` (`capabilities.md` §5).
-  **a1p.**
+- **What a request may do.** For a session, in a browser or at a terminal: the user grant's
+  capabilities and scopes. For an agent: the registration's, **intersected** with the user grant's —
+  an agent never holds more than the user it acts for. Coverage is computed down the path at check
+  time, as for a `Token` (`capabilities.md` §5). **a1p.**
 - **Audience** (`capabilities.md` §5) is every live `Token`, user grant and agent registration whose
-  coverage reaches a container. The gate computes its delta over all three. **a1p.**
+  coverage reaches a container. The gate computes its delta over all three. A terminal registration
+  adds no one to it: it is its person, whose grant is already counted. **a1p.**
 - **Revocation** is an admin revoking a grant or a registration here, or the person a registration
-  serves revoking it (**decided** for a registration, §AB), effective on the next request (check 7
-  runs every time); the last grant holding `admin` over `["*"]` is never revoked. Revoking a grant
-  revokes, in the same step, every registration serving its `sub`, each with its own `identity.revoke`,
-  so a later grant to that `sub` starts with no agents. **a1p.** **Narrowing your own access is never
-  gated**: an admin revoking their own grant, or a person revoking a registration that serves them.
+  serves revoking it (**decided**: an agent's, §AB; that a terminal can be ended, §AJ; **a1p**, by
+  whom), effective on the next request (check 7 runs every time); the last grant holding `admin`
+  over `["*"]` is never revoked. Revoking a
+  grant revokes, in the same step, every registration serving its `sub`, agents' and terminals'
+  alike, each with its own `identity.revoke`, so a later grant to that `sub` starts with no agents
+  and no terminals. **a1p.** **Narrowing your own access is never gated**: an admin revoking their
+  own grant, or a person revoking a registration that serves them. A terminal ends its own
+  registration the same way, with the token it holds, which is its person's (`egzos logout`, §8).
   **At the REST door, ending a grant or a registration that serves someone else requires the
   confirm** (§5), as granting it does (`rest.md` §4.3). **a1p** (GHSA-c3gg-hwx9-473g). **The owner
   `Token` is the recovery factor** (§AD): on the CLI and the lifeboat it revokes without the confirm,
   as it removes a credential, audited as every revoke is, and never at the REST door. **a1p.**
-  Signing the user out at the provider ends their tokens at `exp`.
+  Signing the user out at the provider ends their tokens at `exp`. **Withdrawing a person's consent
+  to a client at the provider is that person's own act**, so only their own browser makes it. Where a
+  person ends a terminal of theirs from egzos.io, the page withdraws their consent to that client,
+  which ends its refresh tokens there; and whenever it shows a person their terminals, it does the
+  same for each of theirs the container lists as ended (`rest.md` §4.3). So a terminal ended by
+  `egzos logout`, by an admin or with its grant is ended at the provider on that person's next
+  visit; until then its refresh token still mints tokens, which this container refuses. The
+  container's refusal never waits on the provider. `TODO(a1p)`: removing the provider's record of a
+  client that no registration names any more, an operator's act. **a1p** (v0.7 §AJ).
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
-  `outcome`, `capabilities` and `scopes`; a refusal (`outcome: refused`, `reason: last_admin`,
-  `rest.md` §4.3) carries no `capabilities` or `scopes`, since nothing changed hands. They enter
-  `events.md` §1 with the code that appends them. For a registration, `details.for` names the person
-  it serves (`user:<sub>`). **a1p.**
+  `details.kind` (`user`, `agent` or `terminal`), `outcome`, and `capabilities` and `scopes` (a
+  terminal's registration has none, and its events carry none); a refusal (`outcome: refused`,
+  `reason: last_admin`, `rest.md` §4.3) carries no `capabilities` or `scopes`, since nothing changed
+  hands. They enter `events.md` §1 with the code that appends them. For a registration, `details.for`
+  names the person it serves (`user:<sub>`). **a1p.**
 
 ## 5 · The confirm — the presence backstop
 
@@ -275,7 +365,9 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   confirms (**decided**, §U, §V); every user grant (§4), which widens an audience the same way
   (**a1p**, a1r's finding 2 on #282); every agent registration (§4), as the person's consent to an
   agent acting with what they hold: no person newly sees anything, so it needs no `publish`, and its
-  first leg names the agent instead (`rest.md` §4.3; **decided**, §AB); and, at the REST door, ending
+  first leg names the agent instead (`rest.md` §4.3; **decided**, §AB); every terminal registration
+  (§4), the person's consent to a terminal acting as them, whose first leg names the terminal the
+  same way (**a1p**, v0.7 §AJ); and, at the REST door, ending
   a grant or a registration that serves someone else (§4), which removes a person's access as surely
   as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g); and, at the REST door, tombstoning an item a
   person promoted, which removes curated knowledge (`rest.md` §4; **a1p**, #296). On a grant, a
@@ -303,6 +395,15 @@ AgentRegistration  { client_id, sub, name, capabilities, scopes, created_at, rev
   achieves. Software that drives a person's own browser session holds an `interactive` token
   (`capabilities.md` §4 records that gap) and can press a button; **the biometric proof is the real
   backstop**, and an owner who wants it everywhere sets `confirm.allow_button` to `false`. **a1p.**
+- **A terminal's token concludes no confirm**, with either proof, always, whatever
+  `confirm.allow_button` says and whatever credentials the person has. A `confirm` presented with a
+  token that names a terminal registration concludes `step_up` refused, `terminal`, and the act does
+  not happen. A first leg served to such a token answers `webauthn: null`: it tells the command what
+  the act would do and that it is finished in a browser, where the person begins it again. The
+  terminal never offers a confirm (§8); the container now holds every holder of its token to that,
+  so a refresh token read off a machine confirms nothing, by the button or by an authenticator
+  within its reach. **a1p**, binding onto the container v0.7 §AI's rule that the terminal never
+  gives a confirm, which §AJ makes possible by giving a terminal's token a client of its own.
 - **The owner may require the stronger proof**: `confirm.allow_button` (§2) at `false` accepts only
   `biometric`. **a1p.**
 - **The credentials behind `biometric` follow GitHub's sudo model**, more strictly. A person's first
@@ -381,22 +482,32 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
   nothing that person's own surfaces don't. What those surfaces hold goes with the token, though:
   an MCP client given a person's provider token can present it at `/v1/` as well, and confirm
   with §5's button wherever §5 still accepts one (no credential registered and
-  `confirm.allow_button` at `true`, both the defaults). The backstop there is §5's biometric, as
-  for any software that holds a person's token. **a1p** (#294), the rest.
+  `confirm.allow_button` at `true`, both the defaults), unless the token is a terminal's, which
+  concludes no confirm at all (§5). The backstop there is §5's biometric, as for any software that
+  holds a person's token. **a1p** (#294), the rest.
 
 ## 8 · Places
 
 A local (a laptop, a desktop) with no provider keeps working offline on its own `Token`. To push to or
 pull from its cloud (§V), its owner signs in through the cloud's provider like any client: `egzos
-login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p** the rest:
+login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG, §AJ). **a1p** the rest:
 
-- **What the login yields**, once the person has said yes to the account and the cloud it shows
-  (§3a), is a person's token bound to the cloud container, `principal:
-  interactive`, with a refresh token where the provider issues one to a public client (the check §AG
-  owes); without one the access token runs to its `exp` and `egzos login` runs again. The terminal presents it at that container alone (`/v1/`, and
-  `/mcp` as §7 admits a person's token), and §3, §4 and §5 decide the rest. It is not a container
-  `Token`: `token ls` does not list it, and nothing mints one from it. A person egzos hosts no
-  container for has nothing to log in to, and the terminal says so in one line.
+- **What the login yields**, once the person has confirmed the terminal in the browser and said yes
+  at the terminal to the account and the cloud it shows (§3a), is a person's token issued to that
+  terminal's own client, which the cloud container holds as a terminal of that person (§4):
+  `principal: interactive`, with a refresh token where the provider issues one to a public client
+  (the check §AG owes); without one the access token runs to its `exp` and `egzos login` runs again.
+  The terminal presents it at that container alone (`/v1/`, and `/mcp` as §7 admits a person's
+  token), and §3, §4 and §5 decide the rest. It is not a container `Token`: `token ls` does not list
+  it, and nothing mints one from it. The cloud lists it among the person's terminals, with its name
+  and when it was last used (`rest.md` §4.3). A person egzos hosts no container for has nothing to
+  log in to, and the terminal says so in one line.
+- **The name.** A terminal asks to be known by a name: the machine's own name, or the one the person
+  gives (`egzos login --name`). It prints the name before the browser opens, because the name leaves
+  the machine and is kept at the cloud; the start page and the confirm show it before it is kept
+  (§3a). It is the terminal's own claim: display data of at most 128 characters, escaped and
+  labelled wherever it is shown, and nothing is decided on it. **a1p**; which name is the default is
+  the Chief's open question (v0.7 §AJ).
 - **Where it lives.** The refresh token goes in the operating system's credential store (the Keychain
   on macOS, the Secret Service on Linux, the Credential Manager on Windows), through a maintained
   library (§R); where none can be reached, a file under `EGZOS_HOME` readable by its owner alone
@@ -405,17 +516,37 @@ login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG). **a1p*
   whoami` says who is signed in and to which cloud.
 - **A stored token is a held token.** Any process running as the machine's user can read what that
   user's store holds, so a refresh token at rest is §5's admitted gap (software that holds a
-  person's token can press the button) made durable: the second **accepted residual** (§AG), named
-  beside the paste path's. The container cannot tell this token from the browser's, since both are
-  the person's, issued to the same client, so nothing here refuses it anything. What bounds it: the
-  CLI never offers the button, and a human-only act begun from a terminal is finished in the browser,
-  where the biometric runs; the owner who wants the biometric everywhere sets `confirm.allow_button`
-  to `false` (§5), and `egzos login` says so once, on first use; the token is bound to one container
-  (§3a) and ends with its grant (§4). The backstop is §5's biometric, as for any software that
-  holds a person's token.
-- **`egzos logout` forgets the token on this machine.** The provider publishes no revocation endpoint,
-  so the refresh token is deleted here and the access token runs to its `exp`; a cloud's admin
-  revokes a grant, never a token (§4). The line says exactly that.
+  person's token) made durable: the second **accepted residual** (§AG), named beside the paste
+  path's. From §AJ it is bounded at the container, where before only the CLI's manners bounded it.
+  The token names the terminal's own client, so the container tells it from the browser's and from
+  every other terminal's. It concludes no confirm (§5), so a human-only act begun from a terminal is
+  finished in the browser, where the biometric runs, and it gives no one access (`rest.md` §4.3).
+  Everything done through it is on the chain under that terminal (§3a), and the cloud lists the
+  terminal with when it was last used. And the person, from any browser, or an admin ends it, after
+  which its next request is refused (§4). The token is still bound to one container (§3a) and still
+  ends with its grant (§4). **What stays open:** until the terminal is ended, whoever holds its token
+  reads and writes as the person; ends that person's other terminals and agents, and an admin's own
+  grant, since narrowing is never gated (§4); and reads the person's own profile at the provider
+  (§3a). `egzos login` says once, on first use, where the terminal is listed and how it is ended.
+- **`egzos logout` ends the terminal at the cloud, then forgets the token on this machine.** It
+  revokes its own registration with the token it holds (§4), so an access token it leaves behind is
+  refused from then on, and it deletes the refresh token here. When the cloud cannot be reached it
+  still deletes the token here, and says that the terminal is still listed at the cloud and is
+  ended from a browser. It cannot withdraw the provider's consent, since a container-bound token is
+  never presented there (§3a); the person's next visit to egzos.io does (§4). The line says exactly
+  what was done. **a1p**; it amends the sentence of v0.7 §AG that the command "can do no more",
+  which §AJ records for the Chief.
+- **A terminal that signs in again replaces itself.** Each sign-in is a new client and a new
+  registration (§3a). A terminal that already holds a sign-in to that cloud ends the earlier
+  registration once the new one is kept, so one machine is listed once. It ends it with the new
+  token, since the earlier one may no longer be accepted, and when it cannot, it says that the
+  earlier terminal is still listed at the cloud and is ended from a browser.
+- **A sign-in kept before terminals were registered** names the container's own client. The
+  container cannot tell it from a browser's, it is listed nowhere, and a confirm is not refused to
+  it. `egzos login` deletes it on this machine, but the provider honours a copy of its refresh
+  token until it lapses. So at a person's first registered terminal on a container, egzos.io
+  withdraws their consent to that container's own client once: every such sign-in ends at the
+  provider, and the browser connects again without asking (§3a). **a1p** (v0.7 §AJ).
 - **What the login supplies the link.** A local its owner links (§4) needs the owner's `sub`; the
   login's token carries it, so `egzos link` takes it from the login in place of a typed value. The
   login does not register the local's own client at the provider: §3a's `TODO(a1p)` on how a

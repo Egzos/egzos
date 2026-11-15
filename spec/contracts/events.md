@@ -66,7 +66,7 @@ drift a reader resolves by guessing.
 | `client.register` | the owner registers, amends or removes a client, `op: add · amend · remove` (AS §5) | decided, not running |
 | `config.set` | a container-config key is changed — an `admin` act (`container.md` §8) | running |
 | `rest.tally` | a window closes in which the REST door's throttle admitted a 401 or a refused redemption that names no caller (`rest.md` §2) | running |
-| `identity.grant` | a user grant or an agent registration is written, `kind: user · agent`, or a narrowing of the last admin grant is refused (`identity.md` §4) | running |
+| `identity.grant` | a user grant, an agent registration or a terminal registration is written, `kind: user · agent · terminal` (`terminal` from v0.7 §AJ, not running until its code lands), or a narrowing of the last admin grant is refused (`identity.md` §4) | running |
 | `identity.revoke` | a grant or registration is revoked, or the last admin grant's revoke is refused (`identity.md` §4) | running |
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |

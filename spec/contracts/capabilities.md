@@ -74,10 +74,10 @@ split: `Principal` is the three words, `TokenPrincipal` the two a `Token`, an `A
 item's provenance may carry.
 
 - **Amended by `identity.md` (v1.1):** a provider token is accepted only when it is bound to this
-  container (`identity.md` §3a, check 6): one issued to the container's own client is
-  `principal: interactive`, one issued to an agent client registered here is `principal: client`, and
-  a bare provider session, with no `client_id`, is refused (`identity.md` §3, §4). The AS login below is
-  retired.
+  container (`identity.md` §3a, check 6): one issued to the container's own client, or to a terminal
+  the person registered here, is `principal: interactive`, one issued to an agent client registered
+  here is `principal: client`, and a bare provider session, with no `client_id`, is refused
+  (`identity.md` §3, §4). The AS login below is retired.
 - `principal: interactive` — established, for browser sessions, by the login PKCE performs against
   the container. The flow is `authorization-server.md` §2; **where in it the principal is established
   is issue #61** (Part B, presence composition), as `container.md` §9 already says. In the skeleton
@@ -116,7 +116,8 @@ human (§3), and an `interactive` token can be minted to software, so the gate h
 
 **Amended by `identity.md` (v1.1):** the backstop is the confirm, `identity.md` §5 — a WebAuthn
 assertion with user verification, or the button where the device has none, which is refused to a
-`client` principal; the localhost tap is retired. The text below that cites the retired
+`client` principal, while a terminal's token concludes no confirm at all; the localhost tap is
+retired. The text below that cites the retired
 `authorization-server.md` is the record of 0.3.
 
 The backstop's full text, and the test a conforming container must pass, is

@@ -214,7 +214,7 @@ persisted on disk.
 same substrate and never delegated (F3), as §3.1's counters are. **a1p.**
 
 ```
-# IdentityState — identity.md §4's two records; the getters return revoked records too
+# IdentityState — identity.md §4's records; the getters return revoked records too
 put_user_grant(grant)                            -> None             # insert or replace, keyed on sub
 get_user_grant(sub)                              -> UserGrant | None
 list_user_grants()                               -> list[UserGrant]
@@ -231,6 +231,9 @@ put_config(key, value)                           -> None
   (`identity.md` §3 check 7), and the record's history reads back. No method deletes one.
 - **No column holds a credential.** A grant names a provider user id (`sub`) and a registration an
   OAuth `client_id`; neither is a secret, and no token value or hash is stored here.
+- **A terminal registration is kept as an agent registration is**: by the same three methods, under
+  the same key, its record carrying `kind: terminal` and no capabilities or scopes. A record with
+  no `kind` is an agent's. **a1p** (v0.7 §AJ).
 - **A config key never set is absent**, and the reader serves `CONTAINER_CONFIG_DEFAULTS` for it.
   Absence is tested by absence, never by truthiness (`container.md` §8): an empty string set is a
   value.
