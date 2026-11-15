@@ -26,7 +26,7 @@ from typing import Any
 from egzos._ids import ulid
 from egzos._types import UploadRecord
 from egzos.backends.base import Backend
-from egzos.identity import principal_id, principal_parts
+from egzos.identity import principal_id, principal_of
 from egzos.ledger import Ledger
 from egzos.model import ContextItem, Node, Token
 from egzos.store.blobs import BlobStore
@@ -58,18 +58,20 @@ class TooManyUploads(Exception):
 def person_of(principal: str, actor: str) -> str | None:
     """Whose upload it is (§4.4, v0.7 §AC), from the opener's `Token.id` and `owner`, both recorded
     at open. A container `Token`'s id is a ULID, which holds no `:`: its own person, whatever owner
-    it names. A provider principal's id names one `(client_id, sub)` pair (`principal_parts`); a
-    person's, recorded beside `user:<sub>`, is that person, and an agent's, recorded beside
-    `agent:<client_id>`, serves the person whose id is `principal_id(None, sub)`. An id that reads
-    as no pair, or that was recorded beside an owner other than its own, is nobody's: None, which
-    answers to an admin alone."""
+    it names. A provider principal's id names one `(client_id, sub)` pair of one kind
+    (`principal_of`); a person's, recorded beside `user:<sub>`, is that person; a terminal's,
+    recorded beside `user:<sub>` too, is the person at that terminal; and an agent's, recorded
+    beside `agent:<client_id>`, serves the person whose id is `principal_id(None, sub)`. What is
+    counted per person stays per person (rest.md §6). An id that reads as no pair, or that was
+    recorded beside an owner other than its own, is nobody's: None, which answers to an admin
+    alone."""
     if ":" not in principal:
         return principal
-    pair = principal_parts(principal)
-    if pair is None:
+    read = principal_of(principal)
+    if read is None:
         return None
-    client_id, sub = pair
-    owner = f"user:{sub}" if client_id is None else f"agent:{client_id}"
+    kind, client_id, sub = read
+    owner = f"agent:{client_id}" if kind == "agent" else f"user:{sub}"
     return principal_id(None, sub) if actor == owner else None
 
 
@@ -132,8 +134,8 @@ class Uploads:
 
     def answers_to(self, token: Token, record: UploadRecord) -> bool:
         """Whether `record` is listed to and discarded by `token` short of admin: its opener, and
-        once it is an orphan, the person an agent opener serves (§4.4: an open upload is its
-        opener's). Never another agent of that person."""
+        once it is an orphan, the person an agent or a terminal opener serves (§4.4: an open
+        upload is its opener's). Never another agent or terminal of that person (rest.md §6)."""
         return self.opened(token, record) or (
             self.orphan(record) and token.id == person_of(record["principal"], record["actor"]))
 

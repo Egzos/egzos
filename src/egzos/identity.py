@@ -4,8 +4,10 @@
 The container as a resource server (spec/contracts/identity.md).
 
 A request may carry an access token signed by the container's identity provider (Supabase Auth):
-a person's, issued to this container's own OAuth client, or an agent's, issued to a client that the
-person it serves registered here (§4: each person registers their own, v0.7 §AB).
+a person's, issued to this container's own OAuth client or to a terminal's own client that the
+person registered here (§4, v0.7 §AJ), or an agent's, issued to a client that the person it serves
+registered here (§4: each person registers their own, v0.7 §AB). Both registrations are kept in
+one store, told apart by `kind`, and every reader here names the kind it wants.
 `Identity.verify` runs §3's seven checks in order, on every request, and answers
 with the principal the token maps to, or `None`: every failure is the same answer, whichever check
 failed. The JWT work is PyJWT's (buy, don't build). What is here is what egzos is: the order, the
@@ -13,7 +15,8 @@ binding to this one container, and the grants that decide what a verified caller
 
 A verified caller reaches the engine as a `GrantToken`: a `Token` built per request from the grant
 (and, for an agent, the registration intersected with it), never stored, so coverage, the gate and
-the audience treat a granted person exactly as they treat a minted token.
+the audience treat a granted person exactly as they treat a minted token. A person at a terminal is
+that person, with the grant as it stands, under the terminal's own id and marked with its client.
 """
 
 from __future__ import annotations
@@ -33,7 +36,15 @@ from urllib.parse import unquote, urlsplit
 
 import jwt
 
-from egzos._types import AgentRegistration, IdentityState, UserGrant
+from egzos._types import (
+    REGISTRATION_KINDS,
+    AgentRegistration,
+    IdentityState,
+    Registration,
+    RegistrationKind,
+    TerminalRegistration,
+    UserGrant,
+)
 from egzos.ledger import Ledger
 from egzos.model import CAPABILITIES, ROLE_BUNDLES, Node, Token, now_iso
 
@@ -90,13 +101,29 @@ class LastAdmin(Exception):
     """§4: the last live grant holding `admin` over `["*"]` is never revoked."""
 
 
-#: rest.md §4.3: the live registrations one person holds at most, so the audience the gate
+#: rest.md §4.3: the live agent registrations one person holds at most, so the audience the gate
 #: computes over registrations (§4) stays bounded.
 MAX_AGENTS = 16
+#: rest.md §4.3: the live terminal registrations one person holds at most, counted apart from
+#: their agents, which bounds what one person's tokens spend together (rest.md §6).
+MAX_TERMINALS = 16
 
 
 class TooManyAgents(Exception):
-    """rest.md §4.3: the person already holds `MAX_AGENTS` live registrations. Their own fact."""
+    """rest.md §4.3: the person already holds `MAX_AGENTS` live agent registrations. Their own
+    fact."""
+
+
+class TooManyTerminals(Exception):
+    """rest.md §4.3: the person already holds `MAX_TERMINALS` live terminal registrations. Their
+    own fact."""
+
+
+class Registered(Exception):
+    """identity.md §4, rest.md §4.3: a `client_id` is registered as a terminal once. One that
+    names any registration here is never registered as a terminal, and one that names a
+    terminal's is never registered as an agent. The door concludes the confirm refused,
+    `registered`, never a refusal that says so before a leg."""
 
 
 #: A name shown to a person deciding something — who would newly see an item, an agent's own
@@ -128,28 +155,46 @@ def provider_id(value: Any, what: str = "an id the provider issued") -> str:
     return value
 
 
-def principal_id(client_id: str | None, sub: str) -> str:
-    """A provider principal's `Token.id`, naming exactly one `(client_id, sub)` pair
-    (GHSA-9g46-638p-v4xm): `user:<sub>` for a person, `agent:<client_id>:<sub>` for an agent, as
-    ever, where no part holds `%` or `:`, a UUID among them. Otherwise the kind is `user%` or
-    `agent%`, which no id written before held, and each part has `%` written `%25` and `:` `%3A`.
-    The owner and `acting_for` are attribution, not ids: one part each, raw (identity.md §3a)."""
-    kind, parts = ("user", [sub]) if client_id is None else ("agent", [client_id, sub])
+def principal_id(client_id: str | None, sub: str, kind: RegistrationKind = "agent") -> str:
+    """A provider principal's `Token.id`, naming exactly one `(client_id, sub)` pair of one kind
+    (GHSA-9g46-638p-v4xm, rest.md §6): `user:<sub>` for a person, `agent:<client_id>:<sub>` for an
+    agent, as ever, and `terminal:<client_id>:<sub>` for a person at a terminal (v0.7 §AJ), where
+    no part holds `%` or `:`, a UUID among them. Otherwise the kind is `user%`, `agent%` or
+    `terminal%`, which no id written before held, and each part has `%` written `%25` and `:`
+    `%3A`. `kind` is read only with a `client_id`. The owner and `acting_for` are attribution, not
+    ids: one part each, raw (identity.md §3a)."""
+    name, parts = ("user", [sub]) if client_id is None else (kind, [client_id, sub])
     if any("%" in p or ":" in p for p in parts):
-        kind, parts = kind + "%", [p.replace("%", "%25").replace(":", "%3A") for p in parts]
-    return ":".join([kind, *parts])
+        name, parts = name + "%", [p.replace("%", "%25").replace(":", "%3A") for p in parts]
+    return ":".join([name, *parts])
 
 
-def principal_parts(token_id: str) -> tuple[str | None, str] | None:
-    """The `(client_id, sub)` pair a provider principal's id names, `client_id` None for a person:
-    `principal_id` read back. None for any string `principal_id` would not write, a container
-    `Token`'s ULID among them, so no other spelling names a pair."""
+def principal_of(token_id: str) -> tuple[str, str | None, str] | None:
+    """`(kind, client_id, sub)` for the provider principal an id names, `kind` one of `user`,
+    `agent` and `terminal`, and `client_id` None for a person: `principal_id` read back. None for
+    any string `principal_id` would not write, a container `Token`'s ULID among them, so no other
+    spelling names a pair, and an id names one kind."""
     parts = [unquote(p) for p in token_id.split(":")[1:]]
     if not 1 <= len(parts) <= 2 or not all(parts):
         return None
-    pair = (None, parts[0]) if len(parts) == 1 else (parts[0], parts[1])
+    if len(parts) == 1:
+        return ("user", None, parts[0]) if principal_id(None, parts[0]) == token_id else None
     # The kind is never parsed: this round trip is what refuses a foreign or mismatched one.
-    return pair if principal_id(*pair) == token_id else None
+    for kind in REGISTRATION_KINDS:
+        if principal_id(parts[0], parts[1], kind) == token_id:
+            return kind, parts[0], parts[1]
+    return None
+
+
+def principal_parts(token_id: str) -> tuple[str | None, str] | None:
+    """The `(client_id, sub)` pair a person's or an agent's id names, `client_id` None for a
+    person. None for a terminal's id, which `principal_of` reads with its kind, so a reader of
+    this pair never takes a terminal for an agent, and None for any string `principal_id` would
+    not write."""
+    read = principal_of(token_id)
+    if read is None or read[0] == "terminal":
+        return None
+    return read[1], read[2]
 
 
 # -- configuration (§2) --------------------------------------------------------------------------
@@ -329,12 +374,15 @@ class Jwks:
 @dataclass
 class GrantToken(Token):
     """A `Token` built per request from a grant: never stored, never minted, never a bearer value.
-    `sub` is the provider's user id; `client_id` is this container's own (a person) or a
-    registered agent's. `acting_for` is the user an agent acts for (`details.for`, §3a)."""
+    `sub` is the provider's user id; `client_id` is this container's own (a person), a registered
+    terminal's (the person at that terminal) or a registered agent's. `acting_for` is the user an
+    agent acts for (`details.for`, §3a); `terminal` is the client id of the terminal a person's
+    token came through (`details.terminal`, §3a), None for every other token."""
 
     sub: str = ""
     client_id: str = ""
     acting_for: str | None = field(default=None, compare=False)
+    terminal: str | None = field(default=None, compare=False)
     #: The grant's or registration's display name: untrusted display data (rest.md §4.3).
     name: str = field(default="", compare=False)
     #: When the person last signed in at the provider (the newest `amr` timestamp), for the acts
@@ -355,8 +403,18 @@ def _auth_time(amr: Any) -> int | None:
     return max(times) if times else None
 
 
-def _live(record: UserGrant | AgentRegistration | None) -> bool:
+def _live(record: UserGrant | Registration | None) -> bool:
     return bool(record) and not record.get("revoked")
+
+
+def kind_of(registration: Registration) -> str:
+    """A registration's kind (storage.md §3.2): a record with none is an agent's. Any other value
+    is returned as it is, so it reads as neither kind."""
+    return registration.get("kind", "agent")
+
+
+def of_kind(registration: Registration | None, kind: RegistrationKind) -> bool:
+    return registration is not None and kind_of(registration) == kind
 
 
 class Identity:
@@ -447,7 +505,8 @@ class Identity:
         sub = claims.get("sub")
         if not isinstance(sub, str) or not sub:
             return None
-        # 6 · Binding: this container's own client, or an agent registered here (§3a).
+        # 6 · Binding: this container's own client, or an agent or a terminal registered here
+        # (§3a).
         client_id = claims.get("client_id")
         if not isinstance(client_id, str) or not client_id:
             return None
@@ -456,11 +515,19 @@ class Identity:
             _live(r) for r in self.state.list_agent_registrations(client_id=client_id)
         ):
             return None
-        # 7 · Grant: a live user grant, and for an agent a live registration serving this `sub`.
-        who = self._person(sub, client_id) if person else self._agent(client_id, sub)
+        # 7 · Grant: a live user grant, and for an agent or a terminal a live registration of
+        # that kind serving this `sub`.
+        who = self._person(sub, client_id) if person else self._registered(client_id, sub)
         if who is not None:
             who.auth_time = _auth_time(claims.get("amr"))
         return who
+
+    def _registered(self, client_id: str, sub: str) -> GrantToken | None:
+        """Check 7 for a registered client: the agent or the terminal its record for `sub` is."""
+        registration = self.state.get_agent_registration(client_id, sub)
+        if of_kind(registration, "terminal"):
+            return self._terminal(client_id, sub)
+        return self._agent(client_id, sub)
 
     # -- §4: what a verified caller may do ------------------------------------------------------
     def _person(self, sub: str, client_id: str) -> GrantToken | None:
@@ -480,10 +547,33 @@ class Identity:
             name=grant.get("name", ""),
         )
 
+    def _terminal(self, client_id: str, sub: str) -> GrantToken | None:
+        """A person at a terminal of theirs (§4): their live grant as it stands now, through a
+        live terminal registration serving them. The person, `interactive`, under the terminal's
+        own id (rest.md §6), so what is issued to it is not the browser's."""
+        grant = self.state.get_user_grant(sub)
+        registration = self.state.get_agent_registration(client_id, sub)
+        if not _live(grant) or not _live(registration) or not of_kind(registration, "terminal"):
+            return None
+        return GrantToken(
+            id=principal_id(client_id, sub, "terminal"),
+            principal="interactive",
+            owner=f"user:{sub}",
+            client=client_id,
+            capabilities=sorted(grant["capabilities"]),
+            scopes=list(grant["scopes"]),
+            # rest.md §6 check 5: a grant or a registration written since is new.
+            created_at=max(grant["created_at"], registration["created_at"]),
+            sub=sub,
+            client_id=client_id,
+            terminal=client_id,
+            name=grant.get("name", ""),
+        )
+
     def _agent(self, client_id: str, sub: str) -> GrantToken | None:
         grant = self.state.get_user_grant(sub)
         registration = self.state.get_agent_registration(client_id, sub)
-        if not _live(grant) or not _live(registration):
+        if not _live(grant) or not _live(registration) or not of_kind(registration, "agent"):
             return None
         capabilities = sorted(set(registration["capabilities"]) & set(grant["capabilities"]))
         scopes = self.intersect(registration["scopes"], grant["scopes"])
@@ -522,47 +612,74 @@ class Identity:
         return sorted(out)
 
     def refresh(self, token: GrantToken) -> GrantToken | None:
-        """The same caller as the grants stand now: a revoke since the request began counts."""
+        """The same caller as the grants stand now: a revoke since the request began counts. A
+        terminal's token stays valid only while its registration and the grant are both live."""
+        if token.terminal is not None:
+            return self._terminal(token.terminal, token.sub)
         if token.principal == "client":
             return self._agent(token.client_id, token.sub)
         return self._person(token.sub, token.client_id)
 
     def named(self, token_id: str) -> GrantToken | None:
-        """The person or agent a `GrantToken` id names, as the grants stand now (rest.md §6 check
-        5): the one pair `principal_parts` reads from it. Revoked since, a stand-in that is revoked
-        and holds nothing, so a refusal is still attributed to whom the grant named. None for an
-        id that is not a grant's."""
-        pair = principal_parts(token_id)
-        if pair is None:
+        """The person, terminal or agent a `GrantToken` id names, as the grants stand now
+        (rest.md §6 check 5): the one pair and kind `principal_of` reads from it, and a
+        registration of that kind. Revoked since, a stand-in that is revoked and holds nothing, so
+        a refusal is still attributed to whom the grant named. None for an id that is not a
+        grant's."""
+        read = principal_of(token_id)
+        if read is None:
             return None
-        client_id, sub = pair
+        kind, client_id, sub = read
         if client_id is None:
             own = self.config("identity.client_id") or ""
             return self._person(sub, own) or GrantToken(
                 id=token_id, principal="interactive", owner=f"user:{sub}", client=own,
                 capabilities=[], scopes=[], revoked=True, sub=sub, client_id=own)
-        if self.state.get_agent_registration(client_id, sub) is None:
+        if not of_kind(self.state.get_agent_registration(client_id, sub), kind):
             return None
+        if kind == "terminal":
+            return self._terminal(client_id, sub) or GrantToken(
+                id=token_id, principal="interactive", owner=f"user:{sub}", client=client_id,
+                capabilities=[], scopes=[], revoked=True, sub=sub, client_id=client_id,
+                terminal=client_id)
         return self._agent(client_id, sub) or GrantToken(
             id=token_id, principal="client", owner=f"agent:{client_id}", client=client_id,
             capabilities=[], scopes=[], revoked=True, sub=sub, client_id=client_id,
             acting_for=f"user:{sub}")
 
     def audience_tokens(self) -> list[GrantToken]:
-        """Every live grant and registration, as the gate counts them (§4: audience is every
-        live `Token`, user grant and agent registration whose coverage reaches a container)."""
+        """Every live grant and agent registration, as the gate counts them (§4: audience is
+        every live `Token`, user grant and agent registration whose coverage reaches a container).
+        A terminal adds no one: it is its person, whose grant is already counted."""
         own = self.config("identity.client_id") or ""
         out: list[GrantToken] = []
         for grant in self.state.list_user_grants():
             person = self._person(grant["sub"], own) if _live(grant) else None
             if person:
                 out.append(person)
-        for registration in self.state.list_agent_registrations():
+        for registration in self.registrations("agent"):
             if _live(registration):
                 agent = self._agent(registration["client_id"], registration["sub"])
                 if agent:
                     out.append(agent)
         return out
+
+    # -- registrations, by kind (§4: every reader names the kind it wants) ----------------------
+    def registrations(self, kind: RegistrationKind, *, sub: str | None = None,
+                      client_id: str | None = None) -> list[Registration]:
+        """Every registration of `kind`, revoked ones included, optionally only those serving
+        `sub` or naming `client_id`. storage.md §3.2 lists by `client_id` only, so a filter by
+        `sub` scans them all."""
+        return [r for r in self.state.list_agent_registrations(client_id=client_id)
+                if of_kind(r, kind) and (sub is None or r["sub"] == sub)]
+
+    def registration(self, client_id: str, sub: str,
+                     kind: RegistrationKind) -> Registration | None:
+        """The registration of `client_id` serving `sub`, revoked or not, when it is of `kind`;
+        None for none and for one of the other kind (rest.md §4.3: a `client_id` of the other
+        kind is §3's refusal on every agent and terminal route)."""
+        found = self.state.get_agent_registration(client_id, sub)
+        return found if of_kind(found, kind) else None
 
     # -- grants (§4) ----------------------------------------------------------------------------
     @staticmethod
@@ -664,21 +781,25 @@ class Identity:
                     capabilities=grant["capabilities"],
                     scopes=grant["scopes"],
                 )
-                for agent in self.serving(sub):
+                for agent in self.serving(sub, "agent"):
                     self.revoke_agent(agent["client_id"], sub, actor=actor, principal=principal)
+                for terminal in self.serving(sub, "terminal"):
+                    self.revoke_terminal(terminal["client_id"], sub, actor=actor,
+                                         principal=principal)
                 return True
         self._refused("identity.revoke", sub, actor=actor, principal=principal)
         raise LastAdmin(sub)
 
     def revoke_agent(self, client_id: str, sub: str, *, actor: str, principal: str) -> bool:
-        """Revoke the live registration of `client_id` serving `sub` and append its
+        """Revoke the live agent registration of `client_id` serving `sub` and append its
         `identity.revoke` (`kind: agent`, `for` the person it served), as one transaction: of two
         concurrent revokes of one registration, one ends it and the other finds nothing. The caller
         has judged the act: the person it serves (never gated), an admin ending someone else's under
-        the confirm at the REST door, or a revoke of the grant it serves (§4). `False` for none."""
+        the confirm at the REST door, or a revoke of the grant it serves (§4). `False` for none,
+        and for a terminal's registration, which `revoke_terminal` ends."""
         with self.atomic():
             registration = self.state.get_agent_registration(client_id, sub)
-            if not _live(registration):
+            if not _live(registration) or not of_kind(registration, "agent"):
                 return False
             self.state.put_agent_registration({**registration, "revoked": True})
             self.ledger.append(
@@ -688,10 +809,28 @@ class Identity:
             )
         return True
 
-    def serving(self, sub: str) -> list[AgentRegistration]:
-        """Every live registration serving `sub`. storage.md §3.2 lists registrations by
-        `client_id` only, so this scans them all: a filter by `sub` would be a contract change."""
-        return [r for r in self.state.list_agent_registrations() if r["sub"] == sub and _live(r)]
+    def revoke_terminal(self, client_id: str, sub: str, *, actor: str, principal: str) -> bool:
+        """End the live terminal registration of `client_id` serving `sub` and append its
+        `identity.revoke` (`kind: terminal`, `for` the person it served, and no capabilities or
+        scopes, since it holds none), as one transaction. Its next request is refused at check 7,
+        and it never returns: its `client_id` is never registered again (§4). The caller has
+        judged the act: the person it serves, or the terminal itself with its person's token
+        (never gated), an admin ending someone else's under the confirm at the REST door, or a
+        revoke of the grant it serves (§4). `False` for none, and for an agent's registration."""
+        with self.atomic():
+            registration = self.state.get_agent_registration(client_id, sub)
+            if not _live(registration) or not of_kind(registration, "terminal"):
+                return False
+            self.state.put_agent_registration({**registration, "revoked": True})
+            self.ledger.append(
+                "identity.revoke", actor=actor, principal=principal, subject=client_id,
+                kind="terminal", outcome="revoked", **{"for": f"user:{sub}"},
+            )
+        return True
+
+    def serving(self, sub: str, kind: RegistrationKind = "agent") -> list[Registration]:
+        """Every live registration of `kind` serving `sub`: its agents, or its terminals."""
+        return [r for r in self.registrations(kind, sub=sub) if _live(r)]
 
     def exceeds(self, caller: Token, capabilities: list[str], scopes: list[str]) -> bool:
         """Whether a grant of these goes beyond `caller`'s own (rest.md §4.3): a capability the
@@ -711,14 +850,14 @@ class Identity:
         old = self.state.get_user_grant(sub)
         had_caps, had_scopes = (old["capabilities"], old["scopes"]) if _live(old) else ([], [])
         out = [(principal_id(None, sub), name)] if self._wider(had_scopes, scopes) else []
-        for agent in self.serving(sub):
+        for agent in self.serving(sub, "agent"):  # a terminal is its person, counted above
             before = self._reach(agent, had_caps, had_scopes)
             if self._wider(before, self._reach(agent, capabilities, scopes)):
                 out.append((principal_id(agent["client_id"], sub), agent["name"]))
         return sorted(out)
 
     def _reach(
-        self, agent: AgentRegistration, capabilities: list[str], scopes: list[str]
+        self, agent: Registration, capabilities: list[str], scopes: list[str]
     ) -> list[str]:
         """What an agent covers under a grant of these, as at check time (`_agent`): nothing
         without a capability in common, else its scopes intersected with the grant's."""
@@ -778,17 +917,23 @@ class Identity:
         the confirm included, in the transaction this joins, and may have read the chain through
         seq `after`. The rest of it and the cap are checked with the write, under one lock: of two
         registrations naming one authorization at most one lands (None for the other and every
-        later one), and two at 15 never both take the 16th (`TooManyAgents`)."""
-        if not isinstance(person, GrantToken) or person.principal != "interactive":
-            raise PermissionError("registering an agent is a person's act")
+        later one), and two at 15 never both take the 16th (`TooManyAgents`). A `client_id` that
+        names a terminal's registration is never an agent's (`Registered`), and this container's
+        own client names a person (`ValueError`). A terminal's token registers nothing."""
+        if (not isinstance(person, GrantToken) or person.principal != "interactive"
+                or person.terminal is not None):
+            raise PermissionError("registering an agent is a person's act, from a browser")
+        self._not_own(client_id)
         registration: AgentRegistration = {
-            "client_id": client_id, "sub": person.sub, "name": name,
+            "client_id": client_id, "sub": person.sub, "kind": "agent", "name": name,
             "capabilities": list(capabilities), "scopes": list(scopes), "created_at": now_iso(),
             "revoked": False,
         }
         with self.atomic():
             if self.claimed(authorization_id, after):
                 return None
+            if self.taken(client_id, "agent"):
+                raise Registered(client_id)
             if self.full(person.sub, client_id):
                 raise TooManyAgents(person.sub)
             self.state.put_agent_registration(registration)
@@ -801,17 +946,41 @@ class Identity:
         return registration
 
     def full(self, sub: str, client_id: str) -> bool:
-        """Whether `sub` holds `MAX_AGENTS` live registrations besides one of `client_id`, which
-        registering it again replaces: a 17th is refused, never written (rest.md §4.3)."""
-        return sum(r["client_id"] != client_id for r in self.serving(sub)) >= MAX_AGENTS
+        """Whether `sub` holds `MAX_AGENTS` live agent registrations besides one of `client_id`,
+        which registering it again replaces: a 17th is refused, never written (rest.md §4.3). Their
+        terminals are counted apart (`terminals_full`)."""
+        return sum(r["client_id"] != client_id
+                   for r in self.serving(sub, "agent")) >= MAX_AGENTS
+
+    def terminals_full(self, sub: str) -> bool:
+        """Whether `sub` holds `MAX_TERMINALS` live terminal registrations: a 17th is refused,
+        never written (rest.md §4.3). A terminal's `client_id` is registered once, so none
+        replaces another. Their agents are counted apart (`full`)."""
+        return len(self.serving(sub, "terminal")) >= MAX_TERMINALS
+
+    def taken(self, client_id: str, kind: RegistrationKind) -> bool:
+        """Whether registering `client_id` as `kind` is refused because it was registered here
+        before (identity.md §4, rest.md §4.3): as a terminal, when any registration names it, an
+        agent's or a terminal's, live or revoked, for any person; as an agent, when a terminal's
+        does. The door asks this inside the registration's atomic step and concludes the confirm
+        refused, `registered`."""
+        named = self.state.list_agent_registrations(client_id=client_id)
+        return bool(named) if kind == "terminal" else any(
+            not of_kind(r, "agent") for r in named)
+
+    def _not_own(self, client_id: str) -> None:
+        """This container's own client names a person, never an agent or a terminal (§4)."""
+        if client_id == self.config("identity.client_id"):
+            raise ValueError("this container's own client names a person")
 
     def claimed(self, authorization_id: str, after: int | None = None) -> bool:
-        """Whether a registration was ever written for this authorization, which keys one
-        (rest.md §4.3). Its only record is `identity.grant`'s `details.authorization_id`: neither
-        identity.md §4's record nor storage.md §3.2 holds it, so this reads the chain; with
-        `after`, only its tail past that seq, so a lock never waits on a read of all of it."""
+        """Whether a registration was ever written for this authorization, which keys one, as an
+        agent or as a terminal (rest.md §4.3). Its only record is `identity.grant`'s
+        `details.authorization_id`: neither identity.md §4's record nor storage.md §3.2 holds it,
+        so this reads the chain; with `after`, only its tail past that seq, so a lock never waits
+        on a read of all of it."""
         return any(
-            e["event"] == "identity.grant" and e["details"].get("kind") == "agent"
+            e["event"] == "identity.grant" and e["details"].get("kind") in REGISTRATION_KINDS
             and e["details"].get("authorization_id") == authorization_id
             for e in (self.ledger.backend.audit_iter() if after is None
                       else self.ledger.tail(self.ledger.tail(1)[-1]["seq"] - after))
@@ -825,12 +994,13 @@ class Identity:
         return [e for e in self.ledger.backend.audit_iter()
                 if (e["actor"], e["details"].get("for")) == pair]
 
-    def last_seen(self, registrations: Iterable[AgentRegistration]) -> dict[tuple[str, str], str]:
+    def last_seen(self, registrations: Iterable[Registration]) -> dict[tuple[str, str], str]:
         """When each agent last acted for the person it serves, by `(client_id, sub)`: its newest
         entry attributed to it and naming that person (`details.for`, §3a). A pair never seen is
-        absent. Read from the chain in one pass, as nothing else records it (rest.md §4.3)."""
+        absent, and so is every registration that is not an agent's. Read from the chain in one
+        pass, as nothing else records it (rest.md §4.3)."""
         wanted = {(f"agent:{r['client_id']}", f"user:{r['sub']}"): (r["client_id"], r["sub"])
-                  for r in registrations}
+                  for r in registrations if of_kind(r, "agent")}
         seen: dict[tuple[str, str], str] = {}
         if wanted:
             for entry in self.ledger.backend.audit_iter():
@@ -838,6 +1008,85 @@ class Identity:
                 if pair is not None:
                     seen[pair] = entry["ts"]
         return seen
+
+    # -- terminal registrations (§4, rest.md §4.3) ----------------------------------------------
+    def register_terminal(self, person: GrantToken, client_id: str, *, authorization_id: str,
+                          name: str, after: int | None = None) -> TerminalRegistration | None:
+        """Write a terminal registration serving `person` and append `identity.grant` attributed
+        to them: `kind: terminal`, `for` the person, `authorization_id` as the caller claimed it,
+        and no capabilities or scopes, since it holds none (§4). Each person registers their own,
+        in a browser: a terminal's token registers nothing. The caller has judged the act, the
+        confirm included, in the transaction this joins, and may have read the chain through seq
+        `after`. Under one lock: an authorization registers once, as an agent or as a terminal
+        (None for every later one); a `client_id` any registration here names is never a
+        terminal's (`Registered`); and a 17th live terminal is refused before anything is written
+        (`TooManyTerminals`). This container's own client names a person (`ValueError`)."""
+        if (not isinstance(person, GrantToken) or person.principal != "interactive"
+                or person.terminal is not None):
+            raise PermissionError("registering a terminal is a person's act, from a browser")
+        self._not_own(client_id)
+        registration: TerminalRegistration = {
+            "client_id": client_id, "sub": person.sub, "kind": "terminal", "name": name,
+            "created_at": now_iso(), "revoked": False,
+        }
+        with self.atomic():
+            if self.claimed(authorization_id, after):
+                return None
+            if self.taken(client_id, "terminal"):
+                raise Registered(client_id)
+            if self.terminals_full(person.sub):
+                raise TooManyTerminals(person.sub)
+            self.state.put_agent_registration(registration)
+            self.ledger.append(
+                "identity.grant", actor=person.owner, principal=person.principal,
+                subject=client_id, kind="terminal", outcome="granted",
+                authorization_id=authorization_id, **{"for": f"user:{person.sub}"},
+            )
+        return registration
+
+    def terminal_acted(self, client_id: str, sub: str) -> list[dict[str, Any]]:
+        """What was done through one terminal, oldest first: every entry whose `actor` is the
+        person it serves and whose `details.terminal` is its `client_id` (§3a), refusals
+        included. Read from the chain in one pass (rest.md §4.3's terminal log)."""
+        pair = (f"user:{sub}", client_id)
+        return [e for e in self.ledger.backend.audit_iter()
+                if (e["actor"], e["details"].get("terminal")) == pair]
+
+    def terminal_last_seen(
+        self, registrations: Iterable[Registration]
+    ) -> dict[tuple[str, str], str]:
+        """When each terminal was last used, by `(client_id, sub)`: its newest entry whose `actor`
+        is its person and whose `details.terminal` is its `client_id` (§3a). A terminal not used
+        yet is absent, and so is every registration that is not a terminal's (rest.md §4.3)."""
+        wanted = {(f"user:{r['sub']}", r["client_id"]): (r["client_id"], r["sub"])
+                  for r in registrations if of_kind(r, "terminal")}
+        seen: dict[tuple[str, str], str] = {}
+        if wanted:
+            for entry in self.ledger.backend.audit_iter():
+                pair = wanted.get((entry["actor"], entry["details"].get("terminal")))
+                if pair is not None:
+                    seen[pair] = entry["ts"]
+        return seen
+
+    def terminal_ended(
+        self, registrations: Iterable[Registration]
+    ) -> dict[tuple[str, str], str]:
+        """When each terminal was ended, by `(client_id, sub)`: the time of its `identity.revoke`
+        (`kind: terminal`, `for` its person), rest.md §4.3's `ended_at`. A live one is absent, and
+        so is every registration that is not a terminal's."""
+        wanted = {(r["client_id"], f"user:{r['sub']}"): (r["client_id"], r["sub"])
+                  for r in registrations if of_kind(r, "terminal")}
+        ended: dict[tuple[str, str], str] = {}
+        if wanted:
+            for entry in self.ledger.backend.audit_iter():
+                details = entry["details"]
+                if (entry["event"] != "identity.revoke" or details.get("kind") != "terminal"
+                        or details.get("outcome") != "revoked"):
+                    continue
+                pair = wanted.get((entry["subject"], details.get("for")))
+                if pair is not None:
+                    ended[pair] = entry["ts"]
+        return ended
 
 
 def _whole(grant: UserGrant) -> bool:

@@ -94,6 +94,27 @@ def test_grant_ls_and_rm_keep_the_last_admin(home, capsys):
     assert code == 1
 
 
+def test_grant_ls_lists_agents_and_terminals_each_apart(home, capsys):
+    """identity.md §4: a terminal is never listed as an agent."""
+    _json(capsys, ["link", "--issuer", ISSUER, "--client-id", "c-1", "--sub", "me"])
+    c = Container(home)
+    c.backend.put_agent_registration({
+        "client_id": "a1", "sub": "me", "name": "helper", "capabilities": ["fetch"],
+        "scopes": ["*"], "created_at": "2026-11-14T00:00:00Z", "revoked": False})
+    c.backend.put_agent_registration({
+        "client_id": "t1", "sub": "me", "kind": "terminal", "name": "laptop",
+        "created_at": "2026-11-14T00:00:00Z", "revoked": True})
+    code, out = _json(capsys, ["grant", "ls"])
+    assert code == 0
+    assert [a["client_id"] for a in out["agents"]] == ["a1"]
+    assert [t["client_id"] for t in out["terminals"]] == ["t1"]
+    capsys.readouterr()
+    assert main(["grant", "ls"]) == 0
+    text = capsys.readouterr().out
+    assert "agent a1 for me" in text and "terminal t1 for me" in text and "ENDED" in text
+    assert "agent t1" not in text
+
+
 def test_a_client_token_cannot_link(home, capsys, monkeypatch):
     c = Container(home)
     agent = c.auth.mint(principal="client", owner="self", client="a", role="admin", scopes=["*"],

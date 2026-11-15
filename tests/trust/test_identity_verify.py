@@ -26,6 +26,7 @@ from egzos.identity import (
 ISSUER = "https://project.supabase.co/auth/v1"
 CLIENT = "container-client"
 AGENT = "agent-client"
+TERMINAL = "terminal-client"
 ALICE = "11111111-1111-1111-1111-111111111111"
 BOB = "22222222-2222-2222-2222-222222222222"
 
@@ -241,6 +242,83 @@ def test_agent_scopes_are_the_overlap_of_registration_and_grant(box, key):
     assert who.scopes == [thread.id]
     _register(box, sub=BOB, scopes=(other.id,))
     assert box.identity.verify(_sign(key, client_id=AGENT, sub=BOB)) is None
+
+
+# -- terminals (§4, v0.7 §AJ) ----------------------------------------------------------------------
+def _terminal(c, client_id=TERMINAL, sub=ALICE, *, revoked=False):
+    c.backend.put_agent_registration({
+        "client_id": client_id, "sub": sub, "kind": "terminal", "name": "a laptop",
+        "created_at": "2026-11-14T00:00:00Z", "revoked": revoked,
+    })
+
+
+def test_a_terminals_token_is_its_person_under_an_id_of_its_own(box, key):
+    _terminal(box)
+    who = box.identity.verify(_sign(key, client_id=TERMINAL, amr=[{"timestamp": 1}]))
+    assert isinstance(who, GrantToken)
+    assert (who.id, who.principal, who.owner, who.sub, who.client, who.terminal) == (
+        f"terminal:{TERMINAL}:{ALICE}", "interactive", f"user:{ALICE}", ALICE, TERMINAL, TERMINAL)
+    assert who.acting_for is None and who.auth_time == 1
+    assert who.scopes == ["*"] and "admin" in who.capabilities
+    # The person's own sign-in carries no terminal, and an agent's token is as it was.
+    assert box.identity.verify(_sign(key)).terminal is None
+
+
+def test_a_terminals_token_holds_the_grant_as_it_stands_at_each_request(box, key):
+    box.identity.grant_user(BOB, name="bob", role="reader", scopes=["*"], actor=OWNER,
+                            principal="interactive")
+    _terminal(box, sub=BOB)
+    token = _sign(key, client_id=TERMINAL, sub=BOB)
+    assert box.identity.verify(token).capabilities == ["fetch"]
+    box.identity.grant_user(BOB, name="bob", role="contributor", scopes=["*"], actor=OWNER,
+                            principal="interactive")
+    assert box.identity.verify(token).capabilities == ["fetch", "remember"]
+
+
+def test_a_terminals_client_id_with_another_sub_is_refused(box, key):
+    _terminal(box, sub=ALICE)
+    box.identity.grant_user(BOB, name="bob", role="admin", scopes=["*"], actor=OWNER,
+                            principal="interactive")
+    assert box.identity.verify(_sign(key, client_id=TERMINAL, sub=BOB)) is None
+
+
+def test_an_ended_terminal_is_refused_at_its_next_request(box, key):
+    assert box.identity.verify(_sign(key, client_id=TERMINAL)) is None  # never registered
+    _terminal(box)
+    token = _sign(key, client_id=TERMINAL)
+    assert box.identity.verify(token) is not None
+    assert box.identity.revoke_terminal(TERMINAL, ALICE, actor=f"user:{ALICE}",
+                                        principal="interactive")
+    assert box.identity.verify(token) is None
+
+
+def test_a_terminal_ends_with_its_persons_grant(box, key):
+    box.identity.grant_user(BOB, name="bob", role="admin", scopes=["*"], actor=OWNER,
+                            principal="interactive")
+    _terminal(box)
+    token = _sign(key, client_id=TERMINAL)
+    live = box.identity.verify(token)
+    box.backend.put_user_grant({**box.backend.get_user_grant(ALICE), "revoked": True})
+    assert box.identity.verify(token) is None
+    assert box.identity.refresh(live) is None  # inside an atomic step too
+
+
+def test_the_caller_re_derived_stays_a_terminal_only_while_both_records_live(box, key):
+    _terminal(box)
+    who = box.identity.verify(_sign(key, client_id=TERMINAL))
+    again = box.identity.refresh(who)
+    assert (again.id, again.terminal, again.principal) == (who.id, TERMINAL, "interactive")
+    box.identity.revoke_terminal(TERMINAL, ALICE, actor=OWNER, principal="interactive")
+    assert box.identity.refresh(who) is None  # never the person's own sign-in instead
+
+
+def test_a_terminal_is_never_read_as_an_agent_nor_an_agent_as_a_terminal(box, key):
+    _terminal(box)
+    _register(box)
+    assert box.identity._agent(TERMINAL, ALICE) is None
+    assert box.identity._terminal(AGENT, ALICE) is None
+    assert box.identity.verify(_sign(key, client_id=AGENT)).principal == "client"
+    assert box.identity.verify(_sign(key, client_id=TERMINAL)).principal == "interactive"
 
 
 # -- the key set (§3 check 1) ----------------------------------------------------------------------

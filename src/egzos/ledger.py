@@ -39,6 +39,11 @@ def _hash(prev_hash: str, body: dict[str, Any]) -> str:
 _acting_for: ContextVar[str | None] = ContextVar("acting_for", default=None)
 
 
+#: The client id of the terminal a person's request came through (identity.md §3a): every entry
+#: that request appends names the person as `actor` and the terminal as `details.terminal`.
+_through_terminal: ContextVar[str | None] = ContextVar("through_terminal", default=None)
+
+
 @contextmanager
 def acting_for(user: str | None) -> Iterator[None]:
     """Stamp `details.for` on every entry appended inside, wherever in the engine it is made."""
@@ -47,6 +52,28 @@ def acting_for(user: str | None) -> Iterator[None]:
         yield
     finally:
         _acting_for.reset(reset)
+
+
+@contextmanager
+def through_terminal(client_id: str | None) -> Iterator[None]:
+    """Stamp `details.terminal` on every entry appended inside, `step_up` included, wherever in
+    the engine it is made, as `acting_for` stamps `details.for` (identity.md §3a)."""
+    reset = _through_terminal.set(client_id)
+    try:
+        yield
+    finally:
+        _through_terminal.reset(reset)
+
+
+@contextmanager
+def attributed(token: Any) -> Iterator[None]:
+    """Both stamps a caller's token asks for, for every entry appended inside: `details.for` for
+    an agent, `details.terminal` for a person at a terminal (identity.md §3a, rest.md §4). A token
+    that is neither stamps nothing. The door wraps each verified request in it, and a `BlobGrant`
+    redeemed with no bearer wraps its entries in the token its descriptor names (rest.md §6)."""
+    with acting_for(getattr(token, "acting_for", None)), \
+            through_terminal(getattr(token, "terminal", None)):
+        yield
 
 
 class Ledger:
@@ -74,6 +101,9 @@ class Ledger:
         user = _acting_for.get()
         if user is not None and principal != "none":
             details = {**details, "for": user}
+        terminal = _through_terminal.get()
+        if terminal is not None and principal != "none":
+            details = {**details, "terminal": terminal}
         # Read the head, chain onto it, append. Two processes (the CLI and `serve --mcp`) can read
         # the same head; the backend accepts one successor per entry, and the loser re-chains.
         for _ in range(64):

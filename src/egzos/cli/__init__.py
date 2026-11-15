@@ -782,16 +782,19 @@ def link(
 
 @grant_app.command("ls")
 def grant_ls():
-    """Who may sign in here, with what: user grants, and the agents registered for them. An admin
-    over the whole container's view: who else holds access is not served to a narrower grant."""
+    """Who may sign in here, with what: user grants, the agents registered for them, and the
+    terminals they signed in at, each kind apart (identity.md §4). An admin over the whole
+    container's view: who else holds access is not served to a narrower grant."""
     c = _container()
     token = _admin(c, "the grant list")
     grants = c.backend.list_user_grants()
-    agents = c.backend.list_agent_registrations()
+    agents = c.identity.registrations("agent")
+    terminals = c.identity.registrations("terminal")
     c.ledger.append(
         "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
         view="grant ls", items=[], layers=[], withheld=0,
         grants=[g["sub"] for g in grants], agents=[a["client_id"] for a in agents],
+        terminals=[t["client_id"] for t in terminals],
     )
     rows = [
         f"{g['sub']}  {g['name']:<14} {','.join(g['capabilities']):<45} "
@@ -802,8 +805,13 @@ def grant_ls():
         f"agent {a['client_id']} for {a['sub']}  {a['name']:<14} {','.join(a['capabilities'])}"
         f"{'  REVOKED' if a['revoked'] else ''}"
         for a in agents
+    ] + [
+        f"terminal {t['client_id']} for {t['sub']}  {t['name']:<14}"
+        f"{'  ENDED' if t['revoked'] else ''}"
+        for t in terminals
     ]
-    _out({"grants": grants, "agents": agents}, "\n".join(rows) or "(no grants)")
+    _out({"grants": grants, "agents": agents, "terminals": terminals},
+         "\n".join(rows) or "(no grants)")
 
 
 @grant_app.command("rm")
