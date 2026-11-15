@@ -813,6 +813,7 @@ def grant_ls():
         for a in agents
     ] + [
         f"terminal {t['client_id']} for {t['sub']}  {t['name']:<14}"
+        f"{'  ' + t['machine'] if 'machine' in t else ''}"
         f"{'  ENDED' if t['revoked'] else ''}"
         for t in terminals
     ]
