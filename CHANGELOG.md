@@ -130,6 +130,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The package and its command are renamed to `egzoscore`**: install it with
+  `uv tool install egzoscore` or `pipx install egzoscore`, and type `egzoscore init`,
+  `egzoscore serve`, `egzoscore web` and the rest. The command line for an egzos cloud is a
+  separate program, `egzos`, on npm. The import package (`egzos`) and every environment variable
+  (`EGZOS_HOME`, `EGZOS_TOKEN` and the rest) are unchanged. `egzos` 0.1.x on PyPI is left as it is.
+  If you ran `connect --apply` before, run `egzoscore connect --apply` once: it replaces the
+  Claude Code entry, which still names the old command.
 - **Items written in the same second list newest id first** (v0.7 §AF, `storage.md` §2), so
   `egzos ls`, the inbox and every backend agree on their order; they listed in no fixed order before.
 - **Contracts: where a hosted container's state lives** (the Chief's decisions of 2026-10-25, v0.7
