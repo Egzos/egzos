@@ -1018,6 +1018,14 @@ def connect(
         # launcher's argv (authz/presence.py). A shell running as the user is the user.
         if not shutil.which("claude"):
             _fail("`claude` is not on PATH; run the printed command once Claude Code is installed")
+        # An entry from an earlier run, written when this program's command was `egzos`, holds
+        # the same name: take it away first, so the add replaces it and never stops on it. The
+        # name is not changed, and an entry that is not there is no error.
+        subprocess.run(
+            ["claude", "mcp", "remove", "--scope", "user", MCP_NAME],
+            check=False, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         subprocess.run(cmd, check=True)
     _out(
         {
