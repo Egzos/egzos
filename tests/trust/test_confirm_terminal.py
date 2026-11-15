@@ -75,6 +75,22 @@ def test_a_terminal_cannot_spend_the_browsers_challenge_into_a_confirm(box):
     assert box.confirm.conclude(person, presented, **ACT) == "spent"
 
 
+def test_the_browser_cannot_conclude_a_challenge_issued_to_a_terminal(box):
+    """rest.md §6: a challenge issued to a terminal's token is that terminal's alone, so the
+    person's own sign-in presenting it concludes refused, `foreign`, and the act does not land."""
+    person = box.identity._person(BOB, "box")
+    terminal = box.identity._terminal("t1", BOB)
+    first = box.confirm.issue(terminal, **ACT, newly=[])
+    presented = {"challenge": first["challenge"], "proof": "button"}
+    assert box.confirm.conclude(person, presented, **ACT) == "foreign"
+    (step_up,) = _step_ups(box)
+    assert (step_up["actor"], step_up["principal"]) == (f"user:{BOB}", "interactive")
+    assert step_up["details"] == {"via": "confirm", "act": "promote", "proof": "button",
+                                  "outcome": "refused", "reason": "foreign"}
+    # The challenge is spent whatever was decided.
+    assert box.confirm.conclude(person, presented, **ACT) == "spent"
+
+
 def test_a_persons_own_sign_in_is_unaffected(box):
     person = box.identity._person(BOB, "box")
     first = box.confirm.issue(person, **ACT, newly=[])

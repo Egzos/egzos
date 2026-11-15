@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 import pytest
 from starlette.datastructures import QueryParams
 
+from egzos import identity
 from egzos.api.blobs import redeem
 from egzos.api.throttle import Throttle
 from egzos.container import OWNER, Container
@@ -123,3 +124,29 @@ def test_a_redemption_takes_the_terminal_from_the_token_its_descriptor_names(box
     assert _redeem(box, again, throttle) is None
     after = box.ledger.tail(1)[-1]
     assert (after["details"]["check"], after["details"]["terminal"]) == (5, "t1")
+
+
+def test_a_grant_minted_through_a_terminal_is_refused_once_its_person_is_granted_again(
+    box, tmp_path, monkeypatch
+):
+    """rest.md §6 check 5: a person's grant written since the mint is not the one the descriptor
+    named, though the terminal's registration still stands."""
+    path = tmp_path / "a.bin"
+    path.write_bytes(os.urandom(64))
+    project = box.nodes.create("project", "p", box.nodes.user_root(), token=box.owner, **KW)
+    item = box.store.add(file=path, scope=project, token=box.owner, **KW)
+    second = tmp_path / "b.bin"
+    second.write_bytes(os.urandom(64))
+    other = box.store.add(file=second, scope=project, token=box.owner, **KW)
+    terminal = box.identity._terminal("t1", BOB)
+    throttle = Throttle(box.backend, box.ledger, b"k" * 32)
+    before = box.trust.authorize_pull(terminal, other)
+    kept = box.trust.authorize_pull(terminal, item)
+    assert _redeem(box, before, throttle) == second.read_bytes()  # as the grant stood at the mint
+    monkeypatch.setattr(identity, "now_iso", lambda: "2099-01-01T00:00:00Z")
+    box.identity.grant_user(BOB, name="bob", role="contributor", scopes=["*"], **KW)
+    assert not box.identity.named(f"terminal:t1:{BOB}").revoked  # the terminal still stands
+    assert _redeem(box, kept, throttle) is None
+    refused = box.ledger.tail(1)[-1]
+    assert (refused["event"], refused["details"]["check"], refused["details"]["terminal"]) == (
+        "context.fetch", 5, "t1")

@@ -755,11 +755,12 @@ class Identity:
 
     def revoke_user(self, sub: str, *, actor: str, principal: str) -> bool:
         """Revoke a person's grant and every live registration serving them, each with its own
-        `identity.revoke`, so a later grant to that `sub` starts with no agents (§4). The caller
-        has judged the act: an admin narrowing their own access (never gated), an admin ending
-        someone else's under the confirm at the REST door, or the owner `Token` on the CLI or the
-        lifeboat, the recovery factor (§AD: no confirm, audited). `False` for no live grant; the
-        last live grant holding `admin` over `["*"]` raises `LastAdmin` and appends a refusal.
+        `identity.revoke`, so a later grant to that `sub` starts with no agents and no terminals
+        (§4). The caller has judged the act: an admin narrowing their own access (never gated), an
+        admin ending someone else's under the confirm at the REST door, or the owner `Token` on the
+        CLI or the lifeboat, the recovery factor (§AD: no confirm, audited). `False` for no live
+        grant; the last live grant holding `admin` over `["*"]` raises `LastAdmin` and appends a
+        refusal.
 
         The read, the last-admin check, the writes and the entries are one transaction, so two
         concurrent revokes of the last two whole-container admins cannot both pass the check, and

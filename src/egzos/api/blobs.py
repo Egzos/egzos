@@ -34,7 +34,8 @@ PULL_HEADERS = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
 }
-#: A `Token.id`, or a provider grant's `user:<sub>` or `agent:<client_id>:<sub>`.
+#: A `Token.id`, or a provider grant's `user:<sub>`, `agent:<client_id>:<sub>` or
+#: `terminal:<client_id>:<sub>`, in either spelling (§6).
 _TOKEN = re.compile(r"[\x21-\x7e]{1,512}")
 _SIG = re.compile(r"[0-9a-f]{64}")
 
