@@ -327,6 +327,23 @@ def test_a_sixteenth_that_lands_after_the_door_is_refused_under_the_lock(c, door
     assert c.backend.get_agent_registration("laptop", "bob") is None
 
 
+def test_the_callers_own_grant_is_read_again_under_the_lock(c, door, sign, monkeypatch):
+    first = door.post("/v1/terminals", headers=sign("bob"), json=LAPTOP).json()
+    verify = c.identity.verify
+
+    def verified_then_revoked(value, **kw):  # the caller's grant ends after the door
+        token = verify(value, **kw)
+        c.identity.revoke_user("bob", **KW)
+        return token
+
+    monkeypatch.setattr(c.identity, "verify", verified_then_revoked)
+    reads = len(_events(c, "context.fetch"))
+    r = door.post("/v1/terminals", headers=sign("bob"), json=_button(first, **LAPTOP))
+    assert r.content == NOT_FOUND and not _events(c, "step_up")
+    assert len(_events(c, "context.fetch")) == reads + 1  # its probe
+    assert c.backend.list_agent_registrations() == []  # so no later grant finds a terminal
+
+
 # -- registered once, said behind the first leg ----------------------------------------------------
 @pytest.mark.parametrize("taken", ["an agent's", "an ended agent's", "a terminal's",
                                    "an ended terminal's", "another person's terminal"])

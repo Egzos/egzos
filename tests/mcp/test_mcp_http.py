@@ -233,6 +233,24 @@ def test_a_persons_token_works_as_interactive(c, sign):
     assert "for" not in entry["details"]
 
 
+def test_a_person_at_a_terminal_works_as_interactive_and_each_entry_names_the_terminal(c, sign):
+    """identity.md §3a: the person is the actor, and `details.terminal` names the terminal on
+    every entry its request appends, never on the next request's."""
+    c.identity.grant_user("alice", name="alice", role="contributor", scopes=["*"], **KW)
+    c.backend.put_agent_registration({
+        "client_id": "laptop", "sub": "alice", "kind": "terminal", "name": "a laptop",
+        "created_at": "2026-11-01T00:00:00Z", "revoked": False})
+    _, (fetched, kept) = _session(c, sign("alice", "laptop"), [
+        ("egzos_fetch", {}), ("egzos_remember", {"text": "from the laptop"})])
+    assert fetched["chain"] and kept["ok"] is True
+    through = [*_events(c, "context.fetch"), *_events(c, "item.add")]
+    assert {(e["actor"], e["principal"], e["details"]["terminal"]) for e in through} == {
+        ("user:alice", "interactive", "laptop")}
+    assert not any("for" in e["details"] for e in through)
+    _session(c, sign("alice"), [("egzos_fetch", {})])  # the browser's own, next
+    assert "terminal" not in _events(c, "context.fetch")[-1]["details"]
+
+
 def _bot(c):
     """A client container Token over everything: an MCP client's own credential, never the owner's
     (identity.md §7)."""
