@@ -9,6 +9,7 @@ import re
 import tomllib
 from pathlib import Path
 
+import click
 import pytest
 import typer.main
 
@@ -106,5 +107,6 @@ def test_usage_and_help_name_the_program_egzoscore(capsys):
     assert main(["no-such-verb"]) == 2
     assert "Try 'egzoscore --help'." in capsys.readouterr().err
     assert main(["--help"]) == 0
-    out = capsys.readouterr().out
+    # Where output is styled (a CI runner forces it), the words are the same under the styling.
+    out = click.unstyle(capsys.readouterr().out)
     assert "Usage: egzoscore" in out and "Usage: egzos " not in out
