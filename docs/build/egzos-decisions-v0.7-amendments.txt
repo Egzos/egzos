@@ -709,6 +709,39 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
           machine's name, printed before the browser opens and shown
           before it is kept, with `--name` to give another.
 
+[DECIDED] The Chief, on 2026-11-15, passing the journeys for the above
+          (Egzos/egzos-platform#388), asked that the app show what type
+          of machine the command line is connecting from, so that it is
+          in what the cloud records of a terminal too. The operator took
+          the ask as the decision to show it and records it here,
+          enacted by the merge that closes Egzos/egzos#394; the Chief
+          may veto by reverting.
+
+          A TERMINAL MAY SAY WHAT KIND OF MACHINE IT IS, IN ONE LINE
+          BESIDE ITS NAME (identity.md §3a, §8; rest.md §4.3;
+          storage.md §3.2). THE OPERATOR'S BINDING, each clause marked
+          a1p in the contracts:
+
+          - The line is the name's twin: optional, the terminal's own
+            claim, held to the name's rule, shown before it is kept and
+            labelled wherever it is shown. Nothing checks it and
+            nothing is decided on it.
+          - The confirm that registers the terminal is bound to it,
+            with the name.
+          - The container keeps it on the terminal's registration, and
+            writes it on the chain where it writes the name: once, when
+            the terminal is confirmed. Not on each request, since every
+            entry made at a terminal already names the terminal.
+          - A container from before this refuses a request that carries
+            the line; egzos.io then registers the terminal without it.
+
+[OPEN→CHIEF] What the line holds by default. The operator's draft: the
+          kind of computer and its operating system, and nothing that
+          tells one machine from another of its kind (no serial number,
+          no hardware identifier, no network address), printed with the
+          name before the browser opens, with `--machine` to give
+          another and `--no-machine` to give none.
+
 
 ================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
@@ -740,7 +773,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   9. Price points for BYOC vs hosted; relay pricing shape.
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
-  macOS builds); §AJ's one (the name a terminal shows by default).
+  macOS builds); §AJ's two (the name a terminal shows by default; what
+  its machine line holds by default).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

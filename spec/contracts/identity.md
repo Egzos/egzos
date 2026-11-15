@@ -180,8 +180,9 @@ session. Each token is bound to one container through the provider's own OAuth 2
     credential the button needs a sign-in at most 300 seconds old (`rest.md` §4.3): the page reads
     its own sign-in's age and asks the person to sign in again before the confirm. At the cap of
     live terminals (`rest.md` §4.3) it says to end one first.
-  - **The name** the terminal asked to be known by (§8) travels in the start URL as display data,
-    the terminal's own claim; the start page and the confirm show it.
+  - **The name** the terminal asked to be known by, and the line it gives for its machine where it
+    gives one (§8), travel in the start URL as display data, the terminal's own claims; the start
+    page and the confirm show them.
   - **A terminal's client is used for one sign-in and never again.** The provider remembers a
     consent and approves a later authorization for the same client and person without asking. So
     egzos.io starts no second flow for a client, a container registers a `client_id` as a terminal
@@ -511,6 +512,14 @@ login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG, §AJ). 
   (§3a). It is the terminal's own claim: display data of at most 128 characters, escaped and
   labelled wherever it is shown, and nothing is decided on it. **a1p**; which name is the default is
   the Chief's open question (v0.7 §AJ).
+- **The machine.** A terminal may also say, in one line, what kind of machine it is: the kind of
+  computer and its operating system as the system gives them, and nothing that tells one machine
+  from another of its kind (no serial number, no hardware identifier, no network address). It
+  prints the line with the name before the browser opens, and the person gives another or none
+  (`egzos login --machine`, `--no-machine`). The line travels, is shown and is kept as the name is
+  (§3a; `rest.md` §4.3), is held to the name's rule, and is as much the terminal's own claim:
+  nothing is decided on it. **a1p** (v0.7 §AJ, the Chief's ask of 2026-11-15; #394); what the line
+  holds by default is his to rule on.
 - **Where it lives.** The refresh token goes in the operating system's credential store (the Keychain
   on macOS, the Secret Service on Linux, the Credential Manager on Windows), through a maintained
   library (§R); where none can be reached, a file under `EGZOS_HOME` readable by its owner alone

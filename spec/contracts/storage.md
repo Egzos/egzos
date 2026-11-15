@@ -232,7 +232,8 @@ put_config(key, value)                           -> None
 - **No column holds a credential.** A grant names a provider user id (`sub`) and a registration an
   OAuth `client_id`; neither is a secret, and no token value or hash is stored here.
 - **A terminal registration is kept as an agent registration is**: by the same three methods, under
-  the same key, its record carrying `kind: terminal` and no capabilities or scopes. A record with
+  the same key, its record carrying `kind: terminal`, no capabilities or scopes, and the `machine`
+  line of a terminal that gave one (`rest.md` §4.3). A record with
   no `kind` is an agent's. The three methods take and return either registration, and a caller that
   wants one kind filters on `kind`: none treats a terminal as an agent. **a1p** (v0.7 §AJ).
 - **A config key never set is absent**, and the reader serves `CONTAINER_CONFIG_DEFAULTS` for it.
