@@ -61,9 +61,10 @@ CHALLENGE_KEEP_SECONDS = 86400
 #: rest.md §4.3: how old a sign-in may be where an act needs a fresh one.
 FRESH_SIGN_IN_SECONDS = 300
 PROOFS = ("biometric", "button")
-#: rest.md §4.2 item 4's closed reasons.
+#: rest.md §4.2 item 4's closed reasons: `terminal` for any proof from a terminal's token
+#: (identity.md §5), and §4.3's `not_fresh` and `registered`.
 REASONS = ("stale", "spent", "foreign", "mismatch", "assertion", "button_off", "delta_changed",
-           "not_fresh")
+           "terminal", "not_fresh", "registered")
 RP_NAME = "egzos"
 #: rest.md §4.3's closed reasons, from the confirm's own (`REASONS`): an add's, and a removal's.
 ADD_REASONS = {"button_off": "button_refused", "assertion": "no_proof"}
@@ -95,8 +96,14 @@ def rp_of(origin: str | None) -> str | None:
 
 def person_of(token: Token) -> str:
     """Whose credentials a confirm draws on: the interactive principal's owner — `user:<sub>` for
-    a provider sign-in, the owner token's owner for the container's own."""
+    a provider sign-in, at a terminal too, the owner token's owner for the container's own."""
     return token.owner
+
+
+def terminal_of(token: Token) -> str | None:
+    """The client id of the terminal `token` came through, or None (identity.md §3a). Such a
+    token concludes no confirm and is offered no assertion (identity.md §5)."""
+    return getattr(token, "terminal", None)
 
 
 class Confirm:
@@ -169,14 +176,18 @@ class Confirm:
         origin: str | None = None,
     ) -> dict[str, Any]:
         """A fresh challenge for this exact request, and the answer the first leg carries. The
-        caller appends the first leg's `context.fetch`: showing `newly` is a read."""
+        caller appends the first leg's `context.fetch`: showing `newly` is a read. To a terminal's
+        token `webauthn` is null whatever the person has registered, and no credential is listed:
+        the act is finished in a browser (rest.md §4.2 item 7)."""
         challenge = self._challenge(token, act=act, subject=subject, destination=destination,
                                     delta=delta)
+        webauthn = None if terminal_of(token) is not None else self._request_options(
+            person_of(token), rp_of(origin), challenge["id"])
         return {
             "result": "confirm",
             "newly": newly,
             "challenge": challenge["id"],
-            "webauthn": self._request_options(person_of(token), rp_of(origin), challenge["id"]),
+            "webauthn": webauthn,
             "expires_at": challenge["expires_at"],
         }
 
@@ -193,24 +204,35 @@ class Confirm:
         origin: str | None = None,
         biometric_only: bool = False,
         fresh_sign_in: bool = False,
+        refusal: str | None = None,
     ) -> str | None:
         """Spend the presented challenge and judge the proof. `None` is confirmed; otherwise the
         reason it was refused. Either way one `step_up` is appended. Run it inside the act's own
         transaction, so a confirmed proof and the act it confirms land together. `fresh_sign_in`:
-        the button also needs a fresh sign-in (rest.md §4.3); a biometric never does."""
+        the button also needs a fresh sign-in (rest.md §4.3); a biometric never does. `refusal`:
+        a reason of `REASONS` the act's own check found inside that transaction (rest.md §4.3's
+        `registered`), which refuses a proof that would otherwise confirm. A terminal's token
+        concludes refused, `terminal`, whatever it presents (identity.md §5)."""
         if not isinstance(presented, dict) or presented.get("proof") not in PROOFS:
             raise ValueError("confirm needs a challenge and a proof")
         challenge_id = presented.get("challenge")
         if not isinstance(challenge_id, str) or not challenge_id:
             raise ValueError("confirm needs a challenge and a proof")
+        if refusal is not None and refusal not in REASONS:
+            raise ValueError(f"not a reason a confirm is refused for: {refusal!r}")
         proof = presented["proof"]
         reason = self._judge(token, challenge_id, presented, act=act, subject=subject,
                              destination=destination, delta=delta, origin=origin,
                              biometric_only=biometric_only, fresh_sign_in=fresh_sign_in)
+        if reason is None:
+            reason = refusal
         details: dict[str, Any] = {"via": "confirm", "act": act, "proof": proof,
                                    "outcome": "refused" if reason else "confirmed"}
         if reason:
             details["reason"] = reason
+        terminal = terminal_of(token)
+        if terminal is not None:  # identity.md §3a, as the door's stamp would add it
+            details["terminal"] = terminal
         self.ledger.append("step_up", actor=token.owner, principal=token.principal,
                            subject=subject, **details)
         return reason
@@ -219,6 +241,10 @@ class Confirm:
                subject: str, destination: str | None, delta: list[str], origin: str | None,
                biometric_only: bool, fresh_sign_in: bool) -> str | None:
         record = self.state.spend_challenge(challenge_id)  # spent now, whatever is decided below
+        if terminal_of(token) is not None:
+            # identity.md §5: a terminal's token concludes no confirm, by either proof, whatever
+            # `confirm.allow_button` says and whatever credentials the person has.
+            return "terminal"
         if record is None:
             return "stale"
         if record.get("spent"):
@@ -286,7 +312,10 @@ class Confirm:
     def begin_registration(self, token: Token, *, origin: str, name: str) -> dict[str, Any]:
         """The registration's first leg: creation options under a challenge bound to this person
         and relying party, and, for a person who already has a credential, the assertion's own
-        challenge (an existing credential must agree to a new one)."""
+        challenge (an existing credential must agree to a new one). Never to a terminal's token:
+        a confirm credential is kept from a browser (rest.md §4.3)."""
+        if terminal_of(token) is not None:
+            raise PermissionError("a confirm credential is registered from a browser")
         person, rp_id = person_of(token), rp_of(origin)
         challenge = self._challenge(token, act="register", subject=person, destination=rp_id,
                                     delta=[])
@@ -338,7 +367,10 @@ class Confirm:
     ) -> tuple[ConfirmCredential | None, str | None]:
         """The second leg: the proof first (an existing credential's biometric, or for a first
         credential the button and a fresh sign-in), then the attestation. Returns the stored
-        credential, or the reason it was refused; `identity.credential` records which."""
+        credential, or the reason it was refused; `identity.credential` records which. Never from
+        a terminal's token, as the first leg (rest.md §4.3)."""
+        if terminal_of(token) is not None:
+            raise PermissionError("a confirm credential is registered from a browser")
         person, rp_id = person_of(token), rp_of(origin)
         reason = self._add_proof(token, presented, person=person, rp_id=rp_id, origin=origin,
                                  fresh=fresh, owner_surface=owner_surface)
