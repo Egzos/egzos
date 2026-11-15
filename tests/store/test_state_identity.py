@@ -6,10 +6,17 @@ signatures against the Protocols, and what the store keeps."""
 from __future__ import annotations
 
 import inspect
+import typing
 
 import pytest
 
-from egzos._types import ConfigState, IdentityState
+from egzos._types import (
+    REGISTRATION_KINDS,
+    AgentRegistration,
+    ConfigState,
+    IdentityState,
+    TerminalRegistration,
+)
 
 IDENTITY_STATE = frozenset({
     "put_user_grant", "get_user_grant", "list_user_grants",
@@ -58,6 +65,38 @@ def test_registrations_are_keyed_on_client_and_user(backend):
     mine = backend.list_agent_registrations(client_id="agent")
     assert [r["sub"] for r in mine] == ["alice", "bob"]
     assert len(backend.list_agent_registrations()) == 3
+
+
+def _terminal(client_id="term", sub="alice", **over):
+    return {"client_id": client_id, "sub": sub, "kind": "terminal", "name": "a laptop",
+            "created_at": "2026-11-14T00:00:00Z", "revoked": False, **over}
+
+
+def test_a_terminal_registration_is_kept_as_an_agents_is(backend):
+    """storage.md §3.2: the same three methods and the same key; the record keeps its `kind`."""
+    backend.put_agent_registration(_registration(sub="alice"))
+    backend.put_agent_registration(_terminal())
+    backend.put_agent_registration(_terminal(revoked=True))  # replaced at its key, and kept
+    assert backend.get_agent_registration("term", "alice") == _terminal(revoked=True)
+    assert backend.get_agent_registration("agent", "alice").get("kind") is None  # an agent's
+    assert backend.list_agent_registrations(client_id="term") == [_terminal(revoked=True)]
+    assert sorted(r.get("kind", "agent") for r in backend.list_agent_registrations()) == [
+        "agent", "terminal"]
+
+
+def test_the_two_registrations_carry_the_fields_identity_md_names():
+    """identity.md §4's records, field for field; a record with no `kind` is an agent's, so only
+    an agent's may lack one (`get_type_hints`: the module's annotations are strings)."""
+    hints = {shape: typing.get_type_hints(shape, include_extras=True)
+             for shape in (AgentRegistration, TerminalRegistration)}
+    assert REGISTRATION_KINDS == ("agent", "terminal")
+    assert set(hints[AgentRegistration]) == {
+        "client_id", "sub", "kind", "name", "capabilities", "scopes", "created_at", "revoked"}
+    assert set(hints[TerminalRegistration]) == {
+        "client_id", "sub", "kind", "name", "created_at", "revoked"}
+    optional = {shape: {k for k, v in h.items() if typing.get_origin(v) is typing.NotRequired}
+                for shape, h in hints.items()}
+    assert optional == {AgentRegistration: {"kind"}, TerminalRegistration: set()}
 
 
 def test_config_absence_is_absence_and_an_empty_value_is_a_value(backend):

@@ -739,11 +739,19 @@ class UserGrant(TypedDict):
     revoked: bool
 
 
+#: identity.md §4: the two kinds of registration, told apart by `kind`.
+RegistrationKind = Literal["agent", "terminal"]
+REGISTRATION_KINDS: tuple[RegistrationKind, ...] = get_args(RegistrationKind)
+
+
 class AgentRegistration(TypedDict):
-    """identity.md §4: an agent's OAuth client, admitted here for the one user it serves."""
+    """identity.md §4: an agent's OAuth client, admitted here for the one user it serves. A
+    record kept before terminals were registered carries no `kind`, and is an agent's
+    (storage.md §3.2)."""
 
     client_id: str
     sub: str
+    kind: NotRequired[Literal["agent"]]
     name: str
     capabilities: list[Capability]
     scopes: list[str]
@@ -751,18 +759,36 @@ class AgentRegistration(TypedDict):
     revoked: bool
 
 
+class TerminalRegistration(TypedDict):
+    """identity.md §4: a terminal's own OAuth client, the person it serves at that terminal. It
+    holds no capabilities or scopes: its token holds its person's grant as it stands."""
+
+    client_id: str
+    sub: str
+    kind: Literal["terminal"]
+    name: str  # the terminal's own claim; untrusted display data
+    created_at: str
+    revoked: bool
+
+
+#: Either registration, as storage.md §3.2's three methods take and return it.
+Registration = AgentRegistration | TerminalRegistration
+
+
 class IdentityState(Protocol):
     """identity.md §4's grants and registrations. The getters return revoked records too: the
-    caller judges liveness, and a revoked record is kept so its history reads back."""
+    caller judges liveness, and a revoked record is kept so its history reads back. The three
+    registration methods keep both kinds under one key; a caller that wants one kind filters on
+    `kind` (storage.md §3.2)."""
 
     def put_user_grant(self, grant: UserGrant) -> None: ...
     #: ^ insert or replace, keyed on `sub`
     def get_user_grant(self, sub: str) -> UserGrant | None: ...
     def list_user_grants(self) -> list[UserGrant]: ...
-    def put_agent_registration(self, registration: AgentRegistration) -> None: ...
+    def put_agent_registration(self, registration: Registration) -> None: ...
     #: ^ insert or replace, keyed on `(client_id, sub)`
-    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None: ...
-    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]: ...
+    def get_agent_registration(self, client_id: str, sub: str) -> Registration | None: ...
+    def list_agent_registrations(self, client_id: str | None = None) -> list[Registration]: ...
 
 
 class ConfigState(Protocol):
@@ -927,6 +953,7 @@ __all__ = [
     "PRINCIPAL_NONE_EVENTS",
     "PROPOSAL_STATUSES",
     "PROPOSAL_WIRE_KEY_FROM",
+    "REGISTRATION_KINDS",
     "RING_RANK",
     "ROLE_BUNDLES",
     "ROOT_TYPES",
@@ -970,6 +997,8 @@ __all__ = [
     "Proposal",
     "ProposalStatus",
     "Provenance",
+    "Registration",
+    "RegistrationKind",
     "ResolvedItem",
     "RevokeRefusalCause",
     "Role",
@@ -977,6 +1006,7 @@ __all__ = [
     "ServingPolicy",
     "StorageBusy",
     "StructureFloor",
+    "TerminalRegistration",
     "TextContent",
     "ThrottleRate",
     "ThrottleState",

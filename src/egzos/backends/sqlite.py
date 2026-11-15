@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from egzos._types import (
-    AgentRegistration,
     ConfirmChallenge,
     ConfirmCredential,
+    Registration,
     StorageBusy,
     ThrottleSurface,
     UploadRecord,
@@ -388,21 +388,21 @@ class SqliteBackend:
         rows = self.db.execute("SELECT doc FROM user_grants ORDER BY rowid")
         return [json.loads(r[0]) for r in rows]
 
-    def put_agent_registration(self, registration: AgentRegistration) -> None:
+    def put_agent_registration(self, registration: Registration) -> None:
         refuse_nul(registration["client_id"], registration["sub"])
         self._write(
             "INSERT OR REPLACE INTO agent_registrations(client_id,sub,doc) VALUES(?,?,?)",
             (registration["client_id"], registration["sub"], json.dumps(registration)),
         )
 
-    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+    def get_agent_registration(self, client_id: str, sub: str) -> Registration | None:
         refuse_nul(client_id, sub)
         row = self.db.execute(
             "SELECT doc FROM agent_registrations WHERE client_id=? AND sub=?", (client_id, sub)
         ).fetchone()
         return json.loads(row[0]) if row else None
 
-    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+    def list_agent_registrations(self, client_id: str | None = None) -> list[Registration]:
         refuse_nul(client_id)
         if client_id is None:
             rows = self.db.execute("SELECT doc FROM agent_registrations ORDER BY rowid")
