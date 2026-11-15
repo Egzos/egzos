@@ -812,9 +812,8 @@ def grant_ls():
         f"{'  REVOKED' if a['revoked'] else ''}"
         for a in agents
     ] + [
-        f"terminal {t['client_id']} for {t['sub']}  {t['name']:<14}"
-        f"{'  ' + t['machine'] if 'machine' in t else ''}"
-        f"{'  ENDED' if t['revoked'] else ''}"
+        f"terminal {t['client_id']}{' [ended]' if t['revoked'] else ''} for {t['sub']}  "
+        f"{t['name']:<14}{'  machine=' + t['machine'] if 'machine' in t else ''}"
         for t in terminals
     ]
     _out({"grants": grants, "agents": agents, "terminals": terminals},

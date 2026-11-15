@@ -262,7 +262,7 @@ def test_a_terminal_that_says_its_machine_is_shown_it_and_kept_with_it(c, door, 
              "created_at": made["terminal"]["created_at"], "last_seen": None}
     assert made["terminal"] == shown
     assert c.backend.get_agent_registration("laptop", "bob")["machine"] == MACHINE
-    # The ledger entry that records the registration is the one it always was.
+    # identity.grant does not carry the machine: it is written on the first leg only (rest.md §4.3).
     assert c.ledger.tail(1)[-1]["details"] == {"kind": "terminal", "outcome": "granted",
                                                "authorization_id": "auth-1", "for": "user:bob"}
     assert door.get("/v1/terminals", headers=bob).json()["terminals"] == [shown]
