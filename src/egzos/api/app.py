@@ -18,6 +18,10 @@ inline, and `GET /v1/blobs/{sha256}` redeems it, by the descriptor alone, never 
 lists the grants, grants access with the confirm, and ends one (§4.3), with the confirm where it is
 someone else's. A person lists the agents serving them, registers one with the confirm, ends one,
 and reads what one did for them (§4.3): an admin ends one serving someone else with the confirm.
+A person registers a terminal of theirs with the confirm, lists their terminals, live or ended,
+ends one and reads what was done through it, as for an agent (§4.3); each family of routes reads
+its own kind only. A terminal's token is its person, but it gives no one access and concludes no
+confirm: the routes that give access refuse it before any leg (§4.3).
 
 MCP over Streamable HTTP (identity.md §7) is `POST /mcp`, past the same credential and throttle:
 its `401` alone names the protected-resource metadata, which is served to anyone, unthrottled.
@@ -44,10 +48,18 @@ from egzos._types import StorageBusy
 from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.backends.base import holds_nul
-from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of
+from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of, terminal_of
 from egzos.container import Container
-from egzos.identity import GrantToken, LastAdmin, TooManyAgents, display_name, provider_id
-from egzos.ledger import acting_for
+from egzos.identity import (
+    GrantToken,
+    LastAdmin,
+    TooManyAgents,
+    TooManyTerminals,
+    display_name,
+    principal_id,
+    provider_id,
+)
+from egzos.ledger import attributed
 from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
 from egzos.store.blobs import grant_url
@@ -55,6 +67,7 @@ from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError
 from egzos.store.uploads import TooManyUploads, valid_open
+from egzos.store.uploads import person_of as opener_of
 from egzos.trust import HumanOnly, TrustError
 
 #: §3: the four lines every answer of this door carries (Content-Type is the response's own).
@@ -345,7 +358,9 @@ def create_app(
         if holds_nul([request.scope["path"], *request.query_params.multi_items()]):
             return out(invalid())  # §3: a malformed request, answered before any lookup
         request.state.token = token
-        with acting_for(getattr(token, "acting_for", None)):
+        # identity.md §3a: every entry the request appends names an agent's person
+        # (`details.for`) or the terminal a person's request came through (`details.terminal`).
+        with attributed(token):
             return out(await call_next(request))
 
     @app.exception_handler(Invalid)
@@ -850,6 +865,12 @@ def create_app(
         return _json(200, {"result": "promoted", "item": promoted.to_dict()})
 
     # -- grants (§4.3) --------------------------------------------------------------------------
+    def at_terminal(token: Token) -> bool:
+        """A person's token issued to a terminal's own client (identity.md §3a). It is its person,
+        but it gives no one access: the routes that give access, or keep or remove a confirm
+        credential, are §3's refusal to it before any leg and before its body is read (§4.3)."""
+        return terminal_of(token) is not None
+
     def grantor(token: Token | None) -> bool:
         """A person signed in at the provider, with `admin` over the whole container. A container
         `Token` names no `sub`; an agent is never served who else holds access."""
@@ -893,7 +914,7 @@ def create_app(
         token: Token = request.state.token
         origin = origin_of(request)
         _only(request.query_params, set())
-        if not grantor(token):  # as on DELETE, the door never reads this caller's body
+        if not grantor(token) or at_terminal(token):  # the door never reads this caller's body
             d.probe(token, "grants")
             return refusal()
         body = await _object(request, {"sub", "name", "role", "capabilities", "scopes", "confirm"},
@@ -962,12 +983,15 @@ def create_app(
             d.probe(token, sub)
             return refusal()
 
-        def first() -> Response:  # whose access it ends, and every agent it takes with it
-            agents = [{"client_id": a["client_id"], "name": a["name"]}
-                      for a in c.identity.serving(sub)]
+        def first() -> Response:  # whose access it ends, and every registration it takes with it
+            ends: dict[str, Any] = {"grant": {"sub": sub, "name": grant["name"]}}
+            for kind, key in (("agent", "agents"), ("terminal", "terminals")):
+                named = [{"client_id": r["client_id"], "name": r["name"]}
+                         for r in c.identity.serving(sub, kind)]
+                if named or kind == "agent":  # `terminals` only where it ends one
+                    ends[key] = named
             return first_leg(token, act="grant.revoke", subject=sub, destination=None, delta=[],
-                             origin=origin, revokes={"grant": {"sub": sub, "name": grant["name"]},
-                                                     "agents": agents})
+                             origin=origin, revokes=ends)
 
         # Narrowing your own access is never gated; ending someone else's is. `last_admin` is
         # `revoke_user`'s, under the lock: your own revoke has no leg to come before, and another
@@ -1017,8 +1041,8 @@ def create_app(
             d.probe(token, "agents")
             return refusal()
         # The registrations serving this person; for an admin over everything, everyone's.
-        live = ([r for r in c.backend.list_agent_registrations() if not r["revoked"]]
-                if grantor(token) else c.identity.serving(token.sub))
+        live = ([r for r in c.identity.registrations("agent") if not r["revoked"]]
+                if grantor(token) else c.identity.serving(token.sub, "agent"))
         seen = c.identity.last_seen(live)
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, read="agents", items=[], layers=[], withheld=0,
@@ -1030,7 +1054,7 @@ def create_app(
         token: Token = request.state.token
         origin = origin_of(request)
         _only(request.query_params, set())
-        if not registrant(token):  # as on the grant routes, the door never reads this body
+        if not registrant(token) or at_terminal(token):  # the door never reads this body
             d.probe(token, "agents")
             return refusal()
         body = await _object(
@@ -1077,11 +1101,16 @@ def create_app(
             # As on the grant routes: the caller as their grant stands now, still covering the
             # registration, so a revoke since the door leaves no agent for a later grant to find;
             # the door's token concludes, as only it carries the sign-in time.
+            # A client id a terminal's registration names is never an agent's: a proof that
+            # would confirm concludes refused, `registered`, and the answer is a fresh first leg,
+            # as for every refused proof, so no leg says the id was taken (§4.3).
             now = c.identity.refresh(token)
             if registrant(now) and not c.identity.exceeds(now, caps, scopes):
+                taken = c.identity.taken(client_id, "agent")
                 reason = c.confirm.conclude(token, proof, act="agent.add", subject=client_id,
                                             destination=terms, delta=[], origin=origin,
-                                            fresh_sign_in=True)
+                                            fresh_sign_in=True,
+                                            refusal="registered" if taken else None)
                 if reason is None:
                     try:
                         made = c.identity.register_agent(
@@ -1117,7 +1146,7 @@ def create_app(
             d.probe(token, client_id)
             return refusal()
         proof = presented(await optional_body(request))
-        found = c.backend.get_agent_registration(client_id, sub)
+        found = c.identity.registration(client_id, sub, "agent")  # a terminal's is not one
         if found is None or found["revoked"]:
             d.probe(token, client_id)
             return refusal()
@@ -1152,26 +1181,27 @@ def create_app(
             return refusal()
         return _json(200, {"result": "revoked"})
 
-    @app.get("/v1/agents/{client_id}/log")
-    async def agent_log(request: Request, client_id: str):
-        token: Token = request.state.token
-        params = request.query_params
-        _only(params, {"sub", "limit"})
+    def log_limit(params: Any) -> int:
+        """§4.3: a log's `limit`, 1 to 200 and 50 when absent; any other value is §3's `400`."""
         raw = params.get("limit", "50")
         limit = int(raw) if re.fullmatch(r"[0-9]{1,3}", raw) else 0
         if not 0 < limit <= 200:
             raise Invalid
-        sub = served(token, params.get("sub"))
-        # A revoked registration's log is still its history, there to review after ending it.
-        if sub is None or c.backend.get_agent_registration(client_id, sub) is None:
-            d.probe(token, client_id)
-            return refusal()
+        return limit
+
+    def log_of(token: Token, entries: list[dict[str, Any]], limit: int,
+               own: Any = None) -> tuple[list[dict[str, Any]], list[int], int]:
+        """§4.3's log reader, newest first, over `entries`: the lines served, their chain
+        positions and how many were passed over to serve them. It omits, with no marker and no
+        count, a refused act, a probe (§4's names no subject), and a line whose subject, or scope
+        where it names one, the reader does not cover today; `own` names the further subjects a
+        terminal's log serves."""
         sight: dict[str, bool] = {}
 
         def sees(ref: str | None) -> bool:
             # Covered today: an item by the node it sits in now, a node by itself, and anything
-            # else (a proposal, an upload, a client id) never. A tombstoned or quarantined item
-            # reads as absent, as at every item route (§3).
+            # else (a proposal, an upload, a client id) never, but what `own` serves. A
+            # tombstoned or quarantined item reads as absent, as at every item route (§3).
             if ref is None:
                 return False
             if ref not in sight:
@@ -1184,22 +1214,211 @@ def create_app(
         lines: list[dict[str, Any]] = []
         positions: list[int] = []  # their chain positions, on the record only: served, a position
         withheld = 0               # would count what the reader cannot see (§4.3, "no count")
-        for e in reversed(c.identity.acted(client_id, sub)):
+        for e in reversed(entries):
             if len(lines) == limit:
                 break
-            # Omitted, with no marker and no count: a refused act, a probe (§4's names no
-            # subject), and a line whose subject, or scope where it names one, is out of sight.
-            if (e["details"].get("outcome") != "refused" and sees(e["subject"])
+            subject = e["subject"]
+            if (e["details"].get("outcome") != "refused"
+                    and (sees(subject) or (own is not None and own(subject)))
                     and (e["scope"] is None or sees(e["scope"]))):
                 lines.append({k: e[k] for k in ("ts", "event", "subject", "scope")})
                 positions.append(e["seq"])
             else:
                 withheld += 1
+        return lines, positions, withheld
+
+    @app.get("/v1/agents/{client_id}/log")
+    async def agent_log(request: Request, client_id: str):
+        token: Token = request.state.token
+        params = request.query_params
+        _only(params, {"sub", "limit"})
+        limit = log_limit(params)
+        sub = served(token, params.get("sub"))
+        # A revoked registration's log is still its history, there to review after ending it. A
+        # terminal's client id names no agent here (§4.3).
+        if sub is None or c.identity.registration(client_id, sub, "agent") is None:
+            d.probe(token, client_id)
+            return refusal()
+        lines, positions, withheld = log_of(token, c.identity.acted(client_id, sub), limit)
         # `withheld`, on the record only: the lines passed over to serve these.
         c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
                         client=token.client, subject=client_id, read="agent_log", items=[],
                         layers=[], withheld=withheld, agent={"client_id": client_id, "sub": sub},
                         entries=positions)
+        return _json(200, {"entries": lines})
+
+    # -- terminals (§4.3) -----------------------------------------------------------------------
+    def terminal(r: dict[str, Any], seen: dict[tuple[str, str], str],
+                 ended: dict[tuple[str, str], str] | None = None) -> dict[str, Any]:
+        """§4.3's `<terminal>`, `last_seen` read from the chain, null for one not used yet; an
+        ended one also carries `ended_at`, read from its `identity.revoke`."""
+        pair = (r["client_id"], r["sub"])
+        out = {**{k: r[k] for k in ("client_id", "name", "sub", "created_at")},
+               "last_seen": seen.get(pair)}
+        if ended is not None:
+            out["ended_at"] = ended.get(pair)
+        return out
+
+    @app.get("/v1/terminals")
+    async def list_terminals(request: Request):
+        token: Token = request.state.token
+        params = request.query_params
+        _only(params, {"ended"})
+        if params.get("ended", "1") != "1":  # absent, or exactly `1`: anything else is a 400
+            raise Invalid
+        ended = "ended" in params
+        if not registrant(token):
+            d.probe(token, "terminals")
+            return refusal()
+        # The live terminals signed in as this person, or with `ended=1` the ended ones; for an
+        # admin over everything, everyone's. Never an agent (§4.3).
+        mine = c.identity.registrations("terminal", sub=None if grantor(token) else token.sub)
+        listed = [r for r in mine if bool(r["revoked"]) == ended]
+        seen = c.identity.terminal_last_seen(listed)
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read="terminals", items=[], layers=[], withheld=0,
+                        terminals=[{"client_id": r["client_id"], "sub": r["sub"]} for r in listed])
+        gone = c.identity.terminal_ended(listed) if ended else None
+        return _json(200, {"terminals": [terminal(r, seen, gone) for r in listed]})
+
+    @app.post("/v1/terminals")
+    async def add_terminal(request: Request):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, set())
+        # A person's own, from a browser: a terminal's token registers nothing, and the door never
+        # reads its body, nor that of a caller who may not act here.
+        if not registrant(token) or at_terminal(token):
+            d.probe(token, "terminals")
+            return refusal()
+        body = await _object(request, {"authorization_id", "client_id", "name", "confirm"},
+                             {"authorization_id", "client_id", "name"})
+        proof = presented(body)
+        try:  # what the hand-off's page relays; the name is the terminal's own claim
+            authorization = provider_id(body["authorization_id"])
+            client_id = provider_id(body["client_id"])
+            name = display_name(body["name"])
+        except ValueError as e:
+            raise Invalid from e
+        # This container's own client names a person, and that id is no secret; an authorization
+        # registers once. Whether this client id was registered here is said by no leg (below).
+        head = c.ledger.tail(1)[-1]["seq"]  # the door reads the chain to here; the lock, past it
+        if client_id == c.config_value("identity.client_id") or c.identity.claimed(authorization):
+            d.probe(token, client_id)
+            return refusal()
+        if c.identity.terminals_full(token.sub):  # the caller's own fact, before any leg
+            return _json(429, {"error": "too_many_terminals"})
+        # The challenge binds the registration as it would land, beside its client (the subject).
+        terms = json.dumps({"authorization_id": authorization, "name": name}, sort_keys=True)
+
+        def first() -> Response:  # nobody newly sees anything: the terminal is named apart
+            return first_leg(token, act="terminal.add", subject=client_id, destination=terms,
+                             delta=[], origin=origin,
+                             signs_in={"client_id": client_id, "name": name})
+
+        if proof is None:
+            return first()
+        made, reason = None, None
+        with c.backend.atomic():
+            # As on POST /v1/agents: the caller as their grant stands now. A client id any
+            # registration here names, of either kind, live or ended, for anyone, is never a
+            # terminal's: a proof that would confirm concludes refused, `registered`, answered with
+            # a fresh first leg as every refused proof is, so a terminal ended never returns.
+            now = c.identity.refresh(token)
+            if registrant(now):
+                taken = c.identity.taken(client_id, "terminal")
+                reason = c.confirm.conclude(token, proof, act="terminal.add", subject=client_id,
+                                            destination=terms, delta=[], origin=origin,
+                                            fresh_sign_in=True,
+                                            refusal="registered" if taken else None)
+                if reason is None:
+                    try:
+                        made = c.identity.register_terminal(
+                            token, client_id, authorization_id=authorization, name=name,
+                            after=head)
+                    except TooManyTerminals:  # a 16th landed since the door; its step_up commits
+                        return _json(429, {"error": "too_many_terminals"})
+        if reason is not None:
+            return first()
+        if made is None:  # the caller's grant changed since the door, or the authorization is spent
+            d.probe(token, client_id)
+            return refusal()
+        return _json(200, {"terminal": terminal(made, c.identity.terminal_last_seen([made]))})
+
+    @app.delete("/v1/terminals/{client_id}")
+    async def end_terminal(request: Request, client_id: str):
+        token: Token = request.state.token
+        origin = origin_of(request)
+        _only(request.query_params, {"sub"})
+        sub = served(token, request.query_params.get("sub"))
+        if sub is None:  # a caller who may not act here never makes the door read a body
+            d.probe(token, client_id)
+            return refusal()
+        proof = presented(await optional_body(request))
+        found = c.identity.registration(client_id, sub, "terminal")  # an agent's is not one
+        if found is None or found["revoked"]:
+            d.probe(token, client_id)
+            return refusal()
+        # As for an agent: ending your own terminal, or the terminal ending itself with its
+        # person's token, is never gated; ending one that serves someone else is, bound to the
+        # pair, and a terminal's token concludes no second leg (identity.md §5).
+        gated = sub != token.sub
+        binding = {"act": "terminal.revoke", "subject": client_id, "destination": sub,
+                   "delta": [], "origin": origin}
+
+        def first() -> Response:  # the terminal it ends; the name is the terminal's own claim
+            return first_leg(token, **binding, revokes={"terminal": {
+                "client_id": client_id, "name": found["name"], "sub": sub}})
+
+        if gated and proof is None:
+            return first()
+        revoked, reason = False, None
+        with c.backend.atomic():
+            if not gated or grantor(c.identity.refresh(token)):
+                if gated:
+                    reason = c.confirm.conclude(token, proof, **binding, fresh_sign_in=True)
+                if reason is None:
+                    revoked = c.identity.revoke_terminal(client_id, sub, actor=token.owner,
+                                                         principal=token.principal)
+        if reason is not None:
+            return first()
+        if not revoked:  # the caller's grant or the registration changed since the door
+            d.probe(token, client_id)
+            return refusal()
+        return _json(200, {"result": "revoked"})
+
+    @app.get("/v1/terminals/{client_id}/log")
+    async def terminal_log(request: Request, client_id: str):
+        token: Token = request.state.token
+        params = request.query_params
+        _only(params, {"sub", "limit"})
+        limit = log_limit(params)
+        sub = served(token, params.get("sub"))
+        # An ended terminal's log stays readable; an agent's client id names no terminal here.
+        if sub is None or c.identity.registration(client_id, sub, "terminal") is None:
+            d.probe(token, client_id)
+            return refusal()
+        person = principal_id(None, sub)
+
+        def own(ref: str | None) -> bool:
+            # §4.3: what a terminal did to its person's other access shows in its log, judged
+            # against the person it serves: their own `sub`, a registration serving them, of
+            # either kind, live or ended, or an upload of theirs.
+            if ref is None:
+                return False
+            if ref == sub or c.backend.get_agent_registration(ref, sub) is not None:
+                return True
+            upload = c.backend.get_upload(ref)
+            return upload is not None and opener_of(upload["principal"], upload["actor"]) == person
+
+        lines, positions, withheld = log_of(token, c.identity.terminal_acted(client_id, sub),
+                                            limit, own)
+        # `withheld`, on the record only. The terminal is named under its own key: `terminal`
+        # here would read as this read having come through it (identity.md §3a).
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, subject=client_id, read="terminal_log", items=[],
+                        layers=[], withheld=withheld,
+                        registration={"client_id": client_id, "sub": sub}, entries=positions)
         return _json(200, {"entries": lines})
 
     # -- confirm credentials (§4.3) -------------------------------------------------------------
@@ -1235,6 +1454,9 @@ def create_app(
         token: Token = request.state.token
         _only(request.query_params, set())
         origin = origin_of(request)
+        if at_terminal(token):  # kept from a browser, so never a body read from a terminal
+            d.probe(token, "credentials")
+            return refusal()
         body = await optional_body_of(request, {"challenge", "attestation", "confirm", "name"})
         if token.principal != "interactive" or origin is None:
             d.probe(token, "credentials")
@@ -1281,6 +1503,9 @@ def create_app(
         token: Token = request.state.token
         _only(request.query_params, {"sub"})
         origin = origin_of(request)
+        if at_terminal(token):  # removed from a browser, so never a body read from a terminal
+            d.probe(token, credential_id)
+            return refusal()
         proof = presented(await optional_body_of(request, {"confirm"}))
         person = whose(token, request.query_params.get("sub")) if (
             token.principal == "interactive") else None
