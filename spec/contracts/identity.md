@@ -245,13 +245,15 @@ and never delegated (F3):
 
 ```
 UserGrant             { sub, name, capabilities, scopes, created_at, revoked }
-AgentRegistration     { client_id, sub, name, capabilities, scopes, created_at, revoked }
-TerminalRegistration  { client_id, sub, name, created_at, revoked }
+AgentRegistration     { client_id, sub, kind: agent,    name, capabilities, scopes, created_at, revoked }
+TerminalRegistration  { client_id, sub, kind: terminal, name, created_at, revoked }
 ```
 
-The two registrations are kept apart by their kind (`storage.md` §3.2), and each route reads its own
-kind only (`rest.md` §4.3). Below, "an agent registration" is an agent's alone, and "a registration"
-is either.
+The two registrations are told apart by `kind`; a record kept before this contract version carries
+none and is an agent's (`storage.md` §3.2). Every reader names the kind it wants: no terminal is
+counted in an audience or under the agents' cap, or read as a `client` principal, and each route
+reads its own kind only (`rest.md` §4.3). Below, "an agent registration" is an agent's alone, and "a
+registration" is either.
 
 - **The owner's grant.** A container egzos provisions gets it at provisioning: the provider user who
   created it, all six capabilities, `["*"]`. A container made by `init` (a local, or a self-hosted one)
@@ -347,7 +349,8 @@ is either.
   `egzos logout`, by an admin or with its grant is ended at the provider on that person's next
   visit; until then its refresh token still mints tokens, which this container refuses. The
   container's refusal never waits on the provider. `TODO(a1p)`: removing the provider's record of a
-  client that no registration names any more, an operator's act. **a1p** (v0.7 §AJ).
+  client that no live registration names, an ended terminal's and an abandoned sign-in's alike, an
+  operator's act. **a1p** (v0.7 §AJ).
 - **Events**: `identity.grant` and `identity.revoke`, each with `subject` the `sub` or `client_id`,
   `details.kind` (`user`, `agent` or `terminal`), `outcome`, and `capabilities` and `scopes` (a
   terminal's registration has none, and its events carry none); a refusal (`outcome: refused`,

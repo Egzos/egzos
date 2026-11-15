@@ -507,11 +507,11 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    moved.
 4. **Every proof that is presented and concludes is audited, success or failure.** A stale, spent,
    foreign or mismatched challenge, a failed assertion, a button where buttons are off, any proof
-   from a terminal's token, and a delta
+   from a terminal's token, a `client_id` that may not be registered (§4.3), and a delta
    that changed since the challenge append `step_up` with `outcome: refused`, `details.proof` as
    presented and `details.reason` (`stale`, `spent`, `foreign`, `mismatch`, `assertion`, `button_off`,
-   `delta_changed`, `terminal`, and §4.3's `not_fresh`), as `events.md` §1 requires of every concluded
-   presence
+   `delta_changed`, `terminal`, and §4.3's `not_fresh` and `registered`), as `events.md` §1 requires
+   of every concluded presence
    check. The answer to the caller is the same whatever the reason: `{"result": "confirm", …}` with a
    fresh challenge (and the new `newly`, where the delta changed). The ledger says which case it was;
    the response does not (`capabilities.md` §6 clause 3).
@@ -589,13 +589,17 @@ lifeboat (`identity.md` §4).
   - Anyone holding a user grant registers their own, with the confirm, and nobody registers one for
     someone else. The person it serves, or an admin, ends it, and so does the terminal itself,
     whose token is its person's.
-  - **A `client_id` is registered as a terminal once.** One equal to `identity.client_id`, or one
-    that names any registration here, an agent's or a terminal's, live or revoked, for any person,
-    is §3's refusal on `POST /v1/terminals`, and one that names a terminal's is §3's refusal on
-    `POST /v1/agents`; the check runs inside the registration's atomic step. A terminal that was
-    ended never returns. The refusal differs from a first leg, so a caller who already holds a
-    `client_id` learns that someone registered it here; a `client_id` is the provider's random id,
-    listed to no one but the person it serves and an admin.
+  - **A `client_id` is registered as a terminal once.** One that names any registration here, an
+    agent's or a terminal's, live or revoked, for any person, is never registered as a terminal, and
+    one that names a terminal's is never registered as an agent. **The door does not say so before a
+    leg.** Such a request is served its first leg like any other; its second leg, inside the
+    registration's atomic step, concludes `step_up` refused, `registered`, and is answered with a
+    fresh first leg, as every refused proof is (§4.2 item 4). The answer is the same whether or not
+    the `client_id` was ever registered here, and the ledger says which case it was. A terminal that
+    was ended never returns. A `client_id` equal to `identity.client_id` is §3's refusal before any
+    leg, as on `POST /v1/agents`: that id is no secret. **What stays open:** a caller whose proof
+    they know to be good, and who is refused, may infer that the id was taken; each such try costs
+    a confirm and is on the ledger.
   - A person holds at most 16 live terminal registrations, counted apart from their agents: a 17th
     answers `429` with `{"error":"too_many_terminals"}` and §3's headers before any leg.
 - **Each family of routes reads and acts on its own kind.** `GET /v1/agents` never lists a terminal
@@ -864,8 +868,10 @@ attribution: `actor` and `details.for` carry their one part raw (`identity.md` �
 issued to a token is issued to that id: a challenge (§4.2 item 3), a `BlobGrant`, an upload (§4.4)
 and the per-token bucket (§2) are that terminal's alone, so the browser's token and another
 terminal's get `foreign`, or §3's refusal, on them, and a grant minted through a terminal that has
-since been ended is refused at check 5. What is counted or kept per person stays per person, under
-`user:<sub>`: confirm credentials, the cap on uploads, the audience and `actor`.
+since been ended is refused at check 5. The bucket is each terminal's own on purpose: a terminal
+that spends its bucket does not spend its person's browser's, and the cap on live terminals (§4.3)
+bounds what one person's tokens spend together. What is counted or kept per person stays per person,
+under `user:<sub>`: confirm credentials, the cap on uploads, the audience and `actor`.
 
 **Redemption is the descriptor, and only the descriptor. a1p**, from `context-item.md` §3: *"a stdio
 client receives the descriptor and redeems it at the REST door"*. A stdio client holds no token

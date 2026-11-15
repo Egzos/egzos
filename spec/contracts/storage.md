@@ -233,7 +233,8 @@ put_config(key, value)                           -> None
   OAuth `client_id`; neither is a secret, and no token value or hash is stored here.
 - **A terminal registration is kept as an agent registration is**: by the same three methods, under
   the same key, its record carrying `kind: terminal` and no capabilities or scopes. A record with
-  no `kind` is an agent's. **a1p** (v0.7 §AJ).
+  no `kind` is an agent's. The three methods take and return either registration, and a caller that
+  wants one kind filters on `kind`: none treats a terminal as an agent. **a1p** (v0.7 §AJ).
 - **A config key never set is absent**, and the reader serves `CONTAINER_CONFIG_DEFAULTS` for it.
   Absence is tested by absence, never by truthiness (`container.md` §8): an empty string set is a
   value.
