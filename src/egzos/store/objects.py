@@ -3,7 +3,7 @@
 """
 Blob store on an object store, through OpenDAL (v0.7 §S): the directory store's surface and
 refusals (storage.md §4) over a synchronous `opendal.Operator`, whose root is the blob root, with
-`sha256/<hash>` and `staging/<hash>` under it. Using it needs `pip install "egzos[objects]"`;
+`sha256/<hash>` and `staging/<hash>` under it. Using it needs `pip install "egzoscore[objects]"`;
 importing this module does not.
 
 What each method relies on is read from `capability()`, never assumed:
@@ -44,7 +44,7 @@ def _opendal() -> Any:
     try:
         import opendal
     except ImportError as e:
-        raise ImportError('an object store needs OpenDAL: pip install "egzos[objects]"') from e
+        raise ImportError('an object store needs OpenDAL: pip install "egzoscore[objects]"') from e
     return opendal
 
 

@@ -1,7 +1,7 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-Stand-in for Claude Code: an MCP stdio client that connects to `egzos serve --mcp`, lists the
+Stand-in for Claude Code: an MCP stdio client that connects to `egzoscore serve --mcp`, lists the
 tools, fetches context, remembers something, and shows the inbox. Walking-skeleton harness.
 
     EGZOS_HOME=... EGZOS_TOKEN=<client token> python scripts/mcp_client_probe.py [scope]

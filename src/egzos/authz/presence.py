@@ -15,7 +15,7 @@ host-agnostic (`get` / `post` / `live`), so the lifeboat can serve the same page
 Every presence check is one `step_up` entry, whatever its outcome (`approved`, `denied`, `expired`,
 `unavailable`, or `window` when an open window covered it), with the source → destination ring
 pair. With `step_up.window_seconds` set, a signature opens a window for that ring pair BOUNDED TO
-THE MANIFEST'S SHAPE (up to K items of the signed kinds), read back from the chain; `egzos trust
+THE MANIFEST'S SHAPE (up to K items of the signed kinds), read back from the chain; `egzoscore trust
 close-window` appends the entry that ends every window. The policy defaults to the contract's 300 s
 (container.md §8); `EGZOS_STEP_UP_WINDOW_SECONDS=0` makes every act tap, and #117 holds the default.
 
@@ -32,7 +32,7 @@ client secret does in `claude mcp add`'s argv under `connect --apply`. The armed
 on 10 s only: §2.3 also names Escape and focus leaving the control, which a page with no script
 cannot observe — design-gap #119 holds the choice. This CLI host serves one answer after a
 decision and closes: the window's close time is stated once in the outcome line and *Close window
-now* is `egzos trust close-window`; the spec frames only the lifeboat and flagship hosts, so the
+now* is `egzoscore trust close-window`; the spec frames only the lifeboat and flagship hosts, so the
 CLI host's post-decision state, title wrap and measure are design-gap #126. Audience
 chips carry no contractor / external flag: tokens record no principal class yet. OS-backed
 presence (WebAuthn / platform authenticator) is the stronger tier the spec names for later.

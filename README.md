@@ -5,7 +5,7 @@
   <img alt="egzos — personal context layer" src="spec/design/brand/banner/readme-header-light.svg" width="1280">
 </picture>
 
-> **v0.1.2.** The source-available core (PolyForm Strict 1.0.0): the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from PyPI below.
+> **v0.2.0.** The source-available core (PolyForm Strict 1.0.0): the CLI, the MCP server, the browser approval tap, the audit chain and the lifeboat UI run end to end. Install it from PyPI below.
 
 egzos is an MCP-first, CLI-first personal context layer. Your container is the home; platforms are clients. The security model is the product.
 
@@ -30,33 +30,37 @@ system Python is older (macOS ships 3.9):
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh   # once (or: brew install uv); then open a new terminal
-uv tool install egzos                       # or, with Python 3.11+: pipx install egzos
+uv tool install egzoscore                   # or, with Python 3.11+: pipx install egzoscore
 
-egzos init                                   # your container at ~/.egzos, and your owner token
-egzos add "Prefer imperative commit messages" --kind preference --key commit.style
-egzos add ./notes.md                         # files work too; everything lands unverified
-egzos find commit                            # numbered results; act on them with %1, %2 …
+egzoscore init                               # your container at ~/.egzos, and your owner token
+egzoscore add "Prefer imperative commit messages" --kind preference --key commit.style
+egzoscore add ./notes.md                     # files work too; everything lands unverified
+egzoscore find commit                        # numbered results; act on them with %1, %2 …
 
-egzos connect                                # mints a token for Claude Code, prints the line to run
-egzos connect --apply                        # …or registers it with Claude Code for you
+egzoscore connect                            # mints a token for Claude Code, prints the line to run
+egzoscore connect --apply                    # …or registers it with Claude Code for you
 ```
+
+This package is the container and its own command, `egzoscore`. The command line for an egzos cloud
+is a separate program, `egzos`, published on npm (`npm install -g egzos`): it signs you in
+(`egzos login`) and runs the everyday verbs against a cloud, as in `egzos ls cloud:`.
 
 Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your context for a scope,
 `egzos_remember` writes (it lands **unverified** in your inbox), `egzos_inbox` lists the queue.
 
-- **Agents propose, you dispose.** Anything an agent writes waits in `egzos trust pending` until you
-  approve it: `egzos trust approve <id>` opens a one-shot approval page in your browser. A move that
+- **Agents propose, you dispose.** Anything an agent writes waits in `egzoscore trust pending` until you
+  approve it: `egzoscore trust approve <id>` opens a one-shot approval page in your browser. A move that
   would widen who can read something is parked until you say yes.
-- **Every read and every yes is on the record.** `egzos audit tail` / `egzos audit verify` — a
+- **Every read and every yes is on the record.** `egzoscore audit tail` / `egzoscore audit verify` — a
   hash chain that verifies end to end.
-- **Structure as you go.** `egzos mk project health`, `egzos mv %1 project:health`, `egzos fetch project:health`.
+- **Structure as you go.** `egzoscore mk project health`, `egzoscore mv %1 project:health`, `egzoscore fetch project:health`.
 
 ## The core and the flagship
 
 What is in this repository (public, source-available under the PolyForm Strict License 1.0.0):
 
 - The container: context store, trust engine, audit ledger
-- The CLI (`egzos`) and MCP server
+- The container's command (`egzoscore`) and MCP server
 - The lifeboat UI (server-rendered, in-process, no JS toolchain)
 - The authorization server surface
 - Spec and contracts (`spec/`)
@@ -90,8 +94,8 @@ See `SECURITY.md`. Report vulnerabilities privately via GitHub Security Advisori
 ## Status
 
 MVP preview. The CLI, MCP stdio server, browser approval tap and audit chain run end to end on the
-walking skeleton's modules (Phase 0.1) plus the MVP additions (`egzos connect`, the step-up tap). The
-lifeboat (`egzos web`, FastAPI + Jinja + htmx per `spec/design/lifeboat.md`) lands next, in its own PR. The frozen-contract
+walking skeleton's modules (Phase 0.1) plus the MVP additions (`egzoscore connect`, the step-up tap). The
+lifeboat (`egzoscore web`, FastAPI + Jinja + htmx per `spec/design/lifeboat.md`) lands next, in its own PR. The frozen-contract
 build (`spec/contracts/`) replaces them module by module. Not yet included: the container's OAuth
 authorization server and remote MCP (Phase 5), embeddings, and the egzos.io flagship.
 

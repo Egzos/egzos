@@ -1,7 +1,7 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The MCP tools, one registry for both transports (a3-doorman): `egzos serve --mcp` over stdio
+The MCP tools, one registry for both transports (a3-doorman): `egzoscore serve --mcp` over stdio
 (v0.3 §10 step 3), and Streamable HTTP at the REST door's `/mcp` (identity.md §7, `mcp.http`).
 
 Each call runs as the principal its transport proves for that call. Over stdio that is the CLIENT

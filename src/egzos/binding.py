@@ -62,7 +62,7 @@ _CASES = {
     "restored": "the database EGZOS_DATABASE_URL names no longer holds the newest entry this home "
                 "has seen: it was restored to an earlier point without its home",
     "driver": 'EGZOS_DATABASE_URL is set, and postgres support is not installed: pip install '
-              '"egzos[postgres]"',
+              '"egzoscore[postgres]"',
     "unreadable": "this home's binding.json, which binds it to the database EGZOS_DATABASE_URL "
                   "names, cannot be read",
     "blobs-partial": "the EGZOS_BLOBS_S3_* variables name an object store all six or none, and "
@@ -75,7 +75,7 @@ _CASES = {
                    "are unset) differs from the one this home recorded: blobs never move to "
                    "another store, or back to the home, without the operator's rebind",
     "blobs-driver": "the EGZOS_BLOBS_S3_* variables are set, and object store support is not "
-                    'installed: pip install "egzos[objects]"',
+                    'installed: pip install "egzoscore[objects]"',
     "blobs-endpoint": "EGZOS_BLOBS_S3_ENDPOINT is not an endpoint the object store can use: check "
                       "its scheme, host and port",
 }

@@ -238,7 +238,7 @@ def test_an_object_store_without_opendal_stops_before_the_database_is_reached(
     monkeypatch.setenv(DATABASE_URL, REFUSED)
     _name_store(monkeypatch)
     err = _stops("blobs-driver", tmp_path, KEY_ID, SECRET, PASSWORD, REFUSED, names=S3_VARS)
-    assert 'pip install "egzos[objects]"' in str(err)
+    assert 'pip install "egzoscore[objects]"' in str(err)
 
 
 @pytest.mark.parametrize(("changed", "root"), [

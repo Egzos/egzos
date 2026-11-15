@@ -1,8 +1,8 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`egzos rm`: the owner token tombstones an item no person has promoted, and the chain records it
-as the door's does. A promoted item is the door's, where the confirm asks the person (rest.md
-§4)."""
+"""`egzoscore rm`: the owner token tombstones an item no person has promoted, and the chain
+records it as the door's does. A promoted item is the door's, where the confirm asks the person
+(rest.md §4)."""
 
 from __future__ import annotations
 

@@ -1,10 +1,10 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The REST door (`egzos serve --http`; spec/contracts/rest.md): an HTTP resource server, in-process
-with the container, under `/v1/`. It accepts the container's own `Token` and access tokens from
-the container's identity provider (`identity.md`), and is where egzos.io and any fork's UI read
-and write the person's container.
+The REST door (`egzoscore serve --http`; spec/contracts/rest.md): an HTTP resource server,
+in-process with the container, under `/v1/`. It accepts the container's own `Token` and access
+tokens from the container's identity provider (`identity.md`), and is where egzos.io and any
+fork's UI read and write the person's container.
 
 TLS (rest.md §1): plain HTTP only when the listening socket is bound to loopback, decided from the
 socket and never from a forwarded header. Anywhere else the door serves TLS, or does not start.
@@ -106,7 +106,7 @@ def check_edge(container: Container, host: str) -> None:
     if parsed is None or parsed.scheme != "https" or not parsed.hostname:
         raise PermissionError(
             f"{EDGE_PROXY}: set identity.origin to the proxy's https origin "
-            "(`egzos config set identity.origin https://…`)"
+            "(`egzoscore config set identity.origin https://…`)"
         )
 
 
@@ -134,7 +134,7 @@ def serve_http(
             "or bind 127.0.0.1 behind a TLS-terminating proxy"
         )
     origin = bound_origin(host, port, tls=tls_cert is not None)
-    print(f"egzos REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
+    print(f"egzoscore REST door on {origin}/v1/, MCP on {origin}/mcp — Ctrl-C to stop.", flush=True)
     with sigterm_as_sigint():  # a SIGTERM stop closes the container as Ctrl-C does
         uvicorn.run(
             create_app(container, origin=origin),

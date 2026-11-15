@@ -22,7 +22,7 @@ An xfail with a repro in this public repository is a zero-day disclosure. That d
 The following surfaces are in scope:
 
 - The container (context store, trust engine, audit ledger)
-- The CLI (`egzos` and all subcommands)
+- The container's command (`egzoscore` and all subcommands)
 - The MCP server (stdio transport; remote transport in Phase 5)
 - The container's OAuth 2.1 authorization server (auth-code + PKCE, device-code, client registration, redirect-URI allowlist, AS metadata)
 - The lifeboat UI (server-rendered, in-process)

@@ -1,7 +1,7 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The lifeboat (`egzos web`), built to spec/design/lifeboat.md §0: server-rendered, in-process with
+The lifeboat (`egzoscore web`), built to spec/design/lifeboat.md §0: server-rendered, in-process with
 the container, FastAPI + Jinja + htmx, no JS toolchain, tokens as CSS variables only. The app is
 `egzos.web.app`; this module launches it on loopback.
 
@@ -14,7 +14,7 @@ on 127.0.0.1 the owner's browser visits. The label is minted in this process and
 `*.localhost` resolves to loopback in Chromium and Firefox (RFC 6761); the launch output says what
 to do when the browser does not (`LOCALHOST_HINT`). The keyed URL is printed only when no
 browser was opened AND stdout is a terminal: an agent's shell tool is not a terminal. To reopen
-the lifeboat after closing the browser, restart `egzos web`.
+the lifeboat after closing the browser, restart `egzoscore web`.
 `tokens.css` lives in this package: spec/design/tokens.css as of v0.12 (Docket v2). It stays there, not
 re-vendored to v0.13 (direction A′), until the lifeboat and tap-page specs are revised for A′.
 """
@@ -35,7 +35,7 @@ DEFAULT_PORT = 7425
 # resolve the session host must be told what to do instead of being left on a dead page.
 LOCALHOST_HINT = (
     "The session moves to a private *.localhost address. If that page does not load, this "
-    "browser does not resolve *.localhost: stop egzos web, run `egzos web --no-open`, and open "
+    "browser does not resolve *.localhost: stop egzoscore web, run `egzoscore web --no-open`, and open "
     "the printed link in Chromium or Firefox."
 )
 
@@ -52,7 +52,7 @@ def _launch(url: str, open_browser: bool, opener=None, terminal=None) -> bool:
     else:
         print(
             "No browser was opened and this is not a terminal, so the session key is not printed. "
-            "Run `egzos web` from a terminal on this machine.",
+            "Run `egzoscore web` from a terminal on this machine.",
             flush=True,
         )
     return False
@@ -77,7 +77,7 @@ def serve_web(container: Container, port: int = DEFAULT_PORT, open_browser: bool
         raise PermissionError("the lifeboat is the owner's; a client principal cannot open it")
     host = "127.0.0.1"
     _boat, app, url = lifeboat_for(container, port)
-    print(f"egzos web on http://{host}:{port} — loopback only. Ctrl-C to stop.", flush=True)
+    print(f"egzoscore web on http://{host}:{port} — loopback only. Ctrl-C to stop.", flush=True)
 
     def launch_when_up() -> None:
         time.sleep(0.5)

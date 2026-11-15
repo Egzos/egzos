@@ -1,10 +1,12 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
-"""`egzos connect` mints a client principal and prints the Claude Code wiring."""
+"""`egzoscore connect` mints a client principal and prints the Claude Code wiring."""
 
 from __future__ import annotations
 
 import json
+
+import pytest
 
 from egzos.cli import main
 
@@ -140,3 +142,64 @@ def test_find_refuses_an_unknown_prefix_and_names_nothing(tmp_path, monkeypatch,
     out = capsys.readouterr().out
     assert "a note" not in out
     assert main(["find", "kind:memory"]) == 0
+
+
+class _AgentConfig:
+    """A stand-in for Claude Code's own `claude mcp` commands: it keeps the registered servers in
+    a dict, and `reject_duplicates` makes an add on a taken name fail, as an agent client may."""
+
+    def __init__(self, entries, *, reject_duplicates):
+        self.entries, self.reject_duplicates, self.calls = entries, reject_duplicates, []
+
+    def run(self, cmd, **kw):
+        import subprocess
+
+        self.calls.append(cmd[:3])
+        assert cmd[:2] == ["claude", "mcp"]
+        name = cmd[cmd.index("user") + 1]
+        if cmd[2] == "remove":
+            found = self.entries.pop(name, None) is not None
+            return subprocess.CompletedProcess(cmd, 0 if found else 1)
+        if self.reject_duplicates and name in self.entries:
+            raise subprocess.CalledProcessError(1, cmd)
+        self.entries[name] = cmd[cmd.index("--") + 1 :]
+        return subprocess.CompletedProcess(cmd, 0)
+
+
+@pytest.mark.parametrize("reject_duplicates", [True, False])
+def test_connect_apply_replaces_an_entry_written_under_the_old_command(
+    tmp_path, monkeypatch, capsys, reject_duplicates
+):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    assert main(["init"]) == 0
+    # what `connect --apply` wrote while the command was still called `egzos`
+    old = ["/usr/local/bin/egzos", "serve", "--mcp"]
+    agent = _AgentConfig({"egzos": old}, reject_duplicates=reject_duplicates)
+    monkeypatch.setattr("egzos.cli.subprocess.run", agent.run)
+    monkeypatch.setattr("egzos.cli.shutil.which", lambda name: f"/opt/bin/{name}")
+    for _ in range(2):  # a second run replaces the first, as the first replaced the old one
+        capsys.readouterr()
+        assert main(["--json", "connect", "--apply"]) == 0
+        assert json.loads(capsys.readouterr().out)["applied"] is True
+    assert list(agent.entries) == ["egzos"]  # one entry, under the name it always had
+    assert agent.entries["egzos"] == ["/opt/bin/egzoscore", "serve", "--mcp"]
+
+
+def test_connect_apply_is_not_stopped_by_an_agent_with_no_entry_yet(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    assert main(["init"]) == 0
+    agent = _AgentConfig({}, reject_duplicates=True)
+    monkeypatch.setattr("egzos.cli.subprocess.run", agent.run)
+    monkeypatch.setattr("egzos.cli.shutil.which", lambda name: f"/opt/bin/{name}")
+    assert main(["--json", "connect", "--apply"]) == 0
+    assert agent.entries == {"egzos": ["/opt/bin/egzoscore", "serve", "--mcp"]}
+
+
+def test_connect_prints_the_executable_as_egzoscore(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("EGZOS_HOME", str(tmp_path))
+    monkeypatch.setattr("egzos.authz.presence.is_terminal", lambda: True)
+    monkeypatch.setattr("egzos.cli.shutil.which", lambda name: None)  # not installed on PATH
+    assert main(["init"]) == 0
+    capsys.readouterr()
+    assert main(["--json", "connect"]) == 0
+    assert json.loads(capsys.readouterr().out)["command"][-3:] == ["egzoscore", "serve", "--mcp"]
