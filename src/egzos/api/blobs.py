@@ -21,7 +21,7 @@ from egzos._ids import is_ulid
 from egzos._types import BLOB_GRANT_LIFETIME_SECONDS, BlobGrant
 from egzos.api.throttle import Throttle
 from egzos.container import Container
-from egzos.ledger import acting_for
+from egzos.ledger import attributed
 from egzos.store.blobs import GRANT_QUERY, _is_digest
 from egzos.trust import grant_expiry
 
@@ -34,7 +34,8 @@ PULL_HEADERS = {
     "Cache-Control": "no-store",
     "Referrer-Policy": "no-referrer",
 }
-#: A `Token.id`, or a provider grant's `user:<sub>` or `agent:<client_id>:<sub>`.
+#: A `Token.id`, or a provider grant's `user:<sub>`, `agent:<client_id>:<sub>` or
+#: `terminal:<client_id>:<sub>`, in either spelling (§6).
 _TOKEN = re.compile(r"[\x21-\x7e]{1,512}")
 _SIG = re.compile(r"[0-9a-f]{64}")
 
@@ -79,7 +80,7 @@ def redeem(
             failed = 7
         if failed is None and (data := c.blobs.get(sha256)) is None:
             failed = 8
-    with acting_for(getattr(token, "acting_for", None)):
+    with attributed(token):
         if failed is not None:
             throttle.count_token(grant["token"], refused=False)
             c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,

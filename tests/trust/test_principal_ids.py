@@ -12,7 +12,7 @@ import uuid
 import pytest
 
 from egzos.container import OWNER, Container
-from egzos.identity import principal_id, principal_parts
+from egzos.identity import principal_id, principal_of, principal_parts
 
 KW = {"actor": OWNER, "principal": "interactive"}
 #: `(client_id, sub)`, `client_id` None for a person.
@@ -56,6 +56,40 @@ def test_an_id_written_before_names_its_own_pair_or_none(pair):
     "01J9Z3K4M5N6P7Q8R9S0T1V2W3",  # a container `Token`'s ULID
 ])
 def test_a_string_principal_id_would_not_write_names_no_pair(token_id):
+    assert principal_parts(token_id) is None
+    assert principal_of(token_id) is None
+
+
+# -- a terminal's id (rest.md §6, v0.7 §AJ) --------------------------------------------------------
+TERMINAL_PAIRS = [pair for pair in PAIRS if pair[0] is not None]
+
+
+@pytest.mark.parametrize("pair", TERMINAL_PAIRS)
+def test_a_terminals_id_reads_back_as_its_pair_and_its_kind(pair):
+    token_id = principal_id(*pair, "terminal")
+    assert principal_of(token_id) == ("terminal", *pair)
+    assert principal_of(principal_id(*pair)) == ("agent", *pair)
+    assert token_id != principal_id(*pair)  # one pair, two kinds, two ids
+    assert token_id.count(":") == 2  # no part holds a raw colon
+    # A reader of the bare pair never takes a terminal for an agent: it reads none.
+    assert principal_parts(token_id) is None
+
+
+def test_a_terminals_id_is_written_and_escaped_as_an_agents_is():
+    client_id, sub = str(uuid.uuid4()), str(uuid.uuid4())
+    assert principal_id(client_id, sub, "terminal") == f"terminal:{client_id}:{sub}"
+    assert principal_id("t:1", "a%b", "terminal") == "terminal%:t%3A1:a%25b"
+    assert principal_id("t", "s", "terminal") == "terminal:t:s"
+    assert len({principal_id(*pair, "terminal") for pair in TERMINAL_PAIRS}) == len(TERMINAL_PAIRS)
+
+
+@pytest.mark.parametrize("token_id", [
+    "terminal", "terminal:", "terminal:a", "terminal::s", "terminal:a:", "terminal:a:b:c",
+    "terminal%:a:b", "terminal:a%3Ab:c", "terminal%:a", "terminal:%3a:b", "Terminal:a:b",
+    "terminal%:a%3ab:c",
+])
+def test_a_terminal_id_principal_id_would_not_write_names_nothing(token_id):
+    assert principal_of(token_id) is None
     assert principal_parts(token_id) is None
 
 
@@ -101,6 +135,30 @@ def test_an_id_is_named_back_as_the_one_it_was_written_for(box):
         True, "agent:A:z", "user:1", [])
     assert (person.revoked, person.owner, person.scopes) == (True, "user:1", [])
     assert not box.identity.named(principal_id("A", "z:1")).revoked  # the other stands
+
+
+def _terminal(c, client_id, sub):
+    c.backend.put_agent_registration({
+        "client_id": client_id, "sub": sub, "kind": "terminal", "name": f"terminal {client_id}",
+        "created_at": "2026-11-14T00:00:00Z", "revoked": False})
+
+
+def test_a_terminals_id_is_named_back_as_its_person_at_that_terminal(box):
+    """rest.md §6 check 5: the id re-derives the person at that terminal, as their grant stands,
+    and only through a registration of that kind; ended, a revoked stand-in still names them."""
+    _terminal(box, "T:1", "z:1")
+    token_id = principal_id("T:1", "z:1", "terminal")
+    named = box.identity.named(token_id)
+    assert (named.id, named.principal, named.owner, named.terminal, named.acting_for,
+            named.revoked, named.scopes) == (token_id, "interactive", "user:z:1", "T:1", None,
+                                             False, ["*"])
+    # The same pair under the other kind names nothing: neither registration is the other's.
+    assert box.identity.named(principal_id("T:1", "z:1")) is None
+    assert box.identity.named(principal_id("A", "z:1", "terminal")) is None
+    assert box.identity.revoke_terminal("T:1", "z:1", **KW)
+    ended = box.identity.named(token_id)
+    assert (ended.revoked, ended.owner, ended.terminal, ended.capabilities, ended.principal) == (
+        True, "user:z:1", "T:1", [], "interactive")
 
 
 def test_whom_a_grant_opens_to_is_named_by_id(box):

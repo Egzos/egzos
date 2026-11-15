@@ -1,8 +1,8 @@
 # Copyright 2026 Ali Sasanian
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """
-The CLI — first surface, doubles as the test harness (v0.3 §10). Daily one-worders: login, fetch,
-add, ls, serve, find; noun-verb for the rest; --json everywhere; sticky scope (v0.4 §9).
+The CLI — first surface, doubles as the test harness (v0.3 §10). Daily one-worders: fetch, add,
+ls, serve, find; noun-verb for the rest; --json everywhere; sticky scope (v0.4 §9).
 
 Walking skeleton verbs: init · whoami · add · ls · fetch · find · cd · pwd · mk · mv · trust
 (pending / approve / deny / quarantine) · token (create / ls) · audit (tail / verify) · serve --mcp.
@@ -675,7 +675,7 @@ def token_revoke(
     target = c.backend.get_token(token_id)
     if target is None or target.principal != "client":
         # Never the owner's interactive token: it is the key to this container, and nothing
-        # re-mints it until `login` lands (Phase 2).
+        # re-mints it.
         _fail("no client token with that id")
     if target.revoked:
         _fail(f"{target.id} is already revoked")
@@ -782,16 +782,19 @@ def link(
 
 @grant_app.command("ls")
 def grant_ls():
-    """Who may sign in here, with what: user grants, and the agents registered for them. An admin
-    over the whole container's view: who else holds access is not served to a narrower grant."""
+    """Who may sign in here, with what: user grants, the agents registered for them, and the
+    terminals they signed in at, each kind apart (identity.md §4). An admin over the whole
+    container's view: who else holds access is not served to a narrower grant."""
     c = _container()
     token = _admin(c, "the grant list")
     grants = c.backend.list_user_grants()
-    agents = c.backend.list_agent_registrations()
+    agents = c.identity.registrations("agent")
+    terminals = c.identity.registrations("terminal")
     c.ledger.append(
         "context.fetch", actor=OWNER, principal=token.principal, client=token.client,
         view="grant ls", items=[], layers=[], withheld=0,
         grants=[g["sub"] for g in grants], agents=[a["client_id"] for a in agents],
+        terminals=[t["client_id"] for t in terminals],
     )
     rows = [
         f"{g['sub']}  {g['name']:<14} {','.join(g['capabilities']):<45} "
@@ -802,8 +805,13 @@ def grant_ls():
         f"agent {a['client_id']} for {a['sub']}  {a['name']:<14} {','.join(a['capabilities'])}"
         f"{'  REVOKED' if a['revoked'] else ''}"
         for a in agents
+    ] + [
+        f"terminal {t['client_id']} for {t['sub']}  {t['name']:<14}"
+        f"{'  ENDED' if t['revoked'] else ''}"
+        for t in terminals
     ]
-    _out({"grants": grants, "agents": agents}, "\n".join(rows) or "(no grants)")
+    _out({"grants": grants, "agents": agents, "terminals": terminals},
+         "\n".join(rows) or "(no grants)")
 
 
 @grant_app.command("rm")

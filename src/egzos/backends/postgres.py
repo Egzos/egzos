@@ -22,9 +22,9 @@ from psycopg import errors, pq
 from psycopg.sql import SQL, Identifier
 
 from egzos._types import (
-    AgentRegistration,
     ConfirmChallenge,
     ConfirmCredential,
+    Registration,
     StorageBusy,
     ThrottleSurface,
     UploadRecord,
@@ -396,16 +396,16 @@ class PostgresBackend:
     def list_user_grants(self) -> list[UserGrant]:
         return self._list("user_grants")
 
-    def put_agent_registration(self, registration: AgentRegistration) -> None:
+    def put_agent_registration(self, registration: Registration) -> None:
         refuse_nul(registration["client_id"], registration["sub"])
         self._write(_PUT["agent_registrations"],
                     (registration["client_id"], registration["sub"], json.dumps(registration)))
 
-    def get_agent_registration(self, client_id: str, sub: str) -> AgentRegistration | None:
+    def get_agent_registration(self, client_id: str, sub: str) -> Registration | None:
         refuse_nul(client_id, sub)
         return self._get("agent_registrations", client_id=client_id, sub=sub)
 
-    def list_agent_registrations(self, client_id: str | None = None) -> list[AgentRegistration]:
+    def list_agent_registrations(self, client_id: str | None = None) -> list[Registration]:
         refuse_nul(client_id)
         return self._list("agent_registrations", client_id=client_id)
 

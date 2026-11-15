@@ -155,7 +155,8 @@ class Container:
 
     def init(self) -> Token:
         """Create the roots and the owner's interactive token; put it in the keychain stand-in.
-        `login` (device-code) replaces this step from Phase 2; the skeleton is single-user.
+        It is the only step that mints the owner's token; people sign in through the container's
+        identity provider instead (identity.md §3).
 
         The check and the creation are one transaction (#136): BEGIN IMMEDIATE takes the write
         lock first, so a second `init` racing this one waits, then finds the container
