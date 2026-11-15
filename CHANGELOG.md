@@ -136,7 +136,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   separate program, `egzos`, on npm. The import package (`egzos`) and every environment variable
   (`EGZOS_HOME`, `EGZOS_TOKEN` and the rest) are unchanged. `egzos` 0.1.x on PyPI is left as it is.
   If you ran `connect --apply` before, run `egzoscore connect --apply` once: it replaces the
-  Claude Code entry, which still names the old command.
+  Claude Code entry, which still names the old command, and also one you added by hand from the
+  printed `claude mcp add` line. The token the earlier entry held keeps working until you end it
+  with `egzoscore token revoke`. Remove the old tool (`uv tool uninstall egzos` or
+  `pipx uninstall egzos`) so its `egzos` does not stand beside the cloud's command of that name.
 - **Items written in the same second list newest id first** (v0.7 §AF, `storage.md` §2), so
   `egzos ls`, the inbox and every backend agree on their order; they listed in no fixed order before.
 - **Contracts: where a hosted container's state lives** (the Chief's decisions of 2026-10-25, v0.7

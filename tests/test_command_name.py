@@ -69,12 +69,21 @@ def test_the_guard_leaves_the_other_program_and_the_name_alone(line):
     assert not _tells_to_run_this_program(line, _verbs())
 
 
-def test_no_line_under_src_tells_a_person_to_run_this_program_as_egzos():
+def _scanned_files():
+    """Everything a person reads or runs from this repository: the source, the top-level
+    documents, the scripts and the adversarial tests."""
+    for top in ("src", "scripts", "adversarial"):
+        for path in sorted((ROOT / top).rglob("*")):
+            if path.is_file() and "__pycache__" not in path.parts:
+                yield path
+    for name in ("README.md", "SECURITY.md"):
+        yield ROOT / name
+
+
+def test_no_line_tells_a_person_to_run_this_program_as_egzos():
     verbs = _verbs()
     found = []
-    for path in sorted((ROOT / "src").rglob("*")):
-        if not path.is_file() or "__pycache__" in path.parts:
-            continue
+    for path in _scanned_files():
         try:
             lines = path.read_text(encoding="utf-8").splitlines()
         except UnicodeDecodeError:

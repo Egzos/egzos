@@ -39,7 +39,7 @@ PROG = "egzoscore"
 MCP_NAME = "egzos"
 
 app = typer.Typer(
-    add_completion=False, no_args_is_help=False, help="egzoscore — the container for your context."
+    add_completion=False, no_args_is_help=False, help="egzoscore — your context, your container."
 )
 trust_app = typer.Typer(help="Trust: pending queue, promotion, quarantine.")
 audit_app = typer.Typer(help="Audit: the hash-chained ledger.")
