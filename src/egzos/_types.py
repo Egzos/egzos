@@ -768,6 +768,7 @@ class TerminalRegistration(TypedDict):
     sub: str
     kind: Literal["terminal"]
     name: str  # the terminal's own claim; untrusted display data
+    machine: NotRequired[str]  # the terminal's own claim, as the name is; absent when it gave none
     created_at: str
     revoked: bool
 
