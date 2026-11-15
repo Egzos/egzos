@@ -7,22 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
+
 ### Added
 
-- **`egzos serve` can sit behind a host's TLS-terminating proxy** (`EGZOS_EDGE_PROXY=1`), on a
+- **`egzoscore serve` can sit behind a host's TLS-terminating proxy** (`EGZOS_EDGE_PROXY=1`), on a
   private address and with an https `identity.origin`.
 - **The container verifies sign-ins from your identity provider** (Supabase Auth, or a self-hosted
   one): `spec/contracts/identity.md` §3's seven checks, in order, with PyJWT. A person signs in
   once, at egzos.io; the token is bound to this one container, and what it may do is the grant
   written here. An agent's token is admitted only through a registration the person it serves made.
-- **`egzos link --issuer … --client-id … --sub …`** links the container to the provider and grants
+- **`egzoscore link --issuer … --client-id … --sub …`** links the container to the provider and grants
   your provider user everything here. The owner token keeps working, as the way back in.
-- **`egzos config get` / `config set`** for the provider keys (`identity.*`), each change recorded
-  as `config.set`; **`egzos grant ls` / `grant rm`** for who may sign in. The last admin grant over
+- **`egzoscore config get` / `config set`** for the provider keys (`identity.*`), each change recorded
+  as `config.set`; **`egzoscore grant ls` / `grant rm`** for who may sign in. The last admin grant over
   the whole container cannot be revoked.
 - Granted people and agents count in an item's audience, so moving something where a granted
   person would newly see it stops at the gate, as it does for a minted token.
-- **The REST door, `egzos serve --http`** (`spec/contracts/rest.md`): `/v1/fetch`, `/v1/find`,
+- **The REST door, `egzoscore serve --http`** (`spec/contracts/rest.md`): `/v1/fetch`, `/v1/find`,
   `/v1/items/{id}`, `/v1/inbox`, `/v1/scopes` and `/v1/pending` to read, and `POST /v1/items` and
   `POST /v1/scopes` to write. It accepts a container token or a provider sign-in. It answers CORS
   for egzos.io (`identity.browser_origins`). Every refusal is one `404`, every unauthenticated
@@ -37,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the button is refused for them, so a stolen session cannot skip the biometric; adding a second
   credential needs the first one's biometric, and removing one needs a biometric, never the button.
   A first credential needs the button and a sign-in under five minutes old. The owner's recovery
-  path is `egzos credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
+  path is `egzoscore credential ls` / `credential rm`. Verified with the maintained `webauthn` library.
 - **Grants at the door** (`rest.md` §4.3): an admin signed in at the provider lists who may sign in
   (`GET /v1/grants`), grants a person access (`POST /v1/grants`: a role or capabilities, over
   scopes named by id or path, never beyond the admin's own) and ends a person's access (`DELETE
@@ -45,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does ending someone else's access, which shows whose access ends and every agent it takes with
   it; ending your own does not. With the button, both also need a sign-in under five minutes old.
   The last grant holding `admin` over the whole container is never revoked, nor re-granted anything
-  short of that. Revoking a grant, here or with `egzos grant rm`, also revokes every agent serving
+  short of that. Revoking a grant, here or with `egzoscore grant rm`, also revokes every agent serving
   that person, each on the record, so a later grant starts with no agents.
 - **Agents at the door** (`rest.md` §4.3): a person signed in at the provider lists the agents
   serving them, with when each last acted for them (`GET /v1/agents`; an admin over the whole
@@ -58,6 +60,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the button a sign-in under five minutes old. Either reads what an agent did for that person,
   newest first (`GET /v1/agents/{client_id}/log`): only what the reader's grant covers today,
   never a refusal, and never an entry's details.
+- **Terminals at the door** (`rest.md` §4.3, v0.7 §AJ): each terminal a person signs in at is a
+  client of its own at the provider, and the container keeps it as that person's own. The person
+  registers it from a browser with the confirm, which names it (`POST /v1/terminals`); it holds no
+  capabilities or scopes, and its token holds the person's grant as it stands at each request.
+  What is done at a terminal is on the chain under the person, with the terminal named beside
+  them. A person lists their terminals with when each was last used (`GET /v1/terminals`, the
+  ended ones with `ended=1`), reads what was done through one, newest first
+  (`GET /v1/terminals/{client_id}/log`), and ends one at once (`DELETE /v1/terminals/{client_id}`);
+  an admin ending one that serves someone else takes the confirm. An ended terminal's next request
+  is refused, and it never returns. A terminal's token gives no one access and concludes no
+  confirm. A person holds at most 16.
 - **Copy** beside move (v0.7 §V): a new, unverified item derived from the source, through the
   same gate.
 - **Upload artifacts at the door** (`rest.md` §4.4): open an upload (`POST /v1/uploads`), send its
@@ -74,17 +87,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   turn down an agent's file without promoting it: its staged bytes go with it, unless another
   upload or staged item holds the same bytes, and its upload slot frees. An item a person promoted
   takes the confirm first. Promoted bytes are never deleted, and the inbox thread a capture opened
-  keeps its name. `egzos rm <id>` does the same with the owner token for an item nobody promoted;
+  keeps its name. `egzoscore rm <id>` does the same with the owner token for an item nobody promoted;
   a promoted item goes only at the door, with the confirm.
 - **Agents connect over the internet: MCP over Streamable HTTP at `/mcp`** (`identity.md` §7), on
-  the door `egzos serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
+  the door `egzoscore serve --http` opens. The same tools as `serve --mcp`, run as the bearer the door
   verified: an agent's sign-in reaches only what both its registration and its user's grant
   cover, and what it reads is on the chain under its name and the user's. The `401` names
   `/.well-known/oauth-protected-resource`, which tells a client where to sign in. It is stateless
   and holds no stream open, so there is no session for anyone else to pick up, and it shares the
   door's throttle and body limit. Built on the MCP SDK's transport. MCP over stdio is unchanged.
   Behind a TLS-terminating proxy or on a wildcard address, set **`identity.origin`** to the origin
-  clients reach, written as a browser sends it (`egzos config set identity.origin https://…`), and
+  clients reach, written as a browser sends it (`egzoscore config set identity.origin https://…`), and
   the metadata and the `401` name it instead of the origin `serve` binds (#294);
   `identity.browser_origins` entries are held to the same form. The metadata is never throttled,
   and with no provider linked it names no authorization server at all. `/mcp` answers CORS as
@@ -102,24 +115,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a key the container makes in its home (`grant.key`) and never exports. Every grant and
   every download is on the chain, and a refused download is recorded or tallied.
 - **A container can keep its state in Postgres** by setting `EGZOS_DATABASE_URL`
-  (`pip install "egzos[postgres]"`), and its home stays bound to that database
+  (`pip install "egzoscore[postgres]"`), and its home stays bound to that database
   (`storage.md` §3.7): another database, an unset variable, an unreachable or restored database, or
   a new home on a database that already holds a chain stops the container before it serves.
-- **Blobs can live in an object store** through OpenDAL (`pip install "egzos[objects]"`,
+- **Blobs can live in an object store** through OpenDAL (`pip install "egzoscore[objects]"`,
   `storage.md` §4): the same content-addressed store, its staging unaddressable until promoted,
   checked on a directory and in memory. No container chooses it yet; the next change wires it.
 - **A container with a named database can keep its blobs in an object store**, such as Supabase
-  Storage, by setting the six `EGZOS_BLOBS_S3_*` variables (`pip install "egzos[objects]"`); its
+  Storage, by setting the six `EGZOS_BLOBS_S3_*` variables (`pip install "egzoscore[objects]"`); its
   home stays bound to that store (`storage.md` §3.7, §4).
 
 ### Fixed
 
-- **`egzos serve --http` and `egzos web` stop on SIGTERM as on Ctrl-C.** A host's stop (Docker, systemd, Kubernetes) now ends the command normally, so it closes its container before it exits.
-- **A stopping door no longer waits without limit for requests in flight.** `egzos serve` gives them 5 seconds (uvicorn's `timeout_graceful_shutdown`), then closes them, so one held request cannot keep a host's stop waiting until a hard kill skips what runs after the door exits, such as a replicator's last sync.
+- **`egzoscore serve --http` and `egzoscore web` stop on SIGTERM as on Ctrl-C.** A host's stop (Docker, systemd, Kubernetes) now ends the command normally, so it closes its container before it exits.
+- **A stopping door no longer waits without limit for requests in flight.** `egzoscore serve` gives them 5 seconds (uvicorn's `timeout_graceful_shutdown`), then closes them, so one held request cannot keep a host's stop waiting until a hard kill skips what runs after the door exits, such as a replicator's last sync.
 
 - `POST /v1/scopes` serves a created node's path only to a token that may read (`fetch`); any
   other gets `path: null` (`rest.md` §4.1).
-- **A usage error under `--json` printed plain text.** `egzos --json nosuchcommand`, a missing
+- **A usage error under `--json` printed plain text.** `egzoscore --json nosuchcommand`, a missing
   argument or a bare group now prints `{"error": …}` on stdout, as every other `--json` failure
   does, and still exits 2 (#203). A `--json` after `--` is data, not the flag.
 - **Principal ids are now unambiguous** (#316, `rest.md` §6). Every id whose parts hold neither `%`
@@ -141,18 +154,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with `egzoscore token revoke`. Remove the old tool (`uv tool uninstall egzos` or
   `pipx uninstall egzos`) so its `egzos` does not stand beside the cloud's command of that name.
 - **Items written in the same second list newest id first** (v0.7 §AF, `storage.md` §2), so
-  `egzos ls`, the inbox and every backend agree on their order; they listed in no fixed order before.
+  `egzoscore ls`, the inbox and every backend agree on their order; they listed in no fixed order before.
 - **Contracts: where a hosted container's state lives** (the Chief's decisions of 2026-10-25, v0.7
   §AF). A container egzos hosts may keep its state on its own Supabase project's Postgres and its
   files in that project's Storage, and its owner token is shown once at provisioning, with only its
   hash kept (`storage.md` §1, §3.7, §4; `identity.md` §4; `rest.md` §6). Writes take one lock per
   container, typed as `_types.Transactional` with `ChainConflict` beside it (`storage.md` §3.6).
   Nothing runs differently yet.
-- The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzos`,
+- The README quickstart states the Python 3.11+ floor and installs with `uv tool install egzoscore`,
   which fetches a suitable Python when the system one is older (macOS ships 3.9, and `pip` then
   answers only "Ignored the following versions that require a different python version").
   Homebrew users can install uv with `brew install uv`.
-- `egzos trust quarantine` refuses an item that is already quarantined, and keeps its first reason.
+- `egzoscore trust quarantine` refuses an item that is already quarantined, and keeps its first reason.
 
 ### Removed
 

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "egzoscore"
-version = "0.1.2"
+version = "0.2.0"
 description = "MCP-first, CLI-first personal context layer"
 readme = "README.md"
 license = { text = "LicenseRef-PolyForm-Strict-1.0.0" }
