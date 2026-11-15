@@ -728,10 +728,13 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
             nothing is decided on it.
           - The confirm that registers the terminal is bound to it,
             with the name.
-          - The container keeps it on the terminal's registration, and
-            writes it on the chain where it writes the name: once, when
-            the terminal is confirmed. Not on each request, since every
-            entry made at a terminal already names the terminal.
+          - The container keeps it on the terminal's registration. On
+            the chain it writes it where it writes the name: in the
+            read that shows the confirm, each time one is shown, and
+            not in the entry that records the registration. Entries
+            made at the terminal afterwards name the terminal, not the
+            line. That is the operator's reading of the Chief's word
+            "telemetry", and his to widen.
           - A container from before this refuses a request that carries
             the line; egzos.io then registers the terminal without it.
 

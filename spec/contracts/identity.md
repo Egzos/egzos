@@ -503,23 +503,24 @@ login`, the terminal's flow §3a describes. **decided** (v0.7 §S, §AG, §AJ). 
   (the check §AG owes); without one the access token runs to its `exp` and `egzos login` runs again.
   The terminal presents it at that container alone (`/v1/`, and `/mcp` as §7 admits a person's
   token), and §3, §4 and §5 decide the rest. It is not a container `Token`: `token ls` does not list
-  it, and nothing mints one from it. The cloud lists it among the person's terminals, with its name
-  and when it was last used (`rest.md` §4.3). A person egzos hosts no container for has nothing to
-  log in to, and the terminal says so in one line.
+  it, and nothing mints one from it. The cloud lists it among the person's terminals, with its name,
+  its machine line where it gave one, and when it was last used (`rest.md` §4.3). A person egzos
+  hosts no container for has nothing to log in to, and the terminal says so in one line.
 - **The name.** A terminal asks to be known by a name: the machine's own name, or the one the person
   gives (`egzos login --name`). It prints the name before the browser opens, because the name leaves
   the machine and is kept at the cloud; the start page and the confirm show it before it is kept
   (§3a). It is the terminal's own claim: display data of at most 128 characters, escaped and
   labelled wherever it is shown, and nothing is decided on it. **a1p**; which name is the default is
   the Chief's open question (v0.7 §AJ).
-- **The machine.** A terminal may also say, in one line, what kind of machine it is: the kind of
-  computer and its operating system as the system gives them, and nothing that tells one machine
-  from another of its kind (no serial number, no hardware identifier, no network address). It
-  prints the line with the name before the browser opens, and the person gives another or none
+- **The machine.** A terminal may also say, in one line, what kind of machine it is. It prints the
+  line with the name before the browser opens, and the person gives another or none
   (`egzos login --machine`, `--no-machine`). The line travels, is shown and is kept as the name is
-  (§3a; `rest.md` §4.3), is held to the name's rule, and is as much the terminal's own claim:
-  nothing is decided on it. **a1p** (v0.7 §AJ, the Chief's ask of 2026-11-15; #394); what the line
-  holds by default is his to rule on.
+  (§3a; `rest.md` §4.3) and is held to the name's rule. It is as much the terminal's own claim:
+  display data, escaped and labelled wherever it is shown, and nothing is decided on it. **a1p**
+  (v0.7 §AJ, the Chief's ask of 2026-11-15; #394). What the command sends when the person gives no
+  line is the Chief's open question (v0.7 §AJ); the operator's draft is the kind of computer and
+  its operating system as the system gives them, and nothing that tells one machine from another
+  of its kind (no serial number, no hardware identifier, no network address).
 - **Where it lives.** The refresh token goes in the operating system's credential store (the Keychain
   on macOS, the Secret Service on Linux, the Credential Manager on Windows), through a maintained
   library (§R); where none can be reached, a file under `EGZOS_HOME` readable by its owner alone

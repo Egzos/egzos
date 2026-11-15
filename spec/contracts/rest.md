@@ -574,8 +574,9 @@ lifeboat (`identity.md` §4).
   "capabilities"?, "scopes", "confirm"?}`; the registration serves the caller; `name` is at most 128
   characters, untrusted display data. `POST /v1/terminals`: `{"authorization_id", "client_id",
   "name", "machine"?, "confirm"?}`; it serves the caller too, and its `name` is held to the same
-  rule, as is its `machine`, the line a terminal may give for the kind of machine it is (below). A
-  role bundle expands at grant time (`capabilities.md` §2). No
+  rule, as is its `machine`, the line a terminal may give for the kind of machine it is (below):
+  the key is left out when the terminal gives none, and a `machine` that is null or not a string
+  is §3's `400`. A role bundle expands at grant time (`capabilities.md` §2). No
   grant or registration exceeds the caller's own grant: wider capabilities or scopes are §3's refusal.
 - **Who registers an agent: each person, their own.** Anyone holding a user grant registers agents
   that serve themselves, an admin the same way, with the confirm and never beyond their own grant
@@ -605,11 +606,13 @@ lifeboat (`identity.md` §4).
   - A person holds at most 16 live terminal registrations, counted apart from their agents: a 17th
     answers `429` with `{"error":"too_many_terminals"}` and §3's headers before any leg.
   - **A terminal may say what kind of machine it is.** `machine` is one line beside the name
-    (`identity.md` §8), there for the person to tell their terminals apart: the terminal's own
+    (`identity.md` §8), there to help the person recognise their terminals: the terminal's own
     claim, kept on the registration and served in `<terminal>`. Nothing checks it and nothing is
-    decided on it. A registration made without one never gains one. It is written on the chain
-    where the name is, on the first leg (below), and on no request after it: every entry made at a
-    terminal already names the terminal (`identity.md` §3a). A door from before this line answers
+    decided on it. A registration made without one never gains one. On the chain it is written
+    where the name is, in `details.signs_in` of each first leg's `context.fetch` (below), the
+    fresh first leg that answers a refused second leg included, and in no other entry: the
+    `identity.grant` that records the registration does not carry it, and every entry made at a
+    terminal already names the terminal (`identity.md` §3a). A door from before `machine` answers
     §3's `400` to a body that carries the key, as to any key it does not name, and a page that
     gets that answer registers the terminal without it. **a1p** (v0.7 §AJ, the Chief's ask of
     2026-11-15; #394).
