@@ -1082,12 +1082,15 @@ storage (v0.7 §S).
    client container `Token` counts its own, and a person's uploads count toward none. Each upload
    counts its declared size while it is open or orphaned, and while its item, or a live copy of it,
    is an artifact not tombstoned, not quarantined and not promoted by a person
-   (`provenance.approved_by`). A copy adds nothing of its own. An open that would pass the bound
+   (`provenance.approved_by`). A copy adds nothing of its own, and no bytes to the store (§4.1 item
+   10); how far copies spread is bounded by the copy route's gate (`organize` on the destination,
+   and a person's confirm where the audience widens, §4.2) and by nothing else (**a1p**). An open that would pass the bound
    answers `429` with `{"error":"too_many_bytes"}`; an open whose `size` alone passes it is the
    same `400` as one past `upload_max_bytes`. Both caps and the open's record are one atomic step:
    of two concurrent opens that together pass either, at most one is recorded. A person makes room
-   by removing or promoting the agent's files (§4); removed files' bytes stay, as promoted bytes do
-   (`storage.md` §4). **decided**, that an agent's kept bytes have a limit (the Chief, 2026-11-26);
+   by removing or promoting the agent's files (§4). A removed file's bytes stay on disk, as
+   promoted bytes do ([0.3 · 44]; `storage.md` §4): the bound limits what an agent holds live, not
+   what the store keeps, and only the owner's purge act (`[v1.1]`) frees them. **decided**, that an agent's kept bytes have a limit (the Chief, 2026-11-26);
    **a1p**, the numbers, the counting and the answers; not running.
    The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
    edge that caps a request's body sets `blobs.upload_max_bytes` at or below that cap.
@@ -1141,7 +1144,8 @@ storage (v0.7 §S).
      its opener is the descriptor's, it is live, its `size` and `sha256` are the descriptor's, its
      bytes have not arrived, and no transfer to it is running, by either route; it is then marked
      as receiving, atomically, until this transfer is staged, refused or cut off; (6) the opener is
-     live and still holds `remember` on the upload's scope, checked now; (7) the
+     live and still holds `remember` on the upload's scope, checked now, and read once, before the
+     bytes, as item 2 reads its caller once, the two routes matching on purpose; (7) the
      bytes, read only up to `size`, are exactly `size` long and hash to `sha256`. Checks 1 to 6
      refuse with §3's refusal, byte-identical whichever failed: a second use, a late use and a
      forged one answer alike. Nothing after check 6 refuses for time. Check 7 refuses with `400`
@@ -1154,8 +1158,8 @@ storage (v0.7 §S).
      `items: []`, the failed check in `details`, attributed to the opener, and counts toward its
      per-token bucket, as §6's refused redemption does; a refusal at check 7 appends `upload.put`
      (`outcome: refused`, `details.reason`: `length` or `hash`), as item 2's does, and counts in no
-     bucket. Where `sig` does not verify, the refusal is counted by the `rest` throttle and tallied
-     under `forged` (§2 item 7). **No log and no entry keeps an address**: its spent record is its
+     bucket. A refusal at check 1, or where `sig` does not verify, is counted by the `rest` throttle
+     and tallied under `forged` (§2 item 7). **No log and no entry keeps an address**: its spent record is its
      `sig`'s sha256 and its `expires_at`, and the door writes neither the address nor its query to
      any log.
 3. **Item.** `POST /v1/items` with `{"kind": "artifact", "upload": <id>, "scope"?, "key"?, "tags"?}`
@@ -1507,8 +1511,9 @@ and is served back once its person promotes it.
   4. The container computes `size` and `sha256` from the decoded bytes; where the caller gave
      `sha256`, the bytes must hash to it, otherwise `invalid_request` and nothing is written. The
      upload record, the item and their entries commit together in the container's database or not
-     at all: a call that fails leaves no upload, no slot taken and no entry but §4's probe, and
-     bytes it wrote are named by no item and never served.
+     at all, and the bytes are promoted only once that commit is made: a call that fails leaves no
+     upload, no slot taken and no entry but §4's probe, and discards the bytes it staged, as an
+     upload's discard does, so nothing it wrote goes untracked (v0.7 §Z).
 
   `scope` in the answer is answered as `egzos_remember` answers it: the resolved path to a
   principal holding `fetch`, the caller's own argument otherwise (§4.1 item 8). A caller whose own

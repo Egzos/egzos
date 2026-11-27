@@ -1004,6 +1004,12 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
             counts a person's agents, and as an orphan it is the
             person's to see and discard. This is the one change to §AC's
             count, the operator's call for the Chief to confirm.
+          - For the Chief: whether removing an agent's kept file that no
+            person promoted should delete its bytes when nothing else
+            refers to them. Today it does not: promoted bytes are never
+            deleted ([0.3 · 44]), so a removed file's bytes stay until
+            the owner's later purge, and the agent's bound limits what it
+            holds, not what the store keeps.
           - Over stdio, a door with no public origin carries a file only
             up to the one-call limit: there is no address it can hand
             out. The operator's call against ruling (1), which the hosted
