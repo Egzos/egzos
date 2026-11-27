@@ -53,6 +53,10 @@ Two variants. Both carry `auto_title` and `title_engine`: every write is auto-ti
 and the engine that produced the title is recorded so a degraded title can be distinguished from an
 embedding-backed one later. **running**
 
+Where a person renamed a text item (`rest.md` §4.5), `auto_title` holds the name they gave and
+`title_engine` is `person`, and no title pass replaces such a title. A person's rename of an
+artifact sets `filename` and nothing else. **a1p** (v0.7 §AK), **not running.**
+
 **Text** (`memory`, `preference`, `skill`, `integration`, `alias`, `rule`):
 
 ```

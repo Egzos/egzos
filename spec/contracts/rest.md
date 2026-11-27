@@ -291,6 +291,10 @@ spec's job).
 | `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
 | `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
+| `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title (§4.5) | an `interactive` principal holding `organize` on its scope | — (new: #404) | `item.rename` |
+| `PATCH /v1/scopes/{id}` | rename a place; its id stays (§4.5) | an `interactive` principal that could create it at its parent; `organize` on it | — (new: #404) | `node.rename` |
+| `DELETE /v1/scopes/{id}` | remove a place that holds nothing (§4.5) | as rename, and `fetch` on it | — (new: #404) | `node.tombstone`; or `context.fetch` (`not_empty`) |
+| `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | — (new: #360) | `context.fetch` (`read: limits`) |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
 
@@ -398,6 +402,10 @@ the row does not name is `400` (§3).
 | `POST /v1/items/{id}/promote` | `{"confirm"?}` | `{"result": "confirm", …}`, then `{"result": "promoted", "item": <item>}` |
 | `DELETE /v1/items/{id}` | `{"confirm"?}` | `{"result": "tombstoned"}`; a promoted item's: `{"result": "confirm", …, "tombstones"}` (§4.2) first |
 | `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
+| `PATCH /v1/items/{id}` | `{"name"}` | `{"item": <item>}` (§4.5) |
+| `PATCH /v1/scopes/{id}` | `{"name"}` | `{"node": <node>}` (§4.5) |
+| `DELETE /v1/scopes/{id}` | — | `{"result": "removed"}`; or `409` `{"error":"not_empty"}` (§4.5) |
+| `GET /v1/limits` | — | `{"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}` (§4.6) |
 | `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
 
 - **`<item>`** is a `ContextItem` per `context-item.md` §1, unknown fields included, returned as
@@ -820,6 +828,96 @@ storage (v0.7 §S).
   facets and filters (7); anomaly sentences (9); token reads and their events (10); where coverage is
   computed (11); a quarantine flag per ring (12). A builder adds none of them.
 
+### 4.5 · Renaming an item or a place, and removing a place
+
+**a1p**, every clause of this subsection (v0.7 §AK; #404), and **not running** until its code lands:
+until then each of these routes is §3's refusal, as a path no route declares, and §4.6 lists none
+of their words.
+
+**A name's shape.** A name sent to `POST /v1/scopes` or to either rename is 1 to 255 characters
+with no U+0000, as today, and a place's name holds no `/`, which a path cannot carry (`container.md`
+§2). Anything else is §3's `400`, before any lookup. An item's name is held to an upload `name`'s
+rule (§4.4). Nodes named before this keep their names; pure capture writes each `/` of a title as
+`-` when it names a thread. Sibling names may still repeat, a tail naming two is still refused as
+ambiguous (§3), and no rule is added on which type sits under which: both are left for a later
+change, because pure capture names inbox threads from titles that may repeat, and a rule there
+needs its own decision (v0.7 §AK).
+
+**Renaming an item: a person's act, as a tombstone is** (§4). `PATCH /v1/items/{id}` with
+`{"name"}` → `{"item": <item>}`.
+
+- **Needs** an `interactive` principal holding `organize` where the item sits. A `client` principal
+  gets §3's refusal, and MCP has no tool for it: an agent's write waits for a person (§4.4), and a
+  name is what the person finds an item by.
+- **It sets one field.** An artifact's `content.filename`; a text item's `content.auto_title`, with
+  `content.title_engine` set to `person`, so a title a person gave is told from one an engine made
+  and no later title pass replaces it (`context-item.md` §3). The bytes, `content.sha256`, `scope`,
+  `key`, `tags` and `trust` stay as they were; `lifecycle.version` and `updated_at` move, as on any
+  mutation (`context-item.md` §6). An inbox thread keeps its name when its item is renamed
+  (`container.md` [0.3 · 2]).
+- **No confirm**: a name widens nobody's view. The write and its `item.rename` (`kind`, `field`:
+  `filename` or `title`, and the new `name`, untrusted display data) are one atomic step.
+- **Absent, uncovered, tombstoned, quarantined, an unverified `rule` (served only at
+  `GET /v1/pending`), or without `organize`**: §3's refusal and §4's probe, the same for each.
+
+**Renaming a place.** `PATCH /v1/scopes/{id}` with `{"name"}` → `{"node": <node>}`, its `path`
+`null` to a principal without `fetch` (§4.1 item 8).
+
+- **Needs** an `interactive` principal that could create a place of the node's type at its parent,
+  by §4's `POST /v1/scopes` row (coverage of the parent; `admin` above its `structure_floor`), and
+  that holds `organize` on the node. A grant whose coverage starts at the node renames what lies
+  under it, never the node, whose name the granter gave.
+- **The node's id never changes**, so grants, agent and terminal registrations and tokens, which
+  hold node ids (`capabilities.md` §5), are untouched. **What changes is every path through the
+  node** (`container.md` §2): a reference held as a path stops resolving and answers as an absent
+  one, and nothing redirects from an old name. An open proposal's `from_path` and `to_path` are
+  display text from when it was parked, and may be stale; it is decided on ids.
+- It appends `node.rename` (`type`, and the new `name`, untrusted display data).
+- **The inbox, the personal root and `global` are never renamed.** Each, an absent or uncovered
+  node, a `client` principal, and a caller short of what this needs get §3's refusal and §4's probe.
+
+**Removing a place.** `DELETE /v1/scopes/{id}` → `{"result": "removed"}`.
+
+- **Needs** what a rename needs, and `fetch` on the node, so that the one told what follows can
+  list the place. The inbox, the personal root and `global` are never removed. Each, and every
+  case a rename refuses, is §3's refusal and §4's probe.
+- **Only a place that holds nothing is removed**: no live item, a quarantined one included; no
+  staged item; no open or orphaned upload naming it, whoever opened it; no child place. This check
+  is the last, inside the atomic step that removes. A place that holds something answers `409` with
+  `{"error":"not_empty"}` and §3's four headers, and appends one `context.fetch` with `items: []`
+  and `details.reason: not_empty`.
+- **What `not_empty` says**: that the place holds something, and nothing else; no count, kind, id
+  or name. What it holds may be nothing this caller is served (a quarantined item, an upload
+  another principal holds open), and the answer is the same. Any answer but `removed` tells this
+  caller as much, so §3's refusal here would hide nothing `not_empty` says; and the caller covers
+  the place and holds `fetch` and `organize` there. It is the one such fact `capabilities.md` §6
+  clause 2 lets this door give.
+- **The node is tombstoned, never erased** (`storage.md` §3), so the chain's entries about it still
+  resolve. From then on it reads as absent everywhere: no list shows it, no tail matches it, and a
+  reference to it, a write, an upload, a move or a copy into it is §3's refusal. Grants,
+  registrations and tokens scoped to it cover nothing. A proposal parked to move into it ends
+  `stale` when decided (`container.md` §6). It appends `node.tombstone` (`type`).
+
+### 4.6 · What this door serves
+
+`GET /v1/limits`, to any valid token, a `client` principal's included → `{"contract": "1.1",
+"features": [<word>], "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}`. **a1p** (v0.7
+§AK; #360), **not running**.
+
+- `upload_max_bytes` and `inline_max_bytes` are `blobs.upload_max_bytes` and
+  `blobs.inline_max_bytes` as they stand (`container.md` §8), and `uploads_held_max` is §4.4's 16:
+  facts about the caller's own container and no secret, so a client says "too big" before it opens
+  an upload. The route reads config and sets none; config stays on the CLI (§4.4).
+- `contract` is the contract set's version (`README.md`). `features` names, one word each and in
+  no order, what this door serves beyond the set as release 0.2.0 served it: `terminals.machine`
+  (§4.3's `machine` line), and §4.5's `items.rename`, `scopes.rename` and `scopes.remove`, each
+  only once its code runs. A client ignores a word it does not know.
+- **A container from before this route answers it with §3's refusal**, and a client reads that as
+  none of the words: it offers none of those acts, rather than reading a later `404` on one as a
+  refusal of the act.
+- Reading it appends `context.fetch` with `items: []` and `details.read: limits`, as §4.3's reads
+  do: it serves no item or node, but `events.md` §4 invariant 2 excepts nothing else.
+
 ## 5 · Audit coverage
 
 `events.md` §4 invariant 2 binds this door without exception: every read, grant mint and blob pull
@@ -829,14 +927,16 @@ whole list is given below, under **The whole list**. A test per row asserts the 
 The two invariant-2 exceptions (the owner's read inside an AS session; refresh rotation) are the
 AS's, and neither reaches this door: §2 accepts no session. **decided.**
 
-**The whole list** of what the door appends is the tables of §4 and §4.3, §4.2's and §4.4's clauses,
-and §2 item 7's `rest.tally` and `authz.release`.
+**The whole list** of what the door appends is the tables of §4 and §4.3, §4.2's, §4.4's, §4.5's and
+§4.6's clauses, and §2 item 7's `rest.tally` and `authz.release`.
 
 **New events.** `item.copy` (a copy is made; `subject` the new item, `details.from` the source),
 `gate.pass.confirmed` (a widening move or copy confirmed inline; `audience_delta` and the `step_up`'s
 `seq`), §4.3's `identity.grant`, `identity.revoke` and `identity.credential`, and §4.4's `upload.put`
 and `upload.discard` are this door's. Like `identity.md`'s, they enter `events.md` §1 and `_types.py`
 with the code that appends them, because the conformance tests pin that table to running code. **a1p.**
+So do §4.5's `item.rename`, `node.rename` and `node.tombstone`, named meanwhile beneath `events.md`
+§1's table (v0.7 §AK).
 
 ## 6 · `BlobGrant` — issue and redemption
 
@@ -1014,7 +1114,7 @@ other four questions were the retired authorization server's and close with it.
 ## 8 · What this document does not fix
 
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
-`identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
-§4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
+`identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials, upload,
+renaming and removing places, and what the door serves → §4–§4.6 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
 `identity.md` §4.
 The look of any client → its design spec.

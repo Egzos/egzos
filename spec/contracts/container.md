@@ -78,6 +78,14 @@ matches (#115).
 itself would change its own path, and paths are the addressing surface. **running** for the
 first-item name; the rename proposal is **decided, not running**.
 
+**A person may rename a place, and remove one that holds nothing** (`rest.md` §4.5; v0.7 §AK).
+The rule above binds a rename that happens on its own, which stays a proposal; a person's rename is
+their own act. It keeps the node's id and changes every path through the node: a reference held as
+a path stops resolving and answers as an absent one, and nothing redirects from an old name. A
+removed node is tombstoned, never erased, and reads as absent, as a tombstoned item does. The
+inbox, the personal root and `global` are never renamed or removed, and a place's name holds no
+`/`. **a1p**, **not running.**
+
 ## 3 · The chain
 
 `NodeService.chain(scope, include_global=True)` returns the chain **innermost first**: (1) the scope,

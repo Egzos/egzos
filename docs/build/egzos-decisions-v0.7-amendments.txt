@@ -747,6 +747,78 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 
 
 ================================================================================
+AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
+    PLACE; THE DOOR SAYS WHAT IT SERVES (amends container.md §2's rename
+    sentence, which bound only a rename that happens on its own.
+    rest.md §4, §4.1, §4.5, §4.6; container.md §2; context-item.md §3;
+    capabilities.md §6; storage.md §3; events.md §1; Egzos/egzos#404,
+    Egzos/egzos#360)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-25 and 2026-11-26. On
+          2026-11-25 he asked for one press-and-hold wheel in the app
+          that carries every act on a thing, and for the app to add a
+          thread or a project and to add, move, or copy files. On
+          2026-11-26 he answered six questions about the wheel; asked
+          whether rename and remove are in its first build, he said:
+          "Do everything, start it all". No route renamed an item or a
+          place, or removed a place (#404). Recorded by the operator,
+          enacted by the merge of the contract change; the Chief may
+          veto by reverting.
+
+[DECIDED] A PERSON RENAMES AN ITEM AND A PLACE, AND REMOVES A PLACE, FROM
+          THE APP.
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts,
+          and not running until its code lands):
+
+          - Renaming an item is a person's act, as a tombstone is: an
+            interactive principal holding `organize` where the item
+            sits; an agent is refused as for anything absent. It sets
+            an artifact's file name, or a text item's title, marked as
+            a person's (`title_engine: person`) so no title pass
+            replaces it, and nothing else. No confirm: a name widens
+            nobody's view. Event `item.rename`.
+          - Renaming a place is a person's act, by the rule that lets
+            them make that place there, with `organize` on it. Its id
+            stays, so grants, registrations and tokens are untouched;
+            every path through it changes, an old path answers as an
+            absent one, and nothing redirects. The inbox, the personal
+            root and `global` are never renamed. Event `node.rename`.
+          - Removing a place is the same person's act, with `fetch` too,
+            and only for a place that holds nothing: no item, no staged
+            item, no upload, no place. Otherwise the answer is a `409`
+            that says only "not empty", told only to someone who covers
+            the place and could otherwise remove it; any other answer
+            would tell them as much. The place is tombstoned, never
+            erased, and reads as absent everywhere after. The inbox,
+            the personal root and `global` are never removed. Event
+            `node.tombstone`.
+          - A place's name, made or renamed, is 1 to 255 characters,
+            with no U+0000 and no `/`. Existing names stay. Pure
+            capture writes a `/` in a title as `-`.
+          - The door serves what it carries (`GET /v1/limits`): the
+            contract's version, a word for each thing it serves that
+            0.2.0 did not, and the upload limits #360 asked for. A container from
+            before it answers the one refusal, which a client reads as
+            "none of these", so it never takes a missing route for a
+            refusal of the act.
+
+[LATER]   Unique names among siblings, and which type of place may sit
+          under which; left out because pure capture names inbox
+          threads from titles that may repeat.
+
+[OPEN→CHIEF] What removing a place that still holds things should do.
+          The draft refuses it. The alternative is one act that sends
+          what it holds to the inbox first, under the gate.
+
+[OPEN→CHIEF] Whether two places side by side may share a name. The draft
+          lets them, as today; a path that names both is refused as
+          ambiguous, and the person gives a longer path or the id.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -760,7 +832,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      confirm credentials, where the app lives, where a hosted
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
-     repository and the core's new name, each terminal a client of its own
+     repository and the core's new name, each terminal a client of its own,
+     renaming and removing places
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
@@ -777,7 +850,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
-  its machine line holds by default).
+  its machine line holds by default); §AK's two (removing a place that
+  still holds things; unique names among siblings).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET
