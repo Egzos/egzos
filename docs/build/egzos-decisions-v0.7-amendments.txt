@@ -753,12 +753,14 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
     writes a `/` or a `:` as `-` and drops Cc, Zl, Zp and Bidi_Control
     characters;
     rest.md §4.2 item 1's list of confirm-gated acts, which gains the
-    rename of a verified or promoted item, and item 3's binding, which
-    gains an item's version; and resolve_ref's tail rule, which gains
-    former names.
+    rename of a verified or promoted item, item 3's binding, which
+    gains an item's version, scope and trust status, and item 4's
+    fresh answer, which carries the act's first-leg fields as they
+    now stand; storage.md §3.3's challenge binding, likewise; and
+    resolve_ref's tail rule, which gains former names.
     rest.md §3, §4, §4.1, §4.2, §4.5, §4.6, §5, §8; container.md §2;
-    context-item.md §3; identity.md §4, §5; storage.md §3; events.md
-    §1; Egzos/egzos#404, Egzos/egzos#360)
+    context-item.md §3; identity.md §4, §5; storage.md §3, §3.3;
+    events.md §1; Egzos/egzos#404, Egzos/egzos#360)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-11-25 and 2026-11-26. On
@@ -793,9 +795,16 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             aside, which is refused whatever its provenance.
           - A confirm on an item (promote, a gated tombstone or
             rename, a move or copy's confirm) is bound to the item's
-            version as its first leg read it; a rename moves the
-            version, so a second leg that finds another concludes
-            `mismatch` and changes nothing; the person asks again.
+            version, scope and trust status as its first leg read
+            them; a rename moves the version, so a second leg that
+            finds any of the three changed concludes `mismatch` and
+            changes nothing; the person asks again, and the fresh
+            answer shows the act as it now stands. The running code
+            moves the version on a promote alone, so the binding does
+            not rest on the version. Only an act on the item that its
+            own rule admits and the chain records (a rename, a
+            promote, a move, a quarantine) moves what a confirm is
+            bound to, and a `mismatch` says nothing of why.
           - Renaming a place is a person's act, by the rule that lets
             them make that place there, with `organize` and `fetch` on
             it. Its id stays; the node alone is written, with its
@@ -805,23 +814,35 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             renamed. A proposal is shown with its places' names as
             they stand.
           - A former name fails closed. A place keeps the names it has
-            borne, which no route serves. A tail that reaches a node
-            by a former name never resolves to it: alone it answers as
-            absent, and beside a match by a present name it is refused
-            as ambiguous. So a path stops resolving to a renamed place
-            and can name another only where no place the caller can
-            see has borne that name. A client still keeps a place's
-            id, never its path. This binds the door, both MCP
-            transports and the command line.
+            borne, at most 64, which no route, tool or command lists;
+            a rename that would add a 65th is refused (`409`
+            `too_many_names`), and none is dropped to make room; a
+            rename back to a former name takes no new place. A tail
+            that reaches a node by a name a node on its path bore never
+            resolves to it: alone it answers as absent, and beside a
+            match by a present name it is refused as ambiguous. So a
+            path stops resolving to a renamed place and can name
+            another only where no place the caller can see has borne
+            that name. By design, that refusal can tell a caller that
+            a node on the path, seen or an ancestor it cannot see, once
+            bore a name: a rename hides no name from anyone who can
+            reach the place by a path. Nothing here clears a clash a
+            former name makes; an id always answers; whether a removed place keeps
+            its former names is for the change that removes one. The
+            rule is for a place that stays under its parent; a change
+            that moves a place under another extends it first. A
+            client still keeps a place's id, never its path. This
+            binds the door, both MCP transports and the command line.
           - A place's name, made or renamed on any surface, is 1 to 255
             Unicode scalar values, compared as given with no
             normalisation, with no `/`, no `:`, and no character of
             category Cc, Zl or Zp or with Bidi_Control. An item's new
             name keeps an upload name's rule and holds none of those
-            characters. Existing names stay. Pure capture writes a `/`
-            or a `:` in a title as `-`, drops every Cc, Zl, Zp or
-            Bidi_Control character, and names a thread left with
-            nothing by the item's id.
+            characters. A lone surrogate is refused. Existing names
+            stay. Pure capture writes a `/` or a `:` in a title as `-`
+            and drops every Cc, Zl, Zp or Bidi_Control character, then
+            keeps the first 40 characters, then names a thread left
+            with nothing by the item's id.
           - The door serves what it carries (`GET /v1/limits`): the
             contract's version, a word for each thing it serves that
             0.2.0 did not (`terminals.machine`, `items.rename`,

@@ -241,11 +241,15 @@ or a path tail, as `resolve_ref` does (`container.md` §2). A tail that matches 
 token covers is refused and nothing is picked ([0.3 · 1]): status `409`, the same four headers, and
 `{"error":"ambiguous","matches":[<path>, …]}`, the paths sorted. **decided**, that the refusal names
 the matches; **a1p**, the bytes (#187). The candidates are only the nodes the token covers, so the
-answer names nothing the token could not list at `GET /v1/scopes`; a tail whose only matches are
-uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the running MCP door's
-`_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`). A
-tail that reaches a node by a name the node once bore is refused this way beside a match, and with
-no match is §3's refusal (`container.md` §2; **a1p**, v0.7 §AK, not running).
+answer names, by present path, no node the token could not list at `GET /v1/scopes`; a tail whose
+only matches are uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the
+running MCP door's `_probe` does. `GET /v1/find` never answers it: a search covers every match
+(`store.find`). A tail that reaches a node by a name a node on its path once bore is refused this
+way beside a match, and with no match is §3's refusal (`container.md` §2). So the refusal can tell
+a caller that a node on that path, one it can see or an ancestor it cannot, once bore a name it
+gave, and `matches` may name a node whose present path is not that tail: by design, a rename hides
+no name from anyone who can reach the node by a path. Nothing in this change clears such a clash;
+an id always answers. **a1p** (v0.7 §AK), not running.
 
 **Only a principal holding `fetch` is told the matches. a1p** (#294): they are what
 `GET /v1/scopes` would list, and it needs `fetch`. Any other gets §3's refusal and §4's probe
@@ -404,7 +408,7 @@ the row does not name is `400` (§3).
 | `DELETE /v1/items/{id}` | `{"confirm"?}` | `{"result": "tombstoned"}`; a promoted item's: `{"result": "confirm", …, "tombstones"}` (§4.2) first |
 | `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
 | `PATCH /v1/items/{id}` | `{"name", "confirm"?}` | `{"item": <item>}` (§4.5); a verified or promoted item's: `{"result": "confirm", …, "renames"}` (§4.2) first |
-| `PATCH /v1/scopes/{id}` | `{"name"}` | `{"node": <node>}` (§4.5) |
+| `PATCH /v1/scopes/{id}` | `{"name"}` | `{"node": <node>}` (§4.5); `409` `{"error":"too_many_names"}` where it would keep a 65th former name |
 | `GET /v1/limits` | — | `{"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}` (§4.6) |
 | `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
 
@@ -510,9 +514,11 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
      `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
      and the same audience delta, recomputed now; and, **a1p** (v0.7 §AK, not running), on an act on
      an item (a promote, a tombstone or a rename that takes the confirm, a move or copy's confirm),
-     the item's `lifecycle.version` as the first leg read it: a second leg that finds another
-     version concludes `mismatch` and changes nothing, and the person asks again and sees the item
-     as it now is;
+     the item's `lifecycle.version`, `scope` and `trust.status`, each as the first leg read it: a
+     second leg that finds any of the three changed concludes `mismatch` and changes nothing, and
+     the person asks again and sees the item as it now is. The running code moves the version on a
+     promote alone today, so the binding names `scope` and `trust.status` and does not rest on
+     the version (**a1p**);
    - verifies the proof (`identity.md` §5);
    - spends the challenge.
 
@@ -528,8 +534,9 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    `delta_changed`, `terminal`, and §4.3's `not_fresh` and `registered`), as `events.md` §1 requires
    of every concluded presence
    check. The answer to the caller is the same whatever the reason: `{"result": "confirm", …}` with a
-   fresh challenge (and the new `newly`, where the delta changed). The ledger says which case it was;
-   the response does not (`capabilities.md` §6 clause 3).
+   fresh challenge and the act's first-leg fields as they now stand: the new `newly`, where the
+   delta changed, and, **a1p** (v0.7 §AK, not running), `renames`, `tombstones` and the others.
+   The ledger says which case it was; the response does not (`capabilities.md` §6 clause 3).
 5. **A challenge is single use and lives `step_up.window_seconds`, at least 60 seconds.** A proof
    that concludes spends its challenge whether it is confirmed or refused, as §6's grant is spent at
    check 4 whatever the later checks decide (a6 on #284); a refused attempt always gets a fresh one.
@@ -847,11 +854,13 @@ rename, which the door and `egzoscore mk` call), is 1 to 255 Unicode scalar valu
 compared as given, with no normalisation. It holds no `/` and no `:`, which a path and its
 `type:name` labels reserve (`container.md` §2), no character of general category Cc (U+0000 and
 U+007F among them), Zl or Zp, and none with the Bidi_Control property. An item's new name is held to
-an upload `name`'s rule (§4.4) and holds no character of Cc, Zl, Zp or Bidi_Control. Anything else
+an upload `name`'s rule (§4.4) and holds no character of Cc, Zl, Zp or Bidi_Control. A name, a
+place's or an item's, that is not well-formed Unicode (a lone surrogate) is `400`. Anything else
 is §3's `400` at the door, before any lookup, and refused on every other surface. Names given before
-this stay as they are. Pure capture, when it names a thread from a title, writes each `/` and `:` as
-`-` and drops every character of Cc, Zl, Zp or Bidi_Control, and where nothing is left the thread's
-name falls back to the item's id. Sibling names may still repeat, a tail naming two is still refused
+this stay as they are. Pure capture, when it names a thread from a title, does three steps in order:
+it writes each `/` and `:` as `-` and drops every character of Cc, Zl, Zp or Bidi_Control; it keeps
+the first 40 characters, the length it keeps today; and where nothing is left the thread's name
+falls back to the item's id. Sibling names may still repeat, a tail naming two is still refused
 as ambiguous (§3), and no rule is added on which type sits under which: both are left for a later
 change, because pure capture names inbox threads from titles that may repeat, and a rule there needs
 its own decision (v0.7 §AK).
@@ -866,9 +875,9 @@ its own decision (v0.7 §AK).
 - **It sets one field.** An artifact's `content.filename`; a text item's `content.auto_title`, with
   `content.title_engine` set to `person`, so a title a person gave is told from one an engine made
   and no later title pass replaces it (`context-item.md` §3). The bytes, `content.sha256`, `scope`,
-  `key`, `tags` and `trust` stay as they were. `lifecycle.version` moves, as it does on each
-  mutation (`context-item.md` §6), so a confirm on the item opened before the rename concludes
-  `mismatch` (§4.2 item 3); `lifecycle.updated_at` moves with it. An inbox thread keeps its name
+  `key`, `tags` and `trust` stay as they were. `lifecycle.version` moves (`context-item.md` §6),
+  so a confirm on the item opened before the rename concludes `mismatch` (§4.2 item 3);
+  `lifecycle.updated_at` moves with it. An inbox thread keeps its name
   when its item is renamed (`container.md` [0.3 · 2]).
 - **An item that is not verified and that no person has promoted is renamed at once**, an
   unverified `rule` aside (below). A `confirm` sent with it is ignored and concludes nothing.
@@ -877,8 +886,11 @@ its own decision (v0.7 §AK).
   behind a re-authentication, as its tombstone does (§4). The first leg answers `newly: []` and
   names what it renames, `"renames": {"item", "kind", "from", "to"}`, the names untrusted display
   data; its `context.fetch` carries the same as `details.renames`. The challenge is bound to the
-  body's `name` and, as on every act on an item, to the item's version (§4.2 item 3), so a second
-  leg that names another, or finds the item changed, is §4.2's `mismatch`.
+  body's `name` and, as on every act on an item, to the item's version, `scope` and
+  `trust.status` (§4.2 item 3), so a second leg that names another, or finds the item changed, is
+  §4.2's `mismatch`. What a challenge on an item is bound to moves only by an act on the item that
+  its own rule admits and the chain records, such as a rename, a promote, a move or a quarantine,
+  and a `mismatch` says nothing of why.
 - **One atomic step** holds a second leg's `step_up`, the write and its `item.rename`, and an item
   renamed at once is written with its `item.rename` in one atomic step too. `item.rename` carries
   `kind`, `field` (`filename` or `title`), `from`, the name as it stood, and the new `name`, both
@@ -908,6 +920,11 @@ its own decision (v0.7 §AK).
 - **One atomic step** holds the node's write, its former name added, and its `node.rename`
   (`storage.md` §3.6), which carries `type`, `from`, the name as it stood, and the new `name`, both
   untrusted display data.
+- **A place keeps at most 64 former names** (`container.md` §2). A rename that would add a 65th is
+  refused, after this route's other checks: `409` with `{"error":"too_many_names"}` and §3's
+  headers — a fact about a place the caller may rename — and one `context.fetch` with `items: []`,
+  as §4's probe appends; nothing is written. The cap refuses and never drops the oldest name; a
+  rename back to a former name takes no new place.
 - **The inbox, the personal root and `global` are never renamed.** Each, an absent or uncovered
   node, a `client` principal, and a caller short of what this needs get §3's refusal and §4's probe.
 
