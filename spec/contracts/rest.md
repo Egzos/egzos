@@ -624,9 +624,9 @@ the CLI or the lifeboat (`identity.md` §4).
   Chief, 2026-11-26, v0.7 §AM; #377), in his words "The screen lists your things and you tick what
   this agent gets", that the person chooses an agent's terms on the consent page; and **decided**
   (the Chief, 2026-11-26, v0.7 §AM: "go with your suggestion") that a person who is not an admin
-  reads their own grant for it. **a1p**, the route, whom it serves and its shape. **Not running**
-  until its code lands, and until then the path is §3's refusal, as a path no route declares. **It
-  never lands before the rules it needs:** a door serves this read only where it already runs
+  reads their own grant for it. **a1p**, the route, whom it serves and its shape. **Running**,
+  after every rule it needs below; a door from before it answers the path with §3's refusal, as a
+  path no route declares. **It never lands before the rules it needs:** a door serves this read only where it already runs
   every rule below that is marked as landing with it (the first leg's `terms` and `replaces` and
   their binding, `"*"` alone, and ids alone) and keeps §4.5's rule on a place's name, so a page
   that is served the read is at a door that runs them all, and a page refused it offers no choice
@@ -899,7 +899,7 @@ the CLI or the lifeboat (`identity.md` §4).
   a terminal's token before any leg: access is given, and a confirm credential kept or removed,
   from a browser. On every other confirm-gated act it is served the first leg and concludes no
   second (§4.2 item 3). **a1p** (v0.7 §AJ). `GET /v1/grant` is §3's refusal to it too (above;
-  **a1p**, v0.7 §AM).
+  **a1p**, v0.7 §AM; **running**).
 - **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
   §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
   instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
@@ -1232,8 +1232,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 
 `GET /v1/limits`, to any valid token, a `client` principal's included → `{"contract",
 "features": [<word>], "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}`. **a1p** (v0.7
-§AK; #360), **running**, its `features` naming `terminals.machine` alone until another word's
-code runs.
+§AK; #360), **running**, its `features` naming `terminals.machine` and `grants.own` until another
+word's code runs.
 
 - `upload_max_bytes` and `inline_max_bytes` are `blobs.upload_max_bytes` and
   `blobs.inline_max_bytes` as they stand (`container.md` §8), and `uploads_held_max` is §4.4's 16:

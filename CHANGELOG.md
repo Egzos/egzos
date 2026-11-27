@@ -46,6 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ends or changes between the legs is `mismatch`; the second leg finds each place again by its id
   under the lock and registers nothing where one is gone; and `identity.grant` carries
   `details.replaces`.
+- **`GET /v1/grant`** (`rest.md` §4.3, §4.6, v0.7 §AM; #377): a person signed in through this
+  container's own client reads their own grant, `{"grant": {"capabilities", "scopes"}}`, each scope
+  a node id that exists or `"*"`, and nothing of any other grant; an agent, a container `Token` and
+  a registered terminal's token get the one refusal and its probe; a parameter is `400` to every
+  caller alike; one `context.fetch` with `read: grant`. It lands after every rule it needs, and
+  `GET /v1/limits` now names `grants.own`.
 - **An agent gets what its person ticks, in the contract** (`rest.md` §4.3, §4.6, `identity.md`
   §3a, §4, §5, §8, v0.7 §AM; #377): an agent registration's capabilities and places, or the whole
   container as one choice of its own, are the person's own choice on the consent page, within their
