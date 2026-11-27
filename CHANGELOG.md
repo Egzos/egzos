@@ -54,6 +54,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   say that an approved agent stays signed in to this cloud, with no end date of its own, until its
   person or an admin ends its access.
 
+### Fixed
+
+- **Request strings must be well-formed Unicode** (`rest.md` §3): the REST door, the MCP tools and
+  the CLI refuse a string anywhere in a request that holds a surrogate code point outside a pair,
+  as they refuse U+0000 (`400 invalid_request` before any lookup, `invalid_request` in a tool's
+  error result), standard input to `egzoscore add -` included.
+
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 
 ### Added

@@ -24,7 +24,7 @@ import typer
 
 from egzos._term import safe
 from egzos._types import CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY, StorageBusy
-from egzos.backends.base import holds_nul
+from egzos.backends.base import malformed
 from egzos.container import OWNER, Container, HomeBindingError
 from egzos.identity import ConfigError, LastAdmin
 from egzos.model import Node
@@ -65,6 +65,11 @@ def _out(payload: Any, human: str | None = None) -> None:
         typer.echo(safe(json.dumps(payload, indent=2, ensure_ascii=False, default=str), json=True))
     elif human is not None:
         typer.echo(safe(human))
+
+
+class _Malformed(Exception):
+    """A request string holds U+0000 or is not well-formed Unicode: `main` answers as rest.md §3
+    has it, as for an argument."""
 
 
 def _fail(msg: str, code: int = 1) -> None:
@@ -217,6 +222,8 @@ def add(
     file: Path | None = None
     if what == "-":
         body = sys.stdin.read()
+        if malformed(body):  # read past `main`'s check of the arguments, so checked here
+            raise _Malformed
     elif Path(what).is_file():
         file = Path(what)
     else:
@@ -1063,7 +1070,7 @@ def _answer(args: list[str], word: str, code: int) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Entry point. Returns an exit code (tests call main([]))."""
     args = sys.argv[1:] if argv is None else argv
-    if holds_nul(args):  # a real argv cannot carry U+0000; a caller in process can (rest.md §3)
+    if malformed(args):  # U+0000 or ill-formed Unicode, refused first (rest.md §3)
         return _answer(args, "invalid_request", 2)
     try:
         rv = app(args=args or ["--help"], prog_name=PROG, standalone_mode=False)
@@ -1090,3 +1097,5 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except StorageBusy:  # the write lock was not taken in time, so nothing was written
         return _answer(args, "busy", 1)
+    except _Malformed:
+        return _answer(args, "invalid_request", 2)

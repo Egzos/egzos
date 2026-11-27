@@ -47,7 +47,7 @@ from starlette.responses import Response, StreamingResponse
 from egzos._types import StorageBusy
 from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
-from egzos.backends.base import holds_nul
+from egzos.backends.base import malformed
 from egzos.confirm import CREDENTIAL_NAME_MAX, REMOVE_REASONS, person_of, terminal_of
 from egzos.container import Container
 from egzos.identity import (
@@ -167,8 +167,8 @@ async def _object(request: Request, allowed: set[str], required: set[str]) -> di
         body = json.loads(raw)
     except ValueError as e:
         raise Invalid from e
-    if not isinstance(body, dict) or set(body) - allowed or required - set(body) or holds_nul(body):
-        raise Invalid  # U+0000 included, in a key or a value at any depth (§3)
+    if not isinstance(body, dict) or set(body) - allowed or required - set(body) or malformed(body):
+        raise Invalid  # U+0000 or ill-formed Unicode, in a key or a value at any depth (§3)
     return body
 
 
@@ -355,7 +355,7 @@ def create_app(
             # identity.md §7: a stateless /mcp opens no stream and has no session to end. The
             # transport's 405, the same for every verified caller; the 401 above came first.
             return out(_json(405, {"error": "method_not_allowed"}, {"Allow": "POST"}))
-        if holds_nul([request.scope["path"], *request.query_params.multi_items()]):
+        if malformed([request.scope["path"], *request.query_params.multi_items()]):
             return out(invalid())  # §3: a malformed request, answered before any lookup
         request.state.token = token
         # identity.md §3a: every entry the request appends names an agent's person

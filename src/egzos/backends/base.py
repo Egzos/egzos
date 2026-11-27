@@ -13,7 +13,7 @@ a third seam already: the blob store sits inside the store module (v0.5 §D, R5)
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import AbstractContextManager
 from typing import Any, Protocol
 
@@ -25,12 +25,31 @@ from egzos.model import ContextItem, Node, Token
 
 def holds_nul(value: Any) -> bool:
     """Whether a string in `value`, a key or an item at any depth, holds U+0000: no store keeps
-    one outside a document (storage.md §3.7), so every door refuses it first (rest.md §3)."""
+    one outside a document (storage.md §3.7)."""
+    return _any_string(value, lambda s: "\0" in s)
+
+
+def _well_formed(text: str) -> bool:
+    try:
+        text.encode("utf-8")  # strict UTF-8 encodes every scalar value and no surrogate
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def malformed(value: Any) -> bool:
+    """Whether a string in `value`, a key or an item at any depth, holds U+0000 or is not
+    well-formed Unicode (a surrogate code point outside a pair): request strings must be
+    well-formed Unicode with no U+0000, so every door refuses either first (rest.md §3)."""
+    return _any_string(value, lambda s: "\0" in s or not _well_formed(s))
+
+
+def _any_string(value: Any, test: Callable[[str], bool]) -> bool:
     stack = [value]  # walked, not recursed, so no depth of nesting raises
     while stack:
         v = stack.pop()
         if isinstance(v, str):
-            if "\0" in v:
+            if test(v):
                 return True
         elif isinstance(v, dict):
             stack.extend(v.keys())
