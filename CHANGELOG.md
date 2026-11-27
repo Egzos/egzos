@@ -28,6 +28,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line-break or bidirectional-control character, and is never `*`. `GET /v1/limits` says which of
   these a container serves, with its upload limits. Removing a place follows in its own change. Not
   running until the code lands.
+- **An agent gets what its person ticks, in the contract** (`rest.md` §4.3, §4.6, `identity.md`
+  §3a, §4, §5, §8, v0.7 §AM; #377): an agent registration's capabilities and places, or the whole
+  container as one choice of its own, are the person's own choice on the consent page, within their
+  grant; the provider's own scopes give nothing here. `GET /v1/grant` serves a signed-in person
+  their own grant (their capabilities and the node ids their grant names), so the page can list
+  what is theirs to give; `GET /v1/limits` names `grants.own` where it is served. An agent chosen
+  for again replaces what it had, and its first leg is to show what is replaced. The page tells the
+  person in fixed words that the agent signs in to this cloud as them within what they tick and can
+  read their account's record at the sign-in provider; the consent page approves an agent only
+  while two dated records of the operator's stand: that the identity project gives an agent's token
+  nothing more, and that a live test at the provider passed against the release it runs. The door
+  checks neither. Place names on the choose step are drawn as untrusted display, and the step waits
+  on §4.5's rule on a place's name. The door already refuses terms wider than the person's grant,
+  before the confirm and again inside it, and binds the confirm to the terms. The read, the terms
+  the first leg says it bound, and what a registration replaces are not running until their code
+  lands, which they do together and only after §4.5's rule on a place's name runs.
 
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 

@@ -913,6 +913,201 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
 
 
 ================================================================================
+AM. AMENDMENT — AN AGENT GETS WHAT ITS PERSON TICKS ON THE CONSENT SCREEN
+    (gives §AB's "never beyond their own grant" the source of a
+    registration's terms, which no contract named once identity.md §9
+    retired authorization-server.md §7's binding to OAuth's scope
+    parameter; replaces rest.md §4.3's check that an authorization
+    "asks for no scopes beyond the body's"; the retired server's page
+    took a request exactly as asked (spec/design/consent.md D-C2), and
+    the page egzos.io hosts does not; rewrites identity.md §3a's check
+    on Egzos/egzos#283, which was owed before the door shipped, as
+    owed before agent sign-in, a terminal's registration and the
+    first container egzos does not host, and restates what identity.md
+    §3a and §8 say a client's token reaches at the provider; adds a
+    word to §AK's list in rest.md §4.6. rest.md §4.3, §4.6; identity.md
+    §3a, §4, §5, §8; Egzos/egzos#377, and the second question in the
+    body of Egzos/egzos#308, on re-registration)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-26, choosing the second of the
+          two ways Egzos/egzos#377 sets out for where an agent
+          registration's capabilities and scopes come from (a default
+          the contract names, or the person's own choice on the consent
+          page), after the operator's survey of how other MCP servers
+          decide it: "go with the suggestion in the document, the
+          closest to you. The screen lists your things and you tick
+          what this agent gets." Recorded by the operator, enacted by
+          the merge of the contract change; the Chief may veto by
+          reverting.
+
+[DECIDED] THE PERSON CHOOSES ON THE CONSENT SCREEN WHAT AN AGENT GETS, in
+          the Chief's words above: the screen lists the person's things,
+          and they tick what this agent gets.
+
+[DECIDED] A PERSON WHO IS NOT THE ADMIN MAY SEE THEIR OWN ACCESS. Decided
+          by the Chief on 2026-11-26. The question as put to him: "May
+          a person who isn't the cloud's admin see their own access
+          (what they can do, and in which places)? The screen needs it
+          to list 'your things'." The operator's pick: yes. His words:
+          "For number 1, go with your suggestion."
+
+[DECIDED] AN AGENT ALREADY APPROVED IS CHOSEN FOR AGAIN, REPLACING WHAT
+          IT HAD, WITH THE SCREEN SHOWING WHAT IS REPLACED. Decided by
+          the Chief on 2026-11-26. The question as put to him: "An
+          agent you already approved asks again. Do you choose again
+          and replace what it had, with the screen showing what is
+          being replaced, or is it refused until you end it?" The
+          operator's pick: choose again and replace. His words:
+          "Number 2, go with your suggestion." This answers the second
+          question in the body of Egzos/egzos#308: re-registration is
+          not refused. That the door's first leg is what tells the
+          screen what is replaced is the operator's binding below.
+
+[DECIDED] AN AGENT MAY BE GIVEN THE WHOLE CONTAINER. Decided by the
+          Chief on 2026-11-26. The question as put to him: "May an
+          agent ever be given the whole cloud, now and later?" The
+          operator's pick: not offered for now, and refused at the
+          door. His words, against that pick: "Number 3, yeah, I want
+          an agent to be able to be given a whole cloud." How it is
+          offered is the operator's binding below.
+
+[DECIDED] AGENT SIGN-IN IS NOT SWITCHED ON BEFORE A LIVE TEST. Decided
+          by the Chief on 2026-11-26. The question as put to him: "May
+          agent sign-in be switched on before one live test with a
+          real agent token at the sign-in provider?" The operator's
+          pick: no. His words: "Number 4, and 4, go with what you
+          suggest."
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts;
+          the read, the first leg's terms and what a registration
+          replaces are not running until their code lands, which is
+          together: no door serves the read without the other two,
+          nor before §AK's rule on a place's name runs):
+
+          - The terms are places, and what the agent may do in them,
+            or the whole container, within the person's own grant
+            (§AB), and come from that choice and from nowhere else.
+            The provider's own scopes (openid, email, profile, phone)
+            carry none of it.
+          - The read is `GET /v1/grant`. It answers the caller's own
+            capabilities and the ids of the places their grant names,
+            and nothing else (an id holds the time its place was
+            made): no name of a place, and nothing of any other
+            person, agent or token. That "in which places" takes the
+            id as it is, with that time, is the operator's reading;
+            the question put to the Chief did not say so. It is
+            served to a person signed in through the provider. An
+            agent, a container token and a registered terminal's
+            token are refused as for anything absent. A page refused
+            it offers no choice.
+          - The door enforces the bound and the binding, as it already
+            runs. Terms wider than the person's own grant are refused
+            before the confirm, and again inside its atomic step
+            against the grant as it then stands. A choice of nothing
+            is refused as malformed. The confirm is bound to the
+            capabilities and the places, so no other terms can land.
+            The first leg is to say the terms it bound, and the page
+            to word the confirm from that answer; the chain is to
+            hold them, on the owner's record.
+          - The consent page owes the rest, since the door cannot see
+            a screen. It offers only what the person's own grant
+            bounds. Nothing is ticked until the person ticks it.
+            Nothing the agent supplies selects, suggests, orders or
+            ticks anything: not the provider's scope string, not any
+            other part of its request, not what it registered about
+            itself, not its name, and not the name of a place.
+          - A place's name is its maker's text, the first words of
+            what was written where a capture opened it, or, once
+            §AK's rename runs, its renamer's text, drawn inert
+            beside the place's kind and path, in an order the page
+            states and no client steers. The choose step is not
+            offered until the door keeps §AK's rule on a place's name
+            (rest.md §4.5), which runs only once its code lands; the
+            read of the person's grant is served only where it runs,
+            and GET /v1/limits then names the word grants.own. The
+            rule bars a path's separators, control and line-break
+            characters and bidirectional controls, and bounds the
+            length; it leaves other formatting characters and names
+            that look alike. A name given before it is drawn inert
+            all the same.
+          - What the page sends is what it shows: capabilities by
+            name, never a role bundle; places by id, never a path;
+            one set of capabilities over every chosen place, since a
+            registration holds one set; each place with everything
+            beneath it, now and later; and that an agent covering a
+            place may make a thread or a project under it.
+          - The whole container is one choice of its own, offered only
+            to a person whose grant holds it, never ticked for them,
+            and worded plainly as everything in this cloud, what is
+            made later and the inbox included. The page sends "*" for
+            that choice alone, never by adding up ticked places. The
+            door takes "*" for an agent only from a person whose grant
+            holds "*", binds the confirm to it and records it on the
+            chain, as it already runs. That is all the door holds to
+            today. It is to say the terms in its first leg, to take
+            "*" only alone, and to take ids alone on this route; none
+            of the three runs yet. Ticking places, top places
+            included, gives those places and what is under them; as
+            the container runs today its two top places hold every
+            place, so ticking both covers what "*" covers, and the
+            page says so, but sends them as two places.
+          - A place renamed between the choice and the confirm is
+            still the place chosen, since the terms are ids. One that
+            is gone, or no longer the person's to give, registers
+            nothing. Nothing moves or removes a place today; a rename
+            is §AK's, and runs once its code lands.
+          - The provider's scopes are neither read nor shown. The
+            container reads no scope from a token, as it already
+            runs. The screen says, in fixed words of its own: that
+            approving lets this agent sign in to this cloud as the
+            person, within what they tick; and that the agent can
+            read their account's record at the sign-in provider:
+            their profile, their email, a phone number where the
+            account holds one, and how they sign in. An
+            authorization that names any scope but the provider's
+            four is refused.
+          - Those words hold only while the identity project gives
+            nothing more to a token carrying a client's id: by the
+            provider's documentation such a token holds what the
+            person's own sign-in holds, whatever scopes were asked.
+            So the consent page approves an agent only while two
+            dated records of the operator's stand: that check, and
+            the live test above against the provider release the
+            project runs. A change to the project's rules, or another
+            release, fells its record until it is made again. Without
+            both the page denies the authorization at the provider
+            and calls no route (identity.md §3a). The door checks
+            neither record and cannot, and agents approved before a
+            record fell stay until they are ended. The provider's own
+            routes that change an account or approve a consent refuse
+            such a token by a reading of its source (v2.199.0,
+            2026-11-26); the test is to confirm it.
+          - Choosing again is a new registration through the same
+            screen, from nothing, which replaces the earlier one
+            whole, and whose first leg shows what it replaces, in the
+            whole-container choice's own words where either side is
+            the whole container. Declining ends nothing, and the
+            screen says so. For an approval the provider gave
+            without asking, the page calls no route; the person ends
+            the agent, and egzos.io withdraws their consent to it at
+            the provider. An agent ended any other way is still
+            consented there until that person's next visit to their
+            agents on egzos.io, which withdraws it; this container
+            refuses it meanwhile. Nothing narrows a registration in
+            place.
+
+[LATER]   One agent holding different capabilities in different
+          places. Narrowing a live registration in place, from the
+          app. A terminal reading its person's grant.
+
+[LATER]   This section does not touch the staging of an agent's file
+          (rest.md §4.4). The Chief's ruling of the same day on it
+          (Egzos/egzos#405) is its own change.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -927,7 +1122,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
      repository and the core's new name, each terminal a client of its own,
-     renaming items and places
+     renaming items and places,
+     an agent's terms as its person's choice on the consent screen
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
