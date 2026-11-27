@@ -380,8 +380,9 @@ registration" is either.
   as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g); and, at the REST door, tombstoning an item a
   person promoted, which removes curated knowledge (`rest.md` §4; **a1p**, #296), or renaming an
   item that is verified or that a person promoted, or renaming a place, which can re-point a name
-  (`rest.md` §4.5; **a1p**, v0.7 §AK, not running). On a grant, a registration or a gated revoke, the button also needs a fresh sign-in, as
-  a first credential does (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
+  (`rest.md` §4.5; **a1p**, v0.7 §AK, not running). On a grant, a registration or a gated revoke,
+  the button also needs a fresh sign-in, as a first credential does (`rest.md` §4.3; **a1p**,
+  GHSA-c3gg-hwx9-473g).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public

@@ -268,9 +268,9 @@ list_credentials(person=None)                    -> list[ConfirmCredential]   # 
   forgotten are both `stale`.
 - **No column holds a secret.** A challenge is a random value bound to the request that asked for
   it: the principal, the act, its subject and destination, and the audience delta; and, **a1p**
-  (v0.7 §AK, not running), on an act on an item, and on an approve for each item its proposal
-  names, the item's `lifecycle.version`, `scope` and `trust.status` as the first leg read them; on a rename, its new name; and on a place's rename,
-  the node's name as the first leg read it. A confirm
+  (v0.7 §AK, not running), on an act on an item, and on an approve for each item its proposal names,
+  the item's `lifecycle.version`, `scope` and `trust.status` as the first leg read them; on a
+  rename, its new name; and on a place's rename, the node's name as the first leg read it. A confirm
   credential is a WebAuthn public key, which verifies an assertion and proves nothing alone; it is
   never served (`rest.md` §4.3's shape omits it). A removed credential is kept, marked `removed`.
 

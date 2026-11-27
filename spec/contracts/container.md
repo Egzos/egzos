@@ -78,19 +78,21 @@ matches (#115).
 itself would change its own path, and paths are the addressing surface. **running** for the
 first-item name; the rename proposal is **decided, not running**.
 
-**The container's admin may rename a place** (`rest.md` §4.5; v0.7 §AK). The rule above binds a
-rename that happens on its own, which stays a proposal; this rename is a person's own act. It
-keeps the node's id and changes every path through the node. After a rename a path names whatever
-bears the name now: a reference held as a path may stop resolving, or may come to name another
-node that now bears the name, and nothing redirects from an old name. A rename can therefore
-re-point a name, and the name it frees may then be taken by anyone who may create a place where a
-path's tail would match it; so a rename is kept to the container's admin, as a confirmed act the
-chain records with the old and the new name, and a client keeps ids. The inbox, the
-personal root and `global` are never renamed, and a place's name, made or renamed on any surface,
-keeps `rest.md` §4.5's rule. **a1p**, **not running.** **A client that keeps a place to act on
-keeps its id, never its path, and acts on the id a path resolved to at once, never keeping a
-path's resolution across a confirm or a later act**: what a path names may have changed, and what
-an id names has not. **a1p**, **not running.**
+**The container's admin may rename a `project` or a `thread`** (`rest.md` §4.5; v0.7 §AK). The rule
+above binds a rename that happens on its own, which stays a proposal; this rename is a person's own
+act. It keeps the node's id and changes every path through the node. After a rename a path names
+whatever bears the name now: a reference held as a path may stop resolving, or may come to name
+another node that now bears the name, and nothing redirects from an old name. A rename can therefore
+re-point a name, and the name it frees may be borne by a place that anyone whose token covers a
+parent makes, a person or an agent, before the rename or after it; a read, a write or a grant still
+addressed by the old path then reaches that place (`rest.md` §4.5). So a rename is kept to the
+container's admin, as a confirmed act the chain records with the old and the new name, and a client
+keeps ids. A place of any other type is not renamed: the inbox, the personal root and `global`
+never, and the other types not in this change. A place's name, made or renamed on any surface,
+keeps `rest.md` §4.5's rule. **a1p**, **not running.** **A client that keeps a place to act
+on keeps its id, never its path, and acts on the id a path resolved to at once, never keeping a
+path's resolution across a confirm or a later act**: what a path names may have changed, and what an
+id names has not. **a1p**, **not running.**
 
 ## 3 · The chain
 
