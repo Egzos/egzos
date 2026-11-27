@@ -566,6 +566,18 @@ def test_blob_grant_descriptor_agrees_across_both_documents() -> None:
         assert set(documented) == set(t.BlobGrant.__annotations__), f"{where}: vs `BlobGrant`"
 
 
+def test_what_the_door_serves_names_the_typed_words_and_version() -> None:
+    """`rest.md` §4.6: `GET /v1/limits` serves the contract set's version, which the set's
+    README states, and names only words §4.6 defines, each of which `DoorFeature` types."""
+    where = "rest.md §4.6"
+    body = section(doc("rest.md"), "4.6", where=where)
+    for word in t.DOOR_FEATURES:
+        assert f"`{word}`" in body, f"{where}: does not define the feature word `{word}`"
+    assert f'`"{t.CONTRACT_VERSION}"` today' in body, f"{where}: vs `CONTRACT_VERSION`"
+    stated = re.search(r"\*\*Contract v([\d.]+) \(", doc("README.md"))
+    assert stated and stated.group(1) == t.CONTRACT_VERSION, "README.md: vs `CONTRACT_VERSION`"
+
+
 # --- the parser is not vacuous -----------------------------------------------------------------
 # Everything above passes if the parser quietly finds nothing. These four break a document on
 # purpose and require the helpers to fail on it.

@@ -34,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bidirectional-control character or lone surrogate (the door with `400` before any lookup, `mk`
   with `invalid_request`); pure capture writes `/` and `:` as `-`, drops those characters, keeps
   40, and names a thread left with nothing, or only `*`, by its item's id. Names given before stay.
+- **`GET /v1/limits`** (`rest.md` §4.6, v0.7 §AK; #360): any valid token, an agent's included, reads
+  the contract's version (`"1.1"`), the words for what this door serves beyond release 0.2.0
+  (`terminals.machine` today) and the upload limits (`upload_max_bytes`, `inline_max_bytes`,
+  `uploads_held_max`), as one `context.fetch` with `read: limits`; a parameter is `400`.
 - **An agent gets what its person ticks, in the contract** (`rest.md` §4.3, §4.6, `identity.md`
   §3a, §4, §5, §8, v0.7 §AM; #377): an agent registration's capabilities and places, or the whole
   container as one choice of its own, are the person's own choice on the consent page, within their
