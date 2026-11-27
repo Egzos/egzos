@@ -1106,6 +1106,25 @@ AM. AMENDMENT — AN AGENT GETS WHAT ITS PERSON TICKS ON THE CONSENT SCREEN
           (rest.md §4.4). The Chief's ruling of the same day on it
           (Egzos/egzos#405) is its own change.
 
+[NOTE]    2026-11-27, the operator: a fact corrected, and the
+          operator's binding above amended to match it; the Chief
+          decided nothing here and may veto it as the rest of the
+          binding. The provider takes a fifth scope word,
+          offline_access, beside the four named above. It carries
+          none of the terms either, and it decides nothing a client
+          receives: a client is handed a refresh token with or
+          without it (read in the provider's public source at
+          release v2.199.0). Many agents' clients send the word. So
+          two lines above are superseded: where the binding says the
+          provider's own scopes are "(openid, email, profile,
+          phone)", read those and offline_access; and where it says
+          an authorization "that names any scope but the provider's
+          four is refused", read five. The consent page's fixed
+          words gain one sentence: that an approved agent stays
+          signed in to this cloud, with no end date of its own,
+          until its person or an admin ends its access, which was
+          already so. rest.md §4.3 carries all of it.
+
 
 ================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
