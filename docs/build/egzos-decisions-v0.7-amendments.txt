@@ -750,12 +750,15 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
     SERVES (amends container.md §2's rename sentence, which bound only a
     rename that happens on its own; [0.3 · 2]'s capture naming, which now
-    writes a `/` or a `:` as `-` and drops control characters; and
+    writes a `/` or a `:` as `-` and drops Cc, Zl, Zp and Bidi_Control
+    characters;
     rest.md §4.2 item 1's list of confirm-gated acts, which gains the
-    rename of a verified or promoted item.
-    rest.md §4, §4.1, §4.2, §4.5, §4.6, §5, §8; container.md §2;
-    context-item.md §3; storage.md §3; events.md §1; Egzos/egzos#404,
-    Egzos/egzos#360)
+    rename of a verified or promoted item, and item 3's binding, which
+    gains an item's version; and resolve_ref's tail rule, which gains
+    former names.
+    rest.md §3, §4, §4.1, §4.2, §4.5, §4.6, §5, §8; container.md §2;
+    context-item.md §3; identity.md §4, §5; storage.md §3; events.md
+    §1; Egzos/egzos#404, Egzos/egzos#360)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-11-25 and 2026-11-26. On
@@ -786,22 +789,39 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
           - Renaming an item that is verified, or that a person has
             promoted, takes the confirm, as its tombstone does: the
             confirm shows the old name and the new, and is bound to the
-            new. Any other item is renamed at once.
+            new. Any other item is renamed at once, an unverified rule
+            aside, which is refused whatever its provenance.
+          - A confirm on an item (promote, a gated tombstone or
+            rename, a move or copy's confirm) is bound to the item's
+            version as its first leg read it; a rename moves the
+            version, so a second leg that finds another concludes
+            `mismatch` and changes nothing; the person asks again.
           - Renaming a place is a person's act, by the rule that lets
-            them make that place there, with `organize` on it. Its id
-            stays and the node alone is written. Every path through it
-            changes: a path may stop resolving, or may come to name
-            another place that now bears the name, and nothing
-            redirects. So a client keeps a place's id, never its path.
-            A proposal is shown with its places' names as they stand.
+            them make that place there, with `organize` and `fetch` on
+            it. Its id stays; the node alone is written, with its
+            `node.rename`, in one atomic step. Grants and agent
+            registrations keep node ids, as the door already does.
             The inbox, the personal root and `global` are never
-            renamed. Event `node.rename`, with the old name and the new.
-          - A place's name, made or renamed, is 1 to 255 characters,
-            with no U+0000, no `/`, no `:`, no control character and no
-            bidirectional control. An item's new name keeps an upload
-            name's rule and holds none of those control characters.
-            Existing names stay. Pure capture writes a `/` or a `:` in
-            a title as `-` and drops those control characters.
+            renamed. A proposal is shown with its places' names as
+            they stand.
+          - A former name fails closed. A place keeps the names it has
+            borne, which no route serves. A tail that reaches a node
+            by a former name never resolves to it: alone it answers as
+            absent, and beside a match by a present name it is refused
+            as ambiguous. So a path stops resolving to a renamed place
+            and can name another only where no place the caller can
+            see has borne that name. A client still keeps a place's
+            id, never its path. This binds the door, both MCP
+            transports and the command line.
+          - A place's name, made or renamed on any surface, is 1 to 255
+            Unicode scalar values, compared as given with no
+            normalisation, with no `/`, no `:`, and no character of
+            category Cc, Zl or Zp or with Bidi_Control. An item's new
+            name keeps an upload name's rule and holds none of those
+            characters. Existing names stay. Pure capture writes a `/`
+            or a `:` in a title as `-`, drops every Cc, Zl, Zp or
+            Bidi_Control character, and names a thread left with
+            nothing by the item's id.
           - The door serves what it carries (`GET /v1/limits`): the
             contract's version, a word for each thing it serves that
             0.2.0 did not (`terminals.machine`, `items.rename`,

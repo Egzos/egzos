@@ -243,7 +243,9 @@ token covers is refused and nothing is picked ([0.3 · 1]): status `409`, the sa
 the matches; **a1p**, the bytes (#187). The candidates are only the nodes the token covers, so the
 answer names nothing the token could not list at `GET /v1/scopes`; a tail whose only matches are
 uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as the running MCP door's
-`_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`).
+`_probe` does. `GET /v1/find` never answers it: a search covers every match (`store.find`). A
+tail that reaches a node by a name the node once bore is refused this way beside a match, and with
+no match is §3's refusal (`container.md` §2; **a1p**, v0.7 §AK, not running).
 
 **Only a principal holding `fetch` is told the matches. a1p** (#294): they are what
 `GET /v1/scopes` would list, and it needs `fetch`. Any other gets §3's refusal and §4's probe
@@ -292,7 +294,7 @@ spec's job).
 | `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title; at once, or with the confirm where it is verified or a person promoted it (§4.5) | an `interactive` principal holding `organize` and `fetch` on its scope | — (new: #404) | `item.rename`; a verified or promoted item's: `context.fetch` (first leg), then `step_up` and `item.rename` |
-| `PATCH /v1/scopes/{id}` | rename a place; its id stays (§4.5) | an `interactive` principal that could create it at its parent; `organize` on it | — (new: #404) | `node.rename` |
+| `PATCH /v1/scopes/{id}` | rename a place; its id stays (§4.5) | an `interactive` principal that could create it at its parent; `organize` and `fetch` on it | — (new: #404) | `node.rename` |
 | `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | — (new: #360) | `context.fetch` (`read: limits`) |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -419,9 +421,11 @@ the row does not name is `400` (§3).
   "verified-only"}`, the running resolver's layer. `chain` lists only the layers the token covers,
   innermost first (`container.md` §3, §4 invariant 3).
 - **`<node>`** is `{"id", "type", "name", "parent", "created_at", "path"}`: `container.md` §2's
-  persisted node plus its computed path, unknown fields included.
+  persisted node plus its computed path, unknown fields included, its former names excepted
+  (`container.md` §2; **a1p**, v0.7 §AK, not running).
 - **`<proposal>`** is `container.md` §6's parked proposal, `_types.Proposal` with the wire key
-  `from` (`PROPOSAL_WIRE_KEY_FROM`).
+  `from` (`PROPOSAL_WIRE_KEY_FROM`), except that its `from_path` and `to_path` are rendered from
+  its ids as they stand when it is served (§4.5; **a1p**, v0.7 §AK, not running).
 - **`<path>`** is a path as `NodeService.path` renders it (`container.md` §2).
 
 **Per route:**
@@ -504,7 +508,11 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
    challenge, at most one proceeds past it, as §6's grant spend:
    - finds the challenge live, unspent and **bound to this request**: the same principal (the
      `Token.id`, or the provider token's `sub` and `client_id`), the same act, subject and destination,
-     and the same audience delta, recomputed now;
+     and the same audience delta, recomputed now; and, **a1p** (v0.7 §AK, not running), on an act on
+     an item (a promote, a tombstone or a rename that takes the confirm, a move or copy's confirm),
+     the item's `lifecycle.version` as the first leg read it: a second leg that finds another
+     version concludes `mismatch` and changes nothing, and the person asks again and sees the item
+     as it now is;
    - verifies the proof (`identity.md` §5);
    - spends the challenge.
 
@@ -834,16 +842,19 @@ until then each of these routes is §3's refusal, as a path no route declares, a
 of their words. The `{id}` in each path is an id, never a path tail, so §3's
 `ambiguous` never arises on these routes.
 
-**A name's shape.** A place's name, sent to `POST /v1/scopes` or to its rename, is 1 to 255
-characters and holds no U+0000, no `/` and no `:`, which a path and its `type:name` labels reserve
-(`container.md` §2), no C0 or C1 control character, and no bidirectional control (U+200E, U+200F,
-U+202A to U+202E, U+2066 to U+2069). An item's new name is held to an upload `name`'s rule (§4.4)
-and holds none of those control characters. Anything else is §3's `400`, before any lookup. Names
-given before this stay as they are. Pure capture, when it names a thread from a title, writes each
-`/` and `:` as `-` and drops those control characters. Sibling names may still repeat, a tail
-naming two is still refused as ambiguous (§3), and no rule is added on which type sits under
-which: both are left for a later change, because pure capture names inbox threads from titles that
-may repeat, and a rule there needs its own decision (v0.7 §AK).
+**A name's shape.** A place's name, made or renamed on any surface (`NodeService.create` and the
+rename, which the door and `egzoscore mk` call), is 1 to 255 Unicode scalar values, kept and
+compared as given, with no normalisation. It holds no `/` and no `:`, which a path and its
+`type:name` labels reserve (`container.md` §2), no character of general category Cc (U+0000 and
+U+007F among them), Zl or Zp, and none with the Bidi_Control property. An item's new name is held to
+an upload `name`'s rule (§4.4) and holds no character of Cc, Zl, Zp or Bidi_Control. Anything else
+is §3's `400` at the door, before any lookup, and refused on every other surface. Names given before
+this stay as they are. Pure capture, when it names a thread from a title, writes each `/` and `:` as
+`-` and drops every character of Cc, Zl, Zp or Bidi_Control, and where nothing is left the thread's
+name falls back to the item's id. Sibling names may still repeat, a tail naming two is still refused
+as ambiguous (§3), and no rule is added on which type sits under which: both are left for a later
+change, because pure capture names inbox threads from titles that may repeat, and a rule there needs
+its own decision (v0.7 §AK).
 
 **Renaming an item: a person's act, as a tombstone is** (§4). `PATCH /v1/items/{id}` with
 `{"name", "confirm"?}` → `{"item": <item>}`.
@@ -855,44 +866,48 @@ may repeat, and a rule there needs its own decision (v0.7 §AK).
 - **It sets one field.** An artifact's `content.filename`; a text item's `content.auto_title`, with
   `content.title_engine` set to `person`, so a title a person gave is told from one an engine made
   and no later title pass replaces it (`context-item.md` §3). The bytes, `content.sha256`, `scope`,
-  `key`, `tags` and `trust` stay as they were; `lifecycle.version` and `updated_at` move, as on any
-  mutation (`context-item.md` §6). An inbox thread keeps its name when its item is renamed
-  (`container.md` [0.3 · 2]).
+  `key`, `tags` and `trust` stay as they were. `lifecycle.version` moves, as it does on each
+  mutation (`context-item.md` §6), so a confirm on the item opened before the rename concludes
+  `mismatch` (§4.2 item 3); `lifecycle.updated_at` moves with it. An inbox thread keeps its name
+  when its item is renamed (`container.md` [0.3 · 2]).
 - **An item that is not verified and that no person has promoted is renamed at once**, an
   unverified `rule` aside (below). A `confirm` sent with it is ignored and concludes nothing.
 - **A verified item, or one a person has promoted (`provenance.approved_by`) whatever its status
-  now, takes the confirm** (§4.2): renaming curated knowledge goes behind a re-authentication, as
-  its tombstone does (§4). The first leg answers `newly: []` and names what it renames,
-  `"renames": {"item", "kind", "from", "to"}`, the names untrusted display data; its
-  `context.fetch` carries the same as `details.renames`. The challenge is bound to the body's
-  `name`, so a second leg that names another is §4.2's `mismatch`.
+  now, an unverified `rule` aside, takes the confirm** (§4.2): renaming curated knowledge goes
+  behind a re-authentication, as its tombstone does (§4). The first leg answers `newly: []` and
+  names what it renames, `"renames": {"item", "kind", "from", "to"}`, the names untrusted display
+  data; its `context.fetch` carries the same as `details.renames`. The challenge is bound to the
+  body's `name` and, as on every act on an item, to the item's version (§4.2 item 3), so a second
+  leg that names another, or finds the item changed, is §4.2's `mismatch`.
 - **One atomic step** holds a second leg's `step_up`, the write and its `item.rename`, and an item
   renamed at once is written with its `item.rename` in one atomic step too. `item.rename` carries
   `kind`, `field` (`filename` or `title`), `from`, the name as it stood, and the new `name`, both
   untrusted display data.
-- **Absent, uncovered, tombstoned, quarantined, an unverified `rule` (served only at
-  `GET /v1/pending`), or without `organize` or `fetch`**: §3's refusal and §4's probe, the same
-  for each.
+- **Absent, uncovered, tombstoned, quarantined, an unverified `rule` whatever its provenance
+  (served only at `GET /v1/pending`), or without `organize` or `fetch`**: §3's refusal and §4's
+  probe, the same for each.
 
-**Renaming a place.** `PATCH /v1/scopes/{id}` with `{"name"}` → `{"node": <node>}`, its `path`
-`null` to a principal without `fetch` (§4.1 item 8).
+**Renaming a place.** `PATCH /v1/scopes/{id}` with `{"name"}` → `{"node": <node>}`.
 
 - **Needs** an `interactive` principal that could create a place of the node's type at its parent,
   by §4's `POST /v1/scopes` row (coverage of the parent; `admin` above its `structure_floor`), and
-  that holds `organize` on the node. A grant whose coverage starts at the node renames what lies
-  under it, never the node, whose name the granter gave.
+  that holds `organize` and `fetch` on the node: the answer carries the node. A grant whose
+  coverage starts at the node renames what lies under it, never the node, whose name the granter
+  gave.
 - **The node's id never changes, and a rename writes the node alone.** A container `Token`'s
-  `scopes` are node ids (`capabilities.md` §5); a person's grant and an agent's registration keep
-  the `scopes` they hold (`identity.md` §4); a terminal registration holds none and acts under its
-  person's grant (§4.3). **What changes is every path through the node** (`container.md` §2): a
-  reference held as a path may stop resolving, or may come to name another node that now bears the
-  name; nothing redirects from an old name. So a client keeps a place's id, never its path
-  (`container.md` §2).
+  `scopes` are node ids (`capabilities.md` §5); a person's grant and an agent's registration that
+  this door writes hold node ids too (`identity.md` §4); a terminal registration holds none and acts
+  under its person's grant (§4.3). **What changes is every path through the node**: a reference held
+  as a path stops resolving to the renamed node, and can come to name another node only where no
+  node the caller can see has borne that name, because the node keeps the names it has borne and a
+  tail that reaches it by one fails closed (`container.md` §2); nothing redirects from an old name.
+  So a client keeps a place's id, never its path (`container.md` §2).
 - **A proposal is shown as its ids now stand.** `GET /v1/pending` and the approve and deny first
   legs render a proposal's `from_path` and `to_path` from its ids as they stand, not as they stood
-  when it was parked; it is decided on ids.
-- It appends `node.rename` (`type`, `from`, the name as it stood, and the new `name`, both
-  untrusted display data).
+  when it was parked (§4.1's `<proposal>`); it is decided on ids.
+- **One atomic step** holds the node's write, its former name added, and its `node.rename`
+  (`storage.md` §3.6), which carries `type`, `from`, the name as it stood, and the new `name`, both
+  untrusted display data.
 - **The inbox, the personal root and `global` are never renamed.** Each, an absent or uncovered
   node, a `client` principal, and a caller short of what this needs get §3's refusal and §4's probe.
 
@@ -915,9 +930,9 @@ may repeat, and a rule there needs its own decision (v0.7 §AK).
   none of the words: it offers none of those acts, rather than reading a later `404` on one as a
   refusal of the act.
 - Reading it appends one `context.fetch` with `items: []` and `details.read: limits`, as §4.3's
-  reads do, its `subject` null as a container-wide `config.set`'s is and its `scope` null
-  (`events.md` §1, §2): it serves no item or node, but `events.md` §4 invariant 2 excepts nothing
-  else.
+  reads do, its `subject` null as a container-wide `config.set`'s is (`events.md` §1) and its
+  `scope` null, as `scope` may be (`events.md` §2): it serves no item or node, but `events.md` §4
+  invariant 2 excepts nothing else.
 
 ## 5 · Audit coverage
 

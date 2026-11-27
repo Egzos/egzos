@@ -291,6 +291,10 @@ registration" is either.
   scopes lie within it, and the intersection below still applies at check time. It needs no `publish`
   (`capabilities.md` §1): the agent holds no more than its person. Nobody registers an agent to serve
   someone else. **decided** (§AB); its route is `rest.md` §4.3.
+- **A grant and an agent registration keep node ids.** At the REST door (`POST /v1/grants`,
+  `POST /v1/agents`), a scope given as a path tail is resolved when the record is written, by
+  `rest.md` §3's rules, and the record keeps the node's id, never the tail; `"*"` stays itself.
+  **running.**
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
   server, the consent page egzos.io hosts — a security surface, whose anti-phishing shape (telling the
   requesting client's real identity and scopes apart from a deceptively named registrant) is A2's to
@@ -374,9 +378,10 @@ registration" is either.
   same way (**a1p**, v0.7 §AJ); and, at the REST door, ending
   a grant or a registration that serves someone else (§4), which removes a person's access as surely
   as a grant gives it (**a1p**, GHSA-c3gg-hwx9-473g); and, at the REST door, tombstoning an item a
-  person promoted, which removes curated knowledge (`rest.md` §4; **a1p**, #296). On a grant, a
-  registration or a gated revoke, the button also needs a fresh sign-in, as a first credential does
-  (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
+  person promoted, which removes curated knowledge (`rest.md` §4; **a1p**, #296), or renaming an
+  item that is verified or that a person promoted (`rest.md` §4.5; **a1p**, v0.7 §AK, not
+  running). On a grant, a registration or a gated revoke, the button also needs a fresh sign-in, as
+  a first credential does (`rest.md` §4.3; **a1p**, GHSA-c3gg-hwx9-473g).
 - **Two proofs.**
   - `biometric` — a WebAuthn assertion with user verification **required**, from a credential the user
     registered with this container under an interactive principal, verified against the stored public

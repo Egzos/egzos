@@ -80,14 +80,29 @@ first-item name; the rename proposal is **decided, not running**.
 
 **A person may rename a place** (`rest.md` §4.5; v0.7 §AK). The rule above binds a rename that
 happens on its own, which stays a proposal; a person's rename is their own act. It keeps the node's
-id and changes every path through the node: a reference held as a path may stop resolving, or may
-come to name another node that now bears the name; nothing redirects from an old name. The inbox,
-the personal root and `global` are never renamed, and a place's name holds no `/`, no `:`, no
-control character and no bidirectional control (`rest.md` §4.5). **a1p**, **not running.** Since
-another person may now rename a place between two of a client's requests, **a client that keeps a
-place to act on keeps its id, never its path, and acts on the id a path resolved to at once, never
-keeping a path's resolution across a confirm or a later act**: what a path names may have changed,
-and what an id names has not. **a1p**, **not running.**
+id and changes every path through the node: a reference held as a path stops resolving to the
+renamed node, and can come to name another node only where no node the caller can see has borne
+that name (below); nothing redirects from an old name. The inbox, the personal root and `global`
+are never renamed, and a place's name, made or renamed on any surface, keeps `rest.md` §4.5's
+rule. **a1p**, **not running.**
+
+**A former name fails closed.** A node keeps, beside the fields above, each name a person's rename
+took from it, its former names (`storage.md` §3); no route or tool serves them (`rest.md` §4.1).
+`resolve_ref`'s tail rule gains one clause: a segment matches a node by its present name, as above,
+and also by a former name, as its `type:name` label or the name alone. A node a tail reaches by
+present names alone is a match; one it reaches with any segment matched only by a former name is a
+stale match, and a stale match never resolves. So a tail with stale matches and no match answers as
+an absent one, and a tail with one match and any stale match, or with two matches, is refused as
+ambiguous (`rest.md` §3's `ambiguous`, to a caller who may be told; the one refusal otherwise), the
+refusal naming each node, match or stale match, by its present path. Stale matches, like matches,
+count only among the nodes the caller can see. A rename back to a name the node once bore makes it
+the present name again, and no longer a former one. An id always resolves. `GET /v1/scopes` shows
+present names only. This binds every surface that resolves a tail: the REST door, both MCP
+transports and the command line. **a1p** (v0.7 §AK), **not running.** Since another person may now
+rename a place between two of a client's requests, **a client that keeps a place to act on keeps its
+id, never its path, and acts on the id a path resolved to at once, never keeping a path's resolution
+across a confirm or a later act**: what a path names may have changed, and what an id names has not.
+**a1p**, **not running.**
 
 ## 3 · The chain
 
