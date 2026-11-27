@@ -913,6 +913,112 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
 
 
 ================================================================================
+AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
+    THROUGH THE MCP DOOR, AND ITS FILE IS KEPT AT ONCE (amends rest.md
+    §4.4 item 3's staging of an agent's artifact and storage.md §4's
+    staging rule for agent-proposed artifacts, for artifacts written
+    from now on; adds a single-use address for an upload's bytes beside
+    rest.md §6's grant. rest.md §4, §4.4, §4.6, §4.7, §5, §6, §8;
+    storage.md §3.5, §4; identity.md §7; context-item.md §3;
+    Egzos/egzos#405. The letter was held for this change by an earlier
+    draft that never merged)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-26, in three answers, recorded
+          by the operator with each as he gave it; enacted by the merge
+          that records this section; the Chief may veto by reverting.
+
+          (1) Asked what files an outside agent must be able to save into
+          his cloud's chosen projects and threads, 2026-11-26: "Golden
+          files can be ... everything. The MCP and the CLI and every other
+          [door] has to be able to ... do all of the ... files and formats
+          and everything under the ... sun all at ... once." (The
+          ellipses are pauses in his speech, kept; "[door]" is ours.) So
+          every door carries any file of any format.
+
+          (2) Asked, the same evening, whether an approved agent's file
+          is kept at once in the places its person ticked on the approve
+          screen, or held in the person's 16 slots until the person
+          decides: "go with keep." The page he answered also proposed a
+          size limit per agent, and that the file stays marked as the
+          agent's and unverified.
+
+          (3) Asked, the same evening, how a file too large for one tool
+          call travels: "In terms of what the research says section, go
+          with the outcome of the research that was suggested." The
+          research found the common way: a tool hands back a one-time
+          upload address and the agent's own code sends the bytes there
+          (Notion, Slack, Box, Egnyte, ClickUp, AWS and Cloudinary do
+          this; the MCP standard itself defines no file upload).
+
+          Already in the contract, and not reopened: an agent may be given
+          the whole container (§AM).
+
+[DECIDED] THE MCP DOOR CARRIES EVERY KIND OF FILE. A small file rides in
+          one call; any larger one goes through an upload whose bytes go
+          to a single-use address. A file is read back by name, type and
+          size, and its bytes through rest.md §6's grant.
+
+[DECIDED] AN APPROVED AGENT'S FILE IS KEPT AT ONCE, in a place its terms
+          cover, the whole container where its person gave it that. It
+          stays the agent's and unverified, and a person promotes it or
+          removes it as any unverified item.
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts, and
+          not running until the code lands):
+
+          - One rule for every tool: it mirrors a route the door already
+            has, under the same capabilities, coverage, validation,
+            refusal and audit events, so no tool gives a caller a power
+            its token lacks at `/v1/`. Where a tool needs something new,
+            the route gets it first: the address has its own route,
+            `POST /v1/uploads/{id}/address`, and every door may use it.
+          - One call carries up to 131,072 bytes (128 KiB), checked by the
+            length of its base64 before it is decoded, the same over stdio
+            and HTTP: at `/mcp` that leaves room for the call inside the
+            262,144 bytes the door reads of a request. The write is one
+            atomic step, so a failed call leaves nothing behind.
+          - The address is bound to the upload, its opener, the declared
+            size and hash, and one use; it lives 900 seconds and never
+            past the upload; it is redeemed with no bearer, on one path
+            and one method, and is never a bearer for anything else. The
+            bytes are checked against the declared length and hash on
+            arrival.
+          - An agent's kept bytes are bounded per agent: 1 GiB by default
+            (`blobs.agent_kept_max_bytes`, which an admin may change), ten
+            files at the per-file limit, so a busy agent fits and a
+            runaway one stops long before a hosted container's volume
+            fills. A person's own uploads count toward no agent's bound.
+            At the bound an open answers `too_many_bytes`; a person frees
+            room by removing the agent's files. Written files no longer
+            hold any of the person's 16 slots; open and orphaned uploads
+            still do. A place the agent's terms do not cover is refused,
+            never held. `GET /v1/limits` names the bound, the one-call
+            limit and, once all of this runs, the word `files.agent`.
+          - A file's name keeps a place name's characters (§AK), on every
+            door, and is display data only, never a path on any store.
+          - `egzos_fetch` names files and mints no grant; `egzos_get`
+            reads one item and carries its grant's address, on the
+            container's public origin.
+          - No tool makes a place: an agent saves into places its person
+            made, and finds their names with `egzos_places`. A tool for it
+            waits on a rule of its own at `POST /v1/scopes` for an agent: a
+            capability, a bound on how many it makes, its places shown as
+            its own, and a way for the person to remove one.
+          - No tool for a human-only act, and none that fetches an address
+            a caller chose.
+
+          WHAT THE OTHER DOORS OWE, so that every door stays true: the
+          REST door carries any file already and gains the address route
+          and the keep; the command line carries any file already, with
+          the owner's token, and changes nothing; egzos.io's app and the
+          lifeboat show an agent's kept file as the agent's and unverified,
+          and offer the person promote and remove on it, as on any
+          unverified item.
+
+
+================================================================================
 AM. AMENDMENT — AN AGENT GETS WHAT ITS PERSON TICKS ON THE CONSENT SCREEN
     (gives §AB's "never beyond their own grant" the source of a
     registration's terms, which no contract named once identity.md §9
@@ -1141,7 +1247,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
      repository and the core's new name, each terminal a client of its own,
-     renaming items and places,
+     renaming items and places, every kind of file through the MCP door
+     and an approved agent's file kept at once,
      an agent's terms as its person's choice on the consent screen
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
