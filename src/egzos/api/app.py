@@ -65,7 +65,7 @@ from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
 from egzos.store.blobs import grant_url
 from egzos.store.find import QueryError, find, parse, shown
-from egzos.store.items import StoreError
+from egzos.store.items import BODY_KINDS, StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError, valid_name
 from egzos.store.uploads import MAX_HELD, TooManyUploads, valid_open
 from egzos.store.uploads import person_of as opener_of
@@ -525,7 +525,7 @@ def create_app(
         body = await _object(request, {"body", "kind", "scope", "key", "tags", "upload"}, set())
         kind = _str(body.get("kind"), optional=True, limit=32) or "memory"
         # Text in its body, or an artifact through an upload (§4.4): one or the other.
-        if kind not in KINDS or (kind == "artifact") != ("upload" in body) or (
+        if kind not in KINDS or (kind in BODY_KINDS) == ("upload" in body) or (
                 ("body" in body) == ("upload" in body)):
             raise Invalid
         text = _str(body["body"], limit=BODY_MAX_BYTES) if "body" in body else None

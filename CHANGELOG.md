@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it. The consent page no longer refuses an authorization for naming it, and its fixed words now
   say that an approved agent stays signed in to this cloud, with no end date of its own, until its
   person or an admin ends its access.
+- **The MCP tools say and do what the contract says** (`rest.md` §3, §4.1): a tool call carrying
+  an argument the tool does not define answers `invalid_request` before any lookup, as a malformed
+  call does; `egzos_remember` takes the kinds `POST /v1/items` takes from a body, so never
+  `artifact`; and the three descriptions and the server's instructions say how a place is named
+  (`Music/drafts`, names exactly as they are, or an id), where a call starts without one, what
+  comes back, and the size limit.
 
 ### Fixed
 
