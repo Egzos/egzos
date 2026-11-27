@@ -268,8 +268,9 @@ request at `/mcp` (§7) counts under the same surface word, `rest`: one door, on
 **Attribution of a verified provider token** (`events.md` §2: every entry names its `actor`). A person:
 `actor` is `user:<sub>`. A person at a terminal: `actor` is `user:<sub>` as well, since the act is
 the person's, and `details.terminal` is the terminal's `client_id` on every entry appended for the
-request, `step_up` included, added as `details.for` is; a `BlobGrant` redeemed with no bearer takes
-it from the token its descriptor names (`rest.md` §6). So the chain says which terminal an act came
+request, `step_up` included, added as `details.for` is; a `BlobGrant` redeemed, or an upload
+address used (`rest.md` §4.4 item 2a), with no bearer takes it from the token its descriptor names
+(`rest.md` §6). So the chain says which terminal an act came
 through (**a1p**, v0.7 §AJ). An agent: `actor` is
 `agent:<client_id>`, and `details.for` is `user:<sub>`, the user it acted for, so "who read this"
 names both. `principal` is `interactive` or `client` as §4 maps it. A container `Token` keeps its
@@ -531,7 +532,8 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
 - **The tools are one set on both transports**, each mirroring a route of the REST door under that
   route's rules, so none gives a caller a power its token lacks at `/v1/`: `rest.md` §4.7 lists
   them, with their arguments, answers and events. An approved agent's file is kept at once in a
-  place its terms cover (`rest.md` §4.4 item 3). **a1p** (v0.7 §AL).
+  place its terms cover (`rest.md` §4.4 item 3; **decided**, v0.7 §AL). **a1p**, the rest of this
+  bullet.
 - **Where the transport's rules meet the door's.** `/mcp` is stateless and declares `POST` alone. A
   verified `GET` (a stream) or `DELETE` (a session's end) answers `405`, with `Allow: POST`,
   `rest.md` §3's headers and `{"error":"method_not_allowed"}`, the same for every caller: it tells

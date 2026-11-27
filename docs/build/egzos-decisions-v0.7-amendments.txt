@@ -917,9 +917,11 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
     THROUGH THE MCP DOOR, AND ITS FILE IS KEPT AT ONCE (amends rest.md
     §4.4 item 3's staging of an agent's artifact and storage.md §4's
     staging rule for agent-proposed artifacts, for artifacts written
-    from now on; adds a single-use address for an upload's bytes beside
-    rest.md §6's grant. rest.md §4, §4.4, §4.6, §4.7, §5, §6, §8;
-    storage.md §3.5, §4; identity.md §7; context-item.md §3;
+    once its code runs, none written before being promoted by the
+    upgrade; adds a single-use address for an upload's bytes beside
+    rest.md §6's grant. rest.md §2, §3, §4, §4.1, §4.4, §4.6, §4.7, §5,
+    §6, §8;
+    storage.md §3.5, §4; identity.md §3a, §7; context-item.md §3;
     Egzos/egzos#405. The letter was held for this change by an earlier
     draft that never merged)
 ================================================================================
@@ -954,15 +956,14 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
           Already in the contract, and not reopened: an agent may be given
           the whole container (§AM).
 
-[DECIDED] THE MCP DOOR CARRIES EVERY KIND OF FILE. A small file rides in
-          one call; any larger one goes through an upload whose bytes go
-          to a single-use address. A file is read back by name, type and
-          size, and its bytes through rest.md §6's grant.
+[DECIDED] THE MCP DOOR CARRIES EVERY KIND OF FILE, and a file too large
+          for one call goes through an upload whose bytes go to a
+          single-use address.
 
 [DECIDED] AN APPROVED AGENT'S FILE IS KEPT AT ONCE, in a place its terms
           cover, the whole container where its person gave it that. It
-          stays the agent's and unverified, and a person promotes it or
-          removes it as any unverified item.
+          stays the agent's and unverified, and an agent's kept bytes
+          have a limit.
 
           THE OPERATOR'S BINDING, which the Chief did not decide and may
           veto clause by clause (each is marked a1p in the contracts, and
@@ -974,33 +975,43 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
             its token lacks at `/v1/`. Where a tool needs something new,
             the route gets it first: the address has its own route,
             `POST /v1/uploads/{id}/address`, and every door may use it.
-          - One call carries up to 131,072 bytes (128 KiB), checked by the
-            length of its base64 before it is decoded, the same over stdio
-            and HTTP: at `/mcp` that leaves room for the call inside the
-            262,144 bytes the door reads of a request. The write is one
-            atomic step, so a failed call leaves nothing behind.
+          - A small file rides in one call, up to 131,072 bytes (128
+            KiB), checked by the length of its base64 before it is
+            decoded, the same over stdio and HTTP: at `/mcp` that leaves
+            room for the call inside the 262,144 bytes the door reads of
+            a request. A failed call leaves no upload and no slot behind.
           - The address is bound to the upload, its opener, the declared
-            size and hash, and one use; it lives 900 seconds and never
-            past the upload; it is redeemed with no bearer, on one path
+            size and hash, and one use; it lives 900 seconds, and none is
+            issued for an upload with less left; an upload takes one
+            transfer at a time; it is redeemed with no bearer, on one path
             and one method, and is never a bearer for anything else. The
             bytes are checked against the declared length and hash on
             arrival.
           - An agent's kept bytes are bounded per agent: 1 GiB by default
             (`blobs.agent_kept_max_bytes`, which an admin may change), ten
-            files at the per-file limit, so a busy agent fits and a
-            runaway one stops long before a hosted container's volume
-            fills. A person's own uploads count toward no agent's bound.
-            At the bound an open answers `too_many_bytes`; a person frees
-            room by removing the agent's files. Written files no longer
-            hold any of the person's 16 slots; open and orphaned uploads
-            still do. A place the agent's terms do not cover is refused,
-            never held. `GET /v1/limits` names the bound, the one-call
-            limit and, once all of this runs, the word `files.agent`.
-          - A file's name keeps a place name's characters (§AK), on every
-            door, and is display data only, never a path on any store.
-          - `egzos_fetch` names files and mints no grant; `egzos_get`
+            files at the per-file limit. A person's own uploads count
+            toward no agent's bound, and a file the person promoted
+            counts toward none. At the bound an open answers
+            `too_many_bytes`; a person makes room by removing the agent's
+            files. An agent holds at most 4 uploads not yet written as
+            items, and none of the person's 16 slots, which stay the
+            person's. A place the agent's terms do not cover is refused,
+            never held. A kept file is served as any unverified item is;
+            in a place that serves verified items only, to no one until a
+            person promotes it.
+          - A client container `Token` the owner minted is kept the same
+            way, though it never passed the approve screen.
+          - A file's name holds no control, line-separator or
+            bidi-control character, on every door, and is display data
+            only, never a path on any store.
+          - A file is read back by name, type, size and writer:
+            `egzos_fetch` names files and mints no grant; `egzos_get`
             reads one item and carries its grant's address, on the
-            container's public origin.
+            container's public origin. `egzos_limits` serves an agent
+            the limits in force, and a file over a limit is answered
+            `too_big` with the limit, so the agent can tell its person.
+            `GET /v1/limits` names the new limits and, once all of this
+            runs, the word `files.agent`.
           - No tool makes a place: an agent saves into places its person
             made, and finds their names with `egzos_places`. A tool for it
             waits on a rule of its own at `POST /v1/scopes` for an agent: a
@@ -1011,11 +1022,17 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
 
           WHAT THE OTHER DOORS OWE, so that every door stays true: the
           REST door carries any file already and gains the address route
-          and the keep; the command line carries any file already, with
-          the owner's token, and changes nothing; egzos.io's app and the
-          lifeboat show an agent's kept file as the agent's and unverified,
-          and offer the person promote and remove on it, as on any
-          unverified item.
+          and the keep. The command line carries any file already, with
+          the owner's token; it checks a file's name against the rule
+          above before it opens an upload and names the character it
+          refuses, and it shows an agent's item as the agent's in ls,
+          find, fetch and get. egzos.io's app and the lifeboat show an
+          agent's kept file as the agent's and unverified, and offer the
+          person promote and remove on it, as on any unverified item. No
+          client renders an artifact's bytes or inline text as active
+          content in its own origin: it previews only by a type found in
+          the bytes, never by the declared one, and offers anything else
+          as a download.
 
 
 ================================================================================
