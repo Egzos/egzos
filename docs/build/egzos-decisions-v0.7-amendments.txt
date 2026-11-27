@@ -749,7 +749,7 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 ================================================================================
 AL. AMENDMENT — AN OUTSIDE AGENT SAVES EVERY KIND OF FILE, THROUGH EVERY DOOR
     (amends nothing decided; extends the MCP door beyond text. rest.md §4,
-    §4.5, §5, §8; identity.md §7; context-item.md §3; Egzos/egzos#405)
+    §4.7, §5, §8; identity.md §7; context-item.md §3; Egzos/egzos#405)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-11-26, asked what files an outside
@@ -761,8 +761,8 @@ AL. AMENDMENT — AN OUTSIDE AGENT SAVES EVERY KIND OF FILE, THROUGH EVERY DOOR
           text (Egzos/egzos#405). Recorded by the operator, enacted by the
           merge that records this section; the Chief may veto by reverting.
 
-[DECIDED] THE MCP DOOR CARRIES FILES, BY TOOLS THAT MIRROR ROUTES THE REST
-          DOOR ALREADY HAS. This section binds the first part, a file small
+[DECIDED] THE MCP DOOR CARRIES EVERY KIND OF FILE, AS THE COMMAND LINE AND
+          THE REST DOOR DO. This section binds the first part, a file small
           enough to ride in one call; a larger one waits for the next
           change (below), and until it lands goes through rest.md §4.4 or
           the command line.

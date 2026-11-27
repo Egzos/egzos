@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`GET /v1/terminals`); the confirm that registers it shows the line and is bound to it; and
   nothing is decided on it.
 
-- **The contract for files through the MCP door** (`rest.md` §4.5, v0.7 §AL; part of #405):
+- **The contract for files through the MCP door** (`rest.md` §4.7, v0.7 §AL; part of #405):
   `egzos_add_file` writes a file small enough for one call, `egzos_places` and `egzos_make_place`
   list and make places, `egzos_get` reads one item, and `egzos_fetch` names an artifact's file and
   carries its download grant. Each mirrors a REST route under its rules. Not running yet.
