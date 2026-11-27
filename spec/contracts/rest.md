@@ -27,7 +27,8 @@ stdio and the lifeboat. Every clause is derived from what is already decided, an
 - The flagship's needs per #137, **v1.0 only**: #137 files its twelve asks as v1.1 inputs. Item 8
   (artifact transport) is already v1.0 by F5 and is §6 here. The other eleven are `[v1.1]` below.
 
-The running doors (CLI, `egzos_fetch` / `egzos_remember` / `egzos_inbox`, the lifeboat) are cited
+The running doors (CLI, `egzos_fetch` / `egzos_remember` / `egzos_inbox` / `egzos_places`, the
+lifeboat) are cited
 where an endpoint here mirrors one. That makes the endpoint a transport for an operation that
 already runs, not a new operation.
 
@@ -250,7 +251,7 @@ uncovered is §3's refusal. It appends one `context.fetch` with `items: []`, as 
 **Only a principal holding `fetch` is told the matches. a1p** (#294): they are what
 `GET /v1/scopes` would list, and it needs `fetch`. Any other gets §3's refusal and §4's probe
 instead, as for an absent tail, on every route that takes a reference, `POST /v1/items` included,
-and in the MCP tools alike (`egzos_fetch`, `egzos_remember`).
+and in the MCP tools alike (`egzos_fetch`, `egzos_remember`, `egzos_places`).
 
 **A store that cannot take the container's write lock in time answers `503`**, with
 `{"error":"busy"}`, `Retry-After: 1` and the same four headers: the store raised `StorageBusy`
@@ -281,7 +282,7 @@ spec's job).
 | `GET /v1/find?q=` | search across what the token sees, in the query grammar of `egzos.store.find` | `fetch` | `egzos find` | `context.fetch` |
 | `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
-| `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls` | `context.fetch` |
+| `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls`, `egzos_places` | `context.fetch` |
 | `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
 | `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
 | `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
@@ -444,7 +445,11 @@ the row does not name is `400` (§3).
    at `GET /v1/items/{id}`.
 5. **`GET /v1/scopes`** returns the child nodes of `under`, sorted by path. `under` absent is the
    token's start, as `egzos_fetch`'s default: the personal root for a token over everything, the
-   token's first scope for a narrower one. **a1p** (a1r on #288).
+   token's first scope for a narrower one. **a1p** (a1r on #288). `egzos_places`, the same read
+   for an agent, answers with no `under` for a narrower token every place its grant or registration
+   names that exists and it covers, each as a `<node>` whose `parent` is null where the token does
+   not cover that parent, sorted by path, in one `context.fetch` whose `subject` and `scope` are
+   null. **a1p** (#415, 2026-11-27).
 6. **`POST /v1/items`** returns the item as written: `trust.status` is `unverified` (`container.md`
    §5). `kind` defaults to `memory`; `scope` absent is pure capture, a fresh auto-titled thread in
    the inbox (R11), as `egzos_remember`.
