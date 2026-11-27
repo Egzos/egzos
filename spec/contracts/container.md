@@ -256,6 +256,11 @@ audience; a token minted between proposal and approval makes the approval one fo
 than the one displayed. An implementation that executed against the *stored* manifest would pass
 every test that does not mint a token mid-flight — and would break the only thing the gate is for.
 
+**A proposal also ends `stale` when the place it would move into is removed** (`rest.md` §4.5;
+v0.7 §AK). Nobody could decide it afterwards, so the removal's own atomic step ends it and appends
+`approval.stale` with `details.reason: removed`: no more a human "no" than a mismatch is. **a1p**,
+**not running.**
+
 ### Proposing carries the same floor as moving — `organize` (#94)
 
 **Both branches of the gate require `organize` at the source scope.** Parking a proposal is not a

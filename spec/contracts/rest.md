@@ -291,7 +291,7 @@ spec's job).
 | `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
 | `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
-| `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title (§4.5) | an `interactive` principal holding `organize` on its scope | — (new: #404) | `item.rename` |
+| `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title (§4.5) | an `interactive` principal holding `organize` and `fetch` on its scope | — (new: #404) | `item.rename` |
 | `PATCH /v1/scopes/{id}` | rename a place; its id stays (§4.5) | an `interactive` principal that could create it at its parent; `organize` on it | — (new: #404) | `node.rename` |
 | `DELETE /v1/scopes/{id}` | remove a place that holds nothing (§4.5) | as rename, and `fetch` on it | — (new: #404) | `node.tombstone`; or `context.fetch` (`not_empty`) |
 | `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | — (new: #360) | `context.fetch` (`read: limits`) |
@@ -847,9 +847,10 @@ needs its own decision (v0.7 §AK).
 **Renaming an item: a person's act, as a tombstone is** (§4). `PATCH /v1/items/{id}` with
 `{"name"}` → `{"item": <item>}`.
 
-- **Needs** an `interactive` principal holding `organize` where the item sits. A `client` principal
-  gets §3's refusal, and MCP has no tool for it: an agent's write waits for a person (§4.4), and a
-  name is what the person finds an item by.
+- **Needs** an `interactive` principal holding `organize` and `fetch` where the item sits: the
+  answer carries the item as stored, and a name is given by someone who reads what it names. A
+  `client` principal gets §3's refusal, and MCP has no tool for it: an agent's write waits for a
+  person (§4.4), and a name is what the person finds an item by.
 - **It sets one field.** An artifact's `content.filename`; a text item's `content.auto_title`, with
   `content.title_engine` set to `person`, so a title a person gave is told from one an engine made
   and no later title pass replaces it (`context-item.md` §3). The bytes, `content.sha256`, `scope`,
@@ -859,7 +860,8 @@ needs its own decision (v0.7 §AK).
 - **No confirm**: a name widens nobody's view. The write and its `item.rename` (`kind`, `field`:
   `filename` or `title`, and the new `name`, untrusted display data) are one atomic step.
 - **Absent, uncovered, tombstoned, quarantined, an unverified `rule` (served only at
-  `GET /v1/pending`), or without `organize`**: §3's refusal and §4's probe, the same for each.
+  `GET /v1/pending`), or without `organize` or `fetch`**: §3's refusal and §4's probe, the same
+  for each.
 
 **Renaming a place.** `PATCH /v1/scopes/{id}` with `{"name"}` → `{"node": <node>}`, its `path`
 `null` to a principal without `fetch` (§4.1 item 8).

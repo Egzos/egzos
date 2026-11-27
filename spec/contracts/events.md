@@ -276,4 +276,6 @@ The gate's delta rule and the manifest binding → `container.md`. Capabilities 
 (Phase 1); they add no events.
 
 Decided at the 0.3 freeze (item 39): a TOCTOU refusal is `approval.stale`, its own event, and
-`approval.deny` is only a human "no" — anomaly detection tells them apart by name.
+`approval.deny` is only a human "no" — anomaly detection tells them apart by name. `approval.stale`
+gains a second cause with v0.7 §AK: the removal of the place a proposal would move into
+(`rest.md` §4.5; `details.reason: removed`), which is no human "no" either. **a1p**, **not running.**
