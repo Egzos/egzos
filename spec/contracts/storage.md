@@ -464,7 +464,7 @@ and how a container names its own.
 ```
 put(data)      -> sha256        # promoted store, dedup by construction
 stage(data)    -> sha256        # staging prefix, invisible to resolution
-promote(sha)   -> bool          # staging -> promoted, at a write a person or a kept agent makes, or on approval
+promote(sha)   -> bool          # staging -> promoted: a person's or a kept agent's write, or approval
 get(sha)       -> bytes | None
 exists(sha)    -> bool
 discard(sha)   -> bool          # deletes staged bytes only; True if there were any
@@ -529,7 +529,7 @@ staging is not a trust status applied to a reachable blob, it is a different loc
 moves the bytes into the promoted store; only then does the content address resolve. **running.**
 **Since v0.7 §AL an agent's artifact is kept at once** (`rest.md` §4.4 item 3): it is promoted with
 its item, as a person's is, and the upload it was written from records that it was. That record,
-and for a copy its source's, a tombstoned source included, is what Trust reads to tell a kept
+and for a copy the one its chain of sources first reaches, is what Trust reads to tell a kept
 artifact from a staged one (`rest.md` §6 item 2); an agent's artifact with no such record stays
 staged until a person promotes it. Staging holds an upload's bytes until its item is written.
 **decided**, that it is kept; **a1p**, the rest; not running.

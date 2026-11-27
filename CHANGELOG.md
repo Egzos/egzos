@@ -81,8 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   address, while `egzos_fetch` names an artifact's file and its writer and mints none; and
   `egzos_limits` serves it the limits in force. An approved agent's file is kept at once in a place
   its terms cover, the agent's and unverified, within a per-agent bound
-  (`blobs.agent_kept_max_bytes`, 1 GiB by default; `too_many_bytes` past it); an agent holds at
-  most 4 uploads not yet written and none of its person's 16. A file's name holds no control,
+  (`blobs.agent_kept_max_bytes`, 1 GiB by default; `too_many_bytes` past it); an agent's upload
+  whose bytes have not arrived holds no slot of its person's 16, and an agent holds at most 4 such. A file's name holds no control,
   line-separator or bidi-control character. No tool makes a place. Not running until the code
   lands.
 

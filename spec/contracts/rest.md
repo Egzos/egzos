@@ -106,7 +106,8 @@ own.
    redemption route (§6). **a1p** for the rest of this item, reading `authorization-server.md`
    §11.0 and §12.1 onto this door. **Wherever this item says redemption, it means §6's redemption
    or the use of §4.4 item 2a's upload address**, whose descriptor's opener is the token that keys
-   the third bucket (v0.7 §AL; **a1p**, not running):
+   the third bucket, with the address's own checks for §6's; an address refused at its check 7
+   counts in no bucket and appends what item 2a says (v0.7 §AL; **a1p**, not running):
    - **What counts:** what a sweep looks like, and nothing else: every `401` answer, and every
      redemption whose descriptor fails §6's check 1 or 2. **decided** (the Chief on #141,
      2026-10-09). A redemption refused at check 3 or later is a refusal of a *verified* descriptor,
@@ -340,7 +341,8 @@ row and these bullets:
   of every one, and so out of every audience: the furthest inward move, which `container.md` §6
   floors on `organize` at the source, as it does every move. Six capabilities are the whole
   vocabulary (§1), so none is added for it. A `client` principal gets §3's refusal: a person
-  decides on what an agent wrote (§4.4), and MCP has no tool for this. The inbox thread a pure capture
+  decides on what an agent wrote (§4.4), and MCP has no tool for this. The inbox thread a pure
+  capture
   opened keeps the name the item's title gave it (`container.md` [0.3 · 2]).
 - **An item no person has promoted goes at once**, an unverified `rule` included (the route
   serves nothing of it), answering `{"result": "tombstoned"}`: §4.4's release. An artifact whose
@@ -1038,7 +1040,8 @@ the CLI or the lifeboat (`identity.md` §4).
 ### 4.4 · Artifact upload
 
 `POST /v1/items` takes text in its body, or an artifact through an upload. **a1p**, the shape;
-**decided**, the staging rule and dedup ([0.3 · 41]; `storage.md` §4). The bytes travel to the
+**decided**, the staging rule as v0.7 §AL amends it, and dedup ([0.3 · 41]; `storage.md` §4). The
+bytes travel to the
 container and nowhere else; the container keeps them in its `BlobStore`, which may sit on object
 storage (v0.7 §S).
 
@@ -1049,7 +1052,8 @@ storage (v0.7 §S).
    `blobs.upload_max_bytes` (default 104857600, 100 MiB; an `admin` may change it), which enters
    `container.md` §8 and `_types.py` with the code that reads it, as `identity.md` §2's keys do. A
    person holds at most 16 uploads that are open or orphaned (below), **or written as an artifact
-   item whose bytes are still staged** (step 3: an agent's, until a person promotes or tombstones it),
+   item whose bytes are still staged** (step 3: an agent's written before item 3's keep ran, until a
+   person promotes or tombstones it),
    counting the uploads of every agent serving them (`identity.md` §4); a container `Token` counts as
    a person of its own, so each `Token` the owner mints holds its own 16, as before (only the owner
    mints one). A 17th answers `429` with `{"error":"too_many_uploads"}` and §3's headers — a
@@ -1065,24 +1069,28 @@ storage (v0.7 §S).
    **a1p**, not running): no character of category Cc, Zl or Zp and none with the Bidi_Control
    property, on every surface that opens an upload, the MCP tools' included. A name is display data
    only: no store uses it as a path or a key, and two files may share one.
-   **An agent's uploads are its own to count** (v0.7 §AL; **a1p**, not running). A `client`
-   principal holds at most 4 uploads that are open or orphaned, and a 5th open answers `429` with
-   `{"error":"too_many_uploads"}`: none of them holds a slot of its person's 16, which stay the
-   person's (this replaces, for a `client` principal, "counting the uploads of every agent serving
-   them" above). Its kept bytes stay within `blobs.agent_kept_max_bytes` (default 1073741824, 1 GiB; an
-   `admin` may change it, and the key enters `container.md` §8 and `_types.py` with the code that
-   reads it), counted over the uploads that `Token.id` (§6) opened: the declared size of each that
-   is open or orphaned, and of each whose item is an artifact not tombstoned, not quarantined and
-   not promoted by a person (`provenance.approved_by`). A copy adds nothing. An open that would
-   pass it answers `429` with `{"error":"too_many_bytes"}`. Both are facts about what that agent
-   holds, and both caps and the open's record are one atomic step: of two concurrent opens that
-   together pass either, at most one is recorded. Each agent registration and each client container
-   `Token` counts its own; a person's uploads count toward none. A person makes room by removing
-   the agent's files (§4); their bytes stay, as promoted bytes do (`storage.md` §4). **decided**,
-   that an agent's kept bytes have a limit (the Chief, 2026-11-26); **a1p**, the numbers, the
-   counting and the answers. The 16 still count the staged items agents wrote before item 3's keep
-   ran. A container behind an edge that caps a request's body sets `blobs.upload_max_bytes` at or
-   below that cap.
+   **An agent's byteless opens are its own to count** (v0.7 §AL, amending §AC's count for these
+   alone; **a1p**, not running, the Chief's to confirm). A `client` principal's upload whose bytes
+   have not arrived holds no slot of its person's 16. A `client` principal holds at most 4 such
+   uploads, and a 5th open answers `429` with `{"error":"too_many_uploads"}`. Once its bytes are
+   staged, it holds one of its person's 16, as v0.7 §AC counts a person's agents, and as an orphan
+   it is its person's to see and discard (below).
+   **An agent's kept bytes are bounded** (v0.7 §AL). The bound is `blobs.agent_kept_max_bytes`
+   (default 1073741824, 1 GiB; an `admin` may change it; the key enters `container.md` §8 and
+   `_types.py` with the code that reads it). It is counted over the uploads that agent's `Token.id`
+   (§6) opened, across every registration that has named it, ended and replaced ones included; a
+   client container `Token` counts its own, and a person's uploads count toward none. Each upload
+   counts its declared size while it is open or orphaned, and while its item, or a live copy of it,
+   is an artifact not tombstoned, not quarantined and not promoted by a person
+   (`provenance.approved_by`). A copy adds nothing of its own. An open that would pass the bound
+   answers `429` with `{"error":"too_many_bytes"}`; an open whose `size` alone passes it is the
+   same `400` as one past `upload_max_bytes`. Both caps and the open's record are one atomic step:
+   of two concurrent opens that together pass either, at most one is recorded. A person makes room
+   by removing or promoting the agent's files (§4); removed files' bytes stay, as promoted bytes do
+   (`storage.md` §4). **decided**, that an agent's kept bytes have a limit (the Chief, 2026-11-26);
+   **a1p**, the numbers, the counting and the answers; not running.
+   The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
+   edge that caps a request's body sets `blobs.upload_max_bytes` at or below that cap.
    **The answer also carries the bytes' address**: `{"upload", "expires_at", "put_url",
    "put_expires_at"}`, item 2a's (**a1p**, not running).
 2. **Bytes.** `PUT /v1/uploads/{id}` with the raw bytes. The id is bound to the principal that opened
@@ -1093,27 +1101,34 @@ storage (v0.7 §S).
    `hash`, `already`). A `PUT` naming an unknown, expired or another principal's id is §3's refusal and
    appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`; a refused `PUT`
    answers `400` (`invalid_request`), a fact about the caller's own bytes, and a later `PUT` of the
-   right bytes may still stage them.
-2a. **The bytes' address** (v0.7 §AL; **a1p**, not running). `put_url` is `PUT
-   <public origin>/v1/uploads/<id>?opener=<Token.id>&size=<n>&sha256=<hex>&expires_at=<UTC
-   ISO-8601>&sig=<sig>`, each value percent-encoded, the origin `identity.md` §2's, `expires_at`
+   right bytes may still stage them. A `PUT` that arrives while another transfer to the upload is
+   running (item 2a) is refused `400` with `details.reason: receiving`, and stages nothing (v0.7
+   §AL; **a1p**, not running).
+2a. **The bytes' address** (v0.7 §AL; **a1p**, not running). `put_url` is the URL `<public
+   origin>/v1/uploads/<id>?opener=<Token.id>&size=<n>&sha256=<hex>&expires_at=<UTC
+   ISO-8601>&sig=<sig>`, to which the caller sends a `PUT`, each value percent-encoded, the origin
+   `identity.md` §2's, `expires_at`
    written as §6 writes it, and `sig` an HMAC-SHA256 under §6's container key over `canonical` JSON
    (`events.md` §3) of `{"use": "upload", "upload", "opener", "size", "sha256", "expires_at"}`. The
    `use` field is in no `BlobGrant`, so no grant's `sig` verifies as an address and no address's
    as a grant. Where the container names no `identity.origin` and the request came over stdio, or
-   §6's key signs nothing, the answer carries neither `put_url` nor `put_expires_at`, never `null`.
+   §6's key signs nothing, no address is given: an open answers as §4.7 says for that case, and
+   `POST /v1/uploads/{id}/address` is §3's refusal.
    - **It is bound** to the upload, to its opener (the `Token.id` that opened it), to the declared
-     `size` and `sha256`, and to one use. It lives 900 seconds from its issue, a fixed contract value,
-     and none is issued for an upload with less than that left. **It is handed only** in the answer
-     to its opener's own open, or to that opener's `POST /v1/uploads/{id}/address`
-     (`egzos_upload_address`), which takes no body and no query, and issues a fresh one, answering
-     `{"upload", "put_url", "put_expires_at"}`, for an upload of its own that is live, has 900
-     seconds left and whose bytes have not arrived, to an opener that still holds `remember` on its
-     scope, checked now. It appends nothing; any other case is §3's refusal and §4's probe. An
-     earlier address stays good until it is spent or expires.
+     `size` and `sha256`, and to one use. It lives 900 seconds from its issue, a fixed contract
+     value. None is issued for an upload with less than that left.
+   - **It is handed only to its opener**: in the answer to its own open, or by
+     `POST /v1/uploads/{id}/address` (`egzos_upload_address`). That route takes no body and no
+     query. It issues a fresh address, answering `{"upload", "put_url", "put_expires_at"}` and
+     appending nothing, only where all of these hold: the upload is the caller's own, live, with 900
+     seconds left, and its bytes have not arrived; and the caller still holds `remember` on its
+     scope, checked now. Any other case is §3's refusal and §4's probe. An earlier address stays
+     good until it is spent or expires.
    - **It is redeemed with no bearer.** A `PUT` to this path that carries no `Authorization` header
-     and carries the descriptor is read as an address; one that carries the header is item 2's
-     route, where a query parameter is §3's `400`. No other route and no other method reads the
+     and carries any parameter of the descriptor is read as an address, and check 1 judges it; one
+     that carries neither is item 2's route, answered `401` (§2 item 5); one that carries the header
+     is item 2's route, where a query parameter is §3's `400`. No other route and no other method
+     reads the
      descriptor, `/mcp` included: **it is never a bearer for anything else**. It delivers exactly
      the declared bytes to that one upload. It reads nothing, lists nothing, writes no item and
      discards nothing. Like §6's redemption, §2 reads no bearer on it (§2 items 5 and 7).
@@ -1122,11 +1137,11 @@ storage (v0.7 §S).
      for the opener is read, and while it holds the address gets §3's refusal, is not spent and
      appends nothing; (3) `expires_at` has not passed; (4) the address has not been spent, and this
      arrival spends it, whatever the later checks decide, atomically, as §6's check 4 spends a
-     grant, in §6's spent records (`storage.md` §3.5); (5) the upload exists, its opener is the
-     descriptor's, it is live and not discarded, no transfer to it is running and its bytes have not
-     arrived, and its `size` and `sha256` are the descriptor's, and the upload is then marked as
-     receiving, atomically, by either route, until this transfer is staged, refused or cut off;
-     (6) the opener is live and still holds `remember` on the upload's scope, checked now; (7) the
+     grant, in §6's spent records (`storage.md` §3.5); (5) the upload exists and is not discarded,
+     its opener is the descriptor's, it is live, its `size` and `sha256` are the descriptor's, its
+     bytes have not arrived, and no transfer to it is running, by either route; it is then marked
+     as receiving, atomically, until this transfer is staged, refused or cut off; (6) the opener is
+     live and still holds `remember` on the upload's scope, checked now; (7) the
      bytes, read only up to `size`, are exactly `size` long and hash to `sha256`. Checks 1 to 6
      refuse with §3's refusal, byte-identical whichever failed: a second use, a late use and a
      forged one answer alike. Nothing after check 6 refuses for time. Check 7 refuses with `400`
@@ -1224,8 +1239,8 @@ capture names inbox threads from titles that may repeat, and a rule there needs 
 
 - **Needs** an `interactive` principal holding `organize` and `fetch` where the item sits: the
   answer carries the item as stored, and a name is given by someone who reads what it names. A
-  `client` principal gets §3's refusal, and MCP has no tool for it: an agent's write waits for a
-  person (§4.4), and a name is what the person finds an item by.
+  `client` principal gets §3's refusal, and MCP has no tool for it: a person decides on what an
+  agent wrote (§4.4), and a name is what the person finds an item by.
 - **It sets one field.** An artifact's `content.filename`; a text item's `content.auto_title`, with
   `content.title_engine` set to `person`, so a title a person gave is told from one an engine made
   and no later title pass replaces it (`context-item.md` §3). The bytes, `content.sha256`, `scope`,
@@ -1332,7 +1347,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 `GET /v1/limits`, to any valid token, a `client` principal's included, and over MCP as
 `egzos_limits` (§4.7) → `{"contract", "features": [<word>], "upload_max_bytes", "inline_max_bytes",
 "uploads_held_max"}`, and, once v0.7 §AL's code runs, `"agent_kept_max_bytes"`,
-`"agent_uploads_held_max"` and `"file_call_max_bytes"` beside them (**a1p**, not running). **a1p** (v0.7
+`"agent_uploads_held_max"` and `"file_call_max_bytes"` beside them (**a1p**, not running). **a1p**
+(v0.7
 §AK; #360), **running**, its `features` naming `terminals.machine` and `grants.own` until another
 word's code runs.
 
@@ -1372,7 +1388,7 @@ word's code runs.
 
 ### 4.7 · The MCP tools
 
-The tools both MCP transports serve (`src/egzos/mcp/server.py`): over stdio as the client `Token`
+The tools both MCP transports serve: over stdio as the client `Token`
 the door was started with, at `/mcp` as the bearer the door verified (`identity.md` §7).
 **decided** (v0.7 §AL), that the MCP door carries every file a person's other doors carry, that an
 approved agent's file is kept at once, and that a file larger than one call goes to a single-use
@@ -1381,20 +1397,25 @@ address; **a1p**, every other clause of this subsection, which the Chief may vet
 
 **A tool does what one route, or a fixed sequence of routes, does, under the same capabilities,
 coverage, validation and refusal; it appends nothing its routes would not, and it may serve less
-than its routes, never more.** A tool that would need a rule of its own is a route first, defined
+than its routes, never more, beyond naming a limit `GET /v1/limits` serves.** A tool that would
+need a rule of its own is a route first, defined
 in §4–§4.6. The token that can call a tool can call its routes.
 
 **Answers, in the running tools' channels** (§3's last paragraph):
 
-- **Not live:** `{"ok": false, "reason": "this token is no longer valid"}`, the same from every tool.
+- **Not live:** `{"ok": false, "reason": "this token is no longer valid"}`, the same from every
+  tool.
 - **Malformed:** the word `invalid_request` in the tool's error result, decided on the arguments
   alone and before any lookup: an argument the tool does not define, as §4.1 refuses a field a row
   does not name (**running** since #421), an argument not of its exact JSON type (an integer is
   never a string, a boolean or a float), U+0000 or a string that is not well-formed Unicode (§3),
-  and each shape §4.1 and §4.4 refuse with `400`. `busy` and `internal` as §3 says.
+  and each shape §4.1 and §4.4 refuse with `400`, but for a size over a limit (below). `busy` and
+  `internal` as §3 says.
 - **Too big:** a file larger than the limit in force answers `{"ok": false, "reason": "too_big",
-  "max_bytes": <that limit>}`, so the caller can tell its person; the route's `400` for the same
-  request stays as it is. The limit is one `GET /v1/limits` already serves.
+  "limit": <its §4.6 field>, "max_bytes": <its value>}`; the route's `400` for the same request
+  stays as it is. The limit is `file_call_max_bytes` for `egzos_add_file`, where a caller that
+  holds a `put_url` uses the upload tools instead; for an open, the smaller of `upload_max_bytes`
+  and `agent_kept_max_bytes`, and then the caller tells its person.
 - **§3's refusal.** A read answers its empty result, as `egzos_fetch` does, so a refused read and an
   empty one are one answer. A write answers `{"ok": false, "reason": "scope not found"}`, and a tool
   that takes an `upload` answers `{"ok": false, "reason": "upload not found"}`, each one answer for
@@ -1427,20 +1448,37 @@ block beside it.
 | `egzos_upload_finish` | `upload`, `scope?`, `key?`, `tags?` | `{"ok": true, "id", "status", "scope", "name", "size", "sha256"}` | `POST /v1/items` (`kind: artifact`) | `item.add`, `blob.put`; `context.fetch` on a refusal |
 | `egzos_upload_discard` | `upload` | `{"ok": true}` | `DELETE /v1/uploads/{id}` | `upload.discard`; `context.fetch` on a refusal |
 
-The first four are **running**, but for `<block>`'s file keys. A test per row asserts the row's
-events when its code lands. **Each file tool's description states** the limits in force when the
-tool list is served, what `size` and `sha256` are, how to send bytes to `put_url`, and what each
-answer means; the wording is the code's.
+The first four are **running**, but for `<block>`'s `"by"` and file keys and the exact-type reading
+of an argument. Where a file is saved in a place that serves verified items only (§4.4 item 3),
+`egzos_add_file`'s and `egzos_upload_finish`'s answers carry `"served": false` beside `status`.
+**Each file tool's description says**, in the code's words, with the limits in force when the tool
+list is served: `scope` is named as for `egzos_remember`; `size` is the file's length in bytes and
+`sha256` its SHA-256 as 64 lowercase hex characters; `mime` takes no parameters; `content_base64`
+is the file's raw bytes in standard base64 with padding, on one line, with no `data:` prefix; a
+caller whose code can reach the container sends every file through the upload tools; the bytes go
+as the whole body of one `PUT` to `put_url`, sent as they are, with no `Authorization` header and
+any `Content-Type`, before `put_expires_at`; the file is saved only by `egzos_upload_finish`,
+before `expires_at`; a `404` from `put_url` means one call to `egzos_upload_address` for a fresh
+address, or to `egzos_upload_finish` where that answers `upload not found`, and a wait before
+trying again; a `400` means the bytes did not match `size` or `sha256`; `too_big` from an open
+means no tool saves that file, and the caller tells its person the size and the limit;
+`too_many_uploads` means finish or discard its own uploads; `too_many_bytes` means its person
+makes room by removing or promoting its files; `egzos_get` returns a text file up to
+`inline_max_bytes` in `content`, with no `download`, and a `download.url` is fetched once by the
+caller's own code with no bearer; a file answered `"served": false` is kept, waits for its person
+and is served back once its person promotes it.
 
 - **`<block>`** is `egzos_fetch`'s running item block, `{"id", "kind", "key", "layer", "trust",
   "shadowed_by", "auto_title", "tags", "content"}`, `content` the fenced body or `inline` text, and
   `trust` the item's `trust.status`, with `"by"` beside it, the item's `provenance.actor`, so an
   agent's file is told from its person's. **For an artifact it also names the file**: `"name"` (its
   `content.filename`), `"mime"`, `"size"` and `"sha256"`, read from the item as stored. **a1p**,
-  not running, `"by"` and the file keys.
+  not running, `"by"` and the file keys. Two people's registrations of one client show the same
+  `"by"`; the entry that wrote the item names the person (§4.4 item 3).
 - **`egzos_fetch` mints no grant**, at any scope: a fetch names files and carries no address for
   their bytes. **running**, that it mints none.
-- **`egzos_limits`** is `GET /v1/limits`, its answer and its read, for a caller that cannot reach the
+- **`egzos_limits`** is `GET /v1/limits`, its answer and its read, for a caller that cannot reach
+  the
   route.
 - **`egzos_get(id)`** is `GET /v1/items/{id}`: `fetch` on the item's scope and the route's serving
   check (an `interactive` principal holding `curate` is shown every covered item but quarantined
@@ -1455,13 +1493,14 @@ answer means; the wording is the code's.
 - **`egzos_places`** is §4.1 item 5's read, **running** (#415).
 - **`egzos_add_file`** writes a file small enough to ride in the call's own arguments: §4.4's open,
   bytes and item **as one step**, with every check of each, in the routes' order:
-  1. `remember`, then the shapes, before any lookup: `name` and `mime` as §4.4 item 1 has them, a
-     `mime` left out read as `application/octet-stream`; `content_base64` standard base64 (RFC 4648
-     §4) of at most 174,764 characters, checked before it is decoded, that decodes to at most
+  1. The shapes, before any lookup: `name` and `mime` as §4.4 item 1 has them, a `mime` left out
+     read as `application/octet-stream`; `content_base64` standard base64 (RFC 4648 §4), padded,
+     with no line break or prefix, of at most 174,764 characters, checked before it is decoded,
+     that decodes to at most
      131,072 bytes (`file_call_max_bytes`, §4.6), longer being `too_big`; `sha256`, where given, as
      §4.4 item 1 has it; `key` and `tags` as `POST /v1/items` takes them. The same bound holds on
      both transports; at `/mcp` it leaves room for the call inside the 262,144 bytes the door reads
-     of a request (`BODY_MAX_BYTES`).
+     of a request.
   2. `remember` on `scope`, which is required, as at `POST /v1/uploads`; otherwise the write's
      §3 answer. A place the caller's terms do not cover is refused, never held.
   3. §4.4 item 1's caps, counted as the route counts them.
@@ -1478,11 +1517,13 @@ answer means; the wording is the code's.
   and discard for a file of any kind up to `blobs.upload_max_bytes`, under the routes' checks and
   answers, each taking only the caller's own upload. **`egzos_upload_address`** asks for a fresh
   address (§4.4 item 2a). The bytes never travel through a tool: the caller's own code sends them
-  to `put_url`, which the door redeems with no bearer (§4.4 item 2a). Where `put_url` is absent
-  (§4.4 item 2a), `egzos_upload_address` answers `upload not found` and the caller sends the file
-  with `egzos_add_file`. After a transfer whose answer did not arrive, the caller calls
-  `egzos_upload_finish` first: it succeeds where the bytes arrived. `finish`'s `scope` is answered
-  as `egzos_add_file`'s is.
+  to `put_url`, which the door redeems with no bearer (§4.4 item 2a). Where no address can be
+  given (§4.4 item 2a), `egzos_upload_open` opens nothing: for a file within `file_call_max_bytes`
+  it answers `{"ok": false, "reason": "use_add_file"}`, and for a larger one `too_big` with
+  `file_call_max_bytes`, so the caller tells its person. After a transfer whose answer did not
+  arrive, the caller calls `egzos_upload_finish` first: it succeeds where the bytes arrived and the
+  upload is still live; an upload that ran out meanwhile is an orphan its person sees (§4.4).
+  `finish`'s `scope` is answered as `egzos_add_file`'s is.
 
 **What stays out:**
 
@@ -1526,13 +1567,15 @@ So do §4.5's `item.rename` and `node.rename`, named meanwhile beneath `events.m
    `Trust.authorize_pull(token, item) -> BlobGrant | silence`. Trust applies the same capability,
    coverage and serving check as a fetch: **artifact download IS fetch**. A minted grant appends
    `blob.grant`. On silence the item is served with no grant.
-   Trust is silent, too, on an artifact an agent wrote, until a person promotes it, and on a copy
-   of one, until the copy or its source is promoted: an agent's upload stays staged that long,
-   unaddressable (`storage.md` §4, §4.4 here). **a1p.** An agent's artifact is kept when the upload
-   it was written from was promoted with its item (§4.4 item 3; that record says so, `storage.md`
-   §4): Trust reads that record, and judges a copy by its source's, a tombstoned source included,
-   and then decides on it as on any artifact. An agent's artifact with no such record stays staged
-   until a person promotes it (v0.7 §AL; **a1p**, not running).
+   Trust is silent, too, on an artifact an agent wrote that was not kept (below), until a person
+   promotes it, and on a copy of one, until the copy or its source is promoted: such an upload
+   stays staged that long, unaddressable (`storage.md` §4, §4.4 here). **a1p.** An agent's artifact
+   is kept when the upload it was written from was promoted with its item (§4.4 item 3; that record
+   says so, `storage.md` §4). Trust reads that record, and judges a copy by the record its chain of
+   sources (`provenance.derived_from`) first reaches, tombstoned items on the way included, or as
+   promoted where a person promoted an item on the way; then it decides on it as on any artifact.
+   An agent's artifact with no such record stays staged until a person promotes it (v0.7 §AL;
+   **a1p**, not running).
 3. Store renders the grant into a URL. It decides nothing, and it never mints on its own authority.
 4. The response carries the item with `grant` (the descriptor `{sha256, item, token, expires_at,
    sig}`) and `grant_url` beside it. **a1p**: the two field names.
@@ -1658,7 +1701,8 @@ one). The MAC is HMAC-SHA256 over every descriptor field but `sig`, written as `
 
 - **Provisioned at first need**, never at `init`: the first mint, address or redemption that
   finds no key makes one, 32 bytes from the platform CSPRNG (`capabilities.md` §5), so a
-  container made before this clause needs no step to get one. A `grant.key` that is not 32 bytes signs and verifies
+  container made before this clause needs no step to get one. A `grant.key` that is not 32 bytes
+  signs and verifies
   nothing: Trust is silent, every redemption is refused, an open carries no upload address (§4.4
   item 2a), and reads go on.
 - **Stored as `grant.key` in the container's home, 0600**, written as `throttle.key` is (`storage.md`
@@ -1672,12 +1716,11 @@ one). The MAC is HMAC-SHA256 over every descriptor field but `sig`, written as `
   every grant minted under the old one.
 - **Rotated by the owner, from the CLI with the owner `Token`** (`egzos blob rotate`): a new key
   replaces the old one in place, every outstanding grant and upload address fails check 2 from then
-  on, and
-  `blob.rotate` is appended, `actor` the owner and no key material. Every mint and redemption
-  reads the key afresh, so a rotation reaches a running door at its next request. `blob.rotate`
-  enters `events.md` §1 and `_types.py` with the code that appends it. **Not running**: until it
-  does, the owner deletes `grant.key`, and the next mint or redemption makes a new one, to the same
-  effect but with no entry.
+  on, and `blob.rotate` is appended, `actor` the owner and no key material. Every mint, address and
+  redemption reads the key afresh, so a rotation reaches a running door at its next request.
+  `blob.rotate` enters `events.md` §1 and `_types.py` with the code that appends it. **Not
+  running**: until it does, the owner deletes `grant.key`, and the next mint, address or redemption
+  makes a new one, to the same effect but with no entry.
 - **The spent records persist in the container's state**, as `storage.md` §3.5's `GrantState`, on
   the `ContainerState` substrate as the confirm's challenges are: a spend is one atomic write every
   process serving the container sees. A record is a `sig`'s sha256 and its grant's `expires_at`, no
