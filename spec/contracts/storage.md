@@ -174,8 +174,8 @@ fixes only how those shapes are **persisted**.
 **A person's rename of a place** (`rest.md` §4.5; v0.7 §AK) is a `put_node` of the same id with
 its new name, as moving a node is a metadata update (`container.md` §2), and adds no method. The
 node's former names (`container.md` §2), at most 64, are a field on the node, which `put_node`
-writes and `get_node` and `list_nodes` return with it; no route, tool or command lists them
-(`rest.md` §4.1). **a1p**, **not running.**
+writes and `get_node` and `list_nodes` return with it; no route, tool or command lists them as a
+node's field (`rest.md` §4.1), and the chain holds each in its `node.rename`. **a1p**, **not running.**
 
 ## 3.1 · The door's throttle state — `ThrottleState`
 

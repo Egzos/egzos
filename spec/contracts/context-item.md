@@ -128,7 +128,9 @@ Quarantined items are **never served**, at any scope, in any query. **running**
 
 `{ created_at, updated_at, version, tombstoned? }`. `version` increments on each mutation;
 `tombstoned` is absent until the item is tombstoned. Timestamps are UTC ISO-8601 to the second
-(`%Y-%m-%dT%H:%M:%SZ`). **running**
+(`%Y-%m-%dT%H:%M:%SZ`). **running**, but for `version`: **decided** on each mutation, and the
+running code increments it on a promote alone, not yet on a move, a quarantine or a tombstone
+(**a1p**, v0.7 §AK).
 
 Deletion is a tombstone, not a removal — the audit chain must keep referring to something.
 

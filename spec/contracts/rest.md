@@ -888,9 +888,12 @@ its own decision (v0.7 §AK).
   data; its `context.fetch` carries the same as `details.renames`. The challenge is bound to the
   body's `name` and, as on every act on an item, to the item's version, `scope` and
   `trust.status` (§4.2 item 3), so a second leg that names another, or finds the item changed, is
-  §4.2's `mismatch`. What a challenge on an item is bound to moves only by an act on the item that
-  its own rule admits and the chain records, such as a rename, a promote, a move or a quarantine,
-  and a `mismatch` says nothing of why.
+  §4.2's `mismatch`. What a challenge on an item is bound to moves only by an act its own rule
+  admits and the chain records, on the item or, for a quarantine, on the item it was copied from:
+  a rename, a promote, a move, a quarantine. So any principal whose rule admits such an act, an
+  agent holding `organize` among them and a terminal as its person, can keep a person's confirm
+  from concluding; each such act is on the chain, revoking that principal ends it, and a
+  `mismatch` says nothing of why.
 - **One atomic step** holds a second leg's `step_up`, the write and its `item.rename`, and an item
   renamed at once is written with its `item.rename` in one atomic step too. `item.rename` carries
   `kind`, `field` (`filename` or `title`), `from`, the name as it stood, and the new `name`, both
@@ -917,14 +920,19 @@ its own decision (v0.7 §AK).
 - **A proposal is shown as its ids now stand.** `GET /v1/pending` and the approve and deny first
   legs render a proposal's `from_path` and `to_path` from its ids as they stand, not as they stood
   when it was parked (§4.1's `<proposal>`); it is decided on ids.
-- **One atomic step** holds the node's write, its former name added, and its `node.rename`
+- **One atomic step** reads the node as it stands under the lock, counts its former names against
+  the cap there, and holds the node's write, its former name added, and its `node.rename`
   (`storage.md` §3.6), which carries `type`, `from`, the name as it stood, and the new `name`, both
   untrusted display data.
 - **A place keeps at most 64 former names** (`container.md` §2). A rename that would add a 65th is
   refused, after this route's other checks: `409` with `{"error":"too_many_names"}` and §3's
   headers — a fact about a place the caller may rename — and one `context.fetch` with `items: []`,
-  as §4's probe appends; nothing is written. The cap refuses and never drops the oldest name; a
-  rename back to a former name takes no new place.
+  `details.reason: too_many_names` and the `name` asked for, as a refused act is recorded
+  elsewhere (§4.3's `last_admin`); nothing is written. The cap refuses and never drops the oldest
+  name. A rename back to a former name takes no new place, and a rename to the present name
+  changes nothing and takes none. **A place at the cap takes back any name it has borne and no
+  other, whoever asks**: one who may rename it can spend its cap for everyone, each rename on the
+  chain.
 - **The inbox, the personal root and `global` are never renamed.** Each, an absent or uncovered
   node, a `client` principal, and a caller short of what this needs get §3's refusal and §4's probe.
 

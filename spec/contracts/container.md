@@ -87,8 +87,8 @@ are never renamed, and a place's name, made or renamed on any surface, keeps `re
 rule. **a1p**, **not running.**
 
 **A former name fails closed.** A node keeps, beside the fields above, each name a person's rename
-took from it, its former names (`storage.md` §3); no route, tool or command lists them (`rest.md`
-§4.1). `resolve_ref`'s tail rule gains one clause: a segment matches a node by its present name, as
+took from it, its former names (`storage.md` §3); no route, tool or command lists them as a
+node's field (`rest.md` §4.1), and the owner's chain holds each in its `node.rename`. `resolve_ref`'s tail rule gains one clause: a segment matches a node by its present name, as
 above, and also by a former name, as its `type:name` label or the name alone. A node a tail reaches
 by present names alone is a match; one it reaches with any segment matched only by a former name is
 a stale match, and a stale match never resolves. So a tail with stale matches and no match answers
