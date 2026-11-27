@@ -953,8 +953,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
   (`container.md` §2). A path names every ancestor of a node, covered or not (`container.md` §2;
   §4.1 item 8), so whoever reads a path beneath a renamed place it does not cover, a principal
   holding `fetch` there, a person or an agent, or a person shown a proposal at `GET /v1/pending`,
-  sees the new name in its paths: a place's rename shows its new name, and so that it was renamed,
-  to whoever reads a path beneath it. **decided** (the Chief, 2026-11-26; v0.7 §AK). For a
+  sees the new name in its paths from the moment of the rename: a place's rename shows its new
+  name, and so that it was renamed and when, to whoever reads a path beneath it. **decided** (the Chief, 2026-11-26; v0.7 §AK). For a
   principal that reads no path beneath the place, a tail it gives through the old name no longer
   reaches the place and, unless it now matches another place that bears the name (above), gets
   §3's refusal, the same answer as for a place that is gone or that its token no longer covers, so

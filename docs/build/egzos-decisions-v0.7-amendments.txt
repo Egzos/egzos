@@ -875,16 +875,19 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             refusal, which a client reads as "none of these", so it
             never takes a missing route for a refusal of the act.
 
-[DECIDED] A PLACE'S RENAME SHOWS ITS NEW NAME, AND THAT IT WAS RENAMED,
-          to whoever can read a path beneath it, a person or an
-          agent, without seeing the place itself. On 2026-11-26 the
-          Chief was asked: "A renamed project or thread shows its new
-          name to anyone who can see something inside it." (the
-          operator's pick: yes). He said: "Rename, yeah, it's fine if
-          it shows." A path names every place above a thing, seen or
-          not, so such a reader's paths show the new name, and a path
-          through the old name no longer reaches the place. Recorded
-          by the operator.
+[DECIDED] A PLACE'S RENAME SHOWS ITS NEW NAME, THAT IT WAS RENAMED, AND
+          WHEN,
+          to whoever can read a path beneath it, a person or an agent,
+          without seeing the place itself. On 2026-11-26 the Chief was
+          asked: "A renamed project or thread shows its new name to anyone
+          who can see something inside it." (the operator's pick: yes). He
+          said: "Rename, yeah, it's fine if it shows." Asked the same
+          evening: "the new name shows right away, to people and agents who
+          can see inside, for any place.", he said: "For number 5, yes. Go
+          ahead with that." A path names every place above a thing, seen or
+          not, so such a reader's paths show the new name from the moment
+          the rename lands, and a path through the old name no longer
+          reaches the place. Recorded by the operator.
 
 [LATER]   Unique names among siblings, and which type of place may sit
           under which; left out because pure capture names inbox

@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   thread (`PATCH /v1/scopes/{id}`; the container's admin's act, with the confirm: its id stays, a
   path names whatever bears the name now, nothing redirects from an old name, and the name it frees
   may be borne by a place anyone covering a parent makes, a person or an agent, so a client keeps
-  ids; a path beneath the place shows its new name, as the Chief decided). A confirm on an item, an
+  ids; a path beneath the place shows its new name at once, and so that it was renamed
+  and when, as the Chief decided). A confirm on an item, an
   approve of a proposal that names it included, is bound to the item's version, scope and trust
   status, and a rename moves the version in the same step as its write; the item rename is served
   only where both hold. A proposal's paths are shown from its ids as they stand, and the place
