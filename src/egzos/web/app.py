@@ -47,6 +47,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from egzos._term import replaced
 from egzos.authz.presence import (
     ARM_SECONDS,
     Presence,
@@ -79,6 +80,15 @@ TEXT_KINDS = {"memory", "preference", "skill", "integration", "alias", "rule"}
 _UNRESERVED = re.compile(r"[A-Za-z0-9\-._~]+")
 
 _TEMPLATES = Jinja2Templates(directory=str(resources.files("egzos.web").joinpath("templates")))
+
+
+def _drawn(value: Any) -> Any:
+    """Every value a page draws, as text a response can encode: a surrogate code point, which is
+    not text, is drawn as U+FFFD. Escaped markup stays markup."""
+    return type(value)(replaced(value)) if isinstance(value, str) else value
+
+
+_TEMPLATES.env.finalize = _drawn
 
 
 # --- formats (lifeboat.md §5) ----------------------------------------------------------------------

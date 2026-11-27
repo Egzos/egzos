@@ -17,14 +17,14 @@ connection is bound to the thread that opened it. Nothing here awaits — it jus
 from __future__ import annotations
 
 import functools
-import json
 import secrets
 from collections.abc import Callable
 from typing import Any
 
 from egzos import __version__
+from egzos._term import json_text
 from egzos._types import StorageBusy
-from egzos.backends.base import holds_nul
+from egzos.backends.base import malformed
 from egzos.container import Container
 from egzos.model import KINDS, Token
 from egzos.store.items import StoreError
@@ -39,7 +39,7 @@ DATA_BANNER = (
 
 
 # Revoked or expired: one answer, the same for both, from every tool.
-NOT_LIVE = json.dumps({"ok": False, "reason": "this token is no longer valid"})
+NOT_LIVE = json_text({"ok": False, "reason": "this token is no longer valid"})
 
 
 def build_server(container: Container, token: Token):
@@ -61,12 +61,13 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
     from mcp.server.mcpserver.exceptions import ToolError
 
     def answered(tool):
-        """rest.md §3 in the tool's own channel: U+0000 in an argument, before any lookup, and a
-        busy store end the call with the door's word in its error result, never a driver's."""
+        """rest.md §3 in the tool's own channel: U+0000 or ill-formed Unicode in an argument,
+        before any lookup, and a busy store end the call with the door's word in its error
+        result, never a driver's. Every result is `json_text`, so it encodes as UTF-8."""
 
         @functools.wraps(tool)
         async def call(**arguments: Any) -> str:
-            if holds_nul(arguments):
+            if malformed(arguments):
                 raise ToolError("invalid_request")
             try:
                 return await tool(**arguments)
@@ -123,7 +124,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         # Absent, uncovered, and covered without `fetch` are one answer (capabilities.md §6
         # clause 1). Every minted bundle holds `fetch`, but an agent's intersected grant may not,
         # so that is checked before `scope` is looked up at all, an ambiguous tail included.
-        silent = json.dumps({"banner": DATA_BANNER, "scope": scope, "chain": [], "items": []})
+        silent = json_text({"banner": DATA_BANNER, "scope": scope, "chain": [], "items": []})
         if not token.has("fetch"):
             _probe(token, scope)
             return silent
@@ -132,8 +133,8 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         except AmbiguousRef as e:
             # Nothing is picked: the scopes it matches (all visible to this token) are named.
             _probe(token, scope)
-            return json.dumps({"banner": DATA_BANNER, "scope": scope, "ambiguous": e.paths,
-                               "chain": [], "items": []}, ensure_ascii=False)
+            return json_text({"banner": DATA_BANNER, "scope": scope, "ambiguous": e.paths,
+                              "chain": [], "items": []})
         if node is None:
             _probe(token, scope)
             return silent
@@ -163,7 +164,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                     ),
                 }
             )
-        return json.dumps(
+        return json_text(
             {
                 "banner": DATA_BANNER,
                 "fence": fence,
@@ -171,7 +172,6 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                 "chain": result["chain"],
                 "items": blocks,
             },
-            ensure_ascii=False,
         )
 
     @server.tool(
@@ -194,10 +194,10 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         # neither answer turns on what `scope` names (rest.md §3).
         if not token.has("remember"):
             _probe(token, scope)
-            return json.dumps({"ok": False, "reason": "token lacks `remember`"})
+            return json_text({"ok": False, "reason": "token lacks `remember`"})
         if kind and kind not in KINDS:  # an empty kind is the default, as `store.add` reads it
-            return json.dumps({"ok": False, "reason": f"unknown kind {kind!r}"})
-        absent = json.dumps({"ok": False, "reason": "scope not found"})
+            return json_text({"ok": False, "reason": f"unknown kind {kind!r}"})
+        absent = json_text({"ok": False, "reason": "scope not found"})
         reads = token.has("fetch")  # paths are named only to who could list them (rest.md §3)
         try:
             node = _scope(scope, token) if scope else None
@@ -205,8 +205,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
             _probe(token, scope)
             if not reads:
                 return absent
-            return json.dumps({"ok": False, "reason": "ambiguous", "matches": e.paths},
-                              ensure_ascii=False)
+            return json_text({"ok": False, "reason": "ambiguous", "matches": e.paths})
         if scope and node is None:
             # silence-not-errors: the same shape whether the scope is absent or not this token's
             _probe(token, scope)
@@ -225,7 +224,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         except StoreError:
             _probe(token, scope)  # past the lookup, every refusal is the absent one
             return absent
-        return json.dumps(
+        return json_text(
             {
                 "ok": True,
                 "id": item.id,
@@ -248,7 +247,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
         # but an agent's registration intersected with its user's grant may not.
         if inbox is None or not token.has("fetch") or not container.trust.covers(token, inbox):
             _probe(token, "inbox")
-            return json.dumps({"banner": DATA_BANNER, "items": []})  # silence-not-errors
+            return json_text({"banner": DATA_BANNER, "items": []})  # silence-not-errors
         # Served, not shown: quarantined never, rules verified-only — the same policy as fetch.
         held = store.inbox_items()
         rows = [(n, i) for n, i in held if container.resolver.serve(i, n)]
@@ -263,7 +262,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
             items=[i.id for _, i in rows],
             withheld=len(held) - len(rows),  # what the policy kept back, as a fetch records it
         )
-        return json.dumps(
+        return json_text(
             {
                 "banner": DATA_BANNER,
                 "items": [
@@ -277,7 +276,6 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                     for n, i in rows
                 ],
             },
-            ensure_ascii=False,
         )
 
     return server

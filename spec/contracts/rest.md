@@ -235,6 +235,8 @@ headers. **a1p**, by `authorization-server.md` §7.1's split between `invalid_sc
 depends on an id the request names.
 A string anywhere in the request that holds U+0000 is one such fact: no store keeps it outside a
 document (`storage.md` §3.7). **a1p** (#331).
+A string anywhere in the request that is not well-formed Unicode (a surrogate code point outside a
+pair) is another such fact. **a1p**.
 
 **An ambiguous path tail gets the third answer.** A scope parameter or body field accepts a node id
 or a path tail, as `resolve_ref` does (`container.md` §2). A tail that matches more than one node the
