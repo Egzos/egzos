@@ -171,10 +171,9 @@ Node and chain semantics — container types, ring ranks, the chain walk, the se
 gate and the container config object — are `container.md`'s, not this document's. This document
 fixes only how those shapes are **persisted**.
 
-**A removed node is tombstoned, never erased** (`rest.md` §4.5; v0.7 §AK). The store holds a
-marker on the node, its `tombstoned_at`; `get_node` and `list_nodes` treat a marked node as absent
-(§5 item 1), and no method erases a node, so every chain entry that names one keeps its subject.
-A rename is a `put_node` of the same id, as a move is. **a1p**, **not running.**
+**A person's rename of a place** (`rest.md` §4.5; v0.7 §AK) is a `put_node` of the same id with
+its new name, as moving a node is a metadata update (`container.md` §2), and adds no method.
+**a1p**, **not running.**
 
 ## 3.1 · The door's throttle state — `ThrottleState`
 

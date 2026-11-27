@@ -78,17 +78,16 @@ matches (#115).
 itself would change its own path, and paths are the addressing surface. **running** for the
 first-item name; the rename proposal is **decided, not running**.
 
-**A person may rename a place, and the container's admin may remove one that holds nothing**
-(`rest.md` §4.5; v0.7 §AK).
-The rule above binds a rename that happens on its own, which stays a proposal; a person's rename is
-their own act. It keeps the node's id and changes every path through the node: a reference held as
-a path stops resolving and answers as an absent one, and nothing redirects from an old name. A
-removed node is tombstoned, never erased, and reads as absent, as a tombstoned item does. The
-inbox, the personal root and `global` are never renamed or removed, and a place's name holds no
-`/`. **a1p**, **not running.** Since another person may now rename or remove a place between two
-of a client's requests, **a client acts on the id a path resolved to at once, and never keeps a
-path's resolution across a confirm or a later act**: what a path names may have changed, and what
-an id names has not. **a1p.**
+**A person may rename a place** (`rest.md` §4.5; v0.7 §AK). The rule above binds a rename that
+happens on its own, which stays a proposal; a person's rename is their own act. It keeps the node's
+id and changes every path through the node: a reference held as a path may stop resolving, or may
+come to name another node that now bears the name; nothing redirects from an old name. The inbox,
+the personal root and `global` are never renamed, and a place's name holds no `/`, no `:`, no
+control character and no bidirectional control (`rest.md` §4.5). **a1p**, **not running.** Since
+another person may now rename a place between two of a client's requests, **a client that keeps a
+place to act on keeps its id, never its path, and acts on the id a path resolved to at once, never
+keeping a path's resolution across a confirm or a later act**: what a path names may have changed,
+and what an id names has not. **a1p**, **not running.**
 
 ## 3 · The chain
 
@@ -259,11 +258,6 @@ This is **contract text, not an implementation detail.** What the Chief approved
 audience; a token minted between proposal and approval makes the approval one for a different act
 than the one displayed. An implementation that executed against the *stored* manifest would pass
 every test that does not mint a token mid-flight — and would break the only thing the gate is for.
-
-**A proposal also ends `stale` when the place it would move into is removed** (`rest.md` §4.5;
-v0.7 §AK). Nobody could decide it afterwards, so the removal's own atomic step ends it and appends
-`approval.stale` with `details.reason: removed`: no more a human "no" than a mismatch is. **a1p**,
-**not running.**
 
 ### Proposing carries the same floor as moving — `organize` (#94)
 

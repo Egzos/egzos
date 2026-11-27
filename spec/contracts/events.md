@@ -80,11 +80,11 @@ code does, and an append under one is rejected as any unlisted name is:
 
 | name | appended when | `subject` · `scope` · `details` |
 |---|---|---|
-| `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `name` |
-| `node.rename` | a person renames a place | the node · its parent · `type`, `name` |
-| `node.tombstone` | a person removes a place that holds nothing | the node · its parent · `type` |
+| `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `from`, `name` |
+| `node.rename` | a person renames a place | the node · its parent · `type`, `from`, `name` |
 
-A `name` is untrusted display data, as `node.create`'s is; every reader escapes it.
+A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader
+escapes them.
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
@@ -276,6 +276,4 @@ The gate's delta rule and the manifest binding → `container.md`. Capabilities 
 (Phase 1); they add no events.
 
 Decided at the 0.3 freeze (item 39): a TOCTOU refusal is `approval.stale`, its own event, and
-`approval.deny` is only a human "no" — anomaly detection tells them apart by name. `approval.stale`
-gains a second cause with v0.7 §AK: the removal of the place a proposal would move into
-(`rest.md` §4.5; `details.reason: removed`), which is no human "no" either. **a1p**, **not running.**
+`approval.deny` is only a human "no" — anomaly detection tells them apart by name.
