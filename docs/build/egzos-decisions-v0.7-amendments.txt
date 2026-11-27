@@ -759,7 +759,7 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
     act's first-leg fields as they now stand; storage.md §3.3's
     challenge binding, likewise.
     rest.md §4, §4.1, §4.2, §4.5, §4.6, §5, §8; container.md §2;
-    context-item.md §3; identity.md §4, §5; storage.md §3, §3.3;
+    context-item.md §3, §6; identity.md §4, §5; storage.md §3, §3.3;
     events.md §1; Egzos/egzos#404, Egzos/egzos#360)
 ================================================================================
 
@@ -794,7 +794,8 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             new. Any other item is renamed at once, an unverified rule
             aside, which is refused whatever its provenance.
           - A confirm on an item (promote, a gated tombstone or
-            rename, a move or copy's confirm) is bound to the item's
+            rename, a move or copy's confirm, and an approve, for
+            each item its proposal names) is bound to the item's
             version, scope and trust status as its first leg read
             them, so a second leg that finds any of the three changed
             concludes `mismatch` and changes nothing; the person asks
@@ -806,9 +807,9 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             promote the status and the version; a move the scope; a
             quarantine the status; a tombstone ends the item; a title
             pass, where one runs, the version with the title it
-            writes. Only an act its
-            own rule admits and the chain records moves what a
-            confirm is bound to. So a principal whose rule admits
+            writes. A title pass aside, only an act its own rule
+            admits and the chain records moves what a confirm is
+            bound to. So a principal whose rule admits
             such an act, an agent holding `organize` among them, can
             keep a person's confirm from concluding; each act is on
             the chain and revoking that principal ends it. A
@@ -845,7 +846,8 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             registrations keep node ids, as the door already does.
             The inbox, the personal root and `global` are never
             renamed. A proposal is shown with its places' names as
-            they stand. A client keeps a place's id, never its path.
+            they stand, never as they stood when it was parked, and
+            a door serves a place's rename only so. A client keeps a place's id, never its path.
           - A place's name, made or renamed on any surface, is 1 to 255
             Unicode scalar values, compared as given with no
             normalisation, with no `/`, no `:`, and no character of
