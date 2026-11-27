@@ -528,6 +528,10 @@ at `/mcp`. **decided** (§S), **a1p** the binding:
   URL>"`, under the same public origin, identical for every unauthenticated case (§3).
 - The agent registers with and signs in through the provider's OAuth server, then presents its token
   here; §3 and §4 decide the rest. MCP over stdio is unchanged.
+- **The tools are one set on both transports**, each mirroring a route of the REST door under that
+  route's rules, so none gives a caller a power its token lacks at `/v1/`: `rest.md` §4.7 lists
+  them, with their arguments, answers and events. An approved agent's file is kept at once in a
+  place its terms cover (`rest.md` §4.4 item 3). **a1p** (v0.7 §AL).
 - **Where the transport's rules meet the door's.** `/mcp` is stateless and declares `POST` alone. A
   verified `GET` (a stream) or `DELETE` (a session's end) answers `405`, with `Allow: POST`,
   `rest.md` §3's headers and `{"error":"method_not_allowed"}`, the same for every caller: it tells
