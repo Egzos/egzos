@@ -77,7 +77,7 @@ def test_every_valid_token_reads_what_the_door_serves_and_the_read_is_recorded(
     bearer, actor, principal = callers[who]
     r = door.get("/v1/limits", headers={"Authorization": f"Bearer {bearer}"})
     assert r.status_code == 200 and set(r.json()) == KEYS
-    assert r.json() == {"contract": "1.1", "features": ["terminals.machine"],
+    assert r.json() == {"contract": "1.1", "features": ["terminals.machine", "grants.own"],
                         "upload_max_bytes": 100 * 1024 * 1024, "inline_max_bytes": 64 * 1024,
                         "uploads_held_max": 16}
     read = c.ledger.tail(1)[-1]
@@ -93,9 +93,8 @@ def test_the_limits_are_the_config_as_it_stands(c, door):
 
 
 def test_no_rename_word_is_named_before_its_route_runs():
-    # §4.6: a word only once its code runs. No rename route, and no read of a person's own grant
-    # with every rule it needs, runs in this tree.
-    assert FEATURES == ("terminals.machine",)
+    # §4.6: a word only once its code runs. No rename route runs in this tree.
+    assert FEATURES == ("terminals.machine", "grants.own")
     assert set(FEATURES) <= set(t.DOOR_FEATURES)
 
 

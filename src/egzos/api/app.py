@@ -90,8 +90,9 @@ METADATA_PATH = "/.well-known/oauth-protected-resource"
 #: rest.md §6: the one route no bearer is read on, for GET only.
 PULL_PATH = re.compile(r"/v1/blobs/[^/]+")
 #: rest.md §4.6: the words `GET /v1/limits` names, each only once its code runs here and every
-#: condition §4.6 sets for it holds. `items.rename` and `scopes.rename` wait on their routes.
-FEATURES: tuple[DoorFeature, ...] = ("terminals.machine",)
+#: condition §4.6 sets for it holds. `items.rename` and `scopes.rename` wait on their routes;
+#: `grants.own` is named with the read it names, which lands after every rule it needs (§4.3).
+FEATURES: tuple[DoorFeature, ...] = ("terminals.machine", "grants.own")
 
 
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
@@ -1061,6 +1062,28 @@ def create_app(
         """§4.3's `<agent>`, `last_seen` read from the chain: null for an agent never seen."""
         keys = ("client_id", "name", "sub", "capabilities", "scopes", "created_at")
         return {**{k: r[k] for k in keys}, "last_seen": seen.get((r["client_id"], r["sub"]))}
+
+    def own_client(token: Token | None) -> bool:
+        """A person's provider token issued to this container's own client (§4.3's `GET
+        /v1/grant`): never an agent, a container `Token` or a registered terminal's token."""
+        return (registrant(token) and not at_terminal(token)
+                and token.client_id == c.config_value("identity.client_id"))
+
+    @app.get("/v1/grant")
+    async def own_grant(request: Request):
+        """§4.3: the caller's own live grant, its capabilities by name and each scope a node id
+        that exists, or `"*"`; nothing else of it, and nothing of any other grant."""
+        token: Token = request.state.token
+        _only(request.query_params, set())  # to every caller alike, before their kind is read
+        grant = c.backend.get_user_grant(token.sub) if own_client(token) else None
+        if grant is None or grant["revoked"]:  # revoked since the door verified the caller too
+            d.probe(token, "grant")
+            return refusal()
+        scopes = [s for s in grant["scopes"] if s == "*" or c.backend.get_node(s) is not None]
+        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
+                        client=token.client, read="grant", items=[], layers=[], withheld=0)
+        return _json(200, {"grant": {"capabilities": sorted(grant["capabilities"]),
+                                     "scopes": scopes}})
 
     @app.get("/v1/agents")
     async def list_agents(request: Request):
