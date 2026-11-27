@@ -29,7 +29,7 @@ from egzos.container import OWNER, Container, HomeBindingError
 from egzos.identity import ConfigError, LastAdmin
 from egzos.model import Node
 from egzos.store.items import StoreError
-from egzos.store.nodes import AmbiguousRef, StructureError
+from egzos.store.nodes import AmbiguousRef, StructureError, valid_name
 from egzos.trust import TrustError
 
 #: The command this program installs. The cloud's command line is a different program, `egzos`.
@@ -415,6 +415,8 @@ def mk(
     ),
 ):
     """Create a container (SKELETON verb — the log says only 'creating wrappers is free')."""
+    if not valid_name(name):  # rest.md §4.5's rule, before any lookup, in §3's word
+        _fail("invalid_request", 2)
     c = _container()
     token = c.require_token()
     p = _scope_or(c, parent, c.nodes.user_root())

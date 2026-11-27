@@ -741,9 +741,9 @@ the CLI or the lifeboat (`identity.md` §4).
     are both steered by whoever makes or renames a place (§4's `POST /v1/scopes`, §4.5). A tick gives the node whose
     id the page sends and what lies beneath it, whatever any name says. The choose step is not
     offered at a door that does not keep §4.5's rule on a place's name ("A name's shape"), which
-    is **not running** until its code lands: until then `POST /v1/scopes` takes any 1 to 255
-    characters but U+0000, and a capture names its thread from the first 40 characters of its
-    item's title, the writer's own text (**running**). That rule holds every name a place is given
+    is **running** where a place is made: a door from before it lets `POST /v1/scopes` take any 1
+    to 255 characters but U+0000, and a capture name its thread from the first 40 characters of
+    its item's title, the writer's own text. That rule holds every name a place is given
     or renamed to, on any surface, a captured thread's included, to 1 to 255 characters with no
     `/` or `:`, no control, line-separator or paragraph-separator character, no bidirectional
     control, and never `*`. It does not reach a name given before it ran, which stays as it is; it
@@ -1100,9 +1100,9 @@ storage (v0.7 §S).
 
 ### 4.5 · Renaming an item or a place
 
-**a1p**, every clause of this subsection (v0.7 §AK; #404), and **not running** until its code lands:
-until then each of these routes is §3's refusal, as a path no route declares, and §4.6 lists none
-of their words. The `{id}` in each path is an id, never a path tail, so §3's
+**a1p**, every clause of this subsection (v0.7 §AK; #404), and **not running** until its code lands,
+but for "A name's shape" where a place is made, which is **running**: until then each of these
+routes is §3's refusal, as a path no route declares, and §4.6 lists none of their words. The `{id}` in each path is an id, never a path tail, so §3's
 `ambiguous` never arises on these routes.
 
 **A name's shape.** A place's name, made or renamed on any surface (`NodeService.create` and the
@@ -1116,7 +1116,8 @@ character of Cc, Zl, Zp or Bidi_Control. A name, a place's or an item's, that is
 Unicode (a lone surrogate) is `400`. Anything else is §3's `400` at the door, before any lookup,
 and refused on every other surface. Names given before this stay as they are. Pure capture, when it
 names a thread from a title, does three steps in order: it writes each `/` and `:` as `-` and drops
-every character of Cc, Zl, Zp or Bidi_Control; it keeps the first 40 characters, the length it
+every character of Cc, Zl, Zp or Bidi_Control and every lone surrogate; it keeps the first 40
+characters, the length it
 keeps today; and where nothing is left, or only `*`, the thread's name falls back to the item's
 id. Sibling names may still repeat, a tail naming two is still refused as ambiguous (§3), and no
 rule is added on which type sits under which: both are left for a later change, because pure

@@ -88,9 +88,10 @@ parent makes, a person or an agent, before the rename or after it; a read, a wri
 addressed by the old path then reaches that place (`rest.md` §4.5). So a rename is kept to the
 container's admin, as a confirmed act the chain records with the old and the new name, and a client
 keeps ids. A place of any other type is not renamed: the inbox, the personal root and `global`
-never, and the other types not in this change. A place's name, made or renamed on any surface,
-keeps `rest.md` §4.5's rule, and pure capture names a thread from a title by that section's three
-steps (v0.7 §AK amends [0.3 · 2]). **a1p**, **not running.** **A client that keeps a place to act
+never, and the other types not in this change. **a1p**, **not running.** A place's name, made or
+renamed on any surface, keeps `rest.md` §4.5's rule, and pure capture names a thread from a title by
+that section's three steps (v0.7 §AK amends [0.3 · 2]). **a1p**, **running** where a place is made
+(`NodeService.create`, the door, `egzoscore mk` and pure capture). **A client that keeps a place to act
 on keeps its id, never its path, and acts on the id a path resolved to at once, never keeping a
 path's resolution across a confirm or a later act**: what a path names may have changed, and what an
 id names has not. **a1p**, **not running.**

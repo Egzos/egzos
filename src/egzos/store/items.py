@@ -21,7 +21,7 @@ from egzos.ledger import Ledger
 from egzos.model import KINDS, ContextItem, Node, Token, now_iso
 from egzos.store.autotitle import DegradedTitler, Titler
 from egzos.store.blobs import BlobStore
-from egzos.store.nodes import NodeService
+from egzos.store.nodes import NodeService, capture_name
 
 
 class StoreError(Exception):
@@ -158,8 +158,8 @@ class Store:
         # busy lock refuses before anything is written (storage.md §3.6; GHSA-2478-6jv5-83ff).
         with self.backend.atomic():
             if opened_thread is not None:
-                # A name is one path segment: a "/" in writer-supplied text would split it.
-                opened_thread.name = content["auto_title"][:40].replace("/", "-")
+                # rest.md §4.5's three steps: the writer's title kept to a place name's rule.
+                opened_thread.name = capture_name(content["auto_title"], item.id)
                 self.backend.put_node(opened_thread)
                 self.ledger.append(
                     "node.create",
