@@ -747,6 +747,71 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 
 
 ================================================================================
+AL. AMENDMENT — AN OUTSIDE AGENT SAVES EVERY KIND OF FILE, THROUGH EVERY DOOR
+    (amends nothing decided; extends the MCP door beyond text. rest.md §4,
+    §4.5, §5, §8; identity.md §7; context-item.md §3; Egzos/egzos#405)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-26, asked what files an outside
+          AI agent must be able to save into his cloud's chosen projects
+          and threads: "Golden files can be ... everything" (the ellipsis
+          is ours). Every file and format, through every door: the MCP
+          door and the command line each carry any file. The command line
+          and the REST door already do (rest.md §4.4); the MCP door carried
+          text (Egzos/egzos#405). Recorded by the operator, enacted by the
+          merge that records this section; the Chief may veto by reverting.
+
+[DECIDED] THE MCP DOOR CARRIES FILES, BY TOOLS THAT MIRROR ROUTES THE REST
+          DOOR ALREADY HAS. This section binds the first part, a file small
+          enough to ride in one call; a larger one waits for the next
+          change (below), and until it lands goes through rest.md §4.4 or
+          the command line.
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts, and
+          not running until the code lands):
+
+          - One rule for every tool: it mirrors a route the door already
+            has, under the same capabilities, coverage, validation,
+            refusal and audit events, so no tool gives a caller a power
+            its token lacks at `/v1/`.
+          - `egzos_places` lists the places under a place, as
+            `GET /v1/scopes`; `egzos_make_place` makes one, as
+            `POST /v1/scopes`. Neither adds a power: the same token can
+            ask the route.
+          - `egzos_add_file` opens, stages and writes a file in one call,
+            with every check of rest.md §4.4's three steps. The container
+            computes the hash. If the item cannot be written, the same
+            call discards what it staged, so nothing is orphaned.
+          - An agent's file stays staged until a person promotes it, and
+            counts toward the person's 16, exactly as before. This
+            section does not touch that rule (below).
+          - `egzos_fetch` names an artifact's file and carries rest.md
+            §6's grant where Trust mints one, as the REST door's reads do;
+            `egzos_get` reads one item, as `GET /v1/items/{id}`.
+          - No tool for a human-only act (promote, approve, deny,
+            tombstone, a rename or a removal under §AK (Egzos/egzos#404),
+            a grant, a confirm); no tool that fetches an address a caller
+            chose.
+
+[LATER]   A file larger than one call carries: an upload whose bytes
+          travel to a single-use address, the mirror of rest.md §6's
+          grant, reviewed on its own, if the Chief says yes to (b).
+
+[OPEN→CHIEF] (a) Whether an agent's file, written into a place the person
+          approved that agent for, may be kept at once instead of waiting
+          staged for the person to promote it. Tied to Egzos/egzos#377.
+          The operator's draft keeps the rule as it stands.
+
+[OPEN→CHIEF] (b) Whether an upload's bytes may travel to a single-use
+          address redeemed without the bearer, as rest.md §6 already allows
+          for a download. The operator's draft: bound to the upload, its
+          opener, its size and its hash, single use and short lived, so
+          whoever holds the address can deliver only the bytes the opener
+          declared.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -761,6 +826,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
      repository and the core's new name, each terminal a client of its own
+     (§AL: every kind of file, through the MCP door too)
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
@@ -778,6 +844,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
   its machine line holds by default).
+  [OPEN→CHIEF]: §AL's two (an agent's file kept at once; an upload's bytes
+  to a single-use address).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

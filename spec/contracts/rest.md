@@ -277,12 +277,12 @@ spec's job).
 |---|---|---|---|---|
 | `GET /v1/fetch?scope=&query=&kind=` | resolve the layered context at a scope (default: the token's start, as `egzos_fetch`) | `fetch` | `egzos_fetch` | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/find?q=` | search across what the token sees, in the query grammar of `egzos.store.find` | `fetch` | `egzos find` | `context.fetch` |
-| `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read | `context.fetch`; `blob.grant` per §6 |
+| `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read; `egzos_get` (§4.5, not running) | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
-| `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls` | `context.fetch` |
-| `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember` | `item.add`; `blob.put` where an artifact is promoted |
-| `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new) | none |
-| `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new) | `upload.put`; or `context.fetch` on a refused id |
+| `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls`; `egzos_places` (§4.5, not running) | `context.fetch` |
+| `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember`; an artifact: `egzos_add_file` (§4.5, not running) | `item.add`; `blob.put` where an artifact is promoted |
+| `POST /v1/uploads` | open an artifact upload (§4.4) | `remember` on its scope | — (new); within `egzos_add_file` (§4.5, not running) | none |
+| `PUT /v1/uploads/{id}` | send the upload's bytes; they are staged (§4.4) | the opener | — (new); within `egzos_add_file` (§4.5, not running) | `upload.put`; or `context.fetch` on a refused id |
 | `DELETE /v1/uploads/{id}` | discard an upload no item was written from, open or orphaned, and its staged bytes (§4.4) | the opener; for an orphan, also the person an agent or a terminal opener serves (v0.7 §AC, §AJ); or an admin | — (new) | `upload.discard` |
 | `POST /v1/items/{id}/move` | move an item; the gate decides, and asks for the confirm inline when the audience widens (§4.2) | `organize`; `publish` to widen | `egzos mv` | `item.move` with `gate.pass.silent`; or `context.fetch` (first leg), then `step_up`, `gate.pass.confirmed` and `item.move`; or `gate.propose` |
 | `POST /v1/items/{id}/copy` | copy an item; the same gate as move (§4.2) | `fetch` on the source; `remember` and `organize` on the destination; `publish` to widen | — (new: v0.7 §V) | as move, with `item.copy` |
@@ -290,7 +290,7 @@ spec's job).
 | `POST /v1/pending/{proposal}/deny` | deny a parked proposal, with the confirm | as approve | `egzos trust deny` | `context.fetch` (first leg); `step_up`, `approval.deny` |
 | `POST /v1/items/{id}/promote` | promote an unverified item to verified, with the confirm | an `interactive` principal covering its scope | `egzos trust promote` | `context.fetch` (first leg); `step_up`, `approval.promote`; `blob.put` where a staged artifact's bytes are promoted (§4.4) |
 | `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
-| `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
+| `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk`; `egzos_make_place` (§4.5, not running) | `node.create` |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
 
@@ -820,6 +820,112 @@ storage (v0.7 §S).
   facets and filters (7); anomaly sentences (9); token reads and their events (10); where coverage is
   computed (11); a quarantine flag per ring (12). A builder adds none of them.
 
+### 4.5 · The MCP tools
+
+The tools both MCP transports serve (`src/egzos/mcp/server.py`): over stdio as the client `Token` the
+door was started with, at `/mcp` as the bearer the door verified (`identity.md` §7). **decided**
+(v0.7 §AL), that the MCP door carries every file a person's other doors carry; **a1p**, every other
+clause of this subsection, which the Chief may veto clause by clause.
+
+**An MCP tool mirrors a route this door already has, under the same capabilities, coverage,
+validation, refusal and audit events, so no tool gives a caller a power its token lacks at `/v1/`.**
+A tool that would need a rule of its own is a route first, reviewed here. The tools write and read
+nothing a route does not, and a client container `Token` or a provider token that can call a tool
+can call its route.
+
+**One channel per answer** for the four new tools below, the channels the running tools use (§3's
+last paragraph); `egzos_remember`'s own texts for a missing `remember` and an unknown `kind` stand as
+they run:
+
+- **Not live:** `{"ok": false, "reason": "this token is no longer valid"}`, the same from every tool.
+- **Malformed:** the word `invalid_request` in the tool's error result, decided on the arguments
+  alone and before any lookup: a missing or mistyped argument, U+0000 in a string, and each shape
+  §4.1 and §4.4 refuse with `400`. **`busy`** and **`internal`** likewise.
+- **§3's refusal.** A read answers its empty result, as `egzos_fetch` and `egzos_inbox` do, so a
+  refused read and an empty one are one answer. A write answers `{"ok": false, "reason": "scope not
+  found"}`, `egzos_remember`'s one absent answer, for every case §3 lists, a missing capability
+  included. Either appends §4's probe, a `context.fetch` with `items: []`.
+- **Ambiguous:** a read carries `"ambiguous": [<path>]` beside its empty result, as `egzos_fetch`
+  does; a write answers `{"ok": false, "reason": "ambiguous", "matches": [<path>]}`. Only to a
+  principal holding `fetch`; any other gets §3's refusal (§3).
+
+**Every string an item or a node holds is untrusted data.** Each read's answer opens with
+`egzos_fetch`'s `banner`, and an item's body or `inline` text sits inside the response's fence, as
+`egzos_fetch` serves it; titles, tags, file names, types and place names are keys of the block
+beside it, under the banner, as `auto_title` and `tags` are today.
+
+| tool | arguments | result | mirrors | events |
+|---|---|---|---|---|
+| `egzos_fetch` | `scope?`, `query?`, `kinds?` | `{"banner", "fence", "scope", "chain", "items": [<block>]}` | `GET /v1/fetch` | `context.fetch`; `blob.grant` per §6 |
+| `egzos_remember` | `text`, `kind?`, `scope?`, `key?`, `tags?` | `{"ok": true, "id", "status", "auto_title", "scope"}` | `POST /v1/items` (text) | `item.add` |
+| `egzos_inbox` | — | `{"banner", "items": [{"id", "kind", "trust", "thread", "auto_title"}]}` | `GET /v1/inbox` | `context.fetch` |
+| `egzos_get` | `id` | `{"banner", "fence", "items": [<block>]}`, one block | `GET /v1/items/{id}` | `context.fetch`; `blob.grant` per §6 |
+| `egzos_places` | `under?` | `{"banner", "nodes": [<node>]}` | `GET /v1/scopes` | `context.fetch` |
+| `egzos_make_place` | `type`, `name`, `parent?` | `{"ok": true, "node": <node>}` | `POST /v1/scopes` | `node.create` |
+| `egzos_add_file` | `scope`, `name`, `mime?`, `content_base64`, `key?`, `tags?` | `{"ok": true, "id", "status", "auto_title", "scope", "sha256", "size", "staged"}` | §4.4's three steps, in one call | `upload.put`, `item.add`; `blob.put` where §4.4 promotes |
+
+The first three are **running**. `egzos_get`, `egzos_places`, `egzos_make_place`, `egzos_add_file`
+and every new key below are **not running**: they enter `server.py` with the code, and a test per
+row asserts the row's events.
+
+- **`<block>`** is `egzos_fetch`'s running item block: `{"id", "kind", "key", "layer", "trust",
+  "shadowed_by", "auto_title", "tags", "content"}`, `content` the fenced body or `inline` text. For
+  an artifact it also names the file, `"filename"`, `"mime"`, `"size"` and `"sha256"` from its
+  `content` (`context-item.md` §3), and where §6 minted a grant for this read, `"grant"` and
+  `"grant_url"` beside them, absent otherwise and never `null`, exactly as §4.1's `<entry>` carries
+  them: silent where §6 is silent, an agent's unpromoted artifact included. Each mint appends
+  `blob.grant`, each redemption at `GET /v1/blobs/` `blob.pull` (§6); a stdio client redeems the
+  descriptor at this door (`context-item.md` §3). `egzos_inbox` mints no grant, as `GET /v1/inbox`
+  mints none (§4.1 item 4).
+- **`egzos_get(id)`** is `GET /v1/items/{id}`: `fetch` on the item's scope and §3's serving check,
+  one block whose `layer` is its own node and `shadowed_by` `null`, one `context.fetch`, and the
+  grant rule above. Refused, it answers `{"banner", "items": []}`.
+- **`egzos_places(under?)`** is `GET /v1/scopes`: the child nodes of `under` that the token covers,
+  sorted by path, viewer-scoped and complete (§4); `under` absent is the token's start, as the
+  route's (§4.1 item 5). It needs `fetch`, as the route does, since only `fetch` reads names (§3).
+  One `context.fetch`, naming the nodes served, as the route appends. Refused, `"nodes": []`.
+- **`egzos_make_place(type, name, parent?)`** is `POST /v1/scopes`: a `type` and a `name` the route
+  accepts, `parent` absent the personal root; coverage of the parent, and `admin` for a type above its
+  `structure_floor` (`capabilities.md` §1); otherwise the write's §3 answer. To a principal without
+  `fetch` the node's `path` is `null` (§4.1 item 8). It appends `node.create`, attributed to its
+  caller as §4's attribution clause has it. **It adds no power:** the same token can ask the route.
+- **`egzos_add_file`** writes an artifact small enough to ride in the call's own arguments, running
+  §4.4's open, bytes and item as one call, with every check of each, in the route's order:
+  1. `remember`, then the shapes, before any lookup: `name` and `mime` as §4.4 item 1 has them,
+     `mime` absent read as `application/octet-stream`; `content_base64` standard base64 (RFC 4648
+     §4) that decodes; `key` and `tags` as `POST /v1/items` takes them; the decoded size above
+     `blobs.upload_max_bytes` is `invalid_request`.
+  2. `remember` on `scope`, which is required, as at `POST /v1/uploads`; otherwise the write's §3
+     answer.
+  3. The per-person cap of §4.4 item 1, counted as the route counts it: a 17th answers `{"ok":
+     false, "reason": "too_many_uploads"}`, the `429`'s fact in the tool's channel.
+  4. The container computes `size` and `sha256` from the decoded bytes, stages them and appends
+     `upload.put` (`outcome: staged`); the caller declares neither, so `length` and `hash` never
+     refuse here.
+  5. It writes the item, `unverified`, and appends `item.add`. An `interactive` principal's bytes
+     are promoted with it (`blob.put`); a `client` principal's stay staged until a person promotes
+     the item, exactly as §4.4 item 3 and §6 item 2 have it, and hold their slot until then.
+     `staged` says which.
+
+  If anything fails after the bytes are staged, the same call discards the upload and its staged
+  bytes as `DELETE /v1/uploads/{id}` does, appending `upload.discard`, and answers as the failure
+  would: no orphan is left and the slot is free. **How much one call carries:** at `/mcp` the door
+  reads at most `BODY_MAX_BYTES` (`src/egzos/api/app.py`, 262,144 bytes, passed to the transport as
+  its `max_body`) of the whole request, so the decoded file is under 196,608 bytes (192 KiB) less
+  the call's envelope and its other arguments; a longer request gets the transport's `413`
+  (`identity.md` §7) before any tool runs, with no entry. Over stdio no door reads the body, and
+  `blobs.upload_max_bytes` alone binds.
+
+**What stays out:**
+
+- **No human-only act has a tool**: promote, approve, deny, tombstone, a rename or a removal under
+  §AK (Egzos/egzos#404), a grant or a registration, a confirm (`identity.md` §7).
+- **A file larger than one call carries** needs an upload whose bytes travel outside the call. That
+  is the next change: a single-use address for an upload's bytes, the mirror of §6, reviewed on its
+  own (v0.7 §AL). Until then such a file goes through §4.4 or the command line.
+- **No tool fetches an address a caller chose.** The container never fetches a URL on a caller's
+  behalf; the bytes arrive in the call or at this door.
+
 ## 5 · Audit coverage
 
 `events.md` §4 invariant 2 binds this door without exception: every read, grant mint and blob pull
@@ -830,7 +936,8 @@ The two invariant-2 exceptions (the owner's read inside an AS session; refresh r
 AS's, and neither reaches this door: §2 accepts no session. **decided.**
 
 **The whole list** of what the door appends is the tables of §4 and §4.3, §4.2's and §4.4's clauses,
-and §2 item 7's `rest.tally` and `authz.release`.
+and §2 item 7's `rest.tally` and `authz.release`. §4.5's tools append only what the rows they mirror
+append.
 
 **New events.** `item.copy` (a copy is made; `subject` the new item, `details.from` the source),
 `gate.pass.confirmed` (a widening move or copy confirmed inline; `audience_delta` and the `step_up`'s
@@ -1015,6 +1122,6 @@ other four questions were the retired authorization server's and close with it.
 
 Who may call the door, provider-token verification, grants, the confirm, CORS and MCP over HTTP →
 `identity.md`. Copy, the confirm, the human-only routes, grants, agents, credentials and upload →
-§4–§4.4 here. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
+§4–§4.4 here. The MCP tools' shapes → §4.5 here; their transport → `identity.md` §7. The lifeboat → `spec/design/lifeboat.md`. The grant key of a container egzos hosts →
 `identity.md` §4.
 The look of any client → its design spec.
