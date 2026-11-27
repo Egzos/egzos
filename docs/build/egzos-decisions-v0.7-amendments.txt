@@ -803,10 +803,10 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
             capture writes a `/` in a title as `-`.
           - The door serves what it carries (`GET /v1/limits`): the
             contract's version, a word for each thing it serves that
-            0.2.0 did not, and the upload limits #360 asked for. A container from
-            before it answers the one refusal, which a client reads as
-            "none of these", so it never takes a missing route for a
-            refusal of the act.
+            0.2.0 did not, and the upload limits #360 asked for. A
+            container from before it answers the one refusal, which a
+            client reads as "none of these", so it never takes a
+            missing route for a refusal of the act.
 
 [LATER]   Unique names among siblings, and which type of place may sit
           under which; left out because pure capture names inbox
