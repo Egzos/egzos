@@ -457,7 +457,8 @@ the row does not name is `400` (§3).
 8. **`POST /v1/scopes`** returns the created node. `parent` absent is the personal root, as
    `egzos mk`. To a principal without `fetch`, the node's `path` is `null`: a computed path names
    its ancestors, and only `fetch` reads names (§3). **a1p.**
-9. **`GET /v1/pending`** is two lists as `Trust.pending` returns them, plus §4.4's `staged` and
+9. **`GET /v1/pending`** is two lists as `Trust.pending` returns them (a proposal's paths rendered
+   as §4.5 says), plus §4.4's `staged` and
    `uploads` where the reader has any: `items`, every `unverified`
    item in a scope the token covers, and `proposals`, every `open` proposal the token decides over
    (`Trust.decides_over`: it covers both ends). Both are viewer-scoped; the running CLI lists every
@@ -957,8 +958,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
   name, and so that it was renamed and when, to whoever reads a path beneath it. **decided** (the Chief, 2026-11-26; v0.7 §AK). For a
   principal that reads no path beneath the place, a tail it gives through the old name no longer
   reaches the place and, unless it now matches another place that bears the name (above), gets
-  §3's refusal, the same answer as for a place that is gone or that its token no longer covers, so
-  the refusal tells it nothing more than those do. A client that keeps a place to act on keeps its id, never its path, and acts on the id
+  §3's refusal, the same answer as for a place its token no longer covers. It may so learn
+  that a name it gave itself no longer names the place, and when; it never learns the new name. A client that keeps a place to act on keeps its id, never its path, and acts on the id
   a path resolved to at once.
 - **A proposal is shown as its ids now stand.** A parked proposal keeps the `from_path` and
   `to_path` it was parked with (`container.md` §6), which may hold a name a place no longer bears.
@@ -980,7 +981,7 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 
 ### 4.6 · What this door serves
 
-`GET /v1/limits`, to any valid token, a `client` principal's included → `{"contract": "1.1",
+`GET /v1/limits`, to any valid token, a `client` principal's included → `{"contract",
 "features": [<word>], "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}`. **a1p** (v0.7
 §AK; #360), **not running**.
 
@@ -989,7 +990,7 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
   facts about the caller's own container and no secret, so a client says "too big" before it opens
   an upload. **It is a read of two config keys and one constant, not a config surface**: it sets
   nothing and serves no other key, and config stays on the CLI (§4.4).
-- `contract` is the contract set's version (`README.md`). `features` names, one word each and in
+- `contract` is the contract set's version (`README.md`), `"1.1"` today. `features` names, one word each and in
   no order, what this door serves beyond the set as release 0.2.0 served it: `terminals.machine`
   (§4.3's `machine` line), and §4.5's `items.rename` and `scopes.rename`, each only once its code
   runs, and `items.rename` only where its rename moves `lifecycle.version` in the same step as its

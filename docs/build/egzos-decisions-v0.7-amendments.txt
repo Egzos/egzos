@@ -840,7 +840,8 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             path beneath it shows its new name to whoever reads that
             path, a person or an agent, its ancestors' names included,
             as every path already does, and so shows that it was renamed
-            (decided below). The confirm shows the old name and the new,
+            and when (decided below). The confirm shows the old name and
+            the new,
             and is bound to the node's name as its first leg read it and
             to the new; a name renamed away and back between the legs
             matches again. Renaming an item or a place to the name it
