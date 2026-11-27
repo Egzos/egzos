@@ -1097,7 +1097,9 @@ storage (v0.7 §S).
      route, where a query parameter is §3's `400`. No other route and no other method reads the
      descriptor, `/mcp` included: **it is never a bearer for anything else**. It delivers exactly
      the declared bytes to that one upload. It reads nothing, lists nothing, writes no item and
-     discards nothing.
+     discards nothing. Like §6's redemption, it is a request §2 reads no bearer on: a `PUT` to this
+     path with no `Authorization` header is never answered `401`, and its answers are the ones
+     below.
    - **The checks, in this order:** (1) every parameter is present and well-formed; (2) `sig`
      verifies, compared in constant time; (3) `expires_at` has not passed; (4) the address has not
      been spent, and this arrival spends it, whatever the later checks decide, atomically, as §6's
