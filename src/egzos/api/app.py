@@ -44,6 +44,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from starlette.responses import Response, StreamingResponse
 
+from egzos._ids import is_ulid
 from egzos._types import CONTRACT_VERSION, DoorFeature, StorageBusy
 from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
@@ -1049,6 +1050,13 @@ def create_app(
         container `Token` names no `sub`; an agent is never served who else holds access."""
         return isinstance(token, GrantToken) and token.principal == "interactive"
 
+    def places(token: Token | None, scopes: list[str]) -> bool:
+        """Whether each scope is `"*"` or the id of a node that exists and `token` covers, found
+        by its id alone (§4.3). `exceeds` alone would pass an absent id for a caller holding `*`."""
+        return token is not None and all(
+            s == "*" or ((n := c.backend.get_node(s)) is not None and c.trust.covers(token, n))
+            for s in scopes)
+
     def agent(r: dict[str, Any], seen: dict[tuple[str, str], str]) -> dict[str, Any]:
         """§4.3's `<agent>`, `last_seen` read from the chain: null for an agent never seen."""
         keys = ("client_id", "name", "sub", "capabilities", "scopes", "created_at")
@@ -1093,50 +1101,69 @@ def create_app(
         if not isinstance(refs, list) or not 0 < len(refs) <= scopes_max:
             raise Invalid
         refs = [_str(r) for r in refs]
-        # The lookups, after every shape check, resolved as a grant's are: node ids, never refs.
-        nodes = [d.scope(token, r) for r in refs if r != "*"]
-        scopes = ["*"] if "*" in refs else sorted({n.id for n in nodes if n is not None})
+        # §4.3, "The whole container is one choice of its own": `"*"` stands alone, and every
+        # other entry has the form of a node id and is read as an id alone, so no name is ever
+        # read as a place here. Both are shape checks, before any lookup.
+        if ("*" in refs and len(refs) != 1) or not all(r == "*" or is_ulid(r) for r in refs):
+            raise Invalid
+        scopes = ["*"] if refs == ["*"] else sorted(set(refs))
         # This container's own client names a person, never an agent; a registration never
         # exceeds the caller's own grant, and needs no `publish`; an authorization registers once.
         head = c.ledger.tail(1)[-1]["seq"]  # the door reads the chain to here; the lock, past it
-        if (client_id == c.config_value("identity.client_id") or None in nodes
+        if (client_id == c.config_value("identity.client_id") or not places(token, scopes)
                 or c.identity.exceeds(token, caps, scopes) or c.identity.claimed(authorization)):
             d.probe(token, client_id)
             return refusal()
         if c.identity.full(token.sub, client_id):  # a fact about the caller's own, before any leg
             return _json(429, {"error": "too_many_agents"})
-        # The challenge binds the registration as it would land, beside its client (the subject):
-        # what the person is shown is what lands.
-        terms = json.dumps({"authorization_id": authorization, "name": name,
-                            "capabilities": caps, "scopes": scopes}, sort_keys=True)
+        terms = {"capabilities": caps, "scopes": scopes}
+
+        def replaced() -> dict[str, Any] | None:
+            """§4.3, "Choosing again": the live registration of this client serving the caller,
+            as `GET /v1/agents` serves it to them, which the new one replaces whole."""
+            was = c.identity.registration(client_id, token.sub, "agent")
+            if was is None or was["revoked"]:
+                return None
+            return {k: was[k] for k in ("capabilities", "scopes", "created_at")}
+
+        def bound(was: dict[str, Any] | None) -> str:
+            # The challenge binds the registration as it would land, beside its client (the
+            # subject), and what it replaces, or that it replaces none: what the person is shown
+            # is what lands.
+            return json.dumps({"authorization_id": authorization, "name": name, **terms,
+                               "replaces": was}, sort_keys=True)
 
         def first() -> Response:  # nobody newly sees anything: the agent is named apart, as itself
-            return first_leg(token, act="agent.add", subject=client_id, destination=terms,
+            was = replaced()  # as it stands now, for every first leg, a fresh one included
+            return first_leg(token, act="agent.add", subject=client_id, destination=bound(was),
                              delta=[], origin=origin,
-                             registers={"client_id": client_id, "name": name})
+                             registers={"client_id": client_id, "name": name}, terms=terms,
+                             **({"replaces": was} if was is not None else {}))
 
         if proof is None:
             return first()
         made, reason = None, None
         with c.backend.atomic():
             # As on the grant routes: the caller as their grant stands now, still covering the
-            # registration, so a revoke since the door leaves no agent for a later grant to find;
-            # the door's token concludes, as only it carries the sign-in time.
-            # A client id a terminal's registration names is never an agent's: a proof that
-            # would confirm concludes refused, `registered`, and the answer is a fresh first leg,
-            # as for every refused proof, so no leg says the id was taken (§4.3).
+            # registration, and each place found again by its id, so a revoke or a place gone
+            # since the door registers nothing; the door's token concludes, as only it carries the
+            # sign-in time. A client id a terminal's registration names is never an agent's: a
+            # proof that would confirm concludes refused, `registered`, and the answer is a fresh
+            # first leg, as for every refused proof, so no leg says the id was taken (§4.3).
             now = c.identity.refresh(token)
-            if registrant(now) and not c.identity.exceeds(now, caps, scopes):
+            if (registrant(now) and places(now, scopes)
+                    and not c.identity.exceeds(now, caps, scopes)):
+                was = replaced()  # read under the lock: one changed since the first leg mismatches
                 taken = c.identity.taken(client_id, "agent")
                 reason = c.confirm.conclude(token, proof, act="agent.add", subject=client_id,
-                                            destination=terms, delta=[], origin=origin,
+                                            destination=bound(was), delta=[], origin=origin,
                                             fresh_sign_in=True,
                                             refusal="registered" if taken else None)
                 if reason is None:
                     try:
                         made = c.identity.register_agent(
                             token, client_id, authorization_id=authorization, name=name,
-                            capabilities=caps, scopes=scopes, after=head)
+                            capabilities=caps, scopes=scopes, after=head, replaces=was)
                     except TooManyAgents:  # a 16th landed since the door; its step_up commits
                         return _json(429, {"error": "too_many_agents"})
         if reason is not None:

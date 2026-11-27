@@ -27,6 +27,8 @@ NOT_FOUND = b'{"error":"not_found"}'
 TOO_MANY = b'{"error":"too_many_agents"}'
 INVALID = b'{"error":"invalid_request"}'
 KW = {"actor": OWNER, "principal": "interactive"}
+#: The form of a node id, naming no node (rest.md §4.3: a scope is read as an id alone).
+ABSENT = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 HELPER = {"authorization_id": "auth-1", "client_id": "helper", "name": "Helper", "role": "reader",
           "scopes": ["*"]}
 
@@ -186,10 +188,11 @@ def test_a_person_registers_their_own_agent_with_the_confirm_and_it_signs_in(c, 
 
 
 @pytest.mark.parametrize("change", [{"client_id": "other"}, {"role": "contributor"},
-                                    {"scopes": ["project:p"]}, {"name": "Other"},
+                                    {"scopes": "p"}, {"name": "Other"},
                                     {"authorization_id": "auth-2"}])
 def test_a_second_leg_naming_any_other_registration_is_mismatch(c, door, sign, change):
-    _node(c, "project", "p")
+    p = _node(c, "project", "p")
+    change = {**change, "scopes": [p.id]} if change.get("scopes") == "p" else change
     first = door.post("/v1/agents", headers=sign(), json=HELPER).json()
     again = door.post("/v1/agents", headers=sign(), json=_button(first, **{**HELPER, **change}))
     assert again.json()["result"] == "confirm"
@@ -197,12 +200,9 @@ def test_a_second_leg_naming_any_other_registration_is_mismatch(c, door, sign, c
     assert c.backend.list_agent_registrations() == []
 
 
-def test_scopes_named_by_path_are_registered_as_node_ids(c, door, sign):
+def test_scopes_are_registered_as_the_node_ids_they_were_sent_as(c, door, sign):
     p = _node(c, "project", "p")
-    first = door.post("/v1/agents", headers=sign(), json={**HELPER, "scopes": ["project:p"]})
-    # The challenge binds the node, so another path to it names the same registration.
-    r = door.post("/v1/agents", headers=sign(), json=_button(first.json(), **{
-        **HELPER, "scopes": ["p"]}))
+    r = _register(door, sign(), scopes=[p.id, p.id])
     assert r.json()["agent"]["scopes"] == [p.id]
     assert c.backend.get_agent_registration("helper", "alice")["scopes"] == [p.id]
 
@@ -236,37 +236,37 @@ def test_a_biometric_needs_no_fresh_sign_in(c, door, sign):
     {"capabilities": ["fetch"]}, {"role": None}, {"role": "emperor"}, {"name": "x" * 129},
     {"name": "Help\u202eer"}, {"client_id": "hel per"}, {"client_id": 7},
     {"authorization_id": ""}, {"authorization_id": "a\nb"}, {"authorization_id": "x" * 256},
-    {"scopes": []}, {"scopes": "*"}, {"scopes": [""]}, {"scopes": ["x"] * 65}, {"extra": 1},
+    {"scopes": []}, {"scopes": "*"}, {"scopes": [""]}, {"scopes": [ABSENT] * 65}, {"extra": 1},
     {"confirm": {"challenge": "", "proof": "button"}},
 ])
 def test_a_malformed_registration_is_400_before_any_lookup(c, door, sign, bad):
     """Its scope names no node, so a lookup made first would answer §3's refusal instead."""
-    body = {k: v for k, v in {**HELPER, "scopes": ["no-such-node"], **bad}.items() if v is not None}
+    body = {k: v for k, v in {**HELPER, "scopes": [ABSENT], **bad}.items() if v is not None}
     reads = len(_events(c, "context.fetch"))
     r = door.post("/v1/agents", headers=sign(), json=body)
     assert r.status_code == 400 and len(_events(c, "context.fetch")) == reads
 
 
 @pytest.mark.parametrize("case", ["beyond the caller's capabilities", "beyond the caller's scopes",
-                                  "an absent scope", "an ambiguous path", "this container's own",
+                                  "an absent scope", "an uncovered scope", "this container's own",
                                   "a spent authorization"])
 def test_every_refused_registration_appends_its_probe(c, door, sign, case):
     p = _node(c, "project", "p")
     _node(c, "thread", "t", parent=p)
-    _node(c, "thread", "t", parent=_node(c, "project", "q"))
+    q = _node(c, "project", "q")
     c.identity.grant_user("pat", name="Pat", role="admin", scopes=[p.id], **KW)
     if case == "a spent authorization":  # spent whoever names it, the registration ended since
         assert _register(door, sign("bob"), client_id="tool").status_code == 200
         _put(c, "tool", "bob", revoked=True)
     who, change = {"beyond the caller's capabilities": ("bob", {"role": "contributor"}),
                    "beyond the caller's scopes": ("pat", {"scopes": ["*"]}),
-                   "an absent scope": ("alice", {"scopes": ["no-such-node"]}),
-                   "an ambiguous path": ("alice", {"scopes": ["t"]}),
+                   "an absent scope": ("alice", {"scopes": [ABSENT]}),
+                   "an uncovered scope": ("pat", {"scopes": [q.id], "role": "reader"}),
                    "this container's own": ("alice", {"client_id": "box"}),
                    "a spent authorization": ("alice", {})}[case]
     reads = len(_events(c, "context.fetch"))
     r = door.post("/v1/agents", headers=sign(who), json={**HELPER, **change})
-    assert r.status_code == (409 if case == "an ambiguous path" else 404)
+    assert r.status_code == 404
     assert [e["details"]["items"] for e in _events(c, "context.fetch")[reads:]] == [[]]
     assert [a for a in c.backend.list_agent_registrations() if not a["revoked"]] == []
 

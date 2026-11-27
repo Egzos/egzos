@@ -911,7 +911,8 @@ class Identity:
     # -- agent registrations (§4, rest.md §4.3) -------------------------------------------------
     def register_agent(self, person: GrantToken, client_id: str, *, authorization_id: str,
                        name: str, capabilities: list[str], scopes: list[str],
-                       after: int | None = None) -> AgentRegistration | None:
+                       after: int | None = None,
+                       replaces: dict[str, Any] | None = None) -> AgentRegistration | None:
         """Write a registration serving `person` and append `identity.grant` attributed to them:
         `kind: agent`, `for` the person, and `authorization_id` as the caller claimed it, never a
         verified fact. Each person registers their own (v0.7 §AB). The caller has judged the act,
@@ -920,7 +921,9 @@ class Identity:
         registrations naming one authorization at most one lands (None for the other and every
         later one), and two at 15 never both take the 16th (`TooManyAgents`). A `client_id` that
         names a terminal's registration is never an agent's (`Registered`), and this container's
-        own client names a person (`ValueError`). A terminal's token registers nothing."""
+        own client names a person (`ValueError`). A terminal's token registers nothing.
+        `replaces` is the registration this one replaces as the caller read it under the same
+        lock (rest.md §4.3), carried on `identity.grant` so the chain says which terms ended."""
         if (not isinstance(person, GrantToken) or person.principal != "interactive"
                 or person.terminal is not None):
             raise PermissionError("registering an agent is a person's act, from a browser")
@@ -943,6 +946,7 @@ class Identity:
                 subject=client_id, kind="agent", outcome="granted",
                 capabilities=registration["capabilities"], scopes=registration["scopes"],
                 authorization_id=authorization_id, **{"for": f"user:{person.sub}"},
+                **({"replaces": replaces} if replaces is not None else {}),
             )
         return registration
 
