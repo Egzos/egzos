@@ -214,6 +214,19 @@ class BlobGrant(TypedDict):
 BLOB_GRANT_LIFETIME_SECONDS: int = 300
 
 
+# --- what the REST door serves (rest.md §4.6) ------------------------------------------------
+
+#: rest.md §4.6 — `GET /v1/limits`' `contract`: the contract set's version (`spec/contracts/
+#: README.md`).
+CONTRACT_VERSION: str = "1.1"
+
+#: rest.md §4.6 — every word `GET /v1/limits`' `features` may name, one per thing the door serves
+#: beyond the set as release 0.2.0 served it. A door names a word only once its code runs, and
+#: only where every condition §4.6 sets for it holds; a client ignores a word it does not know.
+DoorFeature = Literal["terminals.machine", "items.rename", "scopes.rename", "grants.own"]
+DOOR_FEATURES: tuple[DoorFeature, ...] = get_args(DoorFeature)
+
+
 # --- the audit chain (spec/contracts/events.md) ---------------------------------------------
 
 Event = Literal[
@@ -946,6 +959,8 @@ __all__ = [
     "CONTAINER_CONFIG_FIELD_FROM_WIRE_KEY",
     "CONTAINER_TYPES",
     "CONTEXT_ITEM_FIELDS",
+    "CONTRACT_VERSION",
+    "DOOR_FEATURES",
     "DOOR_STATE_CONTRACTS",
     "EVENTS",
     "GENESIS_HASH",
@@ -985,6 +1000,7 @@ __all__ = [
     "ContainerType",
     "ContextItem",
     "DeviceRedemptionCause",
+    "DoorFeature",
     "Event",
     "GrantDecision",
     "GrantState",

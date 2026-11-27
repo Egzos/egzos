@@ -39,3 +39,9 @@ def test_the_rest_tally_is_callerless_and_nothing_else_at_the_door_is():
     assert [e for e in t.EVENTS if e.startswith("rest.")] == ["rest.tally"]
     for attributed in ("blob.pull", "blob.grant", "context.fetch"):
         assert attributed not in t.PRINCIPAL_NONE_EVENTS
+
+
+def test_the_door_names_four_words_beyond_release_0_2_0_and_contract_1_1():
+    # rest.md §4.6: `GET /v1/limits`' `contract` and every word its `features` may name.
+    assert t.CONTRACT_VERSION == "1.1"
+    assert t.DOOR_FEATURES == ("terminals.machine", "items.rename", "scopes.rename", "grants.own")

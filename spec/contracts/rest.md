@@ -1236,7 +1236,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 
 `GET /v1/limits`, to any valid token, a `client` principal's included → `{"contract",
 "features": [<word>], "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}`. **a1p** (v0.7
-§AK; #360), **not running**.
+§AK; #360), **running**, its `features` naming `terminals.machine` alone until another word's
+code runs.
 
 - `upload_max_bytes` and `inline_max_bytes` are `blobs.upload_max_bytes` and
   `blobs.inline_max_bytes` as they stand (`container.md` §8), and `uploads_held_max` is §4.4's 16:
