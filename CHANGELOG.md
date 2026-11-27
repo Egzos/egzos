@@ -16,10 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing is decided on it.
 - **Renaming and removing, in the contract** (`rest.md` §4.5–§4.6, v0.7 §AK; #404, #360): a
   person renames an item (`PATCH /v1/items/{id}`) or a place (`PATCH /v1/scopes/{id}`; its id
-  stays, every path through it changes), and removes a place that holds nothing
-  (`DELETE /v1/scopes/{id}`; one holding something answers `409` `not_empty`). A place's name holds
-  no `/`. `GET /v1/limits` says which of these a container serves, with its upload limits. Not
-  running until the code lands.
+  stays, every path through it changes), and the container's admin removes a place that holds
+  nothing (`DELETE /v1/scopes/{id}`; one holding something answers `409` `not_empty`). A place's
+  name holds no `/`. `GET /v1/limits` says which of these a container serves, with its upload
+  limits. Not running until the code lands.
 
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 

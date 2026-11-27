@@ -202,9 +202,6 @@ every surface: CLI, both MCP transports, REST, the lifeboat and the authorizatio
 2. **No enumeration through error shapes, anywhere.** No error text, field, ordering, count or
    pagination cursor may reveal that something the caller cannot see exists. A partial result and
    a result with nothing in the hidden part are indistinguishable (`container.md` §4 invariant 3).
-   One fact is given by design: `rest.md` §4.5's `not_empty`, that a place holds something, told
-   only to a person who covers the place and may otherwise remove it, and nothing of what it
-   holds. **a1p** (v0.7 §AK), **not running.**
 3. **The audit entry may distinguish what the response may not.** The owner's ledger may record
    which of clause 1's three cases occurred, in `details`. The uniformity is owed to the caller,
    never to the owner reading their own container (`events.md` §4 invariant 1 states the same for

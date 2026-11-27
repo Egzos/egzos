@@ -293,7 +293,7 @@ spec's job).
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title (§4.5) | an `interactive` principal holding `organize` and `fetch` on its scope | — (new: #404) | `item.rename` |
 | `PATCH /v1/scopes/{id}` | rename a place; its id stays (§4.5) | an `interactive` principal that could create it at its parent; `organize` on it | — (new: #404) | `node.rename` |
-| `DELETE /v1/scopes/{id}` | remove a place that holds nothing (§4.5) | as rename, and `fetch` on it | — (new: #404) | `node.tombstone`; or `context.fetch` (`not_empty`) |
+| `DELETE /v1/scopes/{id}` | remove a place that holds nothing (§4.5) | an `interactive` principal holding `admin` over the whole container, and `curate`, `fetch` and `organize` on it | — (new: #404) | `node.tombstone`; or `context.fetch` (`not_empty`) |
 | `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | — (new: #360) | `context.fetch` (`read: limits`) |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -881,23 +881,22 @@ needs its own decision (v0.7 §AK).
 
 **Removing a place.** `DELETE /v1/scopes/{id}` → `{"result": "removed"}`.
 
-- **Needs** what a rename needs, and `fetch` on the node, so that the one told what follows can
-  list the place. The inbox, the personal root and `global` are never removed. Each, and every
-  case a rename refuses, is §3's refusal and §4's probe.
+- **Needs** an `interactive` principal holding `admin` over the whole container, and `curate`,
+  `fetch` and `organize` on the node: the person from whom nothing a place can hold is hidden.
+  §4.4 lists every orphan to an admin over the whole container, a quarantine is `curate`'s to lift
+  (`capabilities.md` §1), and `fetch` lists the rest. The inbox, the personal root and `global`
+  are never removed. Each, an absent or uncovered node, a `client` principal, and a caller short of
+  what this needs get §3's refusal and §4's probe.
 - **Only a place that holds nothing is removed**: no live item, a quarantined one included; no
   staged item; no open or orphaned upload naming it, whoever opened it; no child place. This check
   is the last, inside the atomic step that removes. A place that holds something answers `409` with
   `{"error":"not_empty"}` and §3's four headers, and appends one `context.fetch` with `items: []`
   and `details.reason: not_empty`.
 - **What `not_empty` says**: that the place holds something, and nothing else; no count, kind, id
-  or name. What it holds may be nothing this caller is served (a quarantined item, an upload
-  another principal holds open), and the answer is the same. Any answer but `removed` tells this
-  caller as much, so §3's refusal here would hide nothing `not_empty` says; and the caller covers
-  the place and holds `fetch` and `organize` there. It is the one such fact `capabilities.md` §6
-  clause 2 lets this door give. **It rests on one thing, said once so that no later change breaks
-  it unseen:** nothing sits in a place whose bare existence must stay hidden from a person who
-  covers the place, lists it and may remove it. A change that would let a place hold such a thing
-  amends this clause first.
+  or name. It tells this caller nothing they may not know: whatever holds the place is theirs to
+  list, to discard or to lift, by the capabilities this route needs, so `capabilities.md` §6
+  clause 2 stands as it is written. **A later change that lets anyone else remove a place, or lets
+  a place hold what such a person may not know of, amends this clause first.**
 - **The node is tombstoned, never erased** (`storage.md` §3), so the chain's entries about it still
   resolve. From then on it reads as absent everywhere: no list shows it, no tail matches it, and a
   reference to it, a write, an upload, a move or a copy into it is §3's refusal. Grants,

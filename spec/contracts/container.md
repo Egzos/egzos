@@ -78,7 +78,8 @@ matches (#115).
 itself would change its own path, and paths are the addressing surface. **running** for the
 first-item name; the rename proposal is **decided, not running**.
 
-**A person may rename a place, and remove one that holds nothing** (`rest.md` §4.5; v0.7 §AK).
+**A person may rename a place, and the container's admin may remove one that holds nothing**
+(`rest.md` §4.5; v0.7 §AK).
 The rule above binds a rename that happens on its own, which stays a proposal; a person's rename is
 their own act. It keeps the node's id and changes every path through the node: a reference held as
 a path stops resolving and answers as an absent one, and nothing redirects from an old name. A

@@ -751,12 +751,10 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
     PLACE; THE DOOR SAYS WHAT IT SERVES (amends container.md §2's rename
     sentence, which bound only a rename that happens on its own, and
     [0.3 · 2]'s capture naming, which now writes a `/` as `-`; and
-    capabilities.md §6 clause 2 ([0.3 · 42]), which now names the one
-    fact a removal's `not_empty` gives; and freeze item 39's reading of
-    `approval.stale`, which gains a second cause, a removed place.
+    freeze item 39's reading of `approval.stale`, which gains a second
+    cause, a removed place.
     rest.md §4, §4.1, §4.5, §4.6; container.md §2, §6; context-item.md
-    §3; capabilities.md §6; storage.md §3; events.md §1; Egzos/egzos#404,
-    Egzos/egzos#360)
+    §3; storage.md §3; events.md §1; Egzos/egzos#404, Egzos/egzos#360)
 ================================================================================
 
 [DECIDED] Decided by the Chief on 2026-11-25 and 2026-11-26. On
@@ -791,15 +789,17 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
             every path through it changes, an old path answers as an
             absent one, and nothing redirects. The inbox, the personal
             root and `global` are never renamed. Event `node.rename`.
-          - Removing a place is the same person's act, with `fetch` too,
-            and only for a place that holds nothing: no item, no staged
-            item, no upload, no place. Otherwise the answer is a `409`
-            that says only "not empty", told only to someone who covers
-            the place and could otherwise remove it; any other answer
-            would tell them as much. The place is tombstoned, never
-            erased, and reads as absent everywhere after. The inbox,
-            the personal root and `global` are never removed. Event
-            `node.tombstone`.
+          - Removing a place is the act of the container's admin (an
+            interactive principal holding `admin` over the whole
+            container, and `curate`, `fetch` and `organize` on the
+            place), and only for a place that holds nothing: no item, no
+            staged item, no upload, no place. Otherwise the answer is a
+            `409` that says only "not empty". It goes to the one person
+            from whom nothing a place can hold is hidden, so no rule
+            about what a caller may learn is bent. The place is
+            tombstoned, never erased, and reads as absent everywhere
+            after. The inbox, the personal root and `global` are never
+            removed. Event `node.tombstone`.
           - A place's name, made or renamed, is 1 to 255 characters,
             with no U+0000 and no `/`. Existing names stay. Pure
             capture writes a `/` in a title as `-`.
@@ -813,6 +813,10 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
 [LATER]   Unique names among siblings, and which type of place may sit
           under which; left out because pure capture names inbox
           threads from titles that may repeat.
+
+[LATER]   A person who is not the container's admin removing a place
+          they made. It needs a rule for what they cannot see inside it
+          (another person's unfinished upload, a quarantined item).
 
 [OPEN→CHIEF] What removing a place that still holds things should do.
           The draft refuses it. The alternative is one act that sends
