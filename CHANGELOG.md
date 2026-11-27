@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first leg says it bound, and what a registration replaces are not running until their code
   lands, which they do together and only after §4.5's rule on a place's name runs.
 
+### Changed
+
+- **The provider's scopes, corrected** (`rest.md` §4.3; a note under v0.7 §AM): the sign-in provider
+  accepts a fifth scope word, `offline_access`, beside `openid`, `email`, `profile` and `phone`. It
+  decides nothing a client receives: the provider hands a client a refresh token with or without
+  it. The consent page no longer refuses an authorization for naming it, and its fixed words now
+  say that an approved agent stays signed in to this cloud, with no end date of its own, until its
+  person or an admin ends its access.
+
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 
 ### Added

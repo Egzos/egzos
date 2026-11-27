@@ -795,24 +795,40 @@ the CLI or the lifeboat (`identity.md` §4).
     its id as it then stands, and registers nothing where one is gone.
   - **The provider's scopes give nothing here, and are not shown as if they did.** The container
     reads no `scope` claim of any token: what a token may do is its grant's or its registration's
-    (`identity.md` §4). **running.** The provider's own scopes are `openid`, `email`, `profile` and
-    `phone`, and it offers no others. They select what the provider puts in an ID token and returns
-    at UserInfo, and they limit nothing else: by its documentation, "All OAuth access tokens have
-    full access to user data (same as regular session tokens)", and its scopes "do not control
-    access to your database tables or API endpoints" (Supabase,
+    (`identity.md` §4). **running.** The provider's own scopes are `openid`, `email`, `profile`,
+    `phone` and `offline_access`, and it accepts no others: it refuses an authorization that names
+    any other word itself, before a page is shown one. The first four select what the provider puts
+    in an ID token and returns at UserInfo, and they limit nothing else: by its documentation, "All
+    OAuth access tokens have full access to user data (same as regular session tokens)", and its
+    scopes "do not control access to your database tables or API endpoints" (Supabase,
     https://supabase.com/docs/guides/auth/oauth-server/, the pages `oauth-flows` and
-    `token-security`, read 2026-11-26). So the page reads no capability and no place from an
-    authorization's `scope`, shows the string nowhere, and treats two authorizations that differ
-    only in it alike. It says instead, in fixed words of its own that are the same for every
-    authorization: that approving lets this agent sign in to this cloud as the person, within what
-    they tick; and that the agent can read their account's record at the sign-in provider: their
+    `token-security`, read 2026-11-26). `offline_access` is the word a client asks a refresh token
+    with, and many agents' clients send it. Here it decides nothing a client receives: not whether
+    a refresh token is issued, which this provider hands a client with its first access token
+    whether or not the word was asked; no claim beyond the `scope` string; no length of time. Like
+    the other words, it is kept in the provider's record of the consent and in each token's `scope`
+    claim, which this container does not read, so a later authorization that asks for no more than
+    was last approved is approved without asking (below). So whatever its `scope` said, an agent
+    approved here can keep signing in to this cloud until its registration is ended (`identity.md`
+    §4). The documentation's list stops at four; the fifth, and what it decides, were read in the
+    provider's public source on 2026-11-27, at release v2.199.0 of Supabase Auth
+    (`internal/models/oauth_scope.go`, `internal/api/oauthserver/authorize.go` and `handlers.go`,
+    `internal/tokens/service.go`). That is a reading of the source, as `identity.md` §3a's is. So
+    the page reads no capability, no place and no length of time from an authorization's `scope`,
+    shows the string nowhere, and treats two authorizations that differ only in it alike. It says
+    instead, in fixed words of its own that are the same for every authorization: that approving
+    lets this agent sign in to this cloud as the person, within what they tick; that it stays
+    signed in to this cloud, with no end date of its own, until they or an admin end its access;
+    and that the agent can read their account's record at the sign-in provider: their
     profile, their email, a phone number where the account holds one, and how they sign in. Those
     words are true only while `identity.md` §3a's two records stand: the operator's check that the
     identity project gives a client's token nothing more, and the live test at the provider. While
     either is missing or fallen the page approves no agent: it denies the authorization at the
     provider and calls no route here. The door checks neither record (`identity.md` §3a). An
-    authorization whose `scope` names any word but those four is refused: the page denies it at the
-    provider and calls no route here, having no true words for what such a scope would give.
+    authorization whose `scope` names any word but those five is refused: the page denies it at the
+    provider and calls no route here, having no true words for what such a scope would give. The
+    provider refuses such a word first today; the page's own refusal is for a release that comes to
+    accept one. **a1p** (the fifth word and the page's third sentence, 2026-11-27).
   - **Choosing again.** No route changes a registration's terms in place. Where the provider asks
     the person again about a client that already serves them, whatever made it ask, the client's
     own request included, the page offers the choice anew, from nothing, and says beside it that
@@ -891,7 +907,7 @@ the CLI or the lifeboat (`identity.md` §4).
   instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
   first-party session, and calls this route only for one that is pending, was requested by the
   person whose container token makes the call, is for the body's `client_id`, and names no scope
-  but the provider's four; and it refuses a `client_id` registered on another container (`identity.md`
+  but the provider's five; and it refuses a `client_id` registered on another container (`identity.md`
   §3a). **a1p** (a1r and a6 on #285; the scope check, v0.7 §AM). For a terminal it owes one more
   check: it calls `POST /v1/terminals` only for a client it registered at the provider itself,
   in this browser, for a sign-in the person continued, with egzos.io's callback that client's
