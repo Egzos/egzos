@@ -292,7 +292,7 @@ spec's job).
 | `DELETE /v1/items/{id}` | tombstone an item: at once, or with the confirm where a person promoted it (below) | an `interactive` principal holding `organize` on its scope | `egzos rm` (new, beside it) | `item.tombstone`, with `details.staged_deleted` where it releases staged bytes; a promoted item's: `context.fetch` (first leg), then `step_up` and `item.tombstone` |
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title; at once, or with the confirm where it is verified or a person promoted it (§4.5) | an `interactive` principal holding `organize` and `fetch` on its scope | — (new: #404) | `item.rename`; a verified or promoted item's: `context.fetch` (first leg), then `step_up` and `item.rename` |
-| `PATCH /v1/scopes/{id}` | rename a place, with the confirm; its id stays (§4.5) | an `interactive` principal holding `admin` over `["*"]`, and `organize` and `fetch` on it | — (new: #404) | `context.fetch` (first leg), then `step_up` and `node.rename` |
+| `PATCH /v1/scopes/{id}` | rename a place, with the confirm; its id stays (§4.5) | a person holding a provider token whose grant holds `admin` over `["*"]`, and `organize` and `fetch` on it | — (new: #404) | `context.fetch` (first leg), then `step_up` and `node.rename` |
 | `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | — (new: #360) | `context.fetch` (`read: limits`) |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
@@ -513,8 +513,10 @@ and to every human-only act. **decided** (v0.7 §U); **a1p** the HTTP shape.
      the two legs moves at least one of the three: a rename, the version (§4.5); a promote,
      `trust.status` and the version; a move, `scope`; a quarantine, `trust.status`; a tombstone
      ends the item, and a second leg on a tombstoned item is §3's refusal; a copy leaves its
-     source as it was. The running code moves the version on a promote alone today, which is
-     why a rename is served only where it moves the version too (§4.6). A place's rename is
+     source as it was; a title pass, where one runs, moves the version with the title it writes.
+     The running code moves the version on a promote alone today, which is why a rename is
+     served only where it moves the version too and every confirm on an item is bound to the
+     three (§4.6). A place's rename is
      bound to the node's name as the first leg read it and to the body's new `name` (§4.5)
      (**a1p**);
    - verifies the proof (`identity.md` §5);
@@ -896,6 +898,10 @@ its own decision (v0.7 §AK).
   `item.rename`, and an item renamed at once is written so, with its `item.rename`, in one atomic
   step too. `item.rename` carries `kind`, `field` (`filename` or `title`), `from`, the name as it
   stood, and the new `name`, both untrusted display data.
+- **A `name` equal to the name the item bears now**, compared as given, changes nothing: after the
+  route's own checks pass, the door answers `{"item": <item>}` as it stands, opens no confirm,
+  writes nothing, moves no version, and appends one `context.fetch` with `items: []` in place of
+  `item.rename`.
 - **Absent, uncovered, tombstoned, quarantined, an unverified `rule` whatever its provenance
   (served only at `GET /v1/pending`), or without `organize` or `fetch`**: §3's refusal and §4's
   probe, the same for each.
@@ -903,31 +909,44 @@ its own decision (v0.7 §AK).
 **Renaming a place: the container's admin's act, behind the confirm.** `PATCH /v1/scopes/{id}`
 with `{"name", "confirm"?}` → `{"node": <node>}`.
 
-- **Needs** an `interactive` principal holding `admin` over the whole container (`["*"]`, as
-  §4.3's `GET /v1/grants` needs), and `organize` and `fetch` on the node: the answer carries the
-  node. After a rename a path names whatever bears the name now, so a rename can re-point a name;
-  only a person who could already move what sits under those places may rename one, and only as a
-  deliberate, confirmed act the chain records with the old name and the new.
+- **Needs** a person holding a provider token whose grant holds `admin` over the whole container
+  (`["*"]`), as §4.3's `GET /v1/grants` needs (a container `Token` gets §3's refusal, as there),
+  and `organize` and `fetch` on the node; any such person may, the owner or another admin. The
+  answer carries the node. After a rename a path names whatever bears the name now. The rename
+  changes no coverage and no audience, since tokens, grants and registrations hold ids; it changes
+  only what a path names. So it is kept to the container's admin, who already decides who may see
+  and act on every place, and made a confirmed act the chain records with the old name and the
+  new. The name it frees is free: anyone who may create a place where a path's tail would match it
+  (coverage of the parent, §4) can then make that path name the new place, without the confirm.
+  That is why a client keeps ids.
 - **It takes the confirm** (§4.2). The first leg answers `newly: []` and names what it renames,
   `"renames": {"node", "type", "from", "to"}`, the names untrusted display data; its
   `context.fetch` has the node as `subject` and carries the same as `details.renames`. The
   challenge is bound to the node's id and its name as the first leg read it, and to the body's new
   `name`, so a second leg that finds the node's name changed, or that names another, concludes
-  `mismatch` (§4.2 item 3). A `client` principal never gets the confirm (§4.2 item 6), and a
-  terminal's token concludes no second leg (§4.2 item 3, `identity.md` §5).
+  `mismatch` (§4.2 item 3). A name renamed away and back between the legs matches again, and the
+  rename concludes as the first leg showed it. A `client` principal never gets the confirm (§4.2
+  item 6), MCP has no tool for it, and a terminal's token concludes no second leg (§4.2 item 3,
+  `identity.md` §5).
 - **What a rename changes.** The node's id never changes, and a rename writes the node alone: a
   container `Token`'s `scopes`, and a grant and an agent registration this door writes, hold node
   ids (`capabilities.md` §5, `identity.md` §4). A reference held as a path may stop resolving, or
   may come to name another node that now bears the name; nothing redirects from an old name
-  (`container.md` §2). That is why a place's rename is the admin's confirmed act. A client that
-  keeps a place to act on keeps its id, never its path, and acts on the id a path resolved to at
-  once.
+  (`container.md` §2). A path names every ancestor of a node, covered or not (§4.1 item 8), so a
+  principal holding `fetch` beneath a renamed place it does not cover sees the new name in its
+  paths, and can tell from its own path tails that the place was renamed and when: a place's
+  rename discloses its new name, and that it was renamed, to whoever reads a path beneath it.
+  **a1p**, and the Chief's to decide (v0.7 §AK). A client that keeps a place to act on keeps its
+  id, never its path, and acts on the id a path resolved to at once.
 - **A proposal is shown as its ids now stand.** `GET /v1/pending` and the approve and deny first
   legs render a proposal's `from_path` and `to_path` from its ids as they stand, not as they stood
   when it was parked (§4.1's `<proposal>`); it is decided on ids.
 - **One atomic step** holds the second leg's `step_up`, the node's write (`storage.md` §3.6) and
   its `node.rename`, which carries `type`, `from`, the name as it stood, and the new `name`, both
   untrusted display data.
+- **A `name` equal to the name the place bears now**, compared as given, changes nothing: after
+  the route's own checks pass, the door answers `{"node": <node>}` as it stands, opens no confirm,
+  writes nothing, and appends one `context.fetch` with `items: []` in place of `node.rename`.
 - **The inbox, the personal root and `global` are never renamed.** Each, an absent or uncovered
   node, a `client` principal, and a caller short of what this needs get §3's refusal and §4's probe.
 
@@ -946,7 +965,9 @@ with `{"name", "confirm"?}` → `{"node": <node>}`.
   no order, what this door serves beyond the set as release 0.2.0 served it: `terminals.machine`
   (§4.3's `machine` line), and §4.5's `items.rename` and `scopes.rename`, each only once its code
   runs, and `items.rename` only where its rename moves `lifecycle.version` in the same step as its
-  write (§4.5): the route is not served without it. A client ignores a word it does not know.
+  write (§4.5) and every confirm on an item is bound to the item's `lifecycle.version`, `scope` and
+  `trust.status` (§4.2 item 3): the route is not served without both. A client ignores a word it
+  does not know.
 - **A container from before this route answers it with §3's refusal**, and a client reads that as
   none of the words: it offers none of those acts, rather than reading a later `404` on one as a
   refusal of the act.

@@ -801,9 +801,12 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             again, and the fresh answer shows the act as it now
             stands. Every act that changes an item moves one of the
             three: a rename the version, in the same step as its
-            write (a door serves the rename only so); a promote the
-            status and the version; a move the scope; a quarantine
-            the status; a tombstone ends the item. Only an act its
+            write (a door serves the rename only so, and only where
+            every confirm on an item is bound to the three); a
+            promote the status and the version; a move the scope; a
+            quarantine the status; a tombstone ends the item; a title
+            pass, where one runs, the version with the title it
+            writes. Only an act its
             own rule admits and the chain records moves what a
             confirm is bound to. So a principal whose rule admits
             such an act, an agent holding `organize` among them, can
@@ -811,17 +814,32 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             the chain and revoking that principal ends it. A
             `mismatch` says nothing of why.
           - Renaming a place is the container's admin's act, behind
-            the confirm: an interactive principal holding `admin`
-            over the whole container, with `organize` and `fetch` on
-            the place. After a rename a path names whatever bears
-            the name now, so a rename can re-point a name; only a
-            person who could already move what sits under those
-            places may rename one, and only as a confirmed act the
-            chain records (`node.rename`, with the old name and the
-            new). The node keeps no old name, so nothing is
-            disclosed and nothing is capped. The confirm shows the old
-            name and the new, and is bound to the node's name as its
-            first leg read it and to the new. Its id stays; the node
+            the confirm: a person holding a provider token whose
+            grant holds `admin` over the whole container, as reading
+            the grants needs (a container token gets the one refusal,
+            as there), with `organize` and `fetch` on the place; any
+            such person may, the owner or another admin. After a
+            rename a path names whatever bears the name now. The
+            rename changes no coverage and no audience, since tokens,
+            grants and registrations hold ids; it changes only what a
+            path names. So it is kept to the container's admin, who
+            already decides who may see and act on every place, and
+            made a confirmed act the chain records (`node.rename`,
+            with the old name and the new). The name it frees is
+            free: anyone who may create a place where a path's tail
+            would match it can then make that path name the new
+            place, without the confirm; that is why a client keeps
+            ids. The node keeps no old name, so no old name is
+            disclosed and nothing is capped; a path beneath it shows
+            its new name to whoever reads that path, its ancestors'
+            names included, as every path already does, and so shows
+            that it was renamed (an open question below). The confirm
+            shows the old name and the new, and is bound to the
+            node's name as its first leg read it and to the new; a
+            name renamed away and back between the legs matches
+            again. Renaming an item or a place to the name it bears
+            now changes nothing and opens no confirm. Its id stays;
+            the node
             alone is written, in one atomic step with the confirm's
             `step_up` and its `node.rename`. Grants and agent
             registrations keep node ids, as the door already does.
@@ -865,6 +883,15 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
           lets them, as today; a path that names both is refused as
           ambiguous, and the person gives a longer path or the id.
 
+[OPEN→CHIEF] Whether renaming a place may show its new name, and that it
+          was renamed, to a person who can read a path beneath it
+          without seeing the place itself. A path names every place
+          above a thing, seen or not, so such a person's paths show
+          the new name, and their old paths stop working. The
+          alternative is that such a person's paths keep showing the
+          old name of a place above them they cannot see, which no
+          clause provides for.
+
 
 ================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
@@ -898,8 +925,10 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
-  its machine line holds by default); §AK's two (removing a place that
-  still holds things, for its later change; unique names among siblings).
+  its machine line holds by default); §AK's three (removing a place that
+  still holds things, for its later change; unique names among siblings;
+  whether renaming a place may show its new name, and that it was
+  renamed, beneath it to a person who cannot see it).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

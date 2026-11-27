@@ -83,8 +83,9 @@ rename that happens on its own, which stays a proposal; this rename is a person'
 keeps the node's id and changes every path through the node. After a rename a path names whatever
 bears the name now: a reference held as a path may stop resolving, or may come to name another
 node that now bears the name, and nothing redirects from an old name. A rename can therefore
-re-point a name, so only a person who could already move what sits under those places may rename
-one, and only as a confirmed act the chain records with the old and the new name. The inbox, the
+re-point a name, and the name it frees may then be taken by anyone who may create a place where a
+path's tail would match it; so a rename is kept to the container's admin, as a confirmed act the
+chain records with the old and the new name, and a client keeps ids. The inbox, the
 personal root and `global` are never renamed, and a place's name, made or renamed on any surface,
 keeps `rest.md` §4.5's rule. **a1p**, **not running.** **A client that keeps a place to act on
 keeps its id, never its path, and acts on the id a path resolved to at once, never keeping a
