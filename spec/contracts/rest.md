@@ -832,7 +832,8 @@ storage (v0.7 §S).
 
 **a1p**, every clause of this subsection (v0.7 §AK; #404), and **not running** until its code lands:
 until then each of these routes is §3's refusal, as a path no route declares, and §4.6 lists none
-of their words.
+of their words. The `{id}` in each path is an id, never a path tail, so §3's
+`ambiguous` never arises on these routes.
 
 **A name's shape.** A name sent to `POST /v1/scopes` or to either rename is 1 to 255 characters
 with no U+0000, as today, and a place's name holds no `/`, which a path cannot carry (`container.md`
@@ -895,8 +896,10 @@ needs its own decision (v0.7 §AK).
 - **The node is tombstoned, never erased** (`storage.md` §3), so the chain's entries about it still
   resolve. From then on it reads as absent everywhere: no list shows it, no tail matches it, and a
   reference to it, a write, an upload, a move or a copy into it is §3's refusal. Grants,
-  registrations and tokens scoped to it cover nothing. A proposal parked to move into it ends
-  `stale` when decided (`container.md` §6). It appends `node.tombstone` (`type`).
+  registrations and tokens scoped to it cover nothing. An open proposal to move an item into it
+  could then be decided by no one (`Trust.decides_over` covers both ends), so the same atomic step
+  ends each one `stale`, with its `approval.stale` (`details.reason: removed`). It appends
+  `node.tombstone` (`type`).
 
 ### 4.6 · What this door serves
 

@@ -749,7 +749,10 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 ================================================================================
 AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE, AND REMOVES AN EMPTY
     PLACE; THE DOOR SAYS WHAT IT SERVES (amends container.md §2's rename
-    sentence, which bound only a rename that happens on its own.
+    sentence, which bound only a rename that happens on its own, and
+    [0.3 · 2]'s capture naming, which now writes a `/` as `-`; and
+    capabilities.md §6 clause 2 ([0.3 · 42]), which now names the one
+    fact a removal's `not_empty` gives.
     rest.md §4, §4.1, §4.5, §4.6; container.md §2; context-item.md §3;
     capabilities.md §6; storage.md §3; events.md §1; Egzos/egzos#404,
     Egzos/egzos#360)
