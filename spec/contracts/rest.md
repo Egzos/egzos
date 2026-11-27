@@ -1067,12 +1067,18 @@ storage (v0.7 §S).
    lowercase hex characters, and `mime` carries no parameters (v0.7 §AL; **a1p**, the wording).
    **A file's name holds no control, line-separator or bidi-control character** (v0.7 §AL;
    **a1p**, not running): no character of category Cc, Zl or Zp and none with the Bidi_Control
-   property, on every surface that opens an upload, the MCP tools' included. A name is display data
-   only: no store uses it as a path or a key, and two files may share one.
+   property, on every surface that sets an artifact's `content.filename`: an upload's open, the
+   MCP tools, and an item's rename (§4.5, **a1p**, not running), each answering a name that breaks
+   it with §3's `400` before any lookup, or `invalid_request` in a tool. A name is display data
+   only: no store uses it as a path or a key, and two files may share one. A name stored before
+   the rule ran stays as it is, and is served as stored, as untrusted display data that every
+   surface escapes (above; §4.7's banner).
    **An agent's byteless opens are its own to count** (v0.7 §AL, amending §AC's count for these
    alone; **a1p**, not running, the Chief's to confirm). A `client` principal's upload whose bytes
    have not arrived holds no slot of its person's 16. A `client` principal holds at most 4 such
-   uploads, and a 5th open answers `429` with `{"error":"too_many_uploads"}`. Once its bytes are
+   uploads, and a 5th open answers `429` with `{"error":"too_many_uploads"}`; since a person holds
+   at most 16 live agent registrations (§4.3), their agents hold at most 64, and a client container
+   `Token` holds its own 4. Once its bytes are
    staged, it holds one of its person's 16, as v0.7 §AC counts a person's agents, and as an orphan
    it is its person's to see and discard (below).
    **An agent's kept bytes are bounded** (v0.7 §AL). The bound is `blobs.agent_kept_max_bytes`
@@ -1150,7 +1156,10 @@ storage (v0.7 §S).
      bytes, as item 2 reads its caller once, the two routes matching on purpose; (7) the
      bytes, read only up to `size`, are exactly `size` long and hash to `sha256`. Checks 1 to 6
      refuse with §3's refusal, byte-identical whichever failed: a second use, a late use and a
-     forged one answer alike. Nothing after check 6 refuses for time. Check 7 refuses with `400`
+     forged one answer alike. Nothing after check 6 refuses for time but this: a transfer still
+     running 900 seconds after its address's `expires_at` is cut off, staging nothing, with
+     `upload.put` (`outcome: refused`, `details.reason: length`), and its mark is cleared. Check 7
+     refuses with `400`
      (`invalid_request`), a fact about the bytes the holder sent, and leaves the upload's bytes
      unarrived, so its opener may ask for a fresh address.
    - **On success** the bytes are staged as item 2 stages them, the bytes step is spent, and
@@ -1228,8 +1237,8 @@ compared as given, with no normalisation. It holds no `/` and no `:`, which a pa
 `type:name` labels reserve (`container.md` §2), no character of general category Cc (U+0000 and
 U+007F among them), Zl or Zp, and none with the Bidi_Control property. A place's name is never
 the one character `*`, which a list of scopes reserves for the whole container (`capabilities.md`
-§5; `identity.md` §4). An item's new name is held to an upload `name`'s rule (§4.4) and holds no
-character of Cc, Zl, Zp or Bidi_Control. A name, a place's or an item's, that is not well-formed
+§5; `identity.md` §4). An item's new name is held to an upload `name`'s rule (§4.4 item 1, its
+characters included). A name, a place's or an item's, that is not well-formed
 Unicode (a lone surrogate) is `400`. Anything else is §3's `400` at the door, before any lookup,
 and refused on every other surface. Names given before this stay as they are. Pure capture, when it
 names a thread from a title, does three steps in order: it writes each `/` and `:` as `-` and drops
