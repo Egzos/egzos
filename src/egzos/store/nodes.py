@@ -11,6 +11,7 @@ global (v0.4 §2) — with the personal root slotted between org and global by d
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Callable
 
 from egzos._ids import ulid
@@ -21,6 +22,54 @@ from egzos.model import BASELINE_CREATE, CONTAINER_TYPES, RING_RANK, ROOT_TYPES,
 
 class StructureError(Exception):
     pass
+
+
+class InvalidName(StructureError):
+    """A place's name outside rest.md §4.5's rule: the door's `400`, refused on every surface."""
+
+
+#: rest.md §4.5: a place's name is 1 to this many Unicode scalar values.
+NAME_MAX = 255
+#: The characters with Unicode's Bidi_Control property (PropList.txt): ALM, LRM, RLM, the
+#: embeddings and overrides, and the isolates. `unicodedata` does not expose the property.
+BIDI_CONTROL = frozenset(
+    "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+)
+#: The general categories no name holds: controls (U+0000 and U+007F among them) and the line and
+#: paragraph separators. Cf beyond Bidi_Control (a zero-width joiner, say) is left as it is.
+_BARRED_CATEGORIES = frozenset({"Cc", "Zl", "Zp"})
+#: How many characters of a title pure capture keeps for a thread's name (container.md [0.3 · 2]).
+CAPTURE_NAME_KEEP = 40
+
+
+def _barred(ch: str) -> bool:
+    return unicodedata.category(ch) in _BARRED_CATEGORIES or ch in BIDI_CONTROL
+
+
+def _surrogate(ch: str) -> bool:
+    return "\ud800" <= ch <= "\udfff"
+
+
+def valid_name(name: object) -> bool:
+    """rest.md §4.5, "A name's shape": 1 to 255 scalar values, kept and compared as given, with no
+    `/` or `:`, no Cc, Zl or Zp character, no Bidi_Control, no lone surrogate, and never `*`."""
+    return (
+        isinstance(name, str)
+        and 0 < len(name) <= NAME_MAX
+        and name != "*"
+        and not any(ch in "/:" or _barred(ch) or _surrogate(ch) for ch in name)
+    )
+
+
+def capture_name(title: str, item_id: str) -> str:
+    """Pure capture's thread name from a title, in rest.md §4.5's three steps: `/` and `:` become
+    `-` and every Cc, Zl, Zp or Bidi_Control character is dropped; the first 40 characters are
+    kept; nothing left, or only `*`, falls back to the item's id. A lone surrogate is dropped with
+    the controls, so the name keeps the rule every surface keeps."""
+    kept = "".join(
+        "-" if ch in "/:" else ch for ch in title if not (_barred(ch) or _surrogate(ch))
+    )[:CAPTURE_NAME_KEEP]
+    return item_id if kept in ("", "*") else kept
 
 
 class AmbiguousRef(LookupError):
@@ -88,6 +137,8 @@ class NodeService:
     def create(
         self, type: str, name: str, parent: Node, *, token: Token, actor: str, principal: str
     ) -> Node:
+        if not valid_name(name):  # the name's shape first: a fact about the request alone
+            raise InvalidName("invalid_request")
         if not self.visible(token, parent):
             raise StructureError("scope not found")  # the same answer as a parent that is absent
         if type not in CONTAINER_TYPES or type in ("inbox", "global"):

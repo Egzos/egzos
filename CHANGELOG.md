@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line-break or bidirectional-control character, and is never `*`. `GET /v1/limits` says which of
   these a container serves, with its upload limits. Removing a place follows in its own change. Not
   running until the code lands.
+- **A place's name keeps its shape where it is made** (`rest.md` §4.5, `container.md` §2, v0.7
+  §AK): `POST /v1/scopes`, `egzoscore mk` and `NodeService.create` refuse a name that is empty,
+  longer than 255 characters, `*`, or holds a `/`, a `:`, a control, line- or paragraph-separator,
+  bidirectional-control character or lone surrogate (the door with `400` before any lookup, `mk`
+  with `invalid_request`); pure capture writes `/` and `:` as `-`, drops those characters, keeps
+  40, and names a thread left with nothing, or only `*`, by its item's id. Names given before stay.
 - **An agent gets what its person ticks, in the contract** (`rest.md` §4.3, §4.6, `identity.md`
   §3a, §4, §5, §8, v0.7 §AM; #377): an agent registration's capabilities and places, or the whole
   container as one choice of its own, are the person's own choice on the consent page, within their

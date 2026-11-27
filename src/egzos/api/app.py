@@ -65,7 +65,7 @@ from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem
 from egzos.store.blobs import grant_url
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import StoreError
-from egzos.store.nodes import AmbiguousRef, StructureError
+from egzos.store.nodes import AmbiguousRef, StructureError, valid_name
 from egzos.store.uploads import TooManyUploads, valid_open
 from egzos.store.uploads import person_of as opener_of
 from egzos.trust import HumanOnly, TrustError
@@ -607,8 +607,8 @@ def create_app(
         _only(request.query_params, set())
         body = await _object(request, {"type", "name", "parent"}, {"type", "name"})
         kind = _str(body["type"], limit=32)
-        name = _str(body["name"], limit=255)
-        if kind not in _CREATABLE:
+        name = body["name"]
+        if kind not in _CREATABLE or not valid_name(name):  # §4.5's rule, before any lookup
             raise Invalid
         ref = _str(body.get("parent"), optional=True)
         parent = d.scope(token, ref) if ref is not None else c.nodes.user_root()
