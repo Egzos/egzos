@@ -63,6 +63,7 @@ from egzos.identity import (
 from egzos.ledger import attributed
 from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
+from egzos.places import children, place
 from egzos.store.blobs import grant_url
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import BODY_KINDS, StoreError
@@ -239,7 +240,7 @@ class Door:
         return node if node and self.c.trust.covers(token, node) else None
 
     def node(self, node: Node) -> dict[str, Any]:
-        return {**node.to_dict(), "path": self.c.nodes.path(node)}
+        return place(self.c, node)
 
     def entry(self, item: dict[str, Any], node: Node, shadowed_by: str | None = None) -> dict:
         return {"item": item, "layer": self.c.nodes.path(node), "layer_type": node.type,
@@ -474,12 +475,7 @@ def create_app(
         if node is None or not token.has("fetch"):
             d.probe(token, ref)
             return refusal()
-        children = [n for n in c.backend.list_nodes(parent=node.id) if c.trust.covers(token, n)]
-        out = sorted((d.node(n) for n in children), key=lambda n: n["path"])
-        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
-                        subject=node.id, scope=node.id, client=token.client, items=[],
-                        layers=[], nodes=[n["id"] for n in out], withheld=0)
-        return _json(200, {"nodes": out})
+        return _json(200, {"nodes": children(c, token, node)})  # as `egzos_places` lists them
 
     @app.get("/v1/pending")
     async def pending(request: Request):

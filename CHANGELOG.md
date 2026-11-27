@@ -69,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the first leg says it bound, and what a registration replaces are not running until their code
   lands, which they do together and only after §4.5's rule on a place's name runs.
 
+- **`egzos_places`** (`rest.md` §4.1 item 5; #415): an agent lists the places it may use over MCP,
+  as `GET /v1/scopes` lists them, so it can find a place's exact name and path before it saves or
+  fetches. With no `under`, an agent given particular places is shown every one of them.
+
 ### Changed
 
 - **The provider's scopes, corrected** (`rest.md` §4.3; a note under v0.7 §AM): the sign-in provider
