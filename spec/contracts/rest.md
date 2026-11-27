@@ -561,17 +561,18 @@ records onto HTTP. Every route here needs an **`interactive` principal**: a `cli
 §3's refusal on all of them, reads included, because who else holds access is credential metadata an
 agent is never served. Every list is viewer-scoped and complete (§4). Every read appends
 `context.fetch` with `items: []` and `details.read` naming what was read. The `/v1/grants`,
-`/v1/agents` and `/v1/terminals` routes need a person holding a provider token: a container `Token`
-names no `sub`, so it gets §3's refusal there, and its holder acts on grants from the CLI or the
-lifeboat (`identity.md` §4).
+`/v1/grant`, `/v1/agents` and `/v1/terminals` routes need a person holding a provider token: a
+container `Token` names no `sub`, so it gets §3's refusal there, and its holder acts on grants from
+the CLI or the lifeboat (`identity.md` §4).
 
 | method · path | does | needs | `200` body | events |
 |---|---|---|---|---|
 | `GET /v1/grants` | the user grants | `admin` over `["*"]` | `{"grants": [<grant>]}` | `context.fetch` (`read: grants`) |
 | `POST /v1/grants` | grant a provider user access, with the confirm (§4.2) | `admin` over `["*"]` | `confirm`, then `{"grant": <grant>}` | first leg; `step_up`, `identity.grant` |
 | `DELETE /v1/grants/{sub}` | revoke a user grant and every registration serving that `sub`; another person's with the confirm (below) | `admin` over `["*"]` | `{"result": "revoked"}`; another person's: `confirm` first | `identity.revoke`, and one per registration it ends (`kind: agent` or `terminal`); another person's: first leg; `step_up`, then each `identity.revoke` |
+| `GET /v1/grant` | the caller's own grant: what they hold, and over which places (below) | a person's token issued to this container's own client | `{"grant": {"capabilities", "scopes"}}` | `context.fetch` (`read: grant`) |
 | `GET /v1/agents` | agent registrations serving this person; all of them for an admin | any grant | `{"agents": [<agent>]}` | `context.fetch` (`read: agents`) |
-| `POST /v1/agents` | register an agent to serve the caller, from the consent page's flow, with the confirm | any grant; the registration within it | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
+| `POST /v1/agents` | register an agent to serve the caller, on the terms they chose on the consent page (below), with the confirm | any grant; the registration within it | `confirm`, then `{"agent": <agent>}` | first leg; `step_up`, `identity.grant` |
 | `DELETE /v1/agents/{client_id}?sub=` | revoke one registration; one serving someone else with the confirm (below) | the person it serves, or an admin | `{"result": "revoked"}`; someone else's: `confirm` first | `identity.revoke`; someone else's: first leg; `step_up`, `identity.revoke` |
 | `GET /v1/agents/{client_id}/log?sub=&limit=` | what the agent did for that person, newest first (the pyramid's log facet) | the person it serves, or an admin | `{"entries": [<entry-line>]}` | `context.fetch` (`read: agent_log`) |
 | `GET /v1/terminals?ended=` | the live terminals signed in as this person, or with `ended=1` the ended ones; all of them for an admin | any grant | `{"terminals": [<terminal>]}` | `context.fetch` (`read: terminals`) |
@@ -604,6 +605,9 @@ lifeboat (`identity.md` §4).
   the key is left out when the terminal gives none, and a `machine` that is null or not a string
   is §3's `400`. A role bundle expands at grant time (`capabilities.md` §2). No
   grant or registration exceeds the caller's own grant: wider capabilities or scopes are §3's refusal.
+  The body of `POST /v1/grants` or `POST /v1/agents` names exactly one of `role` and `capabilities`
+  (a role of `capabilities.md` §2, or at least one of §1's six) and 1 to 64 `scopes`; anything
+  else is §3's `400`, before any lookup. (**running**, the rule of this sentence.)
 - **Who registers an agent: each person, their own.** Anyone holding a user grant registers agents
   that serve themselves, an admin the same way, with the confirm and never beyond their own grant
   (above), and needs no `publish`; `identity.md` §4's intersection still applies at check time. Nobody
@@ -612,6 +616,234 @@ lifeboat (`identity.md` §4).
   `{"error":"too_many_agents"}` and §3's headers before any leg, a fact about the caller's own, so the
   audience the gate computes over registrations (`identity.md` §4) stays bounded. A `client_id` equal
   to `identity.client_id` is §3's refusal: it names a person here, never an agent. **a1p.**
+- **A person reads their own grant.** `GET /v1/grant` → `{"grant": {"capabilities", "scopes"}}`: the
+  capabilities and the scopes of the caller's own live user grant, read from its record
+  (`identity.md` §4), the capabilities by name and each scope a node id or `"*"`. **decided** (the
+  Chief, 2026-11-26, v0.7 §AM; #377), in his words "The screen lists your things and you tick what
+  this agent gets", that the person chooses an agent's terms on the consent page; and **decided**
+  (the Chief, 2026-11-26, v0.7 §AM: "go with your suggestion") that a person who is not an admin
+  reads their own grant for it. **a1p**, the route, whom it serves and its shape. **Not running**
+  until its code lands, and until then the path is §3's refusal, as a path no route declares. **It
+  never lands before the rules it needs:** a door serves this read only where it already runs
+  every rule below that is marked as landing with it (the first leg's `terms` and `replaces` and
+  their binding, `"*"` alone, and ids alone) and keeps §4.5's rule on a place's name, so a page
+  that is served the read is at a door that runs them all, and a page refused it offers no choice
+  (below). §4.6 names the word `grants.own` where this read is served, and only there.
+  - **It serves the caller's own grant and nothing else.** It takes no parameter and names no one:
+    an admin reads another person's grant at `GET /v1/grants`, never here. The body holds no `sub`,
+    `name` or `created_at`, and no count or trace of any other grant, registration or `Token`.
+  - **It serves ids, never a name.** A grant written at this door keeps the node ids its refs
+    resolved to, never the refs, and `"*"` as itself (**running**). The route serves a scope only
+    where it is `"*"` or the id of a node that exists, and leaves out, with no marker, anything else
+    the record holds. It serves the id alone: no name, type, path or parent of the node, and no node
+    above or beneath it. Each id it serves is a scope of the caller's own grant, so the caller
+    covers it (`capabilities.md` §5) and none lies outside what they hold. The route adds no name to
+    what a caller can read: a place's name is served, as before, by other reads, among them `GET
+    /v1/scopes`, for the places under a place, and `GET /v1/fetch`, whose first `chain` layer is the
+    scope it was asked for (§4.1), both of which need `fetch`. A person whose grant holds no `fetch`
+    gets ids here and no name.
+  - **What it newly serves:** to a person who is not an admin over `["*"]`, their own capability
+    set and the node ids their grant names, as they stand at the time of the read. A node id holds
+    the time its place was made. `capabilities.md` §6 clause 1 is unchanged: every refusal stays
+    the one refusal, and this read answers a person about their own grant only, never a `client`
+    principal or a `Token` about itself. It is not `[v1.1 · #137 5, 10 or 11]`, which stay
+    deferred: it returns the grant's record as written, says of no place whether the caller may
+    write there, computes no coverage and lists no token. An admin over `["*"]` already reads both
+    at `GET /v1/grants`.
+  - **Needs** a person's provider token issued to this container's own client (`identity.md` §4),
+    which a registered terminal's is not. Every other caller gets §3's refusal and §4's probe: a
+    `client` principal, which no route serves anything of what its person holds, its own
+    registration included; a container `Token`, which names no `sub` and has no grant record (a
+    `Token`'s own read is `[v1.1 · #137 10]`); and a registered terminal's token, because the read is
+    for the consent page, which runs in a browser, and a terminal's token registers
+    nothing (below). A sign-in a terminal kept before terminals were registered names the container's
+    own client (`identity.md` §8), and is served as any person's token is. No MCP tool reads it.
+  - **Answers:** `200`, and otherwise only §2's and §3's; no `409` or `429` is this route's. A
+    request that carries any parameter is §3's `400` to every caller alike, decided on the request
+    alone, as a parameter on `GET /v1/grants` is (**running** there), before the caller's kind or
+    anything else is looked up. A person whose grant was revoked is unauthenticated (`identity.md`
+    §3, check 7), so a `200` always carries a live grant.
+  - **Event:** one `context.fetch` with `items: []` and `details.read: grant`, its `subject` and
+    `scope` null as `GET /v1/grants`' read runs; its `actor` is the person whose grant was read. A
+    refusal appends §4's probe instead.
+- **An agent's terms are its person's own choice.** A registration's capabilities and scopes are
+  what the person it will serve chose on the consent page, for that agent, in that visit.
+  **decided** (the Chief, 2026-11-26, v0.7 §AM; #377): "The screen lists your things and you tick
+  what this agent gets." **a1p**, the rest of this clause and each clause below that cites no
+  decision of its own: that the choice is of places and of what the agent may do in them; that the
+  terms come from nowhere else; and that the provider's own scopes carry none of it. That the terms
+  lie within the person's own grant is **decided** (v0.7 §AB). The clauses say what the door
+  enforces and what the consent page owes, egzos.io's and a self-hosted provider's alike, since the
+  door cannot see a screen.
+  - **The door enforces the bound, twice.** A body whose capabilities, as expanded, hold one the
+    caller's grant lacks, or whose `scopes` reach beyond the caller's coverage (a place it does not
+    cover, an absent one, or `"*"` for a caller who does not hold it), is §3's refusal and §4's
+    probe before any leg. The second leg checks the bound again inside the registration's atomic
+    step, against the caller's grant as it stands then: where the grant has narrowed since the first
+    leg, or was revoked after the door verified the caller, nothing is registered, no proof is
+    concluded, and the answer is §3's refusal and §4's probe (a caller whose grant was revoked
+    before that is §2's `401`). A choice of nothing cannot be sent: a body with no capability or no
+    scope is §3's `400` (above). The door takes the bound from its own records, never from the page.
+    **running.**
+  - **The door binds the terms.** The challenge is bound to the capabilities as expanded and to the
+    scopes as the node ids the door resolved them to, so the terms a first leg was asked for are the
+    only terms its second leg can land: a second leg that names any other within the bound concludes
+    §4.2's `mismatch` and registers nothing (one beyond the bound is §3's refusal first, above). Its
+    answer is a fresh first leg, as for every refused proof (§4.2 item 4), and that leg's challenge
+    is bound to the terms the second leg named: the page shows the person those terms before it
+    asks for another proof, and presents no proof for terms it has not shown. A registration keeps
+    those ids, never the refs it was sent. **running**, each thing this clause says the door does;
+    what the page shows is the page's (**a1p**). **The first leg says the terms it bound.** It
+    answers, beside `registers`, `"terms": {"capabilities", "scopes"}`: the capabilities as expanded
+    and the scopes as those node ids, or `["*"]`. Its `context.fetch` carries the same as
+    `details.terms`, so the chain holds the terms each first leg was asked for, a leg the person
+    walks away from included. The page draws what the person confirms from that answer, never from
+    its own record of what it sent. The answer serves the caller nothing new: each id is a place
+    they cover, as `<agent>` answers it once registered. **a1p. Not running**: it lands with the
+    read (above); until then the chain holds a registration's terms in its `identity.grant` only.
+  - **The page offers only what the person holds, and ticks nothing for them.** It offers the
+    capabilities and the places that the person's `GET /v1/grant`, read at this door in that visit,
+    bounds, and no others, and the whole container only as its own choice (below). Nothing is ticked
+    until the person ticks it, so the least choice is none, and a page with no choice sends nothing. The
+    contract fixes this, and does not leave it to a page's design, because a tick the person did not
+    make is not their choice. Nothing the client supplies selects, suggests, orders or ticks a place or
+    a capability: not the provider's `scope` string, not any other parameter of its authorization
+    request, not what it registered about itself at the provider, not its name, which stays display data
+    labelled as the agent's own claim (below), and not the name of any place, which is the text of whoever
+    named it (below). A page that finds no `grants.own` among `GET /v1/limits`' words (§4.6), or gets
+    §3's refusal from `GET /v1/grant`, as from a door before this read, offers no choice and
+    registers no agent there.
+  - **What the page sends is what it shows.** It sends `capabilities`, each by its name in
+    `capabilities.md` §1, never a `role`; and each chosen place as its node id, never a path, or
+    `"*"` for the whole-container choice alone (below). So the door expands and resolves nothing out
+    of the person's sight, and the body is what the challenge binds. It shows each place by the path
+    the person's own read served for that id in that visit, or by the id alone where no read served
+    one (above), and two places whose paths are the same with their ids as well. It shows the terms
+    as the rules give them: one set of capabilities over every chosen place, since a registration
+    holds one set (`identity.md` §4); each place with everything beneath it, now and later, since
+    coverage is computed down the path at check time (`capabilities.md` §5); that covering a place
+    lets its holder create a container under it at or below its `structure_floor`, a thread or a
+    project by default, whatever its capabilities (§4's `POST /v1/scopes`); and that an agent
+    holding `fetch` is served each chosen place's path, which names every place above it
+    (§4.1 item 8).
+  - **A place's name on this page is untrusted display data**, as an agent's name is: a place is
+    named by whoever made it (§4's `POST /v1/scopes`), or from the first words of what was written
+    where a capture opened it (`container.md` §2), or by the admin who last renamed it (§4.5, **not
+    running** until its code lands), and `<node>` names no maker. The page draws
+    each name inert: escaped, with no control or formatting character of a name acting on the text
+    around it, never where or in the style in which the page's own words stand, each segment of a
+    path set apart by the page's own drawing and never by a character a name holds. It shows each
+    place beside its kind and its path where a read of the person's own served them, and by its id
+    alone where none did (above). It lists the places in an order it states on the page, which no
+    client and no name can steer: an order by name, and one that puts the place made last first,
+    are both steered by whoever makes or renames a place (§4's `POST /v1/scopes`, §4.5). A tick gives the node whose
+    id the page sends and what lies beneath it, whatever any name says. The choose step is not
+    offered at a door that does not keep §4.5's rule on a place's name ("A name's shape"), which
+    is **not running** until its code lands: until then `POST /v1/scopes` takes any 1 to 255
+    characters but U+0000, and a capture names its thread from the first 40 characters of its
+    item's title, the writer's own text (**running**). That rule holds every name a place is given
+    or renamed to, on any surface, a captured thread's included, to 1 to 255 characters with no
+    `/` or `:`, no control, line-separator or paragraph-separator character, no bidirectional
+    control, and never `*`. It does not reach a name given before it ran, which stays as it is; it
+    leaves every other formatting character, a zero-width one among them, and names that look
+    alike; and it lets two places side by side share a name. A door serves `GET /v1/grant` only
+    where it keeps that rule (above), so a page that is not served the read offers no choice and
+    registers no agent. Every name, one the rule does not reach included, is drawn inert all the
+    same, and two places whose paths are the same are shown with their ids (above). **a1p.**
+  - **The whole container is one choice of its own.** **decided** (the Chief, 2026-11-26, v0.7 §AM):
+    an agent may be given the whole container, now and later. **a1p**, how it is offered. The page
+    offers it only to a person whose `GET /v1/grant` holds `"*"`, as one choice set apart from the
+    places, never ticked until the person ticks it, and worded plainly as everything in this cloud,
+    what is made later and the inbox included. It sends `scopes: ["*"]` for that choice and for
+    nothing else: never because the person ticked every place listed, and never beside a place,
+    which `"*"` already covers. The door registers `"*"` for an agent only where the registrant's
+    own grant holds `"*"`, and for anyone else it is §3's refusal by the bound (above); the
+    challenge is bound to `"*"` as to any scope, and the registration's `identity.grant` carries
+    `scopes: ["*"]`, the chain's record of the whole container (**running**). That is all the door
+    holds to today. As it runs (**running**): the first leg answers `registers` and not the terms;
+    an entry `"*"` is never resolved as a ref, and where every other entry resolves the door
+    registers `["*"]`; and the other entries are §3's refs, an id or a path tail. Until the rules
+    below run, the page alone keeps `"*"` to the whole-container choice, by sending `"*"` for that
+    choice alone and each place as its id. Three rules put that at the door, **a1p** and **not
+    running**, landing with the read (above): the first leg answers `terms`, `scopes: ["*"]` for the
+    whole container, and the page words that confirm from the answer; `"*"` stands alone, so a body
+    whose `scopes` hold it beside any other entry is §3's `400`; and on this route a scope is `"*"`
+    or has the form of a node id, any other string being §3's `400`, and one of that form is read as
+    an id alone, one that names no node the caller covers being §3's refusal, so no name is ever
+    read as a place here. When they land, they replace for this route what `identity.md` §4 and
+    §4.5 say of a scope given as a path tail and of a first leg naming no place. **Ticking places is not the whole container.** A place ticked gives that
+    place and what is under it, a top place included. Today every place hangs under one of the
+    container's two top places, since a place is made only under a parent and `init` makes the two
+    that have none, so a registration on both top places covers what `"*"` covers (**running**). The
+    page therefore shows a choice of both top places as covering everything now in the container and
+    whatever is later made under them, and sends them as those two ids, never as `"*"`. The rule is
+    that such a registration covers those two trees and no other: a place the container came to hold
+    under neither would be covered by `"*"` and not by it. No such place can be made today, so the
+    difference is **not running**.
+  - **A place renamed, moved or removed between the choice and the confirm.** The terms are ids, so
+    a place that was renamed is the place that was chosen, and its name was only how the page showed
+    it. The door today still takes a ref as §3 has it, an id or a path tail (**running**; ids alone
+    once the rule above lands), and resolves the body's refs at each leg: a ref that names another
+    node at the second leg concludes `mismatch`; one that has come to name two is §3's `ambiguous`,
+    or its refusal to a caller without `fetch`; one that names no node the caller covers is §3's
+    refusal; and a place that has left the caller's coverage is §3's refusal by the bound. In each
+    case nothing is registered. No route or command moves or removes a place today (**running**),
+    and a place is renamed only as §4.5 has it (**not running** until its code lands); these
+    answers do not turn on which act changed it. Two rules are owed before
+    any door removes a place, and are **not running**: that a scope is read as an id alone, which
+    lands with the read (above); and that the registration's atomic step finds each place again by
+    its id as it then stands, and registers nothing where one is gone.
+  - **The provider's scopes give nothing here, and are not shown as if they did.** The container
+    reads no `scope` claim of any token: what a token may do is its grant's or its registration's
+    (`identity.md` §4). **running.** The provider's own scopes are `openid`, `email`, `profile` and
+    `phone`, and it offers no others. They select what the provider puts in an ID token and returns
+    at UserInfo, and they limit nothing else: by its documentation, "All OAuth access tokens have
+    full access to user data (same as regular session tokens)", and its scopes "do not control
+    access to your database tables or API endpoints" (Supabase,
+    https://supabase.com/docs/guides/auth/oauth-server/, the pages `oauth-flows` and
+    `token-security`, read 2026-11-26). So the page reads no capability and no place from an
+    authorization's `scope`, shows the string nowhere, and treats two authorizations that differ
+    only in it alike. It says instead, in fixed words of its own that are the same for every
+    authorization: that approving lets this agent sign in to this cloud as the person, within what
+    they tick; and that the agent can read their account's record at the sign-in provider: their
+    profile, their email, a phone number where the account holds one, and how they sign in. Those
+    words are true only while `identity.md` §3a's two records stand: the operator's check that the
+    identity project gives a client's token nothing more, and the live test at the provider. While
+    either is missing or fallen the page approves no agent: it denies the authorization at the
+    provider and calls no route here. The door checks neither record (`identity.md` §3a). An
+    authorization whose `scope` names any word but those four is refused: the page denies it at the
+    provider and calls no route here, having no true words for what such a scope would give.
+  - **Choosing again.** No route changes a registration's terms in place. Where the provider asks
+    the person again about a client that already serves them, whatever made it ask, the client's
+    own request included, the page offers the choice anew, from nothing, and says beside it that
+    declining or leaving ends nothing: the agent keeps what it holds until the person ends it
+    (below). The registration then confirmed replaces the earlier one in place and whole: the record
+    is keyed on the pair `(client_id, sub)` (`storage.md` §3.2), so nothing of the earlier terms
+    carries over and the two are never merged, and it takes no new slot (**running**). **The door
+    says what a registration replaces.** Where a live agent registration of that `client_id` already
+    serves the caller, the first leg answers, beside `registers` and `terms`, `"replaces":
+    {"capabilities", "scopes", "created_at"}`: that registration as the door holds it, which
+    `GET /v1/agents` already serves this caller. Its `context.fetch` carries the same as
+    `details.replaces`. The challenge is bound to it, and to there being none where the first leg
+    carried none: a second leg that finds, inside the registration's atomic step, another
+    registration there, one where none was, or none where one was, concludes §4.2's `mismatch` and
+    registers nothing. The `identity.grant` that records the new registration carries
+    `details.replaces` too, so the chain says which terms ended with it. A first leg for a client
+    that does not serve the caller carries no such key. The page shows `replaces` beside `terms`,
+    both from that first leg's answer, before the confirm, and where either is `["*"]` it says so in
+    the whole-container choice's own words: a narrower registration replaced by the whole container,
+    or the reverse. **Not running**: it lands with the read (above), so no page offers the choice at
+    a door that does not answer `replaces`. That an agent already approved is chosen for again and
+    replaces what it had, with what is replaced shown before the confirm, is **decided** (the Chief,
+    2026-11-26, v0.7 §AM: "go with your suggestion"); it answers the second question in #308's body,
+    on re-registration: it is not refused. **a1p**, that the door's first leg is what shows it, and
+    the shape above. The provider remembers a consent (`identity.md` §3a), and an authorization it
+    approved without asking is not pending, so the page calls no route for it (below). A client with
+    a live registration keeps it; for a client with none, the page withdraws the stale consent in
+    place of following the approval (`identity.md` §4). A person who wants to choose again ends the
+    agent, which is never gated (below), and egzos.io then withdraws their consent to that client at
+    the provider, so that the client's next authorization is asked about. Narrowing a registration
+    short of ending it is not in this door.
 - **Who registers a terminal: each person, their own.** A terminal registration is the person's own
   sign-in at a terminal (`identity.md` §4): it holds no capabilities or scopes, and its token holds
   the person's grant as it stands at each request. **decided** (v0.7 §AJ). **a1p**, the rest:
@@ -652,24 +884,26 @@ lifeboat (`identity.md` §4).
   `POST /v1/terminals`, `POST /v1/credentials` and `DELETE /v1/credentials/{id}` are §3's refusal to
   a terminal's token before any leg: access is given, and a confirm credential kept or removed,
   from a browser. On every other confirm-gated act it is served the first leg and concludes no
-  second (§4.2 item 3). **a1p** (v0.7 §AJ).
+  second (§4.2 item 3). **a1p** (v0.7 §AJ). `GET /v1/grant` is §3's refusal to it too (above;
+  **a1p**, v0.7 §AM).
 - **The container never presents a caller's token to the provider**, here or anywhere (`identity.md`
   §3a), so it does not read the provider's authorization itself. **The consent page owes the checks
   instead**, egzos.io's and a self-hosted provider's alike: it reads the authorization with its own
   first-party session, and calls this route only for one that is pending, was requested by the
-  person whose container token makes the call, is for the body's `client_id`, and asks for no scopes
-  beyond the body's; and it refuses a `client_id` registered on another container (`identity.md`
-  §3a). **a1p** (a1r and a6 on #285). For a terminal it owes one more check: it calls
-  `POST /v1/terminals` only for a client it registered at the provider itself, in this browser, for
-  a sign-in the person continued, with egzos.io's callback that client's one redirect URI
-  (`identity.md` §3a). **a1p** (v0.7 §AJ).
+  person whose container token makes the call, is for the body's `client_id`, and names no scope
+  but the provider's four; and it refuses a `client_id` registered on another container (`identity.md`
+  §3a). **a1p** (a1r and a6 on #285; the scope check, v0.7 §AM). For a terminal it owes one more
+  check: it calls `POST /v1/terminals` only for a client it registered at the provider itself,
+  in this browser, for a sign-in the person continued, with egzos.io's callback that client's
+  one redirect URI (`identity.md` §3a). **a1p** (v0.7 §AJ).
 - **What the container holds to is the registrant's confirm.** The first leg answers `newly: []` and, in
   its own field, `"registers": {"client_id", "name"}`: the agent is not a person, and its `name` is
   the agent's own claim, untrusted display data that every surface escapes and labels as the agent's
   (design-gap Egzos/egzos-platform#117). The first leg's `context.fetch` carries the same
   `details.registers` (the `name` as escaped display data), so a first leg the person walks away from
   still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
-  as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. **a1p** (a6
+  as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. The first
+  leg also answers `terms`, and `replaces` where it replaces one (above; not running). **a1p** (a6
   and a1r on #285). A terminal's first leg answers `newly: []` too and, in its own field,
   `"signs_in": {"client_id", "name"}`, with `"machine"` beside them where the body gave one, and
   the same `details.signs_in` on its `context.fetch`: the name and the machine are the terminal's
@@ -1000,6 +1234,9 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
   proposal's paths from its ids as they stand (§4.5): the route is not served without it, so no
   proposal parked before a rename shows a name a place no longer bears. A client ignores a word it
   does not know.
+  `grants.own` (§4.3's `GET /v1/grant`) is named only once its code runs, and only where the door
+  runs every rule §4.3 says lands with that read and keeps §4.5's rule on a place's name (v0.7
+  §AM): the read is not served without them.
 - **A container from before this route answers it with §3's refusal**, and a client reads that as
   none of the words: it offers none of those acts, rather than reading a later `404` on one as a
   refusal of the act.
