@@ -833,7 +833,7 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             disclosed and nothing is capped; a path beneath it shows
             its new name to whoever reads that path, its ancestors'
             names included, as every path already does, and so shows
-            that it was renamed (an open question below). The confirm
+            that it was renamed (decided below). The confirm
             shows the old name and the new, and is bound to the
             node's name as its first leg read it and to the new; a
             name renamed away and back between the legs matches
@@ -865,6 +865,15 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
             refusal, which a client reads as "none of these", so it
             never takes a missing route for a refusal of the act.
 
+[DECIDED] A PLACE'S RENAME SHOWS ITS NEW NAME, AND THAT IT WAS RENAMED,
+          to a person who can read a path beneath it without seeing
+          the place itself. Asked on 2026-11-26 whether a renamed
+          project or thread may show its new name to anyone who can
+          see something inside it, the Chief said: "yeah, it's fine
+          if it shows". A path names every place above a thing, seen
+          or not, so such a person's paths show the new name, and
+          their old paths stop working. Recorded by the operator.
+
 [LATER]   Unique names among siblings, and which type of place may sit
           under which; left out because pure capture names inbox
           threads from titles that may repeat.
@@ -882,15 +891,6 @@ AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
 [OPEN→CHIEF] Whether two places side by side may share a name. The draft
           lets them, as today; a path that names both is refused as
           ambiguous, and the person gives a longer path or the id.
-
-[OPEN→CHIEF] Whether renaming a place may show its new name, and that it
-          was renamed, to a person who can read a path beneath it
-          without seeing the place itself. A path names every place
-          above a thing, seen or not, so such a person's paths show
-          the new name, and their old paths stop working. The
-          alternative is that such a person's paths keep showing the
-          old name of a place above them they cannot see, which no
-          clause provides for.
 
 
 ================================================================================
@@ -925,10 +925,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
-  its machine line holds by default); §AK's three (removing a place that
-  still holds things, for its later change; unique names among siblings;
-  whether renaming a place may show its new name, and that it was
-  renamed, beneath it to a person who cannot see it).
+  its machine line holds by default); §AK's two (removing a place that
+  still holds things, for its later change; unique names among siblings).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

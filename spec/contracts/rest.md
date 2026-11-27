@@ -936,7 +936,7 @@ with `{"name", "confirm"?}` → `{"node": <node>}`.
   principal holding `fetch` beneath a renamed place it does not cover sees the new name in its
   paths, and can tell from its own path tails that the place was renamed and when: a place's
   rename discloses its new name, and that it was renamed, to whoever reads a path beneath it.
-  **a1p**, and the Chief's to decide (v0.7 §AK). A client that keeps a place to act on keeps its
+  **decided** (the Chief, 2026-11-26; v0.7 §AK). A client that keeps a place to act on keeps its
   id, never its path, and acts on the id a path resolved to at once.
 - **A proposal is shown as its ids now stand.** `GET /v1/pending` and the approve and deny first
   legs render a proposal's `from_path` and `to_path` from its ids as they stand, not as they stood

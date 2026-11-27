@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`PATCH /v1/scopes/{id}`; the container's admin's act, with the confirm: its id stays, a path
   names whatever bears the name now, nothing redirects from an old name, and the name it frees may
   be taken by a place made later, so a client keeps ids; a path beneath the place shows its new
-  name, the Chief's to decide). A confirm on an item is bound to the item's version, scope and
+  name, as the Chief decided). A confirm on an item is bound to the item's version, scope and
   trust status, and a rename moves the version in the same step as its write; the item rename is
   served only where both hold.
   A place's name, on any surface, holds no `/`, no `:`, and no control, line-break or
