@@ -747,6 +747,172 @@ AJ. AMENDMENT — EACH SIGNED-IN TERMINAL IS A CLIENT OF ITS OWN (amends §AA's
 
 
 ================================================================================
+AK. AMENDMENT — A PERSON RENAMES AN ITEM OR A PLACE; THE DOOR SAYS WHAT IT
+    SERVES (amends container.md §2's rename sentence, which bound only a
+    rename that happens on its own; [0.3 · 2]'s capture naming, which now
+    writes a `/` or a `:` as `-` and drops Cc, Zl, Zp and Bidi_Control
+    characters;
+    rest.md §4.2 item 1's list of confirm-gated acts, which gains the
+    rename of a verified or promoted item and of a place, item 3's
+    binding, which gains an item's version, scope and trust status
+    and a place's name, and item 4's fresh answer, which carries the
+    act's first-leg fields as they now stand; storage.md §3.3's
+    challenge binding, likewise.
+    rest.md §4, §4.1, §4.2, §4.5, §4.6, §5, §8; container.md §2;
+    context-item.md §3, §6; identity.md §4, §5; storage.md §3, §3.3;
+    events.md §1; Egzos/egzos#404, Egzos/egzos#360)
+================================================================================
+
+[DECIDED] Decided by the Chief on 2026-11-25 and 2026-11-26. On
+          2026-11-25 he asked for one press-and-hold wheel in the app
+          that carries every act on a thing, and for the app to add a
+          thread or a project and to add, move, or copy files. On
+          2026-11-26 he answered six questions about the wheel; asked
+          whether rename and remove are in its first build, he said:
+          "Do everything, start it all". No route renamed an item or a
+          place (#404). This section binds renaming; removing a place
+          follows in its own change. Recorded by the operator, enacted
+          by the merge of the contract change; the Chief may veto by
+          reverting.
+
+[DECIDED] A PERSON RENAMES AN ITEM AND A PLACE FROM THE APP.
+
+          THE OPERATOR'S BINDING, which the Chief did not decide and may
+          veto clause by clause (each is marked a1p in the contracts,
+          and not running until its code lands):
+
+          - Renaming an item is a person's act, as a tombstone is: an
+            interactive principal holding `organize` and `fetch` where
+            the item sits; an agent is refused as for anything absent.
+            It sets an artifact's file name, or a text item's title,
+            marked as a person's (`title_engine: person`) so no title
+            pass replaces it, and nothing else. Event `item.rename`,
+            with the old name and the new.
+          - Renaming an item that is verified, or that a person has
+            promoted, takes the confirm, as its tombstone does: the
+            confirm shows the old name and the new, and is bound to the
+            new. Any other item is renamed at once, an unverified rule
+            aside, which is refused whatever its provenance.
+          - A confirm on an item (promote, a gated tombstone or rename,
+            a move or copy's confirm, and an approve, for each item its
+            proposal names) is bound to the item's version, scope and
+            trust status as its first leg read them, so a second leg
+            that finds any of the three changed concludes `mismatch` and
+            changes nothing; the person asks again, and the fresh answer
+            shows the act as it now stands. Every act that changes an
+            item moves one of the three: a rename the version, in the
+            same step as its write (a door serves the rename only so,
+            and only where every confirm on an item is bound to the
+            three); a promote the status and the version; a move the
+            scope; a quarantine the status; a tombstone ends the item; a
+            title pass, where one runs, the version with the title it
+            writes. A title pass aside, only an act its own rule admits
+            and the chain records moves what a confirm is bound to. So a
+            principal whose rule admits such an act, an agent holding
+            `organize` among them, can keep a person's confirm from
+            concluding; each act is on the chain and revoking that
+            principal ends it. A `mismatch` says nothing of why.
+          - Renaming a place is the container's admin's act, behind the
+            confirm, and the place is a project or a thread; a place of
+            any other type gets the one refusal (a1p). It needs a person
+            holding a provider token whose grant holds `admin` over the
+            whole container, as reading the grants needs (a container
+            token gets the one refusal, as there), with `organize` and
+            `fetch` on the place; any such person may, the owner or
+            another admin. After a rename a path names whatever bears
+            the name now. The rename changes no coverage and no
+            audience, since tokens, grants and registrations hold ids;
+            it changes only what a path names. So it is kept to the
+            container's admin, who already decides who may see and act
+            on every place, and made a confirmed act the chain records
+            (`node.rename`, with the old name and the new). The name it
+            frees is free: anyone whose token covers a parent, a person
+            or an agent, may make a place that bears it, before the
+            rename or after, and whatever is still addressed by the old
+            path, a read, a write, a grant or a registration, then
+            reaches that place, without the confirm; a move or a copy
+            still passes the gate. The door keeps no old name to refuse
+            this by; that is why a client keeps ids. The node keeps no
+            old name and no route serves one, so nothing is capped (the
+            chain keeps the old name in `node.rename`, for the owner's
+            audit, and a proposal parked before the rename keeps the
+            path it was parked with, which the door never serves); a
+            path beneath it shows its new name to whoever reads that
+            path, a person or an agent, its ancestors' names included,
+            as every path already does, and so shows that it was renamed
+            and when (decided below). The confirm shows the old name and
+            the new,
+            and is bound to the node's name as its first leg read it and
+            to the new; a name renamed away and back between the legs
+            matches again. Renaming an item or a place to the name it
+            bears now changes nothing and opens no confirm. Its id
+            stays; the node alone is written, in one atomic step with
+            the confirm's `step_up` and its `node.rename`. Grants and
+            agent registrations keep node ids, as the door already does.
+            The inbox, the personal root and `global` are never renamed,
+            and no other type but a project or a thread is renamed in
+            this change.
+            A proposal is shown with its places' names as they stand,
+            never as they stood when it was parked, and a door serves a
+            place's rename only so. A client keeps a place's id, never
+            its path.
+          - A place's name, made or renamed on any surface, is 1 to 255
+            Unicode scalar values, compared as given with no
+            normalisation, with no `/`, no `:`, and no character of
+            category Cc, Zl or Zp or with Bidi_Control, and never the
+            one character `*`. An item's new name keeps an upload name's
+            rule and holds none of those characters. A lone surrogate is
+            refused. Existing names stay. Pure capture writes a `/` or a
+            `:` in a title as `-` and drops every Cc, Zl, Zp or
+            Bidi_Control character, then keeps the first 40 characters,
+            then names a thread left with nothing, or only `*`, by the
+            item's id.
+          - The door serves what it carries (`GET /v1/limits`): the
+            contract's version, a word for each thing it serves that
+            0.2.0 did not (`terminals.machine`, `items.rename`,
+            `scopes.rename`), and the upload limits #360 asked for. It
+            reads two config keys and one constant, and is not a config
+            surface. A container from before it answers the one
+            refusal, which a client reads as "none of these", so it
+            never takes a missing route for a refusal of the act.
+
+[DECIDED] A PLACE'S RENAME SHOWS ITS NEW NAME, THAT IT WAS RENAMED, AND
+          WHEN,
+          to whoever can read a path beneath it, a person or an agent,
+          without seeing the place itself. On 2026-11-26 the Chief was
+          asked: "A renamed project or thread shows its new name to anyone
+          who can see something inside it." (the operator's pick: yes). He
+          said: "Rename, yeah, it's fine if it shows." Asked the same
+          evening: "the new name shows right away, to people and agents who
+          can see inside, for any place.", he said: "For number 5, yes. Go
+          ahead with that." A path names every place above a thing, seen or
+          not, so such a reader's paths show the new name from the moment
+          the rename lands, and a path through the old name no longer
+          reaches the place. Recorded by the operator.
+
+[LATER]   Unique names among siblings, and which type of place may sit
+          under which; left out because pure capture names inbox
+          threads from titles that may repeat.
+
+[LATER]   Removing a place, in its own change.
+
+[LATER]   Renaming a place of a type other than a project or a thread;
+          this change renames those two.
+
+[LATER]   A person who is not the container's admin renaming a place
+          they made; it needs a rule for names a rename re-points.
+
+[OPEN→CHIEF] What removing a place that still holds things should do:
+          refuse it, or one act that sends what it holds to the inbox
+          first, under the gate. It belongs to the later change that
+          removes a place.
+
+[OPEN→CHIEF] Whether two places side by side may share a name. The draft
+          lets them, as today; a path that names both is refused as
+          ambiguous, and the person gives a longer path or the id.
+
+
+================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 ================================================================================
 
@@ -760,7 +926,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
      confirm credentials, where the app lives, where a hosted
      container's state lives and runs, how a terminal signs in to a cloud,
      the terminal asking before it keeps a sign-in, the command line's own
-     repository and the core's new name, each terminal a client of its own
+     repository and the core's new name, each terminal a client of its own,
+     renaming items and places
   5. egzos-handoff.txt
   6. egzos-build-plan-v1.2.txt
 
@@ -777,7 +944,8 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
 
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
-  its machine line holds by default).
+  its machine line holds by default); §AK's two (removing a place that
+  still holds things, for its later change; unique names among siblings).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET

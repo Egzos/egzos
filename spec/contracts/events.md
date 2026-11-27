@@ -74,6 +74,18 @@ drift a reader resolves by guessing.
 | `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already` (`rest.md` §4.4) | running |
 | `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
+**Entering with their code** (`rest.md` §4.5; v0.7 §AK; **a1p**, not running). These join the table
+above, its count and `_types.py`'s `Event` together, on the day code appends them; until then no
+code does, and an append under one is rejected as any unlisted name is:
+
+| name | appended when | `subject` · `scope` · `details` |
+|---|---|---|
+| `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `from`, `name` |
+| `node.rename` | a person renames a place | the node · its parent · `type`, `from`, `name` |
+
+A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader
+escapes them.
+
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
 

@@ -171,6 +171,10 @@ Node and chain semantics — container types, ring ranks, the chain walk, the se
 gate and the container config object — are `container.md`'s, not this document's. This document
 fixes only how those shapes are **persisted**.
 
+**A rename of a place** (`rest.md` §4.5; v0.7 §AK) is a `put_node` of the same id with its new
+name, as moving a node is a metadata update (`container.md` §2), and adds no method or field.
+**a1p**, **not running.**
+
 ## 3.1 · The door's throttle state — `ThrottleState`
 
 **Status of this section: contract v1.1** (`identity.md` §9). It replaced the draft binding #173 added
@@ -263,7 +267,10 @@ list_credentials(person=None)                    -> list[ConfirmCredential]   # 
   late second leg still reads as `spent` or `stale`, and is then forgotten; one never issued and one
   forgotten are both `stale`.
 - **No column holds a secret.** A challenge is a random value bound to the request that asked for
-  it: the principal, the act, its subject and destination, and the audience delta. A confirm
+  it: the principal, the act, its subject and destination, and the audience delta; and, **a1p**
+  (v0.7 §AK, not running), on an act on an item, and on an approve for each item its proposal names,
+  the item's `lifecycle.version`, `scope` and `trust.status` as the first leg read them; on a
+  rename, its new name; and on a place's rename, the node's name as the first leg read it. A confirm
   credential is a WebAuthn public key, which verifies an assertion and proves nothing alone; it is
   never served (`rest.md` §4.3's shape omits it). A removed credential is kept, marked `removed`.
 

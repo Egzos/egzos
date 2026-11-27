@@ -14,6 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and kept as the terminal's own claim. A terminal that gave one is listed with it
   (`GET /v1/terminals`); the confirm that registers it shows the line and is bound to it; and
   nothing is decided on it.
+- **Renaming, in the contract** (`rest.md` §4.5–§4.6, v0.7 §AK; #404, #360): a person renames an
+  item (`PATCH /v1/items/{id}`; a verified or promoted item with the confirm) or a project or a
+  thread (`PATCH /v1/scopes/{id}`; the container's admin's act, with the confirm: its id stays, a
+  path names whatever bears the name now, nothing redirects from an old name, and the name it frees
+  may be borne by a place anyone covering a parent makes, a person or an agent, so a client keeps
+  ids; a path beneath the place shows its new name at once, and so that it was renamed
+  and when, as the Chief decided). A confirm on an item, an
+  approve of a proposal that names it included, is bound to the item's version, scope and trust
+  status, and a rename moves the version in the same step as its write; the item rename is served
+  only where both hold. A proposal's paths are shown from its ids as they stand, and the place
+  rename is served only so. A place's name, on any surface, holds no `/`, no `:`, and no control,
+  line-break or bidirectional-control character, and is never `*`. `GET /v1/limits` says which of
+  these a container serves, with its upload limits. Removing a place follows in its own change. Not
+  running until the code lands.
 
 ## [0.2.0] — the door opens, and the package becomes egzoscore (2026-11-15)
 
