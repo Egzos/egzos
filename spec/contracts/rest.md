@@ -701,8 +701,8 @@ the CLI or the lifeboat (`identity.md` §4).
     `details.terms`, so the chain holds the terms each first leg was asked for, a leg the person
     walks away from included. The page draws what the person confirms from that answer, never from
     its own record of what it sent. The answer serves the caller nothing new: each id is a place
-    they cover, as `<agent>` answers it once registered. **a1p. Not running**: it lands with the
-    read (above); until then the chain holds a registration's terms in its `identity.grant` only.
+    they cover, as `<agent>` answers it once registered. **a1p**, **running**, ahead of the read
+    (above), which lands only after it.
   - **The page offers only what the person holds, and ticks nothing for them.** It offers the
     capabilities and the places that the person's `GET /v1/grant`, read at this door in that visit,
     bounds, and no others, and the whole container only as its own choice (below). Nothing is ticked
@@ -761,18 +761,17 @@ the CLI or the lifeboat (`identity.md` §4).
     which `"*"` already covers. The door registers `"*"` for an agent only where the registrant's
     own grant holds `"*"`, and for anyone else it is §3's refusal by the bound (above); the
     challenge is bound to `"*"` as to any scope, and the registration's `identity.grant` carries
-    `scopes: ["*"]`, the chain's record of the whole container (**running**). That is all the door
-    holds to today. As it runs (**running**): the first leg answers `registers` and not the terms;
-    an entry `"*"` is never resolved as a ref, and where every other entry resolves the door
-    registers `["*"]`; and the other entries are §3's refs, an id or a path tail. Until the rules
-    below run, the page alone keeps `"*"` to the whole-container choice, by sending `"*"` for that
-    choice alone and each place as its id. Three rules put that at the door, **a1p** and **not
-    running**, landing with the read (above): the first leg answers `terms`, `scopes: ["*"]` for the
+    `scopes: ["*"]`, the chain's record of the whole container (**running**). Before the rules below
+    ran, the first leg answered `registers` and not the terms; an entry `"*"` was never resolved as
+    a ref, and where every other entry resolved the door registered `["*"]`; and the other entries
+    were §3's refs, an id or a path tail, so the page alone kept `"*"` to the whole-container
+    choice. Three rules put that at the door, **a1p** and **running**, ahead of the read (above),
+    which lands only after them: the first leg answers `terms`, `scopes: ["*"]` for the
     whole container, and the page words that confirm from the answer; `"*"` stands alone, so a body
     whose `scopes` hold it beside any other entry is §3's `400`; and on this route a scope is `"*"`
     or has the form of a node id, any other string being §3's `400`, and one of that form is read as
     an id alone, one that names no node the caller covers being §3's refusal, so no name is ever
-    read as a place here. When they land, they replace for this route what `identity.md` §4 and
+    read as a place here. They replace for this route what `identity.md` §4 and
     §4.5 say of a scope given as a path tail and of a first leg naming no place. **Ticking places is not the whole container.** A place ticked gives that
     place and what is under it, a top place included. Today every place hangs under one of the
     container's two top places, since a place is made only under a parent and `init` makes the two
@@ -784,17 +783,14 @@ the CLI or the lifeboat (`identity.md` §4).
     difference is **not running**.
   - **A place renamed, moved or removed between the choice and the confirm.** The terms are ids, so
     a place that was renamed is the place that was chosen, and its name was only how the page showed
-    it. The door today still takes a ref as §3 has it, an id or a path tail (**running**; ids alone
-    once the rule above lands), and resolves the body's refs at each leg: a ref that names another
-    node at the second leg concludes `mismatch`; one that has come to name two is §3's `ambiguous`,
-    or its refusal to a caller without `fetch`; one that names no node the caller covers is §3's
-    refusal; and a place that has left the caller's coverage is §3's refusal by the bound. In each
+    it. The door takes each place as an id alone (above; **running**), and finds it at each leg:
+    one that names no node the caller covers is §3's refusal; and a place that has left the caller's coverage is §3's refusal by the bound. In each
     case nothing is registered. No route or command moves or removes a place today (**running**),
     and a place is renamed only as §4.5 has it (**not running** until its code lands); these
     answers do not turn on which act changed it. Two rules are owed before
-    any door removes a place, and are **not running**: that a scope is read as an id alone, which
-    lands with the read (above); and that the registration's atomic step finds each place again by
-    its id as it then stands, and registers nothing where one is gone.
+    any door removes a place, and are **running**: that a scope is read as an id alone (above); and
+    that the registration's atomic step finds each place again by its id as it then stands, and
+    registers nothing where one is gone.
   - **The provider's scopes give nothing here, and are not shown as if they did.** The container
     reads no `scope` claim of any token: what a token may do is its grant's or its registration's
     (`identity.md` §4). **running.** The provider's own scopes are `openid`, `email`, `profile`,
@@ -850,8 +846,8 @@ the CLI or the lifeboat (`identity.md` §4).
     that does not serve the caller carries no such key. The page shows `replaces` beside `terms`,
     both from that first leg's answer, before the confirm, and where either is `["*"]` it says so in
     the whole-container choice's own words: a narrower registration replaced by the whole container,
-    or the reverse. **Not running**: it lands with the read (above), so no page offers the choice at
-    a door that does not answer `replaces`. That an agent already approved is chosen for again and
+    or the reverse. **Running**, ahead of the read (above), which lands only after it, so no page
+    offers the choice at a door that does not answer `replaces`. That an agent already approved is chosen for again and
     replaces what it had, with what is replaced shown before the confirm, is **decided** (the Chief,
     2026-11-26, v0.7 §AM: "go with your suggestion"); it answers the second question in #308's body,
     on re-registration: it is not refused. **a1p**, that the door's first leg is what shows it, and
@@ -921,7 +917,7 @@ the CLI or the lifeboat (`identity.md` §4).
   `details.registers` (the `name` as escaped display data), so a first leg the person walks away from
   still names the agent it showed. The challenge is bound to the body's `client_id`, its capabilities
   as expanded and its `scopes`, so a second leg naming any other is §4.2's `mismatch`. The first
-  leg also answers `terms`, and `replaces` where it replaces one (above; not running). **a1p** (a6
+  leg also answers `terms`, and `replaces` where it replaces one (above; **running**). **a1p** (a6
   and a1r on #285). A terminal's first leg answers `newly: []` too and, in its own field,
   `"signs_in": {"client_id", "name"}`, with `"machine"` beside them where the body gave one, and
   the same `details.signs_in` on its `context.fetch`: the name and the machine are the terminal's

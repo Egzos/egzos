@@ -38,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the contract's version (`"1.1"`), the words for what this door serves beyond release 0.2.0
   (`terminals.machine` today) and the upload limits (`upload_max_bytes`, `inline_max_bytes`,
   `uploads_held_max`), as one `context.fetch` with `read: limits`; a parameter is `400`.
+- **An agent's terms at the door** (`rest.md` §4.3, v0.7 §AM; #377): on `POST /v1/agents` a scope
+  is `"*"` alone or has the form of a node id and is read as an id alone (`"*"` beside another
+  entry, a path tail or any other string is `400`); the first leg answers `terms` beside
+  `registers`, and `replaces` where a live registration of that client already serves the caller,
+  each also on its `context.fetch`; the challenge is bound to both, so a registration that appears,
+  ends or changes between the legs is `mismatch`; the second leg finds each place again by its id
+  under the lock and registers nothing where one is gone; and `identity.grant` carries
+  `details.replaces`.
 - **An agent gets what its person ticks, in the contract** (`rest.md` §4.3, §4.6, `identity.md`
   §3a, §4, §5, §8, v0.7 §AM; #377): an agent registration's capabilities and places, or the whole
   container as one choice of its own, are the person's own choice on the consent page, within their

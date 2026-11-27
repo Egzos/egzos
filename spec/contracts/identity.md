@@ -328,10 +328,10 @@ registration" is either.
   scopes lie within it, and the intersection below still applies at check time. It needs no `publish`
   (`capabilities.md` §1): the agent holds no more than its person. Nobody registers an agent to serve
   someone else. **decided** (§AB); its route is `rest.md` §4.3.
-- **A grant and an agent registration keep node ids.** At the REST door (`POST /v1/grants`,
-  `POST /v1/agents`), a scope given as a path tail is resolved when the record is written, by
-  `rest.md` §3's rules, and the record keeps the node's id, never the tail; `"*"` stays itself.
-  **running.**
+- **A grant and an agent registration keep node ids.** At the REST door, `POST /v1/grants` takes a
+  scope given as a path tail and resolves it when the record is written, by `rest.md` §3's rules;
+  `POST /v1/agents` takes each scope as a node id alone, or `"*"` alone (`rest.md` §4.3). Either
+  record keeps the node's id, never a tail; `"*"` stays itself. **running.**
 - **An agent registration is how an agent gets in.** When an agent signs in through the provider's OAuth
   server, the consent page egzos.io hosts — a security surface, whose anti-phishing shape (telling the
   requesting client's real identity apart from a deceptively named registrant, and keeping
