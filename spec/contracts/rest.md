@@ -894,7 +894,10 @@ needs its own decision (v0.7 §AK).
   another principal holds open), and the answer is the same. Any answer but `removed` tells this
   caller as much, so §3's refusal here would hide nothing `not_empty` says; and the caller covers
   the place and holds `fetch` and `organize` there. It is the one such fact `capabilities.md` §6
-  clause 2 lets this door give.
+  clause 2 lets this door give. **It rests on one thing, said once so that no later change breaks
+  it unseen:** nothing sits in a place whose bare existence must stay hidden from a person who
+  covers the place, lists it and may remove it. A change that would let a place hold such a thing
+  amends this clause first.
 - **The node is tombstoned, never erased** (`storage.md` §3), so the chain's entries about it still
   resolve. From then on it reads as absent everywhere: no list shows it, no tail matches it, and a
   reference to it, a write, an upload, a move or a copy into it is §3's refusal. Grants,

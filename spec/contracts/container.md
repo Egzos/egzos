@@ -84,7 +84,10 @@ their own act. It keeps the node's id and changes every path through the node: a
 a path stops resolving and answers as an absent one, and nothing redirects from an old name. A
 removed node is tombstoned, never erased, and reads as absent, as a tombstoned item does. The
 inbox, the personal root and `global` are never renamed or removed, and a place's name holds no
-`/`. **a1p**, **not running.**
+`/`. **a1p**, **not running.** Since another person may now rename or remove a place between two
+of a client's requests, **a client acts on the id a path resolved to at once, and never keeps a
+path's resolution across a confirm or a later act**: what a path names may have changed, and what
+an id names has not. **a1p.**
 
 ## 3 · The chain
 
