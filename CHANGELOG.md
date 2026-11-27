@@ -16,10 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing is decided on it.
 - **Renaming, in the contract** (`rest.md` §4.5–§4.6, v0.7 §AK; #404, #360): a person renames an
   item (`PATCH /v1/items/{id}`; a verified or promoted item with the confirm) or a place
-  (`PATCH /v1/scopes/{id}`; its id stays, every path through it changes, and a path that reaches it
-  by a name it once bore fails closed, so a rename hides no name from anyone who can reach the place
-  by a path; a place keeps at most 64 former names, and a rename past that is `409`
-  `too_many_names`). A confirm on an item is bound to the item's version, scope and trust status.
+  (`PATCH /v1/scopes/{id}`; the container's admin's act, with the confirm, because a rename can
+  re-point a name: its id stays, a path names whatever bears the name now, and nothing redirects
+  from an old name). A confirm on an item is bound to the item's version, scope and trust status,
+  and a rename moves the version in the same step as its write.
   A place's name, on any surface, holds no `/`, no `:`, and no control, line-break or
   bidirectional-control character. `GET /v1/limits` says which of
   these a container serves, with its upload limits. Removing a place follows in its own change.
