@@ -1084,13 +1084,15 @@ storage (v0.7 §S).
    is an artifact not tombstoned, not quarantined and not promoted by a person
    (`provenance.approved_by`). A copy adds nothing of its own, and no bytes to the store (§4.1 item
    10); how far copies spread is bounded by the copy route's gate (`organize` on the destination,
-   and a person's confirm where the audience widens, §4.2) and by nothing else (**a1p**). An open that would pass the bound
+   and a person's confirm where the audience widens, §4.2) and by nothing else (**a1p**). An open
+   that would pass the bound
    answers `429` with `{"error":"too_many_bytes"}`; an open whose `size` alone passes it is the
    same `400` as one past `upload_max_bytes`. Both caps and the open's record are one atomic step:
    of two concurrent opens that together pass either, at most one is recorded. A person makes room
    by removing or promoting the agent's files (§4). A removed file's bytes stay on disk, as
    promoted bytes do ([0.3 · 44]; `storage.md` §4): the bound limits what an agent holds live, not
-   what the store keeps, and only the owner's purge act (`[v1.1]`) frees them. **decided**, that an agent's kept bytes have a limit (the Chief, 2026-11-26);
+   what the store keeps, and only the owner's purge act (`[v1.1]`) frees them. **decided**, that an
+   agent's kept bytes have a limit (the Chief, 2026-11-26);
    **a1p**, the numbers, the counting and the answers; not running.
    The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
    edge that caps a request's body sets `blobs.upload_max_bytes` at or below that cap.
@@ -1159,7 +1161,8 @@ storage (v0.7 §S).
      per-token bucket, as §6's refused redemption does; a refusal at check 7 appends `upload.put`
      (`outcome: refused`, `details.reason`: `length` or `hash`), as item 2's does, and counts in no
      bucket. A refusal at check 1, or where `sig` does not verify, is counted by the `rest` throttle
-     and tallied under `forged` (§2 item 7). **No log and no entry keeps an address**: its spent record is its
+     and tallied under `forged` (§2 item 7). **No log and no entry keeps an address**: its spent
+     record is its
      `sig`'s sha256 and its `expires_at`, and the door writes neither the address nor its query to
      any log.
 3. **Item.** `POST /v1/items` with `{"kind": "artifact", "upload": <id>, "scope"?, "key"?, "tags"?}`
