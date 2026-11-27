@@ -28,6 +28,11 @@ class StoreError(Exception):
     pass
 
 
+#: The kinds a write of text takes (`POST /v1/items` with a `body`, `egzos_remember`): every kind
+#: but an artifact, whose bytes arrive through an upload (rest.md §4.4).
+BODY_KINDS: tuple[str, ...] = tuple(k for k in KINDS if k != "artifact")
+
+
 class Store:
     def __init__(
         self,
