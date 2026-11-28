@@ -372,7 +372,7 @@ needs presence proven at the act itself, which is the *strictest* reading and th
 `authorization-server.md` §10 enforces; it never means the check is off. It fails safe in the only
 direction that matters.
 
-Four notes the table cannot carry:
+Five notes the table cannot carry:
 
 - **`chain.personal_root`** is per-deployment by F1 and "invertible **per user**" by R11 — the same
   key in a single-owner container, which is all v0.1 has. Recorded so the freeze reads a known
@@ -389,8 +389,14 @@ Four notes the table cannot carry:
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
   written before this key existed: R11 ratified 30 days cold, then purge, and v0.7 §Z amends it to
   30 days, then ask — nothing is deleted on a timer (`rest.md` §4.4). It covers **staged**
-  bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item; an owner purge act is
-  `[v1.1]` ([0.3 · 44]; `storage.md` §4).
+  bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item, but for an agent's kept
+  file that no person promoted (below); an owner purge act is `[v1.1]` ([0.3 · 44]; `storage.md`
+  §4).
+- **`blobs.deleted_retention_days`** (default `30`) is the days bytes stay in the place for deleted
+  bytes before they are deleted for good (`storage.md` §4). It enters this table and `_types.py`
+  with the code that reads it, as `blobs.agent_kept_max_bytes` does (`rest.md` §4.4). An admin may
+  lengthen it, never below 30: a value under 30, `0` included, is refused. **decided**, the 30 (the
+  Chief, 2026-11-27, v0.7 §AL (6), §AN); **a1p**, the key and its floor; not running.
 
 **The object lives in `ContainerState`, and changing a key is an `admin` act that emits
 `config.set`. [0.3 · 40]** The config is read on the resolution path (`chain.personal_root`), the
