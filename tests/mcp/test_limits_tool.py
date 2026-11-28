@@ -19,7 +19,8 @@ from egzos.mcp.server import NOT_LIVE, build
 
 KW = {"actor": OWNER, "principal": "interactive"}
 SUB = "11111111-1111-4111-8111-111111111111"
-KEYS = ("upload_max_bytes", "inline_max_bytes", "uploads_held_max")
+KEYS = ("upload_max_bytes", "inline_max_bytes", "uploads_held_max",
+        "agent_uploads_held_max")
 
 
 @pytest.fixture

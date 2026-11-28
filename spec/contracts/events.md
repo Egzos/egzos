@@ -71,7 +71,7 @@ drift a reader resolves by guessing.
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 | `identity.credential` | a confirm credential is added or removed, or the attempt is refused: `op: add · remove`, `outcome`, `reason` (`rest.md` §4.3); never key material | running |
-| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, and once `rest.md` §4.4 items 2 and 2a's code runs `receiving · stalled · too_many_transfers · too_many_uploads` (`rest.md` §4.4) | running |
+| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, `too_many_uploads` where an agent's bytes meet its person's 16 on `rest.md` §4.4 item 2's route, and once `rest.md` §4.4 items 2 and 2a's code runs `receiving · stalled · too_many_transfers` (`rest.md` §4.4) | running |
 | `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
 **Entering with their code** (`rest.md` §4.5, v0.7 §AK; `storage.md` §4, v0.7 §AN; **a1p**, not

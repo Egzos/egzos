@@ -61,6 +61,17 @@ def valid_name(name: object) -> bool:
     )
 
 
+def valid_filename(name: object) -> bool:
+    """rest.md §4.4 item 1: an artifact's file name is 1 to 255 characters with no Cc, Zl or Zp
+    character, no Bidi_Control and no lone surrogate, the characters a place's name bars too. `/`,
+    `:` and `*` stay: a file's name is display data, never a path or a key."""
+    return (
+        isinstance(name, str)
+        and 0 < len(name) <= NAME_MAX
+        and not any(_barred(ch) or _surrogate(ch) for ch in name)
+    )
+
+
 def capture_name(title: str, item_id: str) -> str:
     """Pure capture's thread name from a title, in rest.md §4.5's three steps: `/` and `:` become
     `-` and every Cc, Zl, Zp or Bidi_Control character is dropped; the first 40 characters are

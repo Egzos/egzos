@@ -110,7 +110,9 @@ def _rm(door, token, item_id, **body):
 def test_a_person_tombstones_an_agents_staged_artifact_and_its_slot_frees(c, door, notes, sign):
     alice, a1 = sign("alice"), sign("alice", "a1")
     items = [_artifact(door, a1, notes.id, data=b"%d" % n) for n in range(MAX_HELD)]
-    assert _open(door, a1, notes.id, DATA).status_code == 429  # alice's sixteen, a1's in them
+    uid = _open(door, a1, notes.id, DATA).json()["upload"]  # holds no slot with no bytes
+    r = door.put(f"/v1/uploads/{uid}", headers=_auth(a1), content=DATA)
+    assert r.status_code == 429  # alice's sixteen, a1's in them
     r = _rm(door, alice, items[0])
     assert (r.status_code, r.json()) == (200, {"result": "tombstoned"})
     assert c.store.get(items[0]) is None and not _staged(c, b"0") and _staged(c, b"1")
@@ -119,7 +121,8 @@ def test_a_person_tombstones_an_agents_staged_artifact_and_its_slot_frees(c, doo
     assert entry["details"] == {"kind": "artifact", "status": "unverified",
                                 "staged_deleted": hashlib.sha256(b"0").hexdigest()}
     assert not _events(c, "step_up")  # nothing verified, so nothing to confirm
-    assert _open(door, a1, notes.id, DATA).status_code == 200  # the 17th open, 429 before
+    r = door.put(f"/v1/uploads/{uid}", headers=_auth(a1), content=DATA)
+    assert r.status_code == 200  # the 17th's bytes, 429 before
 
 
 def test_staged_bytes_another_upload_holds_stay(c, door, notes):

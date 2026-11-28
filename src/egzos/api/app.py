@@ -579,10 +579,14 @@ def create_app(
             # Unknown, expired, discarded and another principal's alike; no byte is read.
             d.probe(token, upload_id)
             return refusal()
+        if c.uploads.turned_away(token, upload_id):  # its person's 16, before a byte is read
+            return _json(429, {"error": "too_many_uploads"})
         outcome = c.uploads.put(token, upload_id, await _exactly(request, record["size"]))
         if outcome is None:
             d.probe(token, upload_id)
             return refusal()
+        if outcome == "too_many_uploads":
+            return _json(429, {"error": "too_many_uploads"})
         if outcome != "staged":
             return invalid()
         return _json(200, {"upload": upload_id, "sha256": record["sha256"]})
