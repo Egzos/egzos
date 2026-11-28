@@ -305,6 +305,9 @@ spend_grant(sig_hash, expires_at)                -> bool    # True for the one c
 forget_grants(expired_before)                    -> None    # drops the records of grants expired before then
 ```
 
+- **An upload's address is spent here too** (`rest.md` §4.4 item 2a; v0.7 §AL; **a1p**, not
+  running): its record is the sha256 of its `sig` and its `expires_at`, under the same rules, and
+  no address's `sig` is ever a grant's, so one record names one or the other.
 - **A grant is spent once, atomically.** Of two concurrent spends of one grant, exactly one is
   `True` (`rest.md` §6 check 4). A spend commits on its own and is never rolled back: a redemption
   refused at a later check has still spent its grant.
@@ -461,7 +464,7 @@ and how a container names its own.
 ```
 put(data)      -> sha256        # promoted store, dedup by construction
 stage(data)    -> sha256        # staging prefix, invisible to resolution
-promote(sha)   -> bool          # staging -> promoted, on approval
+promote(sha)   -> bool          # staging -> promoted: a person's or a kept agent's write, or approval
 get(sha)       -> bytes | None
 exists(sha)    -> bool
 discard(sha)   -> bool          # deletes staged bytes only; True if there were any
@@ -524,6 +527,14 @@ with a container key** (`context-item.md` §3, [0.3 · 45]).
 agent-proposed artifact awaiting approval is therefore not merely unserved but unaddressable —
 staging is not a trust status applied to a reachable blob, it is a different location. `promote`
 moves the bytes into the promoted store; only then does the content address resolve. **running.**
+**Since v0.7 §AL an agent's artifact is kept at once** (`rest.md` §4.4 item 3): it is promoted with
+its item, as a person's is, and the upload it was written from records that it was. That record,
+and for a copy the one its chain of sources first reaches, is what Trust reads to tell a kept
+artifact from a staged one (`rest.md` §6 item 2); an agent's artifact with no such record stays
+staged until a person promotes it. Staging holds an upload's bytes until its item is written.
+**decided**, that it is kept, by the Chief, who confirmed it on 2026-11-27 with its consequence
+put to him: an agent's bytes resolve and are served from the moment they land, not held apart
+until promoted (v0.7 §AL (4)); **a1p**, the rest; not running.
 
 **`promote` returns its result to its internal caller only. [0.3 · 43]** It returns `True` when
 staged bytes moved to the promoted store and `False` when nothing was staged at that address,

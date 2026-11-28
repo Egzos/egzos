@@ -73,6 +73,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as `GET /v1/scopes` lists them, so it can find a place's exact name and path before it saves or
   fetches. With no `under`, an agent given particular places is shown every one of them.
 
+- **Files through the MCP door, in the contract** (`rest.md` §4.4, §4.6, §4.7, v0.7 §AL; #405): an
+  agent saves a file of up to 128 KiB in one call (`egzos_add_file`), or a file of any kind up to
+  the upload limit through `egzos_upload_open`, a single-use address its own code sends the bytes
+  to (`PUT /v1/uploads/{id}` with no bearer; a fresh one from `POST /v1/uploads/{id}/address`), and
+  `egzos_upload_finish`; it reads a file back with `egzos_get`, which carries a one-time download
+  address, while `egzos_fetch` names an artifact's file and its writer and mints none; and
+  `egzos_limits` serves it the limits in force. An approved agent's file is kept at once in a place
+  its terms cover, the agent's and unverified, within a per-agent bound
+  (`blobs.agent_kept_max_bytes`, 1 GiB by default; `too_many_bytes` past it); an agent's upload
+  whose bytes have not arrived holds no slot of its person's 16, and an agent holds at most 4 such. A file's name holds no control,
+  line-separator or bidi-control character. No tool makes a place. Not running until the code
+  lands.
+
 ### Changed
 
 - **The provider's scopes, corrected** (`rest.md` §4.3; a note under v0.7 §AM): the sign-in provider
