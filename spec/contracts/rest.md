@@ -28,7 +28,7 @@ stdio and the lifeboat. Every clause is derived from what is already decided, an
   (artifact transport) is already v1.0 by F5 and is §6 here. The other eleven are `[v1.1]` below.
 
 The running doors (CLI, `egzos_fetch` / `egzos_remember` / `egzos_inbox` / `egzos_places` /
-`egzos_limits`, the lifeboat) are cited
+`egzos_limits` / `egzos_get`, the lifeboat) are cited
 where an endpoint here mirrors one. That makes the endpoint a transport for an operation that
 already runs, not a new operation.
 
@@ -286,7 +286,7 @@ spec's job).
 |---|---|---|---|---|
 | `GET /v1/fetch?scope=&query=&kind=` | resolve the layered context at a scope (default: the token's start, as `egzos_fetch`) | `fetch` | `egzos_fetch` | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/find?q=` | search across what the token sees, in the query grammar of `egzos.store.find` | `fetch` | `egzos find` | `context.fetch` |
-| `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read; `egzos_get` (§4.7, not running) | `context.fetch`; `blob.grant` per §6 |
+| `GET /v1/items/{id}` | one item | `fetch` on its scope | the lifeboat's item read; `egzos_get` (§4.7) | `context.fetch`; `blob.grant` per §6 |
 | `GET /v1/inbox` | captured, not yet wrapped or promoted | `fetch` on the inbox | `egzos_inbox` | `context.fetch` |
 | `GET /v1/scopes?under=` | the child nodes of a node the token covers | `fetch` | `egzos ls`, `egzos_places` | `context.fetch` |
 | `POST /v1/items` | write an item — text, or an artifact from an upload (§4.4); it lands `unverified` | `remember` on the target scope | `egzos_remember`; an artifact: `egzos_upload_finish`, and within `egzos_add_file` (§4.7, not running) | `item.add`; `blob.put` where an artifact is promoted |
@@ -1516,10 +1516,10 @@ in §4–§4.6. The token that can call a tool can call its routes.
   "reason": <the route's error word>}`: `too_many_uploads`, `too_many_bytes` (§4.4).
 
 **Every string an item, a file or a node holds is untrusted data.** `egzos_fetch` and `egzos_get`
-open with the data banner, `egzos_inbox` with its titles banner (**running**), and `egzos_places`
-carries none, its names keys of each `<node>` (**running**). An item's body or `inline` text sits
-inside the response's fence; titles, tags, file names, types and place names are keys of the
-block beside it (**running** in `egzos_fetch`).
+open with the data banner (**running**), `egzos_inbox` with its titles banner (**running**), and
+`egzos_places` carries none, its names keys of each `<node>` (**running**). An item's body or
+`inline` text sits inside the response's fence; titles, tags, file names, types and place names
+are keys of the block beside it (**running** in `egzos_fetch` and `egzos_get`).
 
 | tool | arguments | result | mirrors | events |
 |---|---|---|---|---|
@@ -1535,7 +1535,7 @@ block beside it (**running** in `egzos_fetch`).
 | `egzos_upload_finish` | `upload`, `scope?`, `key?`, `tags?` | `{"ok": true, "id", "status", "scope", "name", "size", "sha256"}` | `POST /v1/items` (`kind: artifact`) | `item.add`, `blob.put`; `context.fetch` on a refusal |
 | `egzos_upload_discard` | `upload` | `{"ok": true}` | `DELETE /v1/uploads/{id}` | `upload.discard`; `context.fetch` on a refusal |
 
-The first five are **running**. Where a file is saved in a place that serves verified items only
+The first six are **running**. Where a file is saved in a place that serves verified items only
 (§4.4 item 3), `egzos_add_file`'s and `egzos_upload_finish`'s answers carry `"served": false`
 beside `status`.
 **Each file tool's description says**, in the code's words, with the limits in force when the tool
@@ -1578,6 +1578,7 @@ and is served back once its person promotes it.
   came over stdio, it asks for no grant and carries no `download`. Its banner adds that the
   address is good once, for five minutes, at this container only, to be fetched by the caller's
   own code and never shown or sent anywhere else. Refused, it answers `{"banner", "items": []}`.
+  **running**.
 - **`egzos_places`** is §4.1 item 5's read, **running** (#415).
 - **`egzos_add_file`** writes a file small enough to ride in the call's own arguments: §4.4's open,
   bytes and item **as one step**, with every check of each, in the routes' order:

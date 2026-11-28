@@ -62,12 +62,13 @@ from egzos.identity import (
 )
 from egzos.ledger import attributed
 from egzos.mcp.http import StreamableHttp
-from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
+from egzos.model import CONTAINER_TYPES, KINDS, ContextItem, Node, Token
 from egzos.places import children, place
 from egzos.serving import FEATURES as FEATURES  # the words §4.6 names, read here too
 from egzos.serving import limits as limits_of
+from egzos.serving import readable
 from egzos.store.blobs import grant_url
-from egzos.store.find import QueryError, find, parse, shown
+from egzos.store.find import QueryError, find, parse
 from egzos.store.items import BODY_KINDS, StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError, valid_name
 from egzos.store.uploads import TooManyUploads, valid_open
@@ -246,13 +247,7 @@ class Door:
 
     def readable(self, token: Token, item, node: Node) -> bool:
         """Whether `GET /v1/items/{id}` serves the item to this token (§3's list)."""
-        if item.status == "quarantined":
-            return False
-        if item.kind in VERIFIED_ONLY_KINDS and item.status != "verified":
-            return False
-        return token.has("fetch") and self.c.trust.covers(token, node) and shown(
-            self.c, token, item, node
-        )
+        return readable(self.c, token, item, node)
 
 
 def create_app(
@@ -264,7 +259,6 @@ def create_app(
     d = door or Door(container)
     c = container
     own = origin  # the middleware's `origin` is the request's header
-    mcp = StreamableHttp(container, max_body=BODY_MAX_BYTES)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -286,6 +280,9 @@ def create_app(
         `config set` reaches a running door; absent, the origin `serve` binds."""
         named = c.config_value("identity.origin")
         return own if named is None else named
+
+    # `egzos_get` writes a download address on the public origin (rest.md §4.7).
+    mcp = StreamableHttp(container, max_body=BODY_MAX_BYTES, origin=public)
 
     def resource_metadata() -> Response:
         """RFC 9728's document for `/mcp` (identity.md §7): the public origin, and the provider that

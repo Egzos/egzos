@@ -47,7 +47,8 @@ is a separate program, `egzos`, published on npm (`npm install -g egzos`): it si
 
 Then, in Claude Code, ask it to use the `egzos` tools: `egzos_fetch` reads your context for a scope,
 `egzos_remember` writes (it lands **unverified** in your inbox), `egzos_inbox` lists the queue,
-`egzos_places` lists the places you may name, `egzos_limits` the limits in force.
+`egzos_places` lists the places you may name, `egzos_limits` the limits in force, `egzos_get` reads
+one item by its id.
 
 - **Agents propose, you dispose.** Anything an agent writes waits in `egzoscore trust pending` until you
   approve it: `egzoscore trust approve <id>` opens a one-shot approval page in your browser. A move that

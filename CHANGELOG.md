@@ -78,6 +78,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sha256`, keys `GET /v1/fetch` already serves the same caller; and every tool reads an argument
   by its exact JSON type, so a `"5"`, a `5.0` or a `true` is never an integer and a null, a list or
   an object never a string: `invalid_request`, before any lookup.
+- **`egzos_get`, with a one-time download address** (`rest.md` §4.7, §6, `context-item.md` §3,
+  v0.7 §AL; #405): an agent reads one item by its id over MCP as `GET /v1/items/{id}` serves it,
+  one block and one read, and an item it may not read answers as an absent one. A file whose bytes
+  do not ride inline carries `download`, Trust's grant written on the container's public origin:
+  good once, for five minutes. Over stdio with no `identity.origin` no grant is asked for, an
+  agent's file is served with no `download` until its person promotes it, and `egzos_fetch` still
+  carries none.
 
 - **Files through the MCP door, in the contract** (`rest.md` §4.4, §4.6, §4.7, v0.7 §AL; #405): an
   agent saves a file of up to 128 KiB in one call (`egzos_add_file`), or a file of any kind up to

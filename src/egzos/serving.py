@@ -2,14 +2,16 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """What this door serves (rest.md §4.6): `GET /v1/limits` and `egzos_limits` read it here, so the
 two answer alike and append the same read. It is a read of config keys and constants: it sets
-nothing and serves no other key."""
+nothing and serves no other key. `GET /v1/items/{id}` and `egzos_get` read one item's serving rule
+here too (§3, §4.7), so the tool serves no item its route would not."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
 from egzos._types import CONTRACT_VERSION, DoorFeature
-from egzos.model import Token
+from egzos.model import VERIFIED_ONLY_KINDS, ContextItem, Node, Token
+from egzos.store.find import shown
 from egzos.store.uploads import MAX_HELD
 
 if TYPE_CHECKING:
@@ -33,3 +35,13 @@ def limits(c: Container, token: Token) -> dict[str, Any]:
         "inline_max_bytes": c.config_value("blobs.inline_max_bytes"),
         "uploads_held_max": MAX_HELD,
     }
+
+
+def readable(c: Container, token: Token, item: ContextItem, node: Node) -> bool:
+    """Whether `GET /v1/items/{id}` and `egzos_get` serve the item to this token (rest.md §3's
+    list): never quarantined, a rule only once verified, and `fetch` over a place it covers."""
+    if item.status == "quarantined":
+        return False
+    if item.kind in VERIFIED_ONLY_KINDS and item.status != "verified":
+        return False
+    return token.has("fetch") and c.trust.covers(token, node) and shown(c, token, item, node)
