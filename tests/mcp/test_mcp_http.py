@@ -163,7 +163,8 @@ def test_an_agent_reaches_only_what_its_registration_and_its_user_both_cover(c, 
         ("egzos_fetch", {"scope": a.id}), ("egzos_fetch", {"scope": b.id}),
         ("egzos_fetch", {"scope": "01HZZZZZZZZZZZZZZZZZZZZZZZ"}),
         ("egzos_remember", {"text": "x", "scope": a.id})])
-    assert names == ["egzos_fetch", "egzos_inbox", "egzos_limits", "egzos_places", "egzos_remember"]
+    assert names == ["egzos_fetch", "egzos_get", "egzos_inbox", "egzos_limits", "egzos_places",
+                     "egzos_remember"]
     assert [i["id"] for i in seen["items"]] == [mine.id]
     hidden.pop("scope"), absent.pop("scope")  # each echoes the caller's own input, nothing more
     assert hidden == absent and hidden["chain"] == hidden["items"] == []

@@ -94,7 +94,8 @@ def test_each_value_of_its_exact_type_is_taken_as_it_is(c):
 #: Each running tool's arguments: "s" a string, "a" a list of strings, "?" where null is taken.
 TYPED = {"egzos_fetch": {"scope": "s?", "query": "s?", "kinds": "a?"},
          "egzos_remember": {"text": "s", "kind": "s", "scope": "s?", "key": "s?", "tags": "a?"},
-         "egzos_places": {"under": "s?"}, "egzos_inbox": {}, "egzos_limits": {}}
+         "egzos_places": {"under": "s?"}, "egzos_inbox": {}, "egzos_limits": {},
+         "egzos_get": {"id": "s"}}
 
 
 def _wrong(form):
@@ -109,7 +110,7 @@ def _wrong(form):
 WRONG_STRINGS = [
     (tool, {**({"text": "x"} if tool == "egzos_remember" else {}), arg: v})
     for tool, args in TYPED.items() for arg, form in args.items() for v in _wrong(form)
-] + [("egzos_remember", {}), ("egzos_places", {"under": ["Music"]})] + [
+] + [("egzos_remember", {}), ("egzos_get", {}), ("egzos_places", {"under": ["Music"]})] + [
     (tool, {**({"text": "x"} if tool == "egzos_remember" else {}), "scope": [place]})
     for tool in ("egzos_remember", "egzos_fetch") for place in ("Music/drafts", "Nowhere")]
 

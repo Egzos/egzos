@@ -148,9 +148,9 @@ def test_the_tool_list_has_no_human_only_act_no_place_maker_and_no_url_argument(
 
     tools = {t.name: t.input_schema.get("properties", {}) for t in asyncio.run(go())}
     assert set(tools) == {"egzos_fetch", "egzos_remember", "egzos_inbox", "egzos_places",
-                          "egzos_limits"}  # a new tool is held to this list by name
+                          "egzos_limits", "egzos_get"}  # a new tool is held to this list by name
     arguments = {a for properties in tools.values() for a in properties}
-    assert arguments == {"scope", "query", "kinds", "text", "kind", "key", "tags", "under"}
+    assert arguments == {"scope", "query", "kinds", "text", "kind", "key", "tags", "under", "id"}
     assert not [a for a in arguments if "url" in a or "uri" in a or "address" in a]
 
 

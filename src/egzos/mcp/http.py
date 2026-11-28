@@ -28,7 +28,7 @@ entries name the user it acts for.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextvars import ContextVar
 from typing import TYPE_CHECKING
 
@@ -49,10 +49,12 @@ _caller: ContextVar[Token | None] = ContextVar("egzos_mcp_caller", default=None)
 class StreamableHttp:
     """The ASGI app the door routes `POST /mcp` to, behind its credential and its throttle."""
 
-    def __init__(self, container: Container, *, max_body: int):
+    def __init__(self, container: Container, *, max_body: int, origin: Callable[[], str]):
         # WARNING keeps the SDK's per-request INFO lines quiet; the SDK also installs a root log
-        # handler when it builds a server, as it does for stdio.
-        self.server = build(container, _caller.get, log_level="WARNING", subscriptions=False)
+        # handler when it builds a server, as it does for stdio. `origin` is the door's public
+        # origin, read on every call (identity.md §2).
+        self.server = build(container, _caller.get, origin=origin, log_level="WARNING",
+                            subscriptions=False)
         self.max_body = max_body
         self._manager: StreamableHTTPSessionManager | None = None
 
