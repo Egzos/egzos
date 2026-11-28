@@ -305,9 +305,12 @@ spend_grant(sig_hash, expires_at)                -> bool    # True for the one c
 forget_grants(expired_before)                    -> None    # drops the records of grants expired before then
 ```
 
-- **An upload's address is spent here too** (`rest.md` §4.4 item 2a; v0.7 §AL; **a1p**, not
-  running): its record is the sha256 of its `sig` and its `expires_at`, under the same rules, and
-  no address's `sig` is ever a grant's, so one record names one or the other.
+- **An upload's address is spent here too** (`rest.md` §4.4 item 2a; v0.7 §AL; **a1p**; running
+  in Trust, which spends an address it has verified outside any block and forgets no record, a
+  grant's or an address's, until 900 seconds past its `expires_at`; not running at the door, which
+  redeems no address until item 2a's route runs): its record is the sha256 of its `sig` and its
+  `expires_at`, under the same rules, and no address's `sig` is ever a grant's, so one record
+  names one or the other.
 - **A grant is spent once, atomically.** Of two concurrent spends of one grant, exactly one is
   `True` (`rest.md` §6 check 4). A spend commits on its own and is never rolled back: a redemption
   refused at a later check has still spent its grant.
