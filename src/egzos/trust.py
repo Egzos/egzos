@@ -17,19 +17,27 @@ on the check a fetch applies, and a redemption runs that check again, as things 
 
 from __future__ import annotations
 
+import calendar
 import hashlib
 import hmac
+import re
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
 from egzos._ids import ulid
-from egzos._types import BLOB_GRANT_LIFETIME_SECONDS, BlobGrant
+from egzos._types import (
+    BLOB_GRANT_LIFETIME_SECONDS,
+    UPLOAD_ADDRESS_LIFETIME_SECONDS,
+    BlobGrant,
+    UploadAddress,
+    UploadRecord,
+)
 from egzos.backends.base import Backend
 from egzos.ledger import Ledger
 from egzos.model import RING_RANK, ROLE_BUNDLES, ContextItem, Node, Token, canonical, now_iso
-from egzos.store.blobs import _is_digest
+from egzos.store.blobs import ADDRESS_QUERY, _is_digest
 from egzos.store.nodes import NodeService
 
 
@@ -47,6 +55,17 @@ _MOVE_REFUSED = "moving items needs `organize` (and `publish` where the audience
 GRANT_KEY_FILE = "grant.key"
 GRANT_KEY_BYTES = 32
 _UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
+#: rest.md §6 and storage.md §3.5: one table keeps grants' and addresses' spent records, each kept
+#: at least its own lifetime past its expiry, so every forget keeps the longer of the two.
+SPENT_KEPT_SECONDS = max(BLOB_GRANT_LIFETIME_SECONDS, UPLOAD_ADDRESS_LIFETIME_SECONDS)
+_GRANT_FIELDS = frozenset(BlobGrant.__annotations__)
+#: rest.md §4.4 item 2a: an address's fields, the path's and its URL's query's; and the form an
+#: upload's own `expires_at` is written in (store/uploads.py).
+ADDRESS_FIELDS = ("upload", *ADDRESS_QUERY)
+_UPLOAD_ISO = "%Y-%m-%dT%H:%M:%SZ"
+#: A size as one decimal writes it: no sign, no space, no leading zero, ASCII digits only, so one
+#: signature has one URL.
+_SIZE = re.compile(r"0|[1-9][0-9]*")
 
 
 def _utc(at: float) -> str:
@@ -66,6 +85,17 @@ def grant_expiry(text: str) -> float | None:
         return datetime.strptime(text, _UTC).replace(tzinfo=UTC).timestamp()
     except ValueError:
         return None
+
+
+def _text(value: object) -> bool:
+    """Whether `value` is a string UTF-8 can write: no lone surrogate, which no message holds."""
+    if not isinstance(value, str):
+        return False
+    try:
+        value.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
 
 
 def _after(text: str, when: float) -> bool:
@@ -155,8 +185,8 @@ class TrustEngine:
                 or self.pull_refusal(token, item)):
             return None
         now = self.clock()
-        # rest.md §6: a spent record is kept a lifetime past its grant's expiry, then forgotten.
-        self.backend.forget_grants(_utc(now - BLOB_GRANT_LIFETIME_SECONDS))
+        # rest.md §6: a spent record is kept a lifetime past its expiry, then forgotten.
+        self.backend.forget_grants(_utc(now - SPENT_KEPT_SECONDS))
         expires_at = _utc(now + BLOB_GRANT_LIFETIME_SECONDS)
         grant: BlobGrant = {"sha256": sha, "item": item.id, "token": token.id,
                             "expires_at": expires_at, "sig": ""}
@@ -177,7 +207,7 @@ class TrustEngine:
         return key if len(key) == GRANT_KEY_BYTES else None
 
     @staticmethod
-    def _sign(grant: BlobGrant, key: bytes) -> str:
+    def _sign(grant: Mapping[str, Any], key: bytes) -> str:
         """[0.3 · 45]: HMAC-SHA256 under the container's key over every descriptor field but
         `sig`, as `canonical` JSON — each value a quoted string under its name, so no two
         descriptors share a message, and a field added later is covered with no edit here."""
@@ -185,9 +215,10 @@ class TrustEngine:
         return hmac.new(key, body.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def verify_grant(self, grant: BlobGrant) -> bool:
-        """rest.md §6 check 2: `sig` verifies under the container key, in constant time."""
+        """rest.md §6 check 2: `sig` verifies under the container key, in constant time. A
+        descriptor of any other fields is no grant (§4.4 item 2a)."""
         key = self._key()
-        return key is not None and hmac.compare_digest(
+        return key is not None and set(grant) == _GRANT_FIELDS and hmac.compare_digest(
             self._sign(grant, key).encode(), grant["sig"].encode())
 
     def spend_grant(self, grant: BlobGrant) -> bool:
@@ -195,6 +226,58 @@ class TrustEngine:
         later checks decide. Keyed on the sha256 of its `sig`, kept at least until it expires."""
         digest = hashlib.sha256(grant["sig"].encode()).hexdigest()
         return self.backend.spend_grant(digest, grant["expires_at"])
+
+    # -- the bytes' address (rest.md §4.4 item 2a) ------------------------------------------------
+    def address(self, record: UploadRecord, token: Token) -> UploadAddress | None:
+        """A fresh single-use address for the bytes of `record`, or None: its opener's alone,
+        while it is live with `UPLOAD_ADDRESS_LIFETIME_SECONDS` left, not discarded, its bytes not
+        arrived and no item written, and the opener holds `remember` on its scope, checked now;
+        and only where the key signs. It appends nothing (item 2a)."""
+        key, node = self._key(), self.backend.get_node(record["scope"])
+        try:
+            ends = calendar.timegm(time.strptime(record["expires_at"], _UPLOAD_ISO))
+        except (TypeError, ValueError):
+            return None
+        now = self.clock()
+        if (key is None or node is None or record["principal"] != token.id
+                or record["actor"] != token.owner or not token.has("remember")
+                or not self.covers(token, node) or record["discarded"] or record["staged"]
+                or record["item"] is not None or ends - now < UPLOAD_ADDRESS_LIFETIME_SECONDS):
+            return None
+        self.backend.forget_grants(_utc(now - SPENT_KEPT_SECONDS))
+        address: UploadAddress = {"upload": record["id"], "opener": record["principal"],
+                                  "size": str(record["size"]), "sha256": record["sha256"],
+                                  "expires_at": _utc(now + UPLOAD_ADDRESS_LIFETIME_SECONDS),
+                                  "sig": ""}
+        address["sig"] = self._sign_address(address, key)
+        return address
+
+    @classmethod
+    def _sign_address(cls, address: UploadAddress, key: bytes) -> str:
+        """Item 2a's message: the address's five named fields and `"use": "upload"`, which no
+        grant carries, so neither kind of descriptor's message is ever the other's."""
+        return cls._sign({"use": "upload", "upload": address["upload"],
+                          "opener": address["opener"], "size": address["size"],
+                          "sha256": address["sha256"], "expires_at": address["expires_at"]}, key)
+
+    def verify_address(self, address: UploadAddress) -> bool:
+        """Item 2a check 2: `sig` verifies under the container key, in constant time. Only the
+        six fields, each a string, and `size` in its one decimal form; anything else is False."""
+        key = self._key()
+        if (key is None or set(address) != set(ADDRESS_FIELDS)
+                or not all(_text(v) for v in address.values())
+                or not _SIZE.fullmatch(address["size"])):
+            return False
+        return hmac.compare_digest(self._sign_address(address, key).encode(),
+                                   address["sig"].encode())
+
+    def spend_address(self, address: UploadAddress) -> bool:
+        """Item 2a check 4: the first verified arrival spends the address in §6's spent records,
+        keyed on the sha256 of its `sig`, never the `sig`. The spend commits on its own, so it is
+        made outside any `atomic()` block (the backend refuses one inside), and check 5's mark is
+        a block of its own after it."""
+        digest = hashlib.sha256(address["sig"].encode()).hexdigest()
+        return self.backend.spend_grant(digest, address["expires_at"])
 
     def pull_refusal(
         self, token: Token | None, item: ContextItem | None, minted: float | None = None
