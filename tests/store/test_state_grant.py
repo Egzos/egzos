@@ -54,3 +54,20 @@ def test_two_connections_spending_one_grant_proceed_once(make_backend):
     for t in threads:
         t.join()
     assert sorted(seen) == [False, True]
+
+
+def test_an_address_spent_before_its_upload_is_marked_spends_once_on_every_connection(
+        make_backend):
+    # rest.md §4.4 item 2a checks 4 and 5: the spend commits on its own, outside any block, and
+    # the mark that follows is a block of its own; a second spend from anywhere finds the record.
+    first, second = make_backend(), make_backend()
+    first.put_upload({"id": "u1", "principal": "t1", "actor": "self", "scope": "n",
+                      "name": "a.bin", "mime": "application/pdf", "size": 3, "sha256": "0" * 64,
+                      "opened_at": "2026-10-23T00:00:00Z", "expires_at": "2026-10-23T01:00:00Z",
+                      "staged": False, "item": None, "promoted": False, "discarded": False})
+    assert first.spend_grant("address", WHEN) is True
+    with first.atomic():
+        assert first.spend_upload("u1", "bytes") is True
+    assert second.spend_grant("address", WHEN) is False
+    assert first.spend_grant("address", WHEN) is False
+    assert second.spend_upload("u1", "bytes") is False  # the block after the spend committed

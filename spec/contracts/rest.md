@@ -1130,7 +1130,8 @@ storage (v0.7 §S).
    written as §6 writes it, and `sig` an HMAC-SHA256 under §6's container key over `canonical` JSON
    (`events.md` §3) of `{"use": "upload", "upload", "opener", "size", "sha256", "expires_at"}`. The
    `use` field is in no `BlobGrant`, so no grant's `sig` verifies as an address and no address's
-   as a grant. Where the container names no `identity.origin` and the request came over stdio, or
+   as a grant (running in Trust's signing and verification; no route issues or redeems an
+   address yet). Where the container names no `identity.origin` and the request came over stdio, or
    §6's key signs nothing, no address is given: an open answers as §4.7 says for that case, and
    `POST /v1/uploads/{id}/address` is §3's refusal.
    - **It is bound** to the upload, to its opener (the `Token.id` that opened it), to the declared

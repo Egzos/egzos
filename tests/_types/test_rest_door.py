@@ -17,6 +17,11 @@ def test_a_blob_grant_lives_three_hundred_seconds():
     assert t.BLOB_GRANT_LIFETIME_SECONDS == 300
 
 
+def test_an_upload_address_lives_nine_hundred_seconds():
+    # rest.md §4.4 item 2a: "It lives 900 seconds from its issue, a fixed contract value."
+    assert t.UPLOAD_ADDRESS_LIFETIME_SECONDS == 900
+
+
 def test_the_grant_lifetime_is_not_a_config_key():
     # "The lifetime is not configurable": no container-config field or wire key may carry it.
     fields = set(t.ContainerConfig.__annotations__)

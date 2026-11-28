@@ -16,9 +16,9 @@ import hashlib
 import re
 from collections.abc import Callable
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
-from egzos._types import BlobGrant
+from egzos._types import BlobGrant, UploadAddress
 
 
 class BlobStore:
@@ -104,6 +104,18 @@ def grant_url(grant: BlobGrant) -> str:
     """rest.md §6's URL for a grant, its four other fields in the query, each value encoded."""
     query = urlencode([(k, grant[k]) for k in GRANT_QUERY], safe=":")
     return f"/v1/blobs/{grant['sha256']}?{query}"
+
+
+#: rest.md §4.4 item 2a: an upload address's fields in its URL's query, in this order; `upload` is
+#: the path's, and `use` is signed and never written.
+ADDRESS_QUERY = ("opener", "size", "sha256", "expires_at", "sig")
+
+
+def put_url(origin: str, address: UploadAddress) -> str:
+    """Item 2a's `put_url` on the container's public origin, its other fields in the query, each
+    value encoded."""
+    query = urlencode([(k, address[k]) for k in ADDRESS_QUERY], safe=":")
+    return f"{origin.rstrip('/')}/v1/uploads/{quote(address['upload'], safe='')}?{query}"
 
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")

@@ -214,6 +214,24 @@ class BlobGrant(TypedDict):
 BLOB_GRANT_LIFETIME_SECONDS: int = 300
 
 
+class UploadAddress(TypedDict):
+    """rest.md §4.4 item 2a: the single-use address for an upload's bytes, signed by TRUST under
+    §6's key over these fields but `sig`, with `"use": "upload"` beside them, which no `BlobGrant`
+    carries. `size` is the declared length as its decimal string, the way the URL writes it."""
+
+    upload: str
+    opener: str
+    size: str
+    sha256: str
+    expires_at: str
+    sig: str
+
+
+#: rest.md §4.4 item 2a — an upload address lives this long from its issue, a fixed contract
+#: value, and none is issued for an upload with less than this left.
+UPLOAD_ADDRESS_LIFETIME_SECONDS: int = 900
+
+
 # --- what the REST door serves (rest.md §4.6) ------------------------------------------------
 
 #: rest.md §4.6 — `GET /v1/limits`' `contract`: the contract set's version (`spec/contracts/
@@ -979,6 +997,7 @@ __all__ = [
     "STRUCTURE_FLOORS",
     "TOKEN_PRINCIPALS",
     "TRUST_STATUSES",
+    "UPLOAD_ADDRESS_LIFETIME_SECONDS",
     "VERIFIED_ONLY_KINDS",
     "AgentRegistration",
     "ArtifactContent",
@@ -1034,6 +1053,7 @@ __all__ = [
     "Transactional",
     "Trust",
     "TrustStatus",
+    "UploadAddress",
     "UploadRecord",
     "UploadState",
     "UserGrant",
