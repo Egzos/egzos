@@ -532,7 +532,9 @@ its item, as a person's is, and the upload it was written from records that it w
 and for a copy the one its chain of sources first reaches, is what Trust reads to tell a kept
 artifact from a staged one (`rest.md` §6 item 2); an agent's artifact with no such record stays
 staged until a person promotes it. Staging holds an upload's bytes until its item is written.
-**decided**, that it is kept; **a1p**, the rest; not running.
+**decided**, that it is kept, by the Chief, who confirmed it on 2026-11-27 with its consequence
+put to him: an agent's bytes resolve and are served from the moment they land, not held apart
+until promoted (v0.7 §AL (4)); **a1p**, the rest; not running.
 
 **`promote` returns its result to its internal caller only. [0.3 · 43]** It returns `True` when
 staged bytes moved to the promoted store and `False` when nothing was staged at that address,

@@ -925,9 +925,9 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
     §3.5, §4; identity.md §3a, §7; context-item.md §3; Egzos/egzos#405)
 ================================================================================
 
-[DECIDED] Decided by the Chief on 2026-11-26, in three answers, recorded
-          by the operator with each as he gave it; enacted by the merge
-          that records this section; the Chief may veto by reverting.
+[DECIDED] Decided by the Chief on 2026-11-26 and 27, in six answers,
+          each recorded by the operator as he gave it; enacted by the
+          merge that records this section; he may veto by reverting.
 
           (1) Asked what files an outside agent must be able to save into
           his cloud's chosen projects and threads, 2026-11-26: "Golden
@@ -952,6 +952,25 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
           (Notion, Slack, Box, Egnyte, ClickUp, AWS and Cloudinary do
           this; the MCP standard itself defines no file upload).
 
+          (4) Asked on 2026-11-27 to confirm keep, with this put to him:
+          "An approved agent's file can be read and downloaded the moment
+          it lands, before you have looked at it. That applies to you and
+          to anyone else who can read that place, other approved agents
+          included. It stays marked as the agent's and unverified. The
+          alternative locks each file's bytes until you promote it, one
+          by one." He answered: "1. keep".
+
+          (5) Asked then whether an agent's upload with no bytes yet may
+          stop counting toward his 16, at most 4 per agent, the worst
+          case put to him (64 transfers at once, not 16, so up to 64 ×
+          100 MB mid-transfer): "2. go with ur suggestion", which was
+          yes. He also asked why the 16 exists; §AC otherwise stands.
+
+          (6) Asked then whether the bytes of an agent's file that nobody
+          promoted are deleted when he removes it, bending [0.3 · 44] for
+          those files only: "3. delete and take to a deleted bucket for
+          30 days."
+
           Already in the contract, and not reopened: an agent may be given
           the whole container (§AM).
 
@@ -964,8 +983,9 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
           stays the agent's and unverified, and an agent's kept bytes
           have a limit.
 
-          THE OPERATOR'S BINDING, which the Chief did not decide and may
-          veto clause by clause (each is marked a1p in the contracts, and
+          THE OPERATOR'S BINDING, which the Chief did not decide but for
+          the parts two bullets name as his, and may veto clause by
+          clause (each other part is marked a1p in the contracts, and
           not running until the code lands):
 
           - One rule for every tool: it does what one route, or a fixed
@@ -1003,13 +1023,16 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
             Once its bytes are staged it holds one of the 16, as §AC
             counts a person's agents, and as an orphan it is the
             person's to see and discard. This is the one change to §AC's
-            count, the operator's call for the Chief to confirm.
-          - For the Chief: whether removing an agent's kept file that no
-            person promoted should delete its bytes when nothing else
-            refers to them. Today it does not: promoted bytes are never
-            deleted ([0.3 · 44]), so a removed file's bytes stay until
-            the owner's later purge, and the agent's bound limits what it
-            holds, not what the store keeps.
+            count, which the Chief confirmed ((5) above).
+          - Ruled by the Chief ((6) above): when an agent's kept file
+            that no person promoted is removed, its bytes are deleted by
+            way of a place for deleted bytes, for 30 days; the operator's
+            reading, his to veto: only bytes no other live item, copy or
+            upload holds. The clause that carries it is the next change
+            to these contracts; keep's code runs no earlier (the
+            operator's order). Until then promoted bytes are never
+            deleted ([0.3 · 44]) and a removed file's bytes stay until
+            the owner's later purge.
           - Over stdio, a door with no public origin carries a file only
             up to the one-call limit: there is no address it can hand
             out. The operator's call against ruling (1), which the hosted

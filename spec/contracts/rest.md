@@ -1074,13 +1074,13 @@ storage (v0.7 §S).
    the rule ran stays as it is, and is served as stored, as untrusted display data that every
    surface escapes (above; §4.7's banner).
    **An agent's byteless opens are its own to count** (v0.7 §AL, amending §AC's count for these
-   alone; **a1p**, not running, the Chief's to confirm). A `client` principal's upload whose bytes
-   have not arrived holds no slot of its person's 16. A `client` principal holds at most 4 such
-   uploads, and a 5th open answers `429` with `{"error":"too_many_uploads"}`; since a person holds
-   at most 16 live agent registrations (§4.3), their agents hold at most 64, and a client container
-   `Token` holds its own 4. Once its bytes are
-   staged, it holds one of its person's 16, as v0.7 §AC counts a person's agents, and as an orphan
-   it is its person's to see and discard (below).
+   alone: **decided**, the Chief, 2026-11-27, that they hold no slot, at most 4 an agent; **a1p**,
+   the rest; not running). A `client` principal's upload whose bytes have not arrived holds no
+   slot of its person's 16. A `client` principal holds at most 4 such uploads, and a 5th open
+   answers `429` with `{"error":"too_many_uploads"}`; since a person holds at most 16 live agent
+   registrations (§4.3), their agents hold at most 64, and a client container `Token` holds its
+   own 4. Once its bytes are staged, it holds one of its person's 16, as v0.7 §AC counts a
+   person's agents, and as an orphan it is its person's to see and discard (below).
    **An agent's kept bytes are bounded** (v0.7 §AL). The bound is `blobs.agent_kept_max_bytes`
    (default 1073741824, 1 GiB; an `admin` may change it; the key enters `container.md` §8 and
    `_types.py` with the code that reads it). It is counted over the uploads that agent's `Token.id`
@@ -1097,9 +1097,12 @@ storage (v0.7 §S).
    of two concurrent opens that together pass either, at most one is recorded. A person makes room
    by removing or promoting the agent's files (§4). A removed file's bytes stay on disk, as
    promoted bytes do ([0.3 · 44]; `storage.md` §4): the bound limits what an agent holds live, not
-   what the store keeps, and only the owner's purge act (`[v1.1]`) frees them. **decided**, that an
-   agent's kept bytes have a limit (the Chief, 2026-11-26);
-   **a1p**, the numbers, the counting and the answers; not running.
+   what the store keeps, and only the owner's purge act (`[v1.1]`) frees them. That stands until
+   the next change to this contract carries the Chief's ruling of 2026-11-27 (v0.7 §AL (6)): the
+   bytes of a removed kept file that no person promoted, where no other live item, copy or upload
+   holds them, are deleted by way of a place for deleted bytes, for 30 days; item 3's keep runs no
+   earlier (the operator's order). **decided**, that an agent's kept bytes have a limit (the
+   Chief, 2026-11-26); **a1p**, the numbers, the counting and the answers; not running.
    The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
    edge that caps a request's body sets `blobs.upload_max_bytes` at or below that cap.
    **The answer also carries the bytes' address**: `{"upload", "expires_at", "put_url",
@@ -1190,10 +1193,11 @@ storage (v0.7 §S).
    to no one, its agent included, until a person promotes it, as for every other write there. A
    person promotes it to verified or removes it as any unverified item. An agent's artifact written
    before the code that keeps it runs stays staged until a person decides on it, and no upgrade
-   promotes it. **decided** (the Chief, 2026-11-26: "go with keep"), that an approved agent's file
-   is kept and stays the agent's and unverified; **a1p**, the rest, and that a client container
-   `Token` the owner minted is kept the same way; **not running**: until the code lands, an agent's
-   stays staged. Events: `item.add`, and `blob.put` where promoted.
+   promotes it. **decided** (the Chief, 2026-11-26: "go with keep"; confirmed 2026-11-27 with its
+   consequence put to him, v0.7 §AL (4)), that an approved agent's file is kept and stays the
+   agent's and unverified; **a1p**, the rest, and that a client container `Token` the owner minted
+   is kept the same way; **not running**: until the code lands, an agent's stays staged. Events:
+   `item.add`, and `blob.put` where promoted.
 
 **Nothing staged is deleted on a timer, and nothing staged goes untracked** (v0.7 §Z, amending R11's
 "30 days cold, then purge"):
