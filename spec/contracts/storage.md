@@ -574,7 +574,8 @@ its code lands (v0.7 §AN).
 
 - **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get` and
   `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
-  serves it.
+  serves it; the act that brings a removed file back (below) is the one exception to come, and a
+  later change specifies it.
 - **Which bytes.** The bytes of an artifact item go there in the act that tombstones it (`rest.md`
   §4) where (a) it was kept from an upload an agent's `Token` opened, the upload's record saying so
   (§4 above), or it is a copy an agent made (its own `provenance` naming the agent) whose chain of
