@@ -72,6 +72,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`egzos_places`** (`rest.md` §4.1 item 5; #415): an agent lists the places it may use over MCP,
   as `GET /v1/scopes` lists them, so it can find a place's exact name and path before it saves or
   fetches. With no `under`, an agent given particular places is shown every one of them.
+- **`egzos_limits`, and each file named on `egzos_fetch`** (`rest.md` §4.6, §4.7, v0.7 §AL;
+  #405): an agent reads `GET /v1/limits`' answer over MCP, appending the same read; each block
+  `egzos_fetch` serves names its writer (`by`) and, for a file, its `name`, `mime`, `size` and
+  `sha256`, keys `GET /v1/fetch` already serves the same caller; and every tool reads an argument
+  by its exact JSON type, so a `"5"`, a `5.0` or a `true` is never an integer and a null, a list or
+  an object never a string: `invalid_request`, before any lookup.
 
 - **Files through the MCP door, in the contract** (`rest.md` §4.4, §4.6, §4.7, v0.7 §AL; #405): an
   agent saves a file of up to 128 KiB in one call (`egzos_add_file`), or a file of any kind up to

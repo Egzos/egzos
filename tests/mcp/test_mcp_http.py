@@ -90,7 +90,8 @@ def _session(c, bearer, calls, *, mode="legacy"):
                           mode=mode) as client:
             names = sorted(t.name for t in (await client.list_tools()).tools)
             results = [await client.call_tool(name, args) for name, args in calls]
-            return names, [json.loads(r.content[0].text) for r in results]
+            return names, [r.content[0].text if r.is_error else json.loads(r.content[0].text)
+                           for r in results]
 
     return asyncio.run(run())
 
@@ -162,7 +163,7 @@ def test_an_agent_reaches_only_what_its_registration_and_its_user_both_cover(c, 
         ("egzos_fetch", {"scope": a.id}), ("egzos_fetch", {"scope": b.id}),
         ("egzos_fetch", {"scope": "01HZZZZZZZZZZZZZZZZZZZZZZZ"}),
         ("egzos_remember", {"text": "x", "scope": a.id})])
-    assert names == ["egzos_fetch", "egzos_inbox", "egzos_places", "egzos_remember"]
+    assert names == ["egzos_fetch", "egzos_inbox", "egzos_limits", "egzos_places", "egzos_remember"]
     assert [i["id"] for i in seen["items"]] == [mine.id]
     hidden.pop("scope"), absent.pop("scope")  # each echoes the caller's own input, nothing more
     assert hidden == absent and hidden["chain"] == hidden["items"] == []
@@ -175,6 +176,30 @@ def test_an_agent_reaches_only_what_its_registration_and_its_user_both_cover(c, 
     hidden_read, absent_read = ([e[k] for k in keep] + [{**e["details"], "ref": "-"}]
                                 for e in reads[1:3])
     assert hidden_read == absent_read
+
+
+def test_an_argument_of_the_wrong_type_is_invalid_request_at_mcp_before_any_lookup(c, sign):
+    a = c.nodes.create("project", "a", c.nodes.user_root(), token=c.owner, **KW)
+    c.identity.grant_user("alice", name="alice", role="contributor", scopes=["*"], **KW)
+    _agent(c, "agent-1", ["fetch", "remember"], [a.id])
+    calls = [("egzos_fetch", {"scope": [a.id]}), ("egzos_remember", {"text": 5, "scope": a.id}),
+             ("egzos_places", {"under": True}), ("egzos_limits", {"all": 1})]
+    _, out = _session(c, sign("alice", "agent-1"), calls)
+    assert out == [f"Error executing tool {name}: invalid_request" for name, _ in calls]
+    assert _events(c, "context.fetch") == _events(c, "item.add") == []  # no lookup, no write
+
+
+def test_an_agent_that_may_not_read_reads_the_limits_at_mcp_as_at_the_route(c, sign):
+    c.identity.grant_user("alice", name="alice", role="contributor", scopes=["*"], **KW)
+    _agent(c, "scribe", ["remember"], ["*"])
+    bearer = sign("alice", "scribe")
+    _, (served,) = _session(c, bearer, [("egzos_limits", {})])
+    r = TestClient(create_app(c, origin=ORIGIN)).get("/v1/limits", headers=_bearer(bearer))
+    assert r.status_code == 200 and served == r.json()
+    keys = ("actor", "principal", "subject", "scope", "details")
+    tool_read, route_read = ({k: e[k] for k in keys} for e in _events(c, "context.fetch")[-2:])
+    assert tool_read == route_read and tool_read["details"]["read"] == "limits"
+    assert (tool_read["actor"], tool_read["details"]["for"]) == ("agent:scribe", "user:alice")
 
 
 def test_a_caller_without_fetch_gets_the_absent_answer_wherever_it_asks(c, sign):

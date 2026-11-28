@@ -139,6 +139,21 @@ def test_the_stated_limit_is_the_doors():
     assert REQUEST_MAX_BYTES == BODY_MAX_BYTES
 
 
+def test_the_tool_list_has_no_human_only_act_no_place_maker_and_no_url_argument(c):
+    """rest.md §4.7, what stays out: no tool promotes, approves, denies, tombstones, renames,
+    grants, registers or confirms; none makes a place; and none takes an address to fetch."""
+    async def go():
+        async with Client(build(c, lambda: c.owner)) as client:
+            return (await client.list_tools()).tools
+
+    tools = {t.name: t.input_schema.get("properties", {}) for t in asyncio.run(go())}
+    assert set(tools) == {"egzos_fetch", "egzos_remember", "egzos_inbox", "egzos_places",
+                          "egzos_limits"}  # a new tool is held to this list by name
+    arguments = {a for properties in tools.values() for a in properties}
+    assert arguments == {"scope", "query", "kinds", "text", "kind", "key", "tags", "under"}
+    assert not [a for a in arguments if "url" in a or "uri" in a or "address" in a]
+
+
 # -- d: nothing else changes --------------------------------------------------------------------
 def test_an_agent_given_a_place_still_gets_silence_without_a_scope_or_outside_it(c):
     taxes = c.nodes.create("project", "Taxes", c.nodes.user_root(), token=c.owner, **KW)

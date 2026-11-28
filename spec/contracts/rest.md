@@ -27,8 +27,8 @@ stdio and the lifeboat. Every clause is derived from what is already decided, an
 - The flagship's needs per #137, **v1.0 only**: #137 files its twelve asks as v1.1 inputs. Item 8
   (artifact transport) is already v1.0 by F5 and is §6 here. The other eleven are `[v1.1]` below.
 
-The running doors (CLI, `egzos_fetch` / `egzos_remember` / `egzos_inbox` / `egzos_places`, the
-lifeboat) are cited
+The running doors (CLI, `egzos_fetch` / `egzos_remember` / `egzos_inbox` / `egzos_places` /
+`egzos_limits`, the lifeboat) are cited
 where an endpoint here mirrors one. That makes the endpoint a transport for an operation that
 already runs, not a new operation.
 
@@ -302,7 +302,7 @@ spec's job).
 | `POST /v1/scopes` | create a container node | coverage of the parent; `admin` above its `structure_floor` | `egzos mk` | `node.create` |
 | `PATCH /v1/items/{id}` | rename an item: an artifact's file name, a text item's title; at once, or with the confirm where it is verified or a person promoted it (§4.5) | an `interactive` principal holding `organize` and `fetch` on its scope | — (new: #404) | `item.rename`; a verified or promoted item's: `context.fetch` (first leg), then `step_up` and `item.rename` |
 | `PATCH /v1/scopes/{id}` | rename a project or a thread, with the confirm; its id stays (§4.5) | a person holding a provider token whose grant holds `admin` over `["*"]`, and `organize` and `fetch` on it | — (new: #404) | `context.fetch` (first leg), then `step_up` and `node.rename` |
-| `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | `egzos_limits` (§4.7, not running) | `context.fetch` (`read: limits`) |
+| `GET /v1/limits` | what this door serves, and its upload limits (§4.6) | any valid token | `egzos_limits` | `context.fetch` (`read: limits`) |
 | `GET /v1/pending` | unverified items and open proposals | an `interactive` principal | `egzos trust pending` | `context.fetch` |
 | `GET /v1/blobs/{sha256}?…` | redeem a `BlobGrant` | the grant (§6) | — (new: F5) | `blob.pull` |
 
@@ -1372,8 +1372,8 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 ### 4.6 · What this door serves
 
 `GET /v1/limits`, to any valid token, a `client` principal's included, and over MCP as
-`egzos_limits` (§4.7) → `{"contract", "features": [<word>], "upload_max_bytes", "inline_max_bytes",
-"uploads_held_max"}`, and, once v0.7 §AL's code runs, `"agent_kept_max_bytes"`,
+`egzos_limits` (§4.7, **running**) → `{"contract", "features": [<word>], "upload_max_bytes",
+"inline_max_bytes", "uploads_held_max"}`, and, once v0.7 §AL's code runs, `"agent_kept_max_bytes"`,
 `"agent_uploads_held_max"` and `"file_call_max_bytes"` beside them (**a1p**, not running). **a1p**
 (v0.7
 §AK; #360), **running**, its `features` naming `terminals.machine` and `grants.own` until another
@@ -1430,13 +1430,13 @@ in §4–§4.6. The token that can call a tool can call its routes.
 **Answers, in the running tools' channels** (§3's last paragraph):
 
 - **Not live:** `{"ok": false, "reason": "this token is no longer valid"}`, the same from every
-  tool.
+  tool (**running**).
 - **Malformed:** the word `invalid_request` in the tool's error result, decided on the arguments
   alone and before any lookup: an argument the tool does not define, as §4.1 refuses a field a row
   does not name (**running** since #421), an argument not of its exact JSON type (an integer is
-  never a string, a boolean or a float), U+0000 or a string that is not well-formed Unicode (§3),
-  and each shape §4.1 and §4.4 refuse with `400`, but for a size over a limit (below). `busy` and
-  `internal` as §3 says.
+  never a string, a boolean or a float; **running**, for every tool the door serves), U+0000 or a
+  string that is not well-formed Unicode (§3), and each shape §4.1 and §4.4 refuse with `400`, but
+  for a size over a limit (below). `busy` and `internal` as §3 says.
 - **Too big:** a file larger than the limit in force answers `{"ok": false, "reason": "too_big",
   "limit": <its §4.6 field>, "max_bytes": <its value>}`; the route's `400` for the same request
   stays as it is. The limit is `file_call_max_bytes` for `egzos_add_file`, where a caller that
@@ -1458,7 +1458,7 @@ in §4–§4.6. The token that can call a tool can call its routes.
 open with the data banner, `egzos_inbox` with its titles banner (**running**), and `egzos_places`
 carries none, its names keys of each `<node>` (**running**). An item's body or `inline` text sits
 inside the response's fence; titles, tags, file names, types and place names are keys of the
-block beside it.
+block beside it (**running** in `egzos_fetch`).
 
 | tool | arguments | result | mirrors | events |
 |---|---|---|---|---|
@@ -1474,9 +1474,9 @@ block beside it.
 | `egzos_upload_finish` | `upload`, `scope?`, `key?`, `tags?` | `{"ok": true, "id", "status", "scope", "name", "size", "sha256"}` | `POST /v1/items` (`kind: artifact`) | `item.add`, `blob.put`; `context.fetch` on a refusal |
 | `egzos_upload_discard` | `upload` | `{"ok": true}` | `DELETE /v1/uploads/{id}` | `upload.discard`; `context.fetch` on a refusal |
 
-The first four are **running**, but for `<block>`'s `"by"` and file keys and the exact-type reading
-of an argument. Where a file is saved in a place that serves verified items only (§4.4 item 3),
-`egzos_add_file`'s and `egzos_upload_finish`'s answers carry `"served": false` beside `status`.
+The first five are **running**. Where a file is saved in a place that serves verified items only
+(§4.4 item 3), `egzos_add_file`'s and `egzos_upload_finish`'s answers carry `"served": false`
+beside `status`.
 **Each file tool's description says**, in the code's words, with the limits in force when the tool
 list is served: `scope` is named as for `egzos_remember`; `size` is the file's length in bytes and
 `sha256` its SHA-256 as 64 lowercase hex characters; `mime` takes no parameters; `content_base64`
@@ -1499,13 +1499,12 @@ and is served back once its person promotes it.
   `trust` the item's `trust.status`, with `"by"` beside it, the item's `provenance.actor`, so an
   agent's file is told from its person's. **For an artifact it also names the file**: `"name"` (its
   `content.filename`), `"mime"`, `"size"` and `"sha256"`, read from the item as stored. **a1p**,
-  not running, `"by"` and the file keys. Two people's registrations of one client show the same
+  **running**, `"by"` and the file keys. Two people's registrations of one client show the same
   `"by"`; the entry that wrote the item names the person (§4.4 item 3).
 - **`egzos_fetch` mints no grant**, at any scope: a fetch names files and carries no address for
   their bytes. **running**, that it mints none.
 - **`egzos_limits`** is `GET /v1/limits`, its answer and its read, for a caller that cannot reach
-  the
-  route.
+  the route (**running**).
 - **`egzos_get(id)`** is `GET /v1/items/{id}`: `fetch` on the item's scope and the route's serving
   check (an `interactive` principal holding `curate` is shown every covered item but quarantined
   ones and unverified rules, as `GET /v1/items/{id}` shows it, **running**), one block whose `layer`
@@ -1555,13 +1554,14 @@ and is served back once its person promotes it.
 **What stays out:**
 
 - **No human-only act has a tool**: promote, approve, deny, tombstone, a rename, a grant or a
-  registration, a confirm (`identity.md` §7).
-- **No tool makes a place.** An agent saves into places its person made, and learns their names
-  with `egzos_places`. A tool that makes one waits on a rule of its own at `POST /v1/scopes` for a
-  `client` principal: a capability for it, a bound on how many it makes, its places shown as its
-  own, and a way for the person to remove one (v0.7 §AL).
+  registration, a confirm (`identity.md` §7). **running**.
+- **No tool makes a place** (**running**). An agent saves into places its person made, and learns
+  their names with `egzos_places`. A tool that makes one waits on a rule of its own at
+  `POST /v1/scopes` for a `client` principal: a capability for it, a bound on how many it makes,
+  its places shown as its own, and a way for the person to remove one (v0.7 §AL).
 - **No tool fetches an address a caller chose.** The container never fetches a URL on a caller's
-  behalf; the bytes arrive in the call or at this door.
+  behalf; the bytes arrive in the call or at this door. **running**, that no tool takes an
+  address.
 
 ## 5 · Audit coverage
 
