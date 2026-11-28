@@ -575,50 +575,66 @@ decided to remove. Every other clause below is **a1p**; none of it runs until it
   `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
   serves it.
 - **Which bytes.** The bytes of an artifact item go there in the act that tombstones it (`rest.md`
-  §4) where (a) it was kept from an agent's upload, the upload's record saying so (§4 above), or,
-  for a copy, the record its chain of sources first reaches, as Trust reads it (`rest.md` §6 item
-  2); (b) no person promoted it or any item on that chain (`provenance.approved_by` absent); and (c)
-  nothing else holds its address. **Holds**, for an address in `sha256/`: an item not tombstoned
+  §4) where (a) it was kept from an upload an agent's `Token` opened, the upload's record saying so
+  (§4 above), or it is a copy an agent made (its own `provenance` naming the agent) whose chain of
+  sources first reaches such a record, as Trust reads it (`rest.md` §6 item 2); (b) no person
+  promoted it or any item on that chain (`provenance.approved_by` absent: a person's own write has
+  none either, so (b) alone never qualifies a file); and (c) nothing else holds its address. A
+  client container `Token`'s file, kept the same way (`rest.md` §4.4 item 3), and a copy a person
+  made are not an agent's file here. **Holds**, for an address in `sha256/`: an item not tombstoned
   whose `content.sha256` names it, of whatever kind, writer or status, a quarantined item and a copy
-  included; a tombstoned item naming it that does not meet (a) and (b), so a person's removed file
-  and a removed promoted file keep their bytes as [0.3 · 44] says; and an upload, not discarded and
-  not yet written as an item, that declared it. The audit chain's entries that name the address hold
-  nothing, nor do spent grants or addresses. Bytes held when their file is removed stay promoted, as
-  other promoted bytes do, and a holder that lapses later sends them nowhere. A person's own files,
+  included; and a tombstoned item naming it that does not meet (a) and (b), so a person's removed
+  file and a removed promoted file keep their bytes as [0.3 · 44] says. An upload holds nothing
+  here: its bytes are in `staging/`, and `promote` decides by them alone. Nor do the audit chain's
+  entries, spent grants or addresses. Bytes held when their file is removed stay promoted, as other
+  promoted bytes do, and a holder that lapses later sends them nowhere. A person's own files,
   promoted files and staged bytes keep the rules above word for word.
-- **The move, crash-safe.** Inside the tombstone's atomic step (§3.6) the bytes are copied, whole
-  and checked against their address, to `deleted/<hash>`; the container's own state records the
-  address with the time its 30 days run from; and `blob.delete` is appended (`events.md` §1). The
-  promoted copy is deleted after COMMIT, as §3.6 deletes a `promote`'s staged copy, in a short block
-  that first re-checks that nothing holds the address. A crash before COMMIT leaves an unrecorded
-  copy in `deleted/`, which is never read; a crash after it leaves a promoted copy that the pass
-  below deletes after the same re-check, finding it only from the records, never by listing
-  `sha256/`. No promoted copy is deleted before its deleted copy is whole.
-- **The same bytes again.** A write of the same bytes while a deleted copy waits makes a fresh
-  promoted copy, which the re-check keeps, and the deleted copy's purge never touches it. The same
-  address removed again while a copy waits leaves one deleted copy, its 30 days counted from the
-  latest removal.
+- **The move, crash-safe.** It runs no earlier than §3.6's rule that every write path's `put` and
+  `promote` run inside its block. Inside the tombstone's atomic step (§3.6) the bytes are copied to
+  `deleted/<hash>` by the store's own copy or link where it has one, its integrity the store's, or
+  else by a read that re-hashes them, landing whole or not at all as `promote`'s copy does; the
+  container's own state records the address and its `purge_after`; and `blob.delete` is appended
+  (`events.md` §1). A copy that fails fails the removal, which rolls back and is answered as §3.6's
+  `StorageBusy`. Where the promoted copy is missing, nothing moves and no `blob.delete` is appended,
+  and the tombstone proceeds. The promoted copy is deleted after COMMIT, as §3.6 deletes a
+  `promote`'s staged copy, in a short block that holds the lock from its re-check that nothing holds
+  the address through the delete, so a write of the same bytes lands either before the re-check,
+  which finds its item, or after the delete, when `put` writes them afresh. That block appends
+  nothing, and marks the record settled, whether it deleted the copy or the re-check kept it. A
+  crash before COMMIT leaves an unrecorded copy in `deleted/`, which is never read; a crash after it
+  leaves a record not settled, which the pass below settles the same way, finding it only from the
+  records, never by listing `sha256/`. No promoted copy is deleted before its deleted copy is whole.
+- **One record per address.** The same address removed again while its record is not purged copies
+  nothing: only `purge_after` moves to 30 days from the latest removal, and the new `blob.delete`
+  says so, and the record is no longer settled. Where the record is purged, the bytes are copied
+  afresh and the purged mark cleared.
+- **The time.** `purge_after` is 30 days after the removal, on the container host's UTC clock that
+  stamps the chain's entries, read the same way when the record is written and when the pass
+  compares it. The record is found by an index on that time, never by reading every record.
 - **After 30 days it is deleted for good.** A pass of its own, unlike the staging sweep above, run
-  at open and once a day while the container runs, under the lock, marks each record past its time
-  purged, appends `blob.purge`, and after COMMIT deletes `deleted/<hash>` in a short block that
-  first re-checks the record is still purged, so a removal in between keeps its copy. It also
-  deletes what `deleted/` holds with no record or a purged one, through the store's own internal
-  listing (§5). The days are `blobs.deleted_retention_days` (`container.md` §8). The bytes go only
-  from `deleted/`, never from `sha256/` or `staging/`.
+  at open and at least once a day while the container runs, under the lock, settles any record not
+  settled, then marks each record past its `purge_after` purged, appends `blob.purge`, and after
+  COMMIT deletes `deleted/<hash>` in a short block that holds the lock from its re-check that the
+  record is still purged through the delete, so a removal in between keeps its copy. The bytes go no
+  earlier than `purge_after`, and may go later by the time the container did not run. The pass also
+  deletes, through the store's own internal listing (§5) and under the lock, a `deleted/<hash>` that
+  no unpurged record names, after one more check: where something holds the address and `sha256/`
+  lacks it, as a restore of the state without the store may leave, the copy is first copied back to
+  `sha256/`, checked against its address. That is repair, never the return of a removed file.
+  The bytes go only from `deleted/`, never from `sha256/` or `staging/`.
 - **What the chain keeps.** Every entry naming the address stays, and `audit verify` passes
   unchanged: the chain hashes entries, never bytes (`events.md` §3, §4 invariant 4). Unless the same
   bytes were written again, the address then resolves nowhere, and `blob.purge` records why.
 - **Bounds.** Bytes there count toward no agent's bound and no person's 16 (`rest.md` §4.4). Only a
-  person's removal puts bytes there (an agent never tombstones), so an agent cannot fill it alone;
-  it holds at most what people removed of agents' unpromoted files within the days the key names,
-  each such file within its agent's bound while it was live.
-- **Bringing bytes back.** No route, tool or command reads or restores them. During the 30 days the
-  owner can reach them only by hand on the store itself, outside egzos, and that brings back bytes,
-  not the removed item. Whether egzos should bring a removed file back is the Chief's to rule (v0.7
-  §AN).
+  removal puts bytes there: by a person at the door, or with `egzos rm` and the owner `Token`; no
+  `client` principal removes (`rest.md` §4). It holds what was removed of such files within 30 days.
+- **Bringing bytes back.** No route, tool or command reads or restores them. Whether egzos should
+  bring a removed file back is the Chief's to rule (v0.7 §AN).
 
 The `BlobStore` methods for the move and the purge enter with this code, and so do the record's, on
-the `ContainerState` substrate and never delegated (F3), as §3.4's are.
+the `ContainerState` substrate and never delegated (F3), as §3.4's are, with a lookup of every item
+that names an address, tombstoned ones included, answered from an index on every backend, never a
+scan; a delegated `ItemStore` that cannot answer it does not conform (§2).
 
 ## 5 · Silence-not-errors at the storage boundary
 

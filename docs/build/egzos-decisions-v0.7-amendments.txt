@@ -1291,20 +1291,21 @@ AM. AMENDMENT — AN AGENT GETS WHAT ITS PERSON TICKS ON THE CONSENT SCREEN
 
 ================================================================================
 AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
-    DELETED BYTES FOR 30 DAYS (carries §AL (6); amends [0.3 · 44], and
-    by the operator's reading §Z's "nothing is deleted automatically
-    when a retention period ends", for those bytes alone; names two traces a1r asked for on §AL's
-    upload. storage.md §4; rest.md §4, §4.4, §4.6, §5; events.md §1;
+    DELETED BYTES FOR 30 DAYS (carries §AL (6); amends [0.3 · 44]; by
+    the operator's reading bends §Z's "nothing is deleted automatically
+    when a retention period ends" and events.md §2's "who acted", for
+    these bytes alone; names two traces a1r asked for on §AL's upload.
+    storage.md §4; rest.md §4, §4.4, §4.6, §5; events.md §1, §2;
     container.md §8; Egzos/egzos#405)
 ================================================================================
 
-[DECIDED] Decided by the Chief on 2026-11-27, and recorded in §AL (6) as
-          he gave it; enacted by the merge that records this section;
-          he may veto by reverting. The question as put to him: "When
-          you remove an agent's file that nobody promoted, its bytes are
-          deleted. This bends your 'kept bytes are never deleted' ruling
-          for those files only." His words: "3. delete and take to a
-          deleted bucket for 30 days."
+[DECIDED] Decided by the Chief on 2026-11-27, and recorded in §AL (6)
+          as he gave it; carried into the contracts by the merge that
+          records this section; he may veto by reverting. The question
+          as put to him: "When you remove an agent's file that nobody
+          promoted, its bytes are deleted. This bends your 'kept bytes
+          are never deleted' ruling for those files only." His words:
+          "3. delete and take to a deleted bucket for 30 days."
 
 [DECIDED] WHEN A PERSON REMOVES AN AGENT'S KEPT FILE THAT NO PERSON
           PROMOTED, ITS BYTES ARE DELETED BY WAY OF A PLACE FOR DELETED
@@ -1319,59 +1320,64 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
             deleted/<hash> under the blob root. No read path addresses
             it; no route, tool, grant, address or command reads, lists
             or serves it.
-          - Which bytes: those of an artifact kept from an agent's
-            upload (for a copy, as Trust judges one by its chain of
-            sources), that no person promoted, when nothing else holds
-            the address. An item not tombstoned holds it, whatever its
-            kind, writer or status, a quarantined one and a copy
-            included; so does an upload not discarded and not yet an
-            item. A removed item holds it too unless it is itself such
-            an agent's file, so a person's removed file and a removed
-            promoted file keep their bytes as [0.3 · 44] says. That is
-            narrower than §AL's reading ("no other live item, copy or
-            upload"), on purpose. The chain's entries naming the address
-            hold nothing.
+          - Which bytes: those of an artifact kept from an upload an
+            agent's Token opened, or of a copy an agent made of one,
+            that no person promoted, when nothing else holds the
+            address. A client container Token's file and a copy a person
+            made are not an agent's file here. An item not tombstoned
+            holds the address, whatever its kind, writer or status, a
+            quarantined one and a copy included. A removed item holds it
+            too unless it is itself such an agent's file, so a person's
+            removed file and a removed promoted file keep their bytes as
+            [0.3 · 44] says. An upload holds nothing: its bytes are in
+            staging. Both depart from §AL's reading ("no other live
+            item, copy or upload"): removed items now hold, uploads no
+            longer do. The chain's entries naming the address hold
+            nothing.
           - A person's own files, promoted files and staged bytes keep
             their rules word for word.
-          - The move is in the tombstone's atomic step: the bytes are
-            copied whole to the place, the address and its time are
-            recorded in the container's own state, and blob.delete is
-            appended. The promoted copy is deleted after the commit,
-            after a re-check that nothing holds it, as a promote's
-            staged copy is. A crash loses nothing and brings nothing
-            back: no promoted copy goes before its deleted copy is
-            whole, and a pass finishes from the records, never by
-            listing the promoted store.
-          - The same bytes written again while a deleted copy waits are
-            a fresh promoted copy that the deleted copy's end never
-            touches. One address removed twice is one deleted copy, its
-            30 days from the latest removal.
+          - The move runs no earlier than storage.md §3.6's rule that
+            every write path's put and promote run inside its block.
+            In the tombstone's atomic step the bytes are copied to the
+            place, whole, by the store's own copy or link where it has
+            one; the address and its purge_after are recorded in the
+            container's own state; and blob.delete is appended. A copy
+            that fails rolls the removal back. The promoted copy is
+            deleted after the commit, in a short block that holds the
+            lock from its re-check that nothing holds the address
+            through the delete, as a promote's staged copy is; that
+            block appends nothing. A pass finishes what a crash left,
+            from the records, never by listing the promoted store.
+          - One record per address. Removed again while it waits, the
+            address copies nothing; its purge_after moves to 30 days
+            from the latest removal. Times are the host's UTC clock
+            that stamps the chain.
           - When the 30 days end the bytes are deleted for good, the
             operator's reading of "for 30 days". This bends §Z's
             "nothing is deleted automatically when a retention period
             ends" for these bytes alone: the operator's call against
-            §Z's letter, his to veto, since §Z keeps what still waits on
-            a decision and these bytes a person has decided to remove.
-            A pass at open and once a day appends blob.purge and
-            deletes them from the place only. The days are
-            blobs.deleted_retention_days, 30 by default, which an admin
-            may lengthen, never shorten; it enters container.md §8 with
-            its code.
-          - blob.delete names the remover. blob.purge has no caller and
-            principal none is closed to six events, so it carries the
-            blob.delete's actor and principal. The chain verifies the
-            same once the bytes are gone, since it hashes entries, never
-            bytes.
+            §Z's letter, his to veto, since §Z keeps what still waits
+            on a decision and these bytes a person has decided to
+            remove. A pass at open and at least once a day appends
+            blob.purge and deletes them from the place only, no earlier
+            than their purge_after. The 30 days are fixed: no key
+            lengthens or shortens them.
+          - blob.delete names the remover. blob.purge has no caller,
+            and principal none is closed to six events, so it carries
+            the blob.delete's actor and principal; events.md §2 says
+            this is no act of theirs at the purge's time. The chain
+            verifies the same once the bytes are gone, since it hashes
+            entries, never bytes.
           - Bytes in the place count toward no agent's bound and no
-            person's 16. Only a person's removal puts them there, at
-            the door or with egzos rm (an agent never removes), so an
-            agent cannot fill it alone; it holds at most what people
-            removed of agents' unpromoted files in 30 days.
-          - The door answers a removal the same whether or not bytes
-            went to the place.
-          - No route, tool or command brings bytes back. During the 30
-            days the owner can reach them only by hand on the store,
-            and that brings back bytes, not the removed item.
+            person's 16. Only a removal puts them there: by a person at
+            the door, or with egzos rm and the owner Token; no client
+            principal removes.
+          - The door answers a removal with the same body whether or
+            not bytes went to the place, and item.tombstone is the
+            same; blob.delete shows it on the chain, as staged_deleted
+            and bytes_deleted already show deletes of staged bytes.
+          - No route, tool or command reads the place or brings bytes
+            back. Whether egzos should is the Chief's, below.
           - §AL's keep runs no earlier than this section's code, and the
             word files.agent waits on it too.
           - Two traces a1r asked for on §AL's upload: a PUT refused

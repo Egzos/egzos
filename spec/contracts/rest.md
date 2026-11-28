@@ -360,8 +360,9 @@ row and these bullets:
   claims only a deletion that happened (another item's promotion may have moved them already); a
   failure rolls the tombstone back with it. Promoted bytes are never deleted ([0.3 · 44]), but for
   an agent's kept file that no person promoted, whose bytes go to the place for deleted bytes
-  (`storage.md` §4; **decided**, v0.7 §AN), in this same step, with `blob.delete` (**a1p**, not
-  running). The answer and `item.tombstone` are the same whether or not bytes went there.
+  (`storage.md` §4; **decided**, the Chief, 2026-11-27, v0.7 §AL (6), §AN), in this same step, with
+  `blob.delete` (**a1p**, not running). The answer's body and `item.tombstone` are the same whether
+  or not bytes went there.
 - **Absent, uncovered, already tombstoned, quarantined, or without `organize`**: §3's refusal and
   §4's probe, the same for each.
 - **`egzos rm <id>`** tombstones an item no person has promoted, with the owner `Token` (`admin` over
@@ -1099,10 +1100,10 @@ storage (v0.7 §S).
    answers `429` with `{"error":"too_many_bytes"}`; an open whose `size` alone passes it is the
    same `400` as one past `upload_max_bytes`. Both caps and the open's record are one atomic step:
    of two concurrent opens that together pass either, at most one is recorded. A person makes room
-   by removing or promoting the agent's files (§4). Where no person promoted a removed file and
-   nothing else holds its bytes, they go to the place for deleted bytes for 30 days and are then
-   deleted for good (`storage.md` §4; **decided**, the Chief, 2026-11-27, v0.7 §AL (6), §AN;
-   **a1p**, what holds them and the end; not running). Item 3's keep runs no earlier than that
+   by removing or promoting the agent's files (§4). Where no person promoted a removed agent's
+   file and nothing else holds its bytes, they go to the place for deleted bytes for 30 days and
+   are then deleted for good (`storage.md` §4; **decided**, the Chief, 2026-11-27, v0.7 §AL (6),
+   §AN; **a1p**, what holds them and the end; not running). Item 3's keep runs no earlier than that
    clause's code (the operator's order). **decided**, that an agent's kept bytes have a limit (the
    Chief, 2026-11-26); **a1p**, the numbers, the counting and the answers; not running.
    The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
@@ -1118,9 +1119,10 @@ storage (v0.7 §S).
    appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`; a refused `PUT`
    answers `400` (`invalid_request`), a fact about the caller's own bytes, and a later `PUT` of the
    right bytes may still stage them. A `PUT` that arrives while another transfer to the upload is
-   running (item 2a) is refused `400` with `details.reason: receiving`, and stages nothing, and
-   appends `upload.put` (`outcome: refused`, `details.reason: receiving`) (v0.7 §AL, §AN; **a1p**,
-   not running).
+   running (item 2a) is refused `400` with `details.reason: receiving`, stages nothing, and
+   appends `upload.put` (`outcome: refused`, `details.reason: receiving`); while the transfer holds
+   the lock (`storage.md` §3.6), the later `PUT` waits for it and, past the bounded wait, answers
+   as `StorageBusy` does (v0.7 §AL, §AN; **a1p**, not running).
 2a. **The bytes' address** (v0.7 §AL; **a1p**, not running). `put_url` is the URL `<public
    origin>/v1/uploads/<id>?opener=<Token.id>&size=<n>&sha256=<hex>&expires_at=<UTC
    ISO-8601>&sig=<sig>`, to which the caller sends a `PUT`, each value percent-encoded, the origin
@@ -1165,10 +1167,9 @@ storage (v0.7 §S).
      forged one answer alike. Nothing after check 6 refuses for time but this: a transfer still
      running 900 seconds after its address's `expires_at` is cut off, staging nothing, with
      `upload.put` (`outcome: refused`, `details.reason: stalled`, so the audit tells it from a short
-     body; v0.7 §AN), and its mark is cleared. Check 7
-     refuses with `400`
-     (`invalid_request`), a fact about the bytes the holder sent, and leaves the upload's bytes
-     unarrived, so its opener may ask for a fresh address.
+     body; v0.7 §AN), and its mark is cleared. Check 7 refuses with `400` (`invalid_request`), a
+     fact about the bytes the holder sent, and leaves the upload's bytes unarrived, so its opener
+     may ask for a fresh address.
    - **On success** the bytes are staged as item 2 stages them, the bytes step is spent, and
      `upload.put` (`outcome: staged`) is appended, attributed to the opener. `200` `{"upload",
      "sha256"}` with §3's headers.
@@ -1204,8 +1205,8 @@ storage (v0.7 §S).
    `item.add`, and `blob.put` where promoted.
 
 **Nothing staged is deleted on a timer, and nothing staged goes untracked** (v0.7 §Z, amending R11's
-"30 days cold, then purge"). The place for deleted bytes is not staging, and holds only what a
-person removed (`storage.md` §4, v0.7 §AN):
+"30 days cold, then purge"). The place for deleted bytes is not staging, and holds only the bytes
+of removed files (`storage.md` §4, v0.7 §AN):
 
 - **An orphan** is an upload whose bytes were staged but which expired before an item was written. It
   is listed in `GET /v1/pending` under `"uploads": [{"upload", "name", "size", "sha256", "scope",
@@ -1400,10 +1401,8 @@ word's code runs.
   §AM): the read is not served without them.
   `files.agent` (v0.7 §AL) is named only once §4.4's address (item 2a), its keeping of an agent's
   artifact (item 3) and its bound on an agent's kept bytes, `storage.md` §4's place for deleted
-  bytes, and §4.7's file tools, all run: an agent
-  that finds it can save and read back files of any kind, each up to `upload_max_bytes`, through
-  the MCP door (**a1p**, not
-  running).
+  bytes, and §4.7's file tools, all run: an agent that finds it can save and read back files of any
+  kind, each up to `upload_max_bytes`, through the MCP door (**a1p**, not running).
 - **A container from before this route answers it with §3's refusal**, and a client reads that as
   none of the words: it offers none of those acts, rather than reading a later `404` on one as a
   refusal of the act.
