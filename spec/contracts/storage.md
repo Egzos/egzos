@@ -564,10 +564,12 @@ place for deleted bytes (below; v0.7 §AN).
 
 **When a person removes an agent's kept file that no person promoted, its bytes are deleted by way
 of a place for deleted bytes, and kept there 30 days.** **decided** (the Chief, 2026-11-27: "delete
-and take to a deleted bucket for 30 days", v0.7 §AL (6), §AN), amending [0.3 · 44], and v0.7 §Z's
-"nothing is deleted automatically when a retention period ends", for these bytes alone. §Z keeps
-everything still waiting on a decision; these bytes a person has already decided to remove. Every
-other clause below is **a1p**; none of it runs until its code lands (v0.7 §AN).
+and take to a deleted bucket for 30 days", v0.7 §AL (6), §AN), amending [0.3 · 44] for these bytes
+alone. That they are then deleted for good, which bends v0.7 §Z's "nothing is deleted automatically
+when a retention period ends" for these bytes alone, is the operator's reading of "for 30 days", his
+to veto: §Z keeps everything still waiting on a decision, and these bytes a person has already
+decided to remove. Every other clause below is **a1p**; none of it runs until its code lands (v0.7
+§AN).
 
 - **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get` and
   `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
@@ -581,8 +583,9 @@ other clause below is **a1p**; none of it runs until its code lands (v0.7 §AN).
   included; a tombstoned item naming it that does not meet (a) and (b), so a person's removed file
   and a removed promoted file keep their bytes as [0.3 · 44] says; and an upload, not discarded and
   not yet written as an item, that declared it. The audit chain's entries that name the address hold
-  nothing, nor do spent grants or addresses. A person's own files, promoted files and staged bytes
-  keep the rules above word for word.
+  nothing, nor do spent grants or addresses. Bytes held when their file is removed stay promoted, as
+  other promoted bytes do, and a holder that lapses later sends them nowhere. A person's own files,
+  promoted files and staged bytes keep the rules above word for word.
 - **The move, crash-safe.** Inside the tombstone's atomic step (§3.6) the bytes are copied, whole
   and checked against their address, to `deleted/<hash>`; the container's own state records the
   address with the time its 30 days run from; and `blob.delete` is appended (`events.md` §1). The
@@ -603,12 +606,12 @@ other clause below is **a1p**; none of it runs until its code lands (v0.7 §AN).
   listing (§5). The days are `blobs.deleted_retention_days` (`container.md` §8). The bytes go only
   from `deleted/`, never from `sha256/` or `staging/`.
 - **What the chain keeps.** Every entry naming the address stays, and `audit verify` passes
-  unchanged: the chain hashes entries, never bytes (`events.md` §3, §4 invariant 4). The address
-  then resolves nowhere, and `blob.purge` records why.
+  unchanged: the chain hashes entries, never bytes (`events.md` §3, §4 invariant 4). Unless the same
+  bytes were written again, the address then resolves nowhere, and `blob.purge` records why.
 - **Bounds.** Bytes there count toward no agent's bound and no person's 16 (`rest.md` §4.4). Only a
   person's removal puts bytes there (an agent never tombstones), so an agent cannot fill it alone;
-  it holds at most what people removed of agents' unpromoted files in the last 30 days, each such
-  file within its agent's bound while it was live.
+  it holds at most what people removed of agents' unpromoted files within the days the key names,
+  each such file within its agent's bound while it was live.
 - **Bringing bytes back.** No route, tool or command reads or restores them. During the 30 days the
   owner can reach them only by hand on the store itself, outside egzos, and that brings back bytes,
   not the removed item. Whether egzos should bring a removed file back is the Chief's to rule (v0.7

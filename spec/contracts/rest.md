@@ -359,9 +359,9 @@ row and these bullets:
   nothing else holds). The bytes are deleted inside the same lock, before the entry, so the entry
   claims only a deletion that happened (another item's promotion may have moved them already); a
   failure rolls the tombstone back with it. Promoted bytes are never deleted ([0.3 · 44]), but for
-  an agent's kept file that no person promoted, whose bytes go to the place for deleted bytes in
-  this same step, with `blob.delete` (`storage.md` §4; **decided**, v0.7 §AN; not running). The
-  answer and `item.tombstone` are the same whether or not bytes went there.
+  an agent's kept file that no person promoted, whose bytes go to the place for deleted bytes
+  (`storage.md` §4; **decided**, v0.7 §AN), in this same step, with `blob.delete` (**a1p**, not
+  running). The answer and `item.tombstone` are the same whether or not bytes went there.
 - **Absent, uncovered, already tombstoned, quarantined, or without `organize`**: §3's refusal and
   §4's probe, the same for each.
 - **`egzos rm <id>`** tombstones an item no person has promoted, with the owner `Token` (`admin` over

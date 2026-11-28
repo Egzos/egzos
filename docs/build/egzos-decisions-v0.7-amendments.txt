@@ -1290,9 +1290,9 @@ AM. AMENDMENT — AN AGENT GETS WHAT ITS PERSON TICKS ON THE CONSENT SCREEN
 
 ================================================================================
 AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
-    DELETED BYTES FOR 30 DAYS (carries §AL (6); amends [0.3 · 44] and
-    §Z's "nothing is deleted automatically when a retention period ends"
-    for those bytes alone; names two traces a1r asked for on §AL's
+    DELETED BYTES FOR 30 DAYS (carries §AL (6); amends [0.3 · 44], and
+    by the operator's reading §Z's "nothing is deleted automatically
+    when a retention period ends", for those bytes alone; names two traces a1r asked for on §AL's
     upload. storage.md §4; rest.md §4, §4.4, §4.6, §5; events.md §1;
     container.md §8; Egzos/egzos#405)
 ================================================================================
@@ -1307,9 +1307,8 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
 
 [DECIDED] WHEN A PERSON REMOVES AN AGENT'S KEPT FILE THAT NO PERSON
           PROMOTED, ITS BYTES ARE DELETED BY WAY OF A PLACE FOR DELETED
-          BYTES, AND KEPT THERE 30 DAYS. This amends [0.3 · 44] and §Z
-          for these bytes alone. §Z keeps what still waits on a
-          person's decision; these bytes a person has decided to remove.
+          BYTES, AND KEPT THERE 30 DAYS. This amends [0.3 · 44] for
+          these bytes alone.
 
           THE OPERATOR'S BINDING, which the Chief did not decide and may
           veto clause by clause (each is marked a1p in the contracts,
@@ -1347,11 +1346,16 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
             touches. One address removed twice is one deleted copy, its
             30 days from the latest removal.
           - When the 30 days end the bytes are deleted for good, the
-            operator's reading of "for 30 days": a pass at open and once
-            a day appends blob.purge and deletes them from the place
-            only. The days are blobs.deleted_retention_days, 30 by
-            default, which an admin may lengthen, never shorten; it
-            enters container.md §8 with its code.
+            operator's reading of "for 30 days". This bends §Z's
+            "nothing is deleted automatically when a retention period
+            ends" for these bytes alone: the operator's call against
+            §Z's letter, his to veto, since §Z keeps what still waits on
+            a decision and these bytes a person has decided to remove.
+            A pass at open and once a day appends blob.purge and
+            deletes them from the place only. The days are
+            blobs.deleted_retention_days, 30 by default, which an admin
+            may lengthen, never shorten; it enters container.md §8 with
+            its code.
           - blob.delete names the remover. blob.purge has no caller and
             principal none is closed to six events, so it carries the
             blob.delete's actor and principal. The chain verifies the
