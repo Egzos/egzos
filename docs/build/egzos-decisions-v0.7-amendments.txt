@@ -1032,7 +1032,8 @@ AL. AMENDMENT — AN APPROVED AGENT SAVES AND READS EVERY KIND OF FILE
             to these contracts; keep's code runs no earlier (the
             operator's order). Until then promoted bytes are never
             deleted ([0.3 · 44]) and a removed file's bytes stay until
-            the owner's later purge. (Now carried by §AN.)
+            the owner's later purge. §AN is that change, and keep now
+            waits on §AN's code.
           - Over stdio, a door with no public origin carries a file only
             up to the one-call limit: there is no address it can hand
             out. The operator's call against ruling (1), which the hosted
