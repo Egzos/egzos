@@ -64,7 +64,7 @@ _GRANT_FIELDS = frozenset(BlobGrant.__annotations__)
 ADDRESS_FIELDS = ("upload", *ADDRESS_QUERY)
 _UPLOAD_ISO = "%Y-%m-%dT%H:%M:%SZ"
 #: A size as one decimal writes it: no sign, no space, no leading zero, ASCII digits only, so one
-#: signature has one URL.
+#: descriptor has one signed form.
 _SIZE = re.compile(r"0|[1-9][0-9]*")
 
 
@@ -264,7 +264,8 @@ class TrustEngine:
         """Item 2a check 2: `sig` verifies under the container key, in constant time. Only the
         six fields, each a string, and `size` in its one decimal form; anything else is False."""
         key = self._key()
-        if (key is None or set(address) != set(ADDRESS_FIELDS)
+        if (key is None or not isinstance(address, Mapping)
+                or set(address) != set(ADDRESS_FIELDS)
                 or not all(_text(v) for v in address.values())
                 or not _SIZE.fullmatch(address["size"])):
             return False

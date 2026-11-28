@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
@@ -111,7 +112,7 @@ def test_a_grant_and_an_address_with_the_same_field_values_get_different_hmacs(c
     assert TrustEngine._sign(grant, _key(c)) != address["sig"]
 
 
-# -- one signature, one URL ----------------------------------------------------------------------
+# -- one descriptor, one signed form -------------------------------------------------------------
 @pytest.mark.parametrize("size", ["01234", "+1234", " 1234", "1234 ", "1234\n", "1_234",
                                   "１２３４", "1234.0", "-0", ""])
 def test_a_size_not_in_its_one_decimal_form_never_verifies_even_when_signed(c, size):
@@ -128,10 +129,34 @@ def test_an_address_of_other_fields_or_values_never_verifies(c):
     for field in ("upload", "opener", "sha256", "expires_at"):
         assert not c.trust.verify_address({**address, field: address[field] + "0"})
         assert not c.trust.verify_address({**address, field: address[field] + "\ud800"})
+    for not_a_mapping in (None, 1234, list(address)):
+        assert not c.trust.verify_address(not_a_mapping)  # type: ignore[arg-type]
+
+
+def test_only_the_exact_sig_verifies(c):
+    address = c.trust.address(_open(c), c.bot)
+    sig = address["sig"]
+    for other in ("", sig[:8], sig[:-1], sig.upper(), sig[:8] + "0" * 56):
+        assert not c.trust.verify_address({**address, "sig": other}), other
+
+
+def test_a_grant_verifies_only_with_a_grants_own_fields(c):
+    key = _key(c)
+    grant: BlobGrant = {"sha256": SHA, "item": "i", "token": "t",
+                        "expires_at": _utc(T0 + 300), "sig": ""}
+    grant["sig"] = TrustEngine._sign(grant, key)
+    assert c.trust.verify_grant(grant)
+    extra = {**grant, "use": "upload", "sig": ""}
+    extra["sig"] = TrustEngine._sign(extra, key)
+    assert not c.trust.verify_grant(extra)  # type: ignore[arg-type]
 
 
 # -- issue -------------------------------------------------------------------------------------
 def test_an_address_lives_900_seconds_and_none_is_issued_with_less_left_on_the_upload(c):
+    _last_address_at_the_uploads_end(c)
+
+
+def _last_address_at_the_uploads_end(c):
     record = _open(c)  # live for an hour from T0
     last = T0 + 3600 - UPLOAD_ADDRESS_LIFETIME_SECONDS
     c.trust.clock = lambda: last
@@ -147,9 +172,34 @@ def test_only_the_opener_holding_remember_on_a_waiting_upload_is_given_an_addres
     assert c.trust.address(record, c.owner) is None
     assert c.trust.address({**record, "discarded": True}, c.bot) is None
     assert c.trust.address({**record, "staged": True}, c.bot) is None
+    assert c.trust.address({**record, "actor": "someone-else"}, c.bot) is None
+    assert c.trust.address({**record, "item": "01JZZZZZZZZZZZZZZZZZZZZZZZ"}, c.bot) is None
+    assert c.trust.address({**record, "scope": "no-such-node"}, c.bot) is None
+    assert c.trust.address({**record, "expires_at": "not a time"}, c.bot) is None
     reader = _client(c, "reader")
     assert c.trust.address(_open(c, reader), reader) is None  # no `remember`
     assert c.trust.address(record, c.bot) is not None
+
+
+def test_an_opener_must_cover_the_uploads_scope_and_be_live_now(c):
+    scoped = c.auth.mint(principal="client", owner="bot", client="probe", role="contributor",
+                         scopes=[c.p.id], actor=OWNER, by_principal="interactive")
+    record = _open(c, scoped)
+    assert c.trust.address(record, scoped) is not None
+    q = c.nodes.create("project", "q", c.nodes.user_root(), token=c.owner, **KW)
+    assert c.trust.address({**record, "scope": q.id}, scoped) is None  # not covered
+    assert c.auth.revoke(scoped.id, **KW)
+    assert c.trust.address(record, c.backend.get_token(scoped.id)) is None
+
+
+def test_the_uploads_end_is_read_in_utc_whatever_the_local_zone(c, monkeypatch):
+    monkeypatch.setenv("TZ", "America/Los_Angeles")
+    time.tzset()
+    try:
+        _last_address_at_the_uploads_end(c)
+    finally:
+        monkeypatch.undo()
+        time.tzset()
 
 
 def test_a_key_that_is_not_32_bytes_issues_no_address(c):
