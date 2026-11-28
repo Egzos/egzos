@@ -68,16 +68,22 @@ def test_an_upload_is_its_persons_whichever_principal_opens_it(c):
 
 @pytest.mark.parametrize("pair", [("alice", "a1"), ("a1", "a2")])
 def test_two_principals_of_one_person_never_both_take_the_last_slot(tmp_path, pair):
+    """Alice's open takes a slot at once; an agent's upload takes one when its bytes are staged,
+    so the race is her open against an agent's bytes, or two agents' bytes."""
     first = Container(tmp_path)
     first.owner = first.init()
     people = _people(first)
     node = first.nodes.user_root()
     for _ in range(MAX_HELD - 1):
         first.uploads.open(people["alice"], scope=node, **SHAPE)
+    data = b"x"
+    waiting = {name: first.uploads.open(people[name], scope=node, name="n", mime="a/b", size=1,
+                                        sha256=hashlib.sha256(data).hexdigest())["id"]
+               for name in pair if name != "alice"}
     took: list[bool] = []
     gate = threading.Barrier(2)
 
-    def race(token):
+    def race(name):
         box = Container(tmp_path)
         count = box.uploads.holds
 
@@ -87,13 +93,16 @@ def test_two_principals_of_one_person_never_both_take_the_last_slot(tmp_path, pa
 
         box.uploads.holds = slow
         gate.wait()
+        if name in waiting:
+            took.append(box.uploads.put(people[name], waiting[name], data) == "staged")
+            return
         try:
-            box.uploads.open(token, scope=node, **SHAPE)
+            box.uploads.open(people[name], scope=node, **SHAPE)
             took.append(True)
         except TooManyUploads:
             took.append(False)
 
-    threads = [threading.Thread(target=race, args=(people[name],)) for name in pair]
+    threads = [threading.Thread(target=race, args=(name,)) for name in pair]
     for t in threads:
         t.start()
     for t in threads:

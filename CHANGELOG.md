@@ -85,6 +85,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   good once, for five minutes. Over stdio with no `identity.origin` no grant is asked for, an
   agent's file is served with no `download` until its person promotes it, and `egzos_fetch` still
   carries none.
+- **File names, and an agent's uploads with no bytes yet** (`rest.md` §4.4 item 1, §4.6, v0.7 §AL;
+  #405): an upload's open refuses a name holding a control, line-separator or bidi-control
+  character with `400`, before any lookup, and the owner's local add of a file does the same. An
+  agent's upload holds no slot of its person's 16 until its bytes arrive; an agent holds at most 4
+  such uploads, a 5th open answering `429` `too_many_uploads`, and its bytes are refused with that
+  `429` while its person holds 16, the upload staying open to try again. `GET /v1/limits` and
+  `egzos_limits` name the 4 as `agent_uploads_held_max`.
 
 - **Files through the MCP door, in the contract** (`rest.md` §4.4, §4.6, §4.7, v0.7 §AL; #405): an
   agent saves a file of up to 128 KiB in one call (`egzos_add_file`), or a file of any kind up to

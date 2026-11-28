@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: LicenseRef-PolyForm-Strict-1.0.0
 """rest.md §4.6: `GET /v1/limits` tells any valid token, an agent's included, the contract's
 version, the words for what this door serves beyond release 0.2.0, and the upload limits; it reads
-two config keys and one constant, and appends one read."""
+two config keys and two constants, and appends one read."""
 
 from __future__ import annotations
 
@@ -21,7 +21,8 @@ from egzos.store.uploads import MAX_HELD
 
 ISSUER = "https://project.supabase.co/auth/v1"
 KW = {"actor": OWNER, "principal": "interactive"}
-KEYS = {"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}
+KEYS = {"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max",
+        "agent_uploads_held_max"}
 
 
 @pytest.fixture
@@ -79,7 +80,7 @@ def test_every_valid_token_reads_what_the_door_serves_and_the_read_is_recorded(
     assert r.status_code == 200 and set(r.json()) == KEYS
     assert r.json() == {"contract": "1.1", "features": ["terminals.machine", "grants.own"],
                         "upload_max_bytes": 100 * 1024 * 1024, "inline_max_bytes": 64 * 1024,
-                        "uploads_held_max": 16}
+                        "uploads_held_max": 16, "agent_uploads_held_max": 4}
     read = c.ledger.tail(1)[-1]
     assert (read["event"], read["actor"], read["principal"], read["subject"], read["scope"]) == (
         "context.fetch", actor, principal, None, None)

@@ -10,8 +10,10 @@ staged until a person promotes it. The bytes and the item are two spends of one 
 check-and-mark. Nothing staged is deleted on a timer (v0.7 §Z): an upload that expired with its
 bytes staged is an orphan, listed to its opener, an agent's to the person it serves, and to an admin
 until one of them discards it. What a person holds is capped once for them and every agent serving
-them (v0.7 §AC). A person's tombstone of the item is the other decision: it frees the slot, and
-deletes the staged bytes no other upload or staged item, a copy included, still holds (rest.md §4).
+them (v0.7 §AC); an agent's opens with no bytes yet are its own to count, and hold no slot until
+its bytes arrive, which its person's cap may refuse (v0.7 §AL). A person's tombstone of the item
+is the other decision: it frees the slot, and deletes the staged bytes no other upload or staged
+item, a copy included, still holds (rest.md §4).
 """
 
 from __future__ import annotations
@@ -31,13 +33,16 @@ from egzos.ledger import Ledger
 from egzos.model import ContextItem, Node, Token
 from egzos.store.blobs import BlobStore
 from egzos.store.items import Store
+from egzos.store.nodes import valid_filename
 
 #: §4.4 item 2: an upload's id is live for an hour after it is opened.
 UPLOAD_TTL_SECONDS = 3600
 #: §4.4 item 1: uploads a person may hold open, orphaned, or written but still staged, counting
 #: every agent serving them; a container `Token` is a person of its own.
 MAX_HELD = 16
-NAME_MAX = 255
+#: §4.4 item 1: uploads a `client` principal may hold open with no bytes arrived; these hold no
+#: slot of its person's `MAX_HELD` (v0.7 §AL).
+AGENT_BYTELESS_MAX = 4
 MIME_MAX = 127
 #: A `type/subtype` token (RFC 6838's restricted names), no parameters.
 _MIME = re.compile(r"[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*/[A-Za-z0-9][A-Za-z0-9!#$&^_.+-]*")
@@ -52,7 +57,8 @@ class Promoted(Exception):
 
 
 class TooManyUploads(Exception):
-    """§4.4 item 1: the caller's person already holds `MAX_HELD` uploads. A fact about their own."""
+    """§4.4 item 1: the caller's person already holds `MAX_HELD` uploads, or a `client` caller
+    already holds `AGENT_BYTELESS_MAX` with no bytes. A fact about their own."""
 
 
 def person_of(principal: str, actor: str) -> str | None:
@@ -76,9 +82,10 @@ def person_of(principal: str, actor: str) -> str | None:
 
 
 def valid_open(name: Any, mime: Any, size: Any, sha256: Any, *, limit: int) -> bool:
-    """§4.4 item 1's shape, checked before any lookup: the same answer for every container."""
+    """§4.4 item 1's shape, checked before any lookup: the same answer for every container. The
+    name's character rule is the one a place's name keeps (`valid_filename`)."""
     return (
-        isinstance(name, str) and 1 <= len(name) <= NAME_MAX
+        valid_filename(name)
         and isinstance(mime, str) and len(mime) <= MIME_MAX and _MIME.fullmatch(mime) is not None
         and isinstance(size, int) and not isinstance(size, bool) and 0 <= size <= limit
         and isinstance(sha256, str) and _DIGEST.fullmatch(sha256) is not None
@@ -117,12 +124,29 @@ class Uploads:
 
     def holds(self, record: UploadRecord) -> bool:
         """Whether `record` takes one of its person's `MAX_HELD` slots: open, orphaned, or written
-        as an artifact whose bytes are still staged. A person's decision frees a slot."""
+        as an artifact whose bytes are still staged. A person's decision frees a slot. A `client`
+        principal's upload whose bytes have not arrived holds none (`byteless`); a record with no
+        `client` field was opened before that rule and counts as it always did."""
         if record["discarded"]:
             return False
         if record["item"] is None:
+            if record.get("client") and not record["staged"]:
+                return False
             return record["staged"] or not self.expired(record)
         return self._staged_item(record) is not None
+
+    def byteless(self, record: UploadRecord) -> bool:
+        """Whether `record` is one of its `client` opener's `AGENT_BYTELESS_MAX`: live, not
+        discarded, and no bytes arrived."""
+        return (bool(record.get("client")) and not record["discarded"] and not record["staged"]
+                and not self.expired(record))
+
+    def _person_full(self, record: UploadRecord) -> bool:
+        """Whether the person `record`'s opener serves already holds `MAX_HELD` uploads."""
+        mine = person_of(record["principal"], record["actor"])
+        held = [r for r in self.backend.list_uploads()
+                if person_of(r["principal"], r["actor"]) == mine and self.holds(r)]
+        return len(held) >= MAX_HELD
 
     def orphan(self, record: UploadRecord) -> bool:
         return (not record["discarded"] and record["staged"] and record["item"] is None
@@ -159,14 +183,17 @@ class Uploads:
             "item": None,
             "promoted": False,
             "discarded": False,
+            "client": token.principal == "client",
         }
-        mine = person_of(token.id, token.owner)
         with self.backend.atomic():
-            # Counted for the person and written under one lock: two concurrent opens never both
-            # take slot 16, whichever of that person's principals make them.
-            held = [r for r in self.backend.list_uploads()
-                    if person_of(r["principal"], r["actor"]) == mine and self.holds(r)]
-            if len(held) >= MAX_HELD:
+            # Counted and written under one lock: two concurrent opens never both take slot 16,
+            # whichever of that person's principals make them, nor a `client` caller's 4th. A
+            # `client` caller's open takes no slot, so it counts its own uploads alone.
+            if record["client"]:
+                own = [r for r in self.backend.list_uploads(principal=token.id) if self.byteless(r)]
+                if len(own) >= AGENT_BYTELESS_MAX:
+                    raise TooManyUploads
+            elif self._person_full(record):
                 raise TooManyUploads
             self.backend.put_upload(record)
         return record
@@ -180,11 +207,28 @@ class Uploads:
         return record
 
     # -- 2 · bytes ------------------------------------------------------------------------------
+    def turned_away(self, token: Token, upload_id: str) -> bool:
+        """§4.4 item 1, before a byte of the body is read: a `client` principal's byteless upload
+        is refused its bytes while its person holds `MAX_HELD`, appending `upload.put` (`refused`,
+        `too_many_uploads`). `put` counts again under its lock."""
+        with self.backend.atomic():
+            record = self.live(token, upload_id)
+            if (record is None or not record.get("client") or record["staged"]
+                    or not self._person_full(record)):
+                return False
+            self._put_entry(token, record, {"outcome": "refused", "reason": "too_many_uploads"})
+        return True
+
+    def _put_entry(self, token: Token, record: UploadRecord, details: dict[str, Any]) -> None:
+        self.ledger.append("upload.put", actor=token.owner, principal=token.principal,
+                           subject=record["id"], scope=record["scope"], size=record["size"],
+                           sha256=record["sha256"], **details)
+
     def put(self, token: Token, upload_id: str, data: bytes | None) -> str | None:
         """Stage the bytes of a live upload of the caller's; `data` is None when what arrived was
-        not `size` bytes. Returns `staged` or the refusal's reason (`already`, `length`, `hash`),
-        each recorded by `upload.put`; None, and nothing appended, if the id is not the caller's
-        live upload."""
+        not `size` bytes. Returns `staged` or the refusal's reason (`already`, `too_many_uploads`,
+        `length`, `hash`), each recorded by `upload.put`; None, and nothing appended, if the id is
+        not the caller's live upload."""
         digest = BlobStore.digest(data) if data is not None else None
         with self.backend.atomic():
             record = self.live(token, upload_id)
@@ -193,17 +237,16 @@ class Uploads:
             reason = None
             if record["staged"]:
                 reason = "already"
+            elif record.get("client") and self._person_full(record):
+                reason = "too_many_uploads"  # §4.4 item 1: its person's 16, counted again here
             elif data is None or len(data) != record["size"]:
                 reason = "length"
             elif digest != record["sha256"]:
                 reason = "hash"
             elif not self.backend.spend_upload(upload_id, "bytes"):
                 reason = "already"
-            details: dict[str, Any] = {"outcome": "staged"} if reason is None else {
-                "outcome": "refused", "reason": reason}
-            self.ledger.append("upload.put", actor=token.owner, principal=token.principal,
-                               subject=upload_id, scope=record["scope"], size=record["size"],
-                               sha256=record["sha256"], **details)
+            self._put_entry(token, record, {"outcome": "staged"} if reason is None else {
+                "outcome": "refused", "reason": reason})
             if reason is None:
                 self.backend.put_upload({**record, "staged": True})
                 assert data is not None

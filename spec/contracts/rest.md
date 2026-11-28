@@ -421,7 +421,7 @@ the row does not name is `400` (§3).
 | `POST /v1/scopes` | `{"type", "name", "parent"?}` | `{"node": <node>}` |
 | `PATCH /v1/items/{id}` | `{"name", "confirm"?}` | `{"item": <item>}` (§4.5); a verified or promoted item's: `{"result": "confirm", …, "renames"}` (§4.2) first |
 | `PATCH /v1/scopes/{id}` | `{"name", "confirm"?}` | `{"result": "confirm", …, "renames"}` (§4.2), then `{"node": <node>}` (§4.5) |
-| `GET /v1/limits` | — | `{"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max"}`, and `"agent_kept_max_bytes"`, `"agent_uploads_held_max"`, `"file_call_max_bytes"` once v0.7 §AL's code runs (§4.6) |
+| `GET /v1/limits` | — | `{"contract", "features", "upload_max_bytes", "inline_max_bytes", "uploads_held_max", "agent_uploads_held_max"}`, and `"agent_kept_max_bytes"`, `"file_call_max_bytes"` once v0.7 §AL's code runs (§4.6) |
 | `GET /v1/pending` | — | `{"items": [<item>], "proposals": [<proposal>]}` |
 
 - **`<item>`** is a `ContextItem` per `context-item.md` §1, unknown fields included, returned as
@@ -1072,7 +1072,8 @@ storage (v0.7 §S).
    `size` is the file's length in bytes, `sha256` the SHA-256 of exactly those bytes as 64
    lowercase hex characters, and `mime` carries no parameters (v0.7 §AL; **a1p**, the wording).
    **A file's name holds no control, line-separator or bidi-control character** (v0.7 §AL;
-   **a1p**, not running): no character of category Cc, Zl or Zp and none with the Bidi_Control
+   **a1p**; running at an upload's open, not running in the MCP tools): no character of category
+   Cc, Zl or Zp and none with the Bidi_Control
    property, on every surface that sets an artifact's `content.filename`: an upload's open, the
    MCP tools, and an item's rename (§4.5, **a1p**, not running), each answering a name that breaks
    it with §3's `400` before any lookup, or `invalid_request` in a tool. A name is display data
@@ -1081,14 +1082,16 @@ storage (v0.7 §S).
    surface escapes (above; §4.7's banner).
    **An agent's byteless opens are its own to count** (v0.7 §AL, amending §AC's count for these
    alone: **decided**, the Chief, 2026-11-27, that they hold no slot, at most 4 an agent; **a1p**,
-   the rest; not running). A `client` principal's upload whose bytes have not arrived holds no
+   the rest; running). A `client` principal's upload whose bytes have not arrived holds no
    slot of its person's 16. A `client` principal holds at most 4 such uploads, and a 5th open
    answers `429` with `{"error":"too_many_uploads"}`; since a person holds at most 16 live agent
    registrations (§4.3), their agents hold at most 64, and a client container `Token` holds its
    own 4. Once its bytes are staged, it holds one of its person's 16, as v0.7 §AC counts a
    person's agents, and as an orphan it is its person's to see and discard (below).
-   **Its bytes are refused while its person holds 16** (**a1p**, keeping the cap above; not
-   running): a transfer to it is admitted (item 2) only where its person holds fewer than 16, and
+   **Its bytes are refused while its person holds 16** (**a1p**, keeping the cap above; running
+   on item 2's route, counted before a byte of the body is read and again under the lock; not
+   running on item 2a's, nor as one step with item 2's admission): a transfer to it is admitted
+   (item 2) only where its person holds fewer than 16, and
    the step that records its staged bytes counts the 16 again, under the lock; a running transfer
    holds no slot, its bytes not having arrived. Where either count finds 16 it answers `429` with
    `{"error":"too_many_uploads"}` and §3's headers, as a 17th open does, stages nothing, and the
@@ -1434,8 +1437,9 @@ with `{"name", "confirm"?}` → `{"node": <node>}`. The place is a `project` or 
 
 `GET /v1/limits`, to any valid token, a `client` principal's included, and over MCP as
 `egzos_limits` (§4.7, **running**) → `{"contract", "features": [<word>], "upload_max_bytes",
-"inline_max_bytes", "uploads_held_max"}`, and, once v0.7 §AL's code runs, `"agent_kept_max_bytes"`,
-`"agent_uploads_held_max"` and `"file_call_max_bytes"` beside them (**a1p**, not running). **a1p**
+"inline_max_bytes", "uploads_held_max", "agent_uploads_held_max"}`, and, once v0.7 §AL's code runs,
+`"agent_kept_max_bytes"` and `"file_call_max_bytes"` beside them (**a1p**; running for
+`agent_uploads_held_max`, not running for the other two). **a1p**
 (v0.7
 §AK; #360), **running**, its `features` naming `terminals.machine` and `grants.own` until another
 word's code runs.
@@ -1443,9 +1447,9 @@ word's code runs.
 - `upload_max_bytes` and `inline_max_bytes` are `blobs.upload_max_bytes` and
   `blobs.inline_max_bytes` as they stand (`container.md` §8), and `uploads_held_max` is §4.4's 16:
   facts about the caller's own container and no secret, so a client says "too big" before it opens
-  an upload. `agent_kept_max_bytes` is `blobs.agent_kept_max_bytes` as it stands,
-  `agent_uploads_held_max` §4.4 item 1's 4, and `file_call_max_bytes` §4.7's 131,072 (**a1p**, not
-  running). **It is a read of config keys and
+  an upload. `agent_uploads_held_max` is §4.4 item 1's 4 (**a1p**, running);
+  `agent_kept_max_bytes` is `blobs.agent_kept_max_bytes` as it stands, and `file_call_max_bytes`
+  §4.7's 131,072 (**a1p**, not running). **It is a read of config keys and
   constants, not a config surface**: it sets nothing and serves no other key, and config stays on
   the CLI (§4.4).
 - `contract` is the contract set's version (`README.md`), `"1.1"` today. `features` names, one word each and in

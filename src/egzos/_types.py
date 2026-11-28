@@ -897,6 +897,7 @@ class UploadRecord(TypedDict):
     item: str | None  # the item written from it (the item step spent)
     promoted: bool  # its item's bytes were promoted at once: a person's (§4.4 item 3)
     discarded: bool
+    client: NotRequired[bool]  # a `client` principal opened it; absent, read as false (§4.4 item 1)
 
 
 class UploadState(Protocol):

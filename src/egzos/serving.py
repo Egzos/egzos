@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any
 from egzos._types import CONTRACT_VERSION, DoorFeature
 from egzos.model import VERIFIED_ONLY_KINDS, ContextItem, Node, Token
 from egzos.store.find import shown
-from egzos.store.uploads import MAX_HELD
+from egzos.store.uploads import AGENT_BYTELESS_MAX, MAX_HELD
 
 if TYPE_CHECKING:
     from egzos.container import Container
@@ -34,6 +34,7 @@ def limits(c: Container, token: Token) -> dict[str, Any]:
         "upload_max_bytes": c.config_value("blobs.upload_max_bytes"),
         "inline_max_bytes": c.config_value("blobs.inline_max_bytes"),
         "uploads_held_max": MAX_HELD,
+        "agent_uploads_held_max": AGENT_BYTELESS_MAX,
     }
 
 

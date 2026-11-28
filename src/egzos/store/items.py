@@ -21,7 +21,7 @@ from egzos.ledger import Ledger
 from egzos.model import KINDS, ContextItem, Node, Token, now_iso
 from egzos.store.autotitle import DegradedTitler, Titler
 from egzos.store.blobs import BlobStore
-from egzos.store.nodes import NodeService, capture_name
+from egzos.store.nodes import NodeService, capture_name, valid_filename
 
 
 class StoreError(Exception):
@@ -99,6 +99,8 @@ class Store:
 
         content: dict[str, Any] = {}
         if file is not None:
+            if not valid_filename(Path(file).name):  # rest.md §4.4 item 1's character rule
+                raise StoreError("a file's name holds a control, line-separator or bidi character")
             data = Path(file).read_bytes()
             sha = self.blobs.put(data)
             mime = mimetypes.guess_type(str(file))[0] or "application/octet-stream"

@@ -109,8 +109,9 @@ LIMITS = (
     "Read the limits in force at this container, as `GET /v1/limits` serves them: `contract`, the "
     "contract's version; `features`, the words for what this door serves beyond release 0.2.0; "
     "`upload_max_bytes`, the largest file in bytes; `inline_max_bytes`, the largest text file "
-    "whose text rides in an item; `uploads_held_max`, how many uploads a person holds at once. It "
-    "takes no arguments and reads no item."
+    "whose text rides in an item; `uploads_held_max`, how many uploads a person holds at once; "
+    "`agent_uploads_held_max`, how many uploads an agent holds open before their bytes arrive. "
+    "It takes no arguments and reads no item."
 )
 
 #: rest.md §4.7: the JSON types an argument is read as, exactly. `type(value) is` and never

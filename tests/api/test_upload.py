@@ -165,6 +165,7 @@ def test_an_agents_artifact_stays_staged_until_a_person_promotes_it(c, door, not
     {"name": ""}, {"name": "x" * 256}, {"mime": "text"}, {"mime": "text/plain; charset=utf-8"},
     {"mime": "a/" + "b" * 126}, {"size": -1}, {"size": True}, {"size": "3"},
     {"sha256": "ABC"}, {"sha256": "0" * 63}, {"extra": 1},
+    {"name": 7}, {"name": None}, {"name": True}, {"name": ["a"]},
 ])
 def test_an_open_of_the_wrong_shape_is_400(c, door, notes, over):
     r = _open(door, c.owner, notes.id, **over)
@@ -220,26 +221,34 @@ def test_an_agents_staged_artifacts_hold_their_slots_until_a_person_decides(c, d
         uid = _upload(door, agent, notes.id, data=b"%d" % n)
         items.append(_item(door, agent, uid).json()["item"]["id"])
     c.clock.now += UPLOAD_TTL_SECONDS * 2
-    assert _open(door, agent, notes.id).status_code == 429
+    uid = _open(door, agent, notes.id).json()["upload"]  # with no bytes, it holds no slot
+    r = door.put(f"/v1/uploads/{uid}", headers=_auth(agent), content=DATA)
+    assert (r.status_code, r.content) == (429, b'{"error":"too_many_uploads"}')
     c.trust.promote(c.store.get(items[0]), token=c.owner, actor=OWNER)
-    assert _open(door, agent, notes.id).status_code == 200
+    assert door.put(f"/v1/uploads/{uid}", headers=_auth(agent), content=DATA).status_code == 200
 
 
 def test_a_person_and_every_agent_serving_them_share_one_sixteen(c, door, notes, sign):
     alice, a1, a2 = sign("alice"), sign("alice", "a1"), sign("alice", "a2")
-    opened = [_open(door, (alice, a1, a2)[n % 3], notes.id) for n in range(MAX_HELD)]
-    assert {r.status_code for r in opened} == {200}
-    for h in (alice, a1, a2):
-        r = _open(door, h, notes.id)
+    # Alice's opens hold slots at once, her agents' once their bytes are staged.
+    held = []
+    for n in range(MAX_HELD):
+        h = (alice, a1, a2)[n % 3]
+        held.append(_open(door, h, notes.id).json()["upload"] if h is alice
+                    else _upload(door, h, notes.id, data=b"%d" % n))
+    r = _open(door, alice, notes.id)
+    assert (r.status_code, r.content) == (429, b'{"error":"too_many_uploads"}')
+    w1, w2 = (_open(door, h, notes.id).json()["upload"] for h in (a1, a2))
+    for h, uid in ((a1, w1), (a2, w2)):
+        r = door.put(f"/v1/uploads/{uid}", headers=h, content=DATA)
         assert (r.status_code, r.content) == (429, b'{"error":"too_many_uploads"}')
     # Another person, and a container token, count apart.
     assert _open(door, sign("bob"), notes.id).status_code == 200
     assert _open(door, c.owner, notes.id).status_code == 200
     # A slot one agent of theirs frees, any of their principals may take.
-    held = opened[1].json()["upload"]  # a1's
-    assert door.delete(f"/v1/uploads/{held}", headers=a1).status_code == 200
-    assert _open(door, a2, notes.id).status_code == 200
-    assert _open(door, a1, notes.id).status_code == 429
+    assert door.delete(f"/v1/uploads/{held[1]}", headers=a1).status_code == 200  # a1's
+    assert door.put(f"/v1/uploads/{w2}", headers=a2, content=DATA).status_code == 200
+    assert door.put(f"/v1/uploads/{w1}", headers=a1, content=DATA).status_code == 429
 
 
 def test_two_concurrent_opens_never_both_take_the_last_slot(tmp_path):
