@@ -71,7 +71,7 @@ drift a reader resolves by guessing.
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 | `identity.credential` | a confirm credential is added or removed, or the attempt is refused: `op: add · remove`, `outcome`, `reason` (`rest.md` §4.3); never key material | running |
-| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, and once `rest.md` §4.4 item 2a's code runs `receiving · stalled` (`rest.md` §4.4) | running |
+| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, and once `rest.md` §4.4 items 2 and 2a's code runs `receiving · stalled · too_many_transfers · too_many_uploads` (`rest.md` §4.4) | running |
 | `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
 **Entering with their code** (`rest.md` §4.5, v0.7 §AK; `storage.md` §4, v0.7 §AN; **a1p**, not
@@ -83,7 +83,7 @@ name is:
 |---|---|---|
 | `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `from`, `name` |
 | `node.rename` | a person renames a place | the node · its parent · `type`, `from`, `name` |
-| `blob.delete` | an agent's kept file no person promoted is removed, in the tombstone's atomic step, and its bytes are in the place for deleted bytes with their record; the promoted copy's later deletion appends nothing, and the address may still resolve where a later write holds it | the `sha256` · the item's scope · `item`, `tombstone` (the `item.tombstone`'s `seq`), `purge_after` (UTC, 30 days after the removal; a later removal of the same address moves it) |
+| `blob.delete` | an agent's kept file no person promoted is removed, in the tombstone's atomic step, and its bytes are in the place for deleted bytes with their record; the later deletion of its copy in the promoted store appends nothing, and the address may still resolve where a later write holds it | the `sha256` · the item's scope · `item`, `tombstone` (the `item.tombstone`'s `seq`), `purge_after` (UTC, 30 days after the removal; a later removal of the same address moves it) |
 | `blob.purge` | bytes are deleted for good from the place for deleted bytes, their `purge_after` passed | the `sha256` · null · `delete` (the `seq` of the latest `blob.delete` of the address, which finishes the earlier ones) |
 
 A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader escapes

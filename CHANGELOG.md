@@ -102,6 +102,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The upload's readings, settled** (`rest.md` §2, §4.4, §4.7, `storage.md` §3.5, §4, `events.md`
+  §1; a note under v0.7 §AN): an agent's bytes are refused while its person holds 16, counted at
+  admission and again when they are recorded; each transfer is admitted before its body is read,
+  one at a time per opener, two per person and one for the person's agents together
+  (`too_many_transfers`), and a bearer transfer is cut off 1800 seconds after admission; an
+  address's last step does not re-check the upload's hour, and its check 6 refuses an opener
+  granted again since its issue; `size` is signed only as its decimal string; bytes staged before
+  the lock carry a name of the transfer's own; spent records are kept at least 900 seconds. Not
+  running until the code lands, but where marked.
+
 - **The provider's scopes, corrected** (`rest.md` §4.3; a note under v0.7 §AM): the sign-in provider
   accepts a fifth scope word, `offline_access`, beside `openid`, `email`, `profile` and `phone`. It
   decides nothing a client receives: the provider hands a client a refresh token with or without

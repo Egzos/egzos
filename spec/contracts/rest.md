@@ -106,8 +106,9 @@ own.
    redemption route (§6). **a1p** for the rest of this item, reading `authorization-server.md`
    §11.0 and §12.1 onto this door. **Wherever this item says redemption, it means §6's redemption
    or the use of §4.4 item 2a's upload address**, whose descriptor's opener is the token that keys
-   the third bucket, with the address's own checks for §6's; an address refused at its check 7
-   counts in no bucket and appends what item 2a says (v0.7 §AL; **a1p**, not running):
+   the third bucket, with the address's own checks for §6's; an address refused at its check 7,
+   at its admission (§4.4 item 2) or on item 1's 16 at its last step counts in no bucket and
+   appends what item 2 or 2a says (v0.7 §AL; **a1p**, not running):
    - **What counts:** what a sweep looks like, and nothing else: every `401` answer, and every
      redemption whose descriptor fails §6's check 1 or 2. **decided** (the Chief on #141,
      2026-10-09). A redemption refused at check 3 or later is a refusal of a *verified* descriptor,
@@ -1086,6 +1087,12 @@ storage (v0.7 §S).
    registrations (§4.3), their agents hold at most 64, and a client container `Token` holds its
    own 4. Once its bytes are staged, it holds one of its person's 16, as v0.7 §AC counts a
    person's agents, and as an orphan it is its person's to see and discard (below).
+   **Its bytes are refused while its person holds 16** (**a1p**, keeping the cap above; not
+   running): a transfer to it is admitted (item 2) only where its person holds fewer than 16, and
+   the step that records its staged bytes counts the 16 again, under the lock; a running transfer
+   holds no slot, its bytes not having arrived. Where either count finds 16 it answers `429` with
+   `{"error":"too_many_uploads"}` and §3's headers, as a 17th open does, stages nothing, and the
+   upload stays byteless and may be tried again once a slot frees.
    **An agent's kept bytes are bounded** (v0.7 §AL). The bound is `blobs.agent_kept_max_bytes`
    (default 1073741824, 1 GiB; an `admin` may change it; the key enters `container.md` §8 and
    `_types.py` with the code that reads it). It is counted over the uploads that agent's `Token.id`
@@ -1119,16 +1126,41 @@ storage (v0.7 §S).
    appends `context.fetch` with `items: []`. `200` `{"upload": <id>, "sha256"}`; a refused `PUT`
    answers `400` (`invalid_request`), a fact about the caller's own bytes, and a later `PUT` of the
    right bytes may still stage them. A `PUT` that arrives while another transfer to the upload is
-   running (item 2a) is refused `400` with `details.reason: receiving`, stages nothing, and
+   running (by either route) is refused `400` with `details.reason: receiving`, stages nothing, and
    appends `upload.put` (`outcome: refused`, `details.reason: receiving`); while the transfer holds
    the lock (`storage.md` §3.6), the later `PUT` waits for it and, past the bounded wait, answers
-   as `StorageBusy` does (v0.7 §AL, §AN; **a1p**, not running).
+   as `StorageBusy` does (v0.7 §AL, §AN; **a1p**, not running), appending nothing: like every
+   `503` it wrote nothing, the upload stands as it was, and the same bytes may be sent again.
+   **Each transfer is admitted before a byte of its body is read** (v0.7 §AL; **a1p**, not
+   running), on both routes, in one atomic step that counts and takes its read (on item 2's route
+   with its receiving mark; on item 2a's after check 6, its mark already set). Counting this
+   transfer, its opener reads 1 body at this door, its person (counted as item 1 counts the 16)
+   reads at most 2, and the `client` principals serving that person read at most 1 between them,
+   so a person's own transfer always has a read no agent of theirs can take; and item 1's 16 hold
+   for a `client` principal's upload. A transfer past a read limit answers `429` with
+   `{"error":"too_many_transfers"}` and §3's headers, a fact about the caller's own transfers and
+   its person's, stages nothing, clears its mark, leaves the upload's bytes unarrived, and appends
+   `upload.put` (`outcome: refused`, `details.reason: too_many_transfers`); one past the 16 does
+   the same but answers as item 1 says, with `details.reason: too_many_uploads`. Neither counts
+   in any bucket. A transfer's read is its receiving mark once admitted: a mark set at item 2a's
+   check 5 is no read until its admission takes one, and an admission counts only admitted marks.
+   The read is held while the mark is, and freed when the mark is cleared or lapses. A mark lapses
+   at a time written with it: on item 2a's route its cut-off; on this route 1800 seconds after its
+   admission, when the transfer is cut off as item 2a's is, staging nothing, with `upload.put`
+   (`outcome: refused`, `details.reason: stalled`). A lapsed mark is no read, and no transfer runs
+   under it, whether or not the process that set it still runs. A limit the door sets on every
+   body at once is applied only after these, and admits more than one person's reads, so no one
+   opener or person fills it.
 2a. **The bytes' address** (v0.7 §AL; **a1p**, not running). `put_url` is the URL `<public
    origin>/v1/uploads/<id>?opener=<Token.id>&size=<n>&sha256=<hex>&expires_at=<UTC
    ISO-8601>&sig=<sig>`, to which the caller sends a `PUT`, each value percent-encoded, the origin
    `identity.md` §2's, `expires_at`
    written as §6 writes it, and `sig` an HMAC-SHA256 under §6's container key over `canonical` JSON
-   (`events.md` §3) of `{"use": "upload", "upload", "opener", "size", "sha256", "expires_at"}`. The
+   (`events.md` §3) of `{"use": "upload", "upload", "opener", "size", "sha256", "expires_at"}`,
+   every value a JSON string: `size` is signed as its decimal string, ASCII digits with no sign,
+   space or leading zero (`0` alone excepted), and the parameter is well-formed at check 1 only
+   in that one form, so one descriptor has one signed message and no signer reads `size` as a
+   number. The
    `use` field is in no `BlobGrant`, so no grant's `sig` verifies as an address and no address's
    as a grant (running in Trust's signing and verification; no route issues or redeems an
    address yet). Where the container names no `identity.origin` and the request came over stdio, or
@@ -1152,37 +1184,66 @@ storage (v0.7 §S).
      descriptor, `/mcp` included: **it is never a bearer for anything else**. It delivers exactly
      the declared bytes to that one upload. It reads nothing, lists nothing, writes no item and
      discards nothing. Like §6's redemption, §2 reads no bearer on it (§2 items 5 and 7).
-   - **The checks, in this order, each taken on arrival:** (1) every parameter is present and
-     well-formed; (2) `sig` verifies, compared in constant time; then §2 item 7's per-token bucket
-     for the opener is read, and while it holds the address gets §3's refusal, is not spent and
-     appends nothing; (3) `expires_at` has not passed; (4) the address has not been spent, and this
-     arrival spends it, whatever the later checks decide, atomically, as §6's check 4 spends a
+   - **The checks, in this order, each taken on arrival:** (1) every parameter is present exactly
+     once and well-formed; (2) `sig` verifies, compared in constant time; then §2 item 7's per-token
+     bucket for the opener is read, and while it holds the address gets §3's refusal, is not spent
+     and appends nothing; (3) `expires_at` has not passed; (4) the address has not been spent, and
+     this arrival spends it, whatever the later checks decide, atomically, as §6's check 4 spends a
      grant, in §6's spent records (`storage.md` §3.5); (5) the upload exists and is not discarded,
      its opener is the descriptor's, it is live, its `size` and `sha256` are the descriptor's, its
-     bytes have not arrived, and no transfer to it is running, by either route; it is then marked
-     as receiving, atomically, until this transfer is staged, refused or cut off; (6) the opener is
+     bytes have not arrived, and no transfer to it is running, by either route; it is then marked as
+     receiving, atomically, until this transfer is staged, refused or cut off; (6) the opener is
      live and still holds `remember` on the upload's scope, checked now, and read once, before the
-     bytes, as item 2 reads its caller once, the two routes matching on purpose; (7) the
-     bytes, read only up to `size`, are exactly `size` long and hash to `sha256`. Checks 1 to 6
-     refuse with §3's refusal, byte-identical whichever failed: a second use, a late use and a
-     forged one answer alike. Nothing after check 6 refuses for time but this: a transfer still
-     running 900 seconds after its address's `expires_at` is cut off, staging nothing, with
-     `upload.put` (`outcome: refused`, `details.reason: stalled`, so the audit tells it from a short
-     body; v0.7 §AN), and its mark is cleared. Check 7 refuses with `400` (`invalid_request`), a
-     fact about the bytes the holder sent, and leaves the upload's bytes unarrived, so its opener
-     may ask for a fresh address.
+     bytes, as item 2 reads its caller once, the two routes matching on purpose; as §6's check 5
+     reads its token, an agent's registration or a person's grant written since the address's issue
+     (its `expires_at` less 900 seconds) is not the one it named, so an opener revoked and granted
+     again since is refused here, and may ask for a fresh address for the same upload;
+     (7) the bytes, read only up to `size`, are exactly `size` long and hash to `sha256`. Checks
+     1 to 6 refuse with §3's refusal, byte-identical whichever failed: a second use, a late use
+     and a forged one answer alike. A check 5 or a last step that waits past the bounded wait
+     answers as `StorageBusy` does, appending nothing; the address is spent, and its opener may
+     ask for a fresh one. Between checks 6 and 7 the transfer is admitted as item 2 says, its
+     answers there being item 2's; an address refused there is spent, and its opener may ask for a
+     fresh one. Nothing after check 6 refuses for time but this: a transfer still running 900
+     seconds after its address's `expires_at` is cut off, staging nothing, with `upload.put`
+     (`outcome: refused`, `details.reason: stalled`, so the audit tells it from a short body; v0.7
+     §AN), and its mark is cleared. The upload's own hour is not checked again: the step that
+     records the staged bytes, under the lock, re-checks only that the upload is not discarded and
+     that the mark is still this transfer's, so an upload whose hour passes during its transfer
+     still gets its bytes, and is an orphan (below) if no item is written; on item 2's route that
+     step also checks again that its id is live. That step refusing on these is check 5's refusal,
+     answered and traced as a refusal at check 5 is (below); refusing on item 1's 16, on either
+     route, it answers, appends and counts as an admission past the 16 does (item 2), in no bucket.
+     Check 7 refuses with `400` (`invalid_request`), a fact about the bytes the holder sent, and
+     leaves the upload's bytes unarrived, so its opener may ask for a fresh address. **Nothing
+     staged goes untracked** (v0.7 §Z): where a transfer stages its bytes before the lock is taken,
+     on either route, it stages them in `staging/` under a name of its own that no address takes,
+     moved to their address in the step that records them; where that step refuses, or the transfer
+     ends without reaching it, that copy alone is deleted, appending nothing of its own, since the
+     upload is not discarded, and no bytes at the shared address are touched. A copy a crash leaves
+     is deleted by the open-time sweep (`storage.md` §3.6, §4) once no live mark names its transfer.
    - **On success** the bytes are staged as item 2 stages them, the bytes step is spent, and
      `upload.put` (`outcome: staged`) is appended, attributed to the opener. `200` `{"upload",
      "sha256"}` with §3's headers.
    - **Traces.** Where `sig` verifies, a refusal at checks 3 to 6 appends `context.fetch` with
      `items: []`, the failed check in `details`, attributed to the opener, and counts toward its
-     per-token bucket, as §6's refused redemption does; a refusal at check 7 appends `upload.put`
+     per-token bucket, as §6's refused redemption does. Its `ref` is the upload's id. No entry the
+     address route appends, `context.fetch` or `upload.put`, carries the address's `sig`, its
+     `expires_at` or `put_url`; each names the upload by its id (**a1p**, not running). An address
+     replayed after its spend is refused at check 4 each time it arrives, appending its
+     `context.fetch` and counting in its opener's bucket, as a replayed grant does; once that
+     bucket holds, the replay, the opener's own downloads (§6) and the use of its other addresses
+     are refused at the bucket's read, appending nothing, until its window closes (§2 item 7); a
+     refusal at check 7 appends `upload.put`
      (`outcome: refused`, `details.reason`: `length` or `hash`), as item 2's does, and counts in no
-     bucket. A refusal at check 1, or where `sig` does not verify, is counted by the `rest` throttle
-     and tallied under `forged` (§2 item 7). **No log and no entry keeps an address**: its spent
+     bucket, as a refusal at its admission does (item 2). A refusal at check 1, or where `sig` does
+     not verify, is counted by the `rest` throttle and tallied under `forged` (§2 item 7). **No log
+     and no entry keeps an address**: its spent
      record is its
      `sig`'s sha256 and its `expires_at`, and the door writes neither the address nor its query to
-     any log.
+     any log. `put_url` is carried only by the answers that hand it out (item 1's open, the
+     address route and the tools that mirror them): no error body, no probe's `ref` and no orphan
+     row of `GET /v1/pending` carries it (**a1p**, not running).
 3. **Item.** `POST /v1/items` with `{"kind": "artifact", "upload": <id>, "scope"?, "key"?, "tags"?}`
    writes the item, `unverified` like every write. The id must be the caller's own, staged, and not yet
    itemised; `scope`, when given, must equal the upload's; otherwise §3's refusal. Bytes and item are two
@@ -1488,8 +1549,10 @@ before `expires_at`; a `404` from `put_url` means one call to `egzos_upload_addr
 address, or to `egzos_upload_finish` where that answers `upload not found`, and a wait before
 trying again; a `400` means the bytes did not match `size` or `sha256`; `too_big` from an open
 means no tool saves that file, and the caller tells its person the size and the limit;
-`too_many_uploads` means finish or discard its own uploads; `too_many_bytes` means its person
-makes room by removing or promoting its files; `egzos_get` returns a text file up to
+`too_many_uploads` means finish or discard its own uploads; a `429` from `put_url` means a fresh
+address after a wait, once its own or its person's other transfers end (`too_many_transfers`) or
+its person frees a slot (`too_many_uploads`); `too_many_bytes` means its person makes room by
+removing or promoting its files; `egzos_get` returns a text file up to
 `inline_max_bytes` in `content`, with no `download`, and a `download.url` is fetched once by the
 caller's own code with no bearer; a file answered `"served": false` is kept, waits for its person
 and is served back once its person promotes it.
@@ -1528,13 +1591,20 @@ and is served back once its person promotes it.
      of a request.
   2. `remember` on `scope`, which is required, as at `POST /v1/uploads`; otherwise the write's
      §3 answer. A place the caller's terms do not cover is refused, never held.
-  3. §4.4 item 1's caps, counted as the route counts them.
+  3. §4.4 item 1's caps, counted as the route counts them, and, until item 3's keep runs, a
+     `client` principal's file among its person's 16 at once, its item staged, since its bytes
+     arrive with the call (§4.4 item 1); once keep runs, the file holds no slot. The call reads no
+     upload body at the door, so it takes no read (§4.4 item 2).
   4. The container computes `size` and `sha256` from the decoded bytes; where the caller gave
      `sha256`, the bytes must hash to it, otherwise `invalid_request` and nothing is written. The
      upload record, the item and their entries commit together in the container's database or not
-     at all, and the bytes are promoted only once that commit is made: a call that fails leaves no
+     at all, and the bytes are promoted in that block, as `storage.md` §3.6 runs every `promote`'s
+     copy, their staged copy deleted only once it commits: a call that fails leaves no
      upload, no slot taken and no entry but §4's probe, and discards the bytes it staged, as an
-     upload's discard does, so nothing it wrote goes untracked (v0.7 §Z).
+     upload's discard does, so nothing it staged goes untracked (v0.7 §Z); a copy in the promoted
+     store that a failed commit leaves names no item and is never served (`storage.md` §3.6), and
+     is deleted after the failed block, in a short block of its own that first re-checks, under the
+     lock, that nothing holds the address, as §3.6 deletes a `promote`'s staged copy.
 
   `scope` in the answer is answered as `egzos_remember` answers it: the resolved path to a
   principal holding `fetch`, the caller's own argument otherwise (§4.1 item 8). A caller whose own

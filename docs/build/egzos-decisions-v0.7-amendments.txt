@@ -1402,6 +1402,67 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
             stalled, not length, so the audit tells it from a short
             body.
 
+[NOTE]    2026-11-28, the operator: readings of §AL's upload and of
+          this section, settled before their code is built; the
+          Chief decided nothing here, and each is a1p, his to veto
+          as the rest of the binding. rest.md §2 item 7, §4.4 and
+          §4.7, storage.md §3.5 and §4, and events.md §1 carry them.
+          - An agent's bytes are refused while its person holds 16,
+            with the answer a 17th open gets, the upload staying
+            byteless: counted when the transfer is admitted, and
+            again in the locked step that records the bytes. §AL
+            (5) took an upload with no bytes yet out of the 16; that
+            a transfer still running is such an upload, holding no
+            slot, is the operator's reading. This keeps his cap on
+            staged bytes (§AC, §AL (5)); the other reading, 16 plus
+            4 an agent, would change it and is not taken. Until
+            item 3's keep runs, egzos_add_file counts an agent's
+            file among the 16 at once, its bytes arriving with the
+            call.
+          - Each transfer is admitted before its body is read.
+            Counting it, its opener reads one body at this door,
+            its person two at most, and the person's agents one at
+            most between them, so an agent never takes the person's
+            last read; only admitted marks count. These come ahead
+            of any limit on the whole door. Past them, 429
+            too_many_transfers and an upload.put with that reason.
+            Such a refusal counts in no bucket, as a refusal at
+            check 7 does: the operator's reading of rest.md §2 item
+            7, not the Chief's. The bearer route's mark lapses 1800
+            seconds after admission, the transfer cut off as
+            stalled, so no read is held without end. How bodies are
+            read (streamed or whole) waits on a later change.
+          - After check 6 only the cut-off refuses for time: the
+            address's last step does not re-check the upload's hour.
+            The bearer route keeps its re-check.
+          - Check 6 takes rest.md §6's rule: a grant or registration
+            written since the address's issue is not the one it
+            named. The upload survives, and a fresh address may be
+            asked for, so the rule costs its opener one request.
+          - size is signed as its decimal string, in one form only,
+            and each parameter is present once.
+          - Bytes staged before the lock are staged under a name of
+            the transfer's own and deleted alone when it is refused,
+            or by the open-time sweep after a crash, so nothing
+            staged goes untracked (§Z) and no other transfer's bytes
+            are touched. A refusal on the 16 at the last step counts
+            in no bucket, as one at admission does.
+          - A refused address's entries name the check and the
+            upload, never the address; put_url is in no error body,
+            probe or orphan row; a replayed address counts in its
+            opener's bucket each time until the bucket holds.
+          - Every spent record is kept at least 900 seconds, now a
+            clause, not a status marker.
+          - egzos_add_file promotes in its block, as storage.md §3.6
+            runs every promote, rather than after the commit; a copy
+            a failed call leaves in the promoted store is deleted
+            after the same re-check §3.6 makes.
+          - Notes from the review of this section: the repair copy
+            to sha256/ appends nothing, and the text says why; a PUT
+            answered as busy appends nothing, on either route; and
+            "promoted" is kept for a person's act, the bytes being
+            "in the promoted store".
+
 
 ================================================================================
 SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
