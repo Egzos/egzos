@@ -1165,7 +1165,7 @@ storage (v0.7 §S).
      forged one answer alike. Nothing after check 6 refuses for time but this: a transfer still
      running 900 seconds after its address's `expires_at` is cut off, staging nothing, with
      `upload.put` (`outcome: refused`, `details.reason: stalled`, so the audit tells it from a short
-   body; v0.7 §AN), and its mark is cleared. Check 7
+     body; v0.7 §AN), and its mark is cleared. Check 7
      refuses with `400`
      (`invalid_request`), a fact about the bytes the holder sent, and leaves the upload's bytes
      unarrived, so its opener may ask for a fresh address.
