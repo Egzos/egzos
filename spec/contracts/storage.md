@@ -545,10 +545,9 @@ external boundary (§5). **a1p**, the `bool`: the record fixes who sees the resu
 `True`.
 
 **Deletion. [0.3 · 44]** v1.0 **never deletes promoted bytes** behind a tombstoned item: the audit
-chain keeps referring to the address. The one exception is an agent's kept file that no person
-promoted, whose bytes go to the place for deleted bytes (below; v0.7 §AN). **Staged bytes are
-never purged on a timer** (v0.7 §Z, amending R11): past `blobs.staging_retention_days` (30 by
-default, `container.md` §8) they are surfaced to their owner, who promotes the item or tombstones it, and only a tombstone — or the discard of an
+chain keeps referring to the address. **Staged bytes are never purged on a timer** (v0.7 §Z, amending
+R11): past `blobs.staging_retention_days` (30 by default, `container.md` §8) they are surfaced to
+their owner, who promotes the item or tombstones it, and only a tombstone — or the discard of an
 orphaned upload — deletes staged bytes (`rest.md` §4.4), through `discard`, which never touches
 `sha256/`. Staging is content-addressed, so two uploads of the same bytes share one staged copy:
 the caller deletes it only when no other live upload or staged item holds that address. **The
@@ -557,50 +556,52 @@ open-time sweep (§3.6) is no purge**: it finishes the deletes committed acts al
 lists `staging/` through the store's own internal listing, which is no `BlobStore` method and no
 reader's (§5), and deletes, under the lock, only addresses that no live upload or staged item
 holds. **a1p** (#341); not running (#342). An owner
-purge act for promoted bytes is `[v1.1]`: the record defers it to the v1.1 boundary.
+purge act for promoted bytes is `[v1.1]`: the record defers it to the v1.1 boundary. The one
+exception to [0.3 · 44] is an agent's kept file that no person promoted, whose bytes go to the
+place for deleted bytes (below; v0.7 §AN).
 
 ### The place for deleted bytes
 
 **When a person removes an agent's kept file that no person promoted, its bytes are deleted by way
-of a place for deleted bytes, and kept there 30 days.** **decided** (the Chief, 2026-11-27:
-"delete and take to a deleted bucket for 30 days", v0.7 §AL (6), §AN), amending [0.3 · 44], and
-v0.7 §Z's "nothing is deleted automatically when a retention period ends", for these bytes alone. §Z keeps
+of a place for deleted bytes, and kept there 30 days.** **decided** (the Chief, 2026-11-27: "delete
+and take to a deleted bucket for 30 days", v0.7 §AL (6), §AN), amending [0.3 · 44], and v0.7 §Z's
+"nothing is deleted automatically when a retention period ends", for these bytes alone. §Z keeps
 everything still waiting on a decision; these bytes a person has already decided to remove. Every
 other clause below is **a1p**; none of it runs until its code lands (v0.7 §AN).
 
-- **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get`
-  and `exists` never address it, and no route, tool, grant, address or command line verb reads,
-  lists or serves it.
-- **Which bytes.** The bytes of an artifact item go there in the act that tombstones it
-  (`rest.md` §4) where (a) it was kept from an agent's upload, the upload's record saying so (§4
-  above), or, for a copy, the record its chain of sources first reaches, as Trust reads it
-  (`rest.md` §6 item 2); (b) no person promoted it or any item on that chain
-  (`provenance.approved_by` absent); and (c) nothing else holds its address. **Holds**, for an
-  address in `sha256/`: an item not tombstoned whose `content.sha256` names it, of whatever kind,
-  writer or status, a quarantined item and a copy included; a tombstoned item naming it that does
-  not meet (a) and (b), so a person's removed file and a removed promoted file keep their bytes as
-  [0.3 · 44] says; and an upload, not discarded and not yet written as an item, that declared it.
-  The audit chain's entries that name the address hold nothing, nor do spent grants or addresses.
-  A person's own files, promoted files and staged bytes keep the rules above word for word.
+- **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get` and
+  `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
+  serves it.
+- **Which bytes.** The bytes of an artifact item go there in the act that tombstones it (`rest.md`
+  §4) where (a) it was kept from an agent's upload, the upload's record saying so (§4 above), or,
+  for a copy, the record its chain of sources first reaches, as Trust reads it (`rest.md` §6 item
+  2); (b) no person promoted it or any item on that chain (`provenance.approved_by` absent); and (c)
+  nothing else holds its address. **Holds**, for an address in `sha256/`: an item not tombstoned
+  whose `content.sha256` names it, of whatever kind, writer or status, a quarantined item and a copy
+  included; a tombstoned item naming it that does not meet (a) and (b), so a person's removed file
+  and a removed promoted file keep their bytes as [0.3 · 44] says; and an upload, not discarded and
+  not yet written as an item, that declared it. The audit chain's entries that name the address hold
+  nothing, nor do spent grants or addresses. A person's own files, promoted files and staged bytes
+  keep the rules above word for word.
 - **The move, crash-safe.** Inside the tombstone's atomic step (§3.6) the bytes are copied, whole
   and checked against their address, to `deleted/<hash>`; the container's own state records the
   address with the time its 30 days run from; and `blob.delete` is appended (`events.md` §1). The
-  promoted copy is deleted after COMMIT, as §3.6 deletes a `promote`'s staged copy, in a short
-  block that first re-checks that nothing holds the address. A crash before COMMIT leaves an
-  unrecorded copy in `deleted/`, which is never read; a crash after it leaves a promoted copy that
-  the open-time sweep deletes after the same re-check, taking it only from the records, never by
-  listing `sha256/`. No promoted copy is deleted before its deleted copy is whole.
+  promoted copy is deleted after COMMIT, as §3.6 deletes a `promote`'s staged copy, in a short block
+  that first re-checks that nothing holds the address. A crash before COMMIT leaves an unrecorded
+  copy in `deleted/`, which is never read; a crash after it leaves a promoted copy that the pass
+  below deletes after the same re-check, finding it only from the records, never by listing
+  `sha256/`. No promoted copy is deleted before its deleted copy is whole.
 - **The same bytes again.** A write of the same bytes while a deleted copy waits makes a fresh
   promoted copy, which the re-check keeps, and the deleted copy's purge never touches it. The same
   address removed again while a copy waits leaves one deleted copy, its 30 days counted from the
   latest removal.
 - **After 30 days it is deleted for good.** A pass of its own, unlike the staging sweep above, run
-  at open and once a day while the container runs, under the lock, marks each record past its time purged, appends `blob.purge`, and after COMMIT
-  deletes `deleted/<hash>` in a short block that first re-checks the record is still purged, so a
-  removal in between keeps its copy. It also deletes what `deleted/` holds with no record or a
-  purged one, through the store's own internal listing (§5). The days are
-  `blobs.deleted_retention_days` (`container.md` §8). The bytes go only from `deleted/`, never
-  from `sha256/` or `staging/`.
+  at open and once a day while the container runs, under the lock, marks each record past its time
+  purged, appends `blob.purge`, and after COMMIT deletes `deleted/<hash>` in a short block that
+  first re-checks the record is still purged, so a removal in between keeps its copy. It also
+  deletes what `deleted/` holds with no record or a purged one, through the store's own internal
+  listing (§5). The days are `blobs.deleted_retention_days` (`container.md` §8). The bytes go only
+  from `deleted/`, never from `sha256/` or `staging/`.
 - **What the chain keeps.** Every entry naming the address stays, and `audit verify` passes
   unchanged: the chain hashes entries, never bytes (`events.md` §3, §4 invariant 4). The address
   then resolves nowhere, and `blob.purge` records why.
@@ -608,13 +609,13 @@ other clause below is **a1p**; none of it runs until its code lands (v0.7 §AN).
   person's removal puts bytes there (an agent never tombstones), so an agent cannot fill it alone;
   it holds at most what people removed of agents' unpromoted files in the last 30 days, each such
   file within its agent's bound while it was live.
-- **Bringing bytes back.** No route, tool or command reads or restores them. During the 30 days
-  the owner can reach them only by hand on the store itself, outside egzos, and that brings back
-  bytes, not the removed item. Whether egzos should bring a removed file back is the Chief's to
-  rule (v0.7 §AN).
+- **Bringing bytes back.** No route, tool or command reads or restores them. During the 30 days the
+  owner can reach them only by hand on the store itself, outside egzos, and that brings back bytes,
+  not the removed item. Whether egzos should bring a removed file back is the Chief's to rule (v0.7
+  §AN).
 
-The `BlobStore` methods for the move and the purge enter with this code, and so do the record's,
-on the `ContainerState` substrate and never delegated (F3), as §3.4's are.
+The `BlobStore` methods for the move and the purge enter with this code, and so do the record's, on
+the `ContainerState` substrate and never delegated (F3), as §3.4's are.
 
 ## 5 · Silence-not-errors at the storage boundary
 
