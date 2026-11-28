@@ -28,6 +28,7 @@ from egzos.backends.base import malformed
 from egzos.container import Container
 from egzos.model import Token
 from egzos.places import children, granted
+from egzos.serving import limits
 from egzos.store.items import BODY_KINDS, StoreError
 from egzos.store.nodes import AmbiguousRef
 
@@ -87,6 +88,45 @@ INBOX = (
     "egzos_fetch, its thread as `scope`. Only an agent given the inbox or the whole cloud can "
     "read it."
 )
+LIMITS = (
+    "Read the limits in force at this container, as `GET /v1/limits` serves them: `contract`, the "
+    "contract's version; `features`, the words for what this door serves beyond release 0.2.0; "
+    "`upload_max_bytes`, the largest file in bytes; `inline_max_bytes`, the largest text file "
+    "whose text rides in an item; `uploads_held_max`, how many uploads a person holds at once. It "
+    "takes no arguments and reads no item."
+)
+
+#: rest.md §4.7: the JSON types an argument is read as, exactly. `type(value) is` and never
+#: `isinstance`, so a boolean is never an integer; no float, string or boolean is ever coerced.
+_JSON_TYPES: dict[str, type] = {"string": str, "integer": int, "boolean": bool, "null": type(None)}
+
+
+#: The schema keys `exact` reads or that bind nothing; never a bound such as `enum` or `pattern`.
+_READ_KEYS = {"type", "items", "anyOf", "default", "title", "description"}
+
+
+def known(schema: dict[str, Any]) -> bool:
+    """Whether `exact` reads every form in an argument's schema, a bound on its value refused. A
+    tool `build` serves whose arguments it cannot read is refused, so it is held to this reading."""
+    if not schema.keys() <= _READ_KEYS:
+        return False
+    if "anyOf" in schema:
+        return all(known(s) for s in schema["anyOf"])
+    if schema.get("type") == "array":
+        return known(schema.get("items", {}))
+    return schema.get("type") in _JSON_TYPES
+
+
+def exact(schema: dict[str, Any], value: Any) -> bool:
+    """rest.md §4.7: whether `value` is of the JSON type its schema names, read exactly: an
+    integer is never a string, a boolean or a float, and a string is never a null, a list or an
+    object. An array's every element is read the same way."""
+    if "anyOf" in schema:
+        return any(exact(s, value) for s in schema["anyOf"])
+    if schema.get("type") == "array":
+        return type(value) is list and all(exact(schema.get("items", {}), v) for v in value)
+    wanted = _JSON_TYPES.get(schema.get("type", ""))
+    return wanted is not None and type(value) is wanted
 
 
 # Revoked or expired: one answer, the same for both, from every tool.
@@ -129,11 +169,17 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
 
     class Server(MCPServer):
         async def call_tool(self, name: str, arguments: dict[str, Any], context: Any = None):
-            """rest.md §3: a call is checked for its shape before any lookup. An argument the
-            tool does not define is refused as a malformed one is, never dropped."""
+            """rest.md §3, §4.7: a call is checked for its shape before any lookup and before
+            the caller is read. An argument the tool does not define, one it requires left out,
+            and one not of its exact JSON type are refused as a malformed one is, never dropped
+            or coerced, with one answer whatever exists and whoever calls."""
             tool = self._tool_manager.get_tool(name)
-            if tool is not None and set(arguments) - set(tool.parameters.get("properties", {})):
-                raise ToolError(f"Error executing tool {name}: invalid_request")
+            if tool is not None:
+                defined = tool.parameters.get("properties", {})
+                if (set(arguments) - set(defined)
+                        or set(tool.parameters.get("required", [])) - set(arguments)
+                        or not all(exact(defined[k], v) for k, v in arguments.items())):
+                    raise ToolError(f"Error executing tool {name}: invalid_request")
             return await super().call_tool(name, arguments, context)
 
     server = Server(name="egzos", version=__version__, instructions=INSTRUCTIONS, **settings)
@@ -206,6 +252,7 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                     "key": item.get("key"),
                     "layer": entry["layer"],
                     "trust": entry["trust"],
+                    "by": (item.get("provenance") or {}).get("actor"),
                     "shadowed_by": entry["shadowed_by"],
                     "auto_title": item["content"].get("auto_title"),
                     "tags": item.get("tags", []),
@@ -215,6 +262,11 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
                     ),
                 }
             )
+            if item["kind"] == "artifact":
+                # The file is named beside the fence, never inside it, read as stored (§4.7).
+                stored = item["content"]
+                blocks[-1].update(name=stored.get("filename"), mime=stored.get("mime"),
+                                  size=stored.get("size"), sha256=stored.get("sha256"))
         return json_text(
             {
                 "banner": DATA_BANNER,
@@ -348,6 +400,18 @@ def build(container: Container, caller: Callable[[], Token | None], **settings: 
             },
         )
 
+    @server.tool(name="egzos_limits", description=LIMITS)
+    @answered
+    async def egzos_limits() -> str:
+        """`GET /v1/limits` for an agent (rest.md §4.6): any live token, its answer and its read."""
+        token = caller()
+        if token is None:
+            return NOT_LIVE
+        return json_text(limits(container, token))
+
+    for tool in server._tool_manager.list_tools():
+        if not all(known(p) for p in tool.parameters.get("properties", {}).values()):
+            raise TypeError(f"{tool.name}: an argument whose JSON type cannot be read exactly")
     return server
 
 

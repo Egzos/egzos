@@ -45,7 +45,7 @@ from fastapi import FastAPI, Request
 from starlette.responses import Response, StreamingResponse
 
 from egzos._ids import is_ulid
-from egzos._types import CONTRACT_VERSION, DoorFeature, StorageBusy
+from egzos._types import StorageBusy
 from egzos.api.blobs import PULL_HEADERS, redeem
 from egzos.api.throttle import Throttle, throttle_key
 from egzos.backends.base import malformed
@@ -64,11 +64,13 @@ from egzos.ledger import attributed
 from egzos.mcp.http import StreamableHttp
 from egzos.model import CONTAINER_TYPES, KINDS, VERIFIED_ONLY_KINDS, ContextItem, Node, Token
 from egzos.places import children, place
+from egzos.serving import FEATURES as FEATURES  # the words §4.6 names, read here too
+from egzos.serving import limits as limits_of
 from egzos.store.blobs import grant_url
 from egzos.store.find import QueryError, find, parse, shown
 from egzos.store.items import BODY_KINDS, StoreError
 from egzos.store.nodes import AmbiguousRef, StructureError, valid_name
-from egzos.store.uploads import MAX_HELD, TooManyUploads, valid_open
+from egzos.store.uploads import TooManyUploads, valid_open
 from egzos.store.uploads import person_of as opener_of
 from egzos.trust import HumanOnly, TrustError
 
@@ -90,10 +92,6 @@ MCP_PATH = "/mcp"
 METADATA_PATH = "/.well-known/oauth-protected-resource"
 #: rest.md §6: the one route no bearer is read on, for GET only.
 PULL_PATH = re.compile(r"/v1/blobs/[^/]+")
-#: rest.md §4.6: the words `GET /v1/limits` names, each only once its code runs here and every
-#: condition §4.6 sets for it holds. `items.rename` and `scopes.rename` wait on their routes;
-#: `grants.own` is named with the read it names, which lands after every rule it needs (§4.3).
-FEATURES: tuple[DoorFeature, ...] = ("terminals.machine", "grants.own")
 
 
 def _json(status: int, payload: Any, extra: dict[str, str] | None = None) -> Response:
@@ -873,15 +871,7 @@ def create_app(
         nothing and serves no other key."""
         token: Token = request.state.token
         _only(request.query_params, set())
-        c.ledger.append("context.fetch", actor=token.owner, principal=token.principal,
-                        client=token.client, read="limits", items=[], layers=[], withheld=0)
-        return _json(200, {
-            "contract": CONTRACT_VERSION,
-            "features": list(FEATURES),
-            "upload_max_bytes": c.config_value("blobs.upload_max_bytes"),
-            "inline_max_bytes": c.config_value("blobs.inline_max_bytes"),
-            "uploads_held_max": MAX_HELD,
-        })
+        return _json(200, limits_of(c, token))  # `egzos_limits` reads the same (§4.7)
 
     # -- grants (§4.3) --------------------------------------------------------------------------
     def at_terminal(token: Token) -> bool:

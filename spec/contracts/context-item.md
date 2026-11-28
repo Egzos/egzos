@@ -85,8 +85,9 @@ it at the REST door (Phase 2); how long a grant lives and how often it is redeem
 another (`blob.pull`) — see `events.md`. **running** at the REST door's reads (`rest.md` §6).
 Over MCP, `egzos_fetch` names an artifact's file and carries no grant, and `egzos_get` carries the
 grant's address for the one item it reads, on the container's public origin, and none where no
-origin can be named (`rest.md` §4.7; v0.7 §AL). **a1p**, not running: until it lands, no MCP tool
-carries one.
+origin can be named (`rest.md` §4.7; v0.7 §AL). **a1p**; **running**, that `egzos_fetch` names an
+artifact's file and carries no grant; not running, `egzos_get`'s address: until it lands, no MCP
+tool carries one.
 
 **`BlobGrant.sig` is an HMAC over `sha256`, `item`, `token` and `expires_at` under a
 container-held key. [0.3 · 45]** The key never leaves the container, and the grant id is not the
