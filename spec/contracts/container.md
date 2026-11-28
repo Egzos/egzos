@@ -389,8 +389,10 @@ Four notes the table cannot carry:
 - **`blobs.staging_retention_days`** closes `storage.md` §4's `TODO(a1p)` on abandoned staged bytes,
   written before this key existed: R11 ratified 30 days cold, then purge, and v0.7 §Z amends it to
   30 days, then ask — nothing is deleted on a timer (`rest.md` §4.4). It covers **staged**
-  bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item; an owner purge act is
-  `[v1.1]` ([0.3 · 44]; `storage.md` §4).
+  bytes only. v1.0 never deletes *promoted* bytes behind a tombstoned item, but for an agent's kept
+  file that no person promoted, whose bytes stay 30 days in the place for deleted bytes, a fixed
+  span no key changes (`storage.md` §4, v0.7 §AN); an owner purge act is `[v1.1]` ([0.3 · 44];
+  `storage.md` §4).
 
 **The object lives in `ContainerState`, and changing a key is an `admin` act that emits
 `config.set`. [0.3 · 40]** The config is read on the resolution path (`chain.personal_root`), the

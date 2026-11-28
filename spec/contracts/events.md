@@ -71,20 +71,27 @@ drift a reader resolves by guessing.
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 | `identity.credential` | a confirm credential is added or removed, or the attempt is refused: `op: add · remove`, `outcome`, `reason` (`rest.md` §4.3); never key material | running |
-| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already` (`rest.md` §4.4) | running |
+| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, and once `rest.md` §4.4 item 2a's code runs `receiving · stalled` (`rest.md` §4.4) | running |
 | `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
-**Entering with their code** (`rest.md` §4.5; v0.7 §AK; **a1p**, not running). These join the table
-above, its count and `_types.py`'s `Event` together, on the day code appends them; until then no
-code does, and an append under one is rejected as any unlisted name is:
+**Entering with their code** (`rest.md` §4.5, v0.7 §AK; `storage.md` §4, v0.7 §AN; **a1p**, not
+running). These join the table above, its count and `_types.py`'s `Event` together, on the day
+code appends them; until then no code does, and an append under one is rejected as any unlisted
+name is:
 
 | name | appended when | `subject` · `scope` · `details` |
 |---|---|---|
 | `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `from`, `name` |
 | `node.rename` | a person renames a place | the node · its parent · `type`, `from`, `name` |
+| `blob.delete` | an agent's kept file no person promoted is removed, in the tombstone's atomic step, and its bytes are in the place for deleted bytes with their record; the promoted copy's later deletion appends nothing, and the address may still resolve where a later write holds it | the `sha256` · the item's scope · `item`, `tombstone` (the `item.tombstone`'s `seq`), `purge_after` (UTC, 30 days after the removal; a later removal of the same address moves it) |
+| `blob.purge` | bytes are deleted for good from the place for deleted bytes, their `purge_after` passed | the `sha256` · null · `delete` (the `seq` of the latest `blob.delete` of the address, which finishes the earlier ones) |
 
-A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader
-escapes them.
+A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader escapes
+them. `blob.delete` names the remover as `item.tombstone` does. `blob.purge` has no caller, and
+`principal: none` is closed to six events (§2), so it carries the `actor` and `principal` of the
+`blob.delete` it finishes, which is no act of theirs at its `ts` (§2). Neither entry holds bytes,
+and the chain verifies the same once the bytes are gone (§3, §4 invariant 4): what it then says of
+the address is that it was stored, by whom it was removed, and when it was deleted.
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
@@ -160,6 +167,9 @@ the value in `details`. [0.3 · 40]
   rejected**: a read, a pull or an act is never unattributed. `_types.py` pins the six as
   `PRINCIPAL_NONE_EVENTS`. **running**: the ledger
   refuses such an append (#150), though no AS in this tree emits a `none` entry yet. [0.3 · 34, 35]
+  One exception to "who acted": `blob.purge` names the `actor` and `principal` of the `blob.delete`
+  it finishes, whose removal it carries out, not an act of theirs at its own `ts` (§1; v0.7 §AN;
+  **a1p**, not running).
 - `subject` — the id the event is about (item, node, token, proposal, or a blob's `sha256`).
 - `scope` — the container the event happened in; nullable.
 - `details` — event-specific, open. A reader MUST tolerate unknown keys here.

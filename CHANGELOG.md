@@ -86,6 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line-separator or bidi-control character. No tool makes a place. Not running until the code
   lands.
 
+- **A place for deleted bytes, in the contract** (`storage.md` §4, `rest.md` §4.4, `events.md`
+  §1–§2, `container.md` §8, v0.7 §AN; #405): when a person removes an agent's kept file that no
+  person promoted, and nothing else holds its bytes, they go to a place no read path reaches, are
+  kept there 30 days, and are then deleted for good, with `blob.delete` and `blob.purge` on the
+  chain. A person's own files and copies, promoted files and staged bytes keep their rules. A `PUT`
+  refused during a running transfer, and a stalled transfer cut off, now leave their own trace
+  (`receiving`, `stalled`). Not running until the code lands.
+
 ### Changed
 
 - **The provider's scopes, corrected** (`rest.md` §4.3; a note under v0.7 §AM): the sign-in provider
