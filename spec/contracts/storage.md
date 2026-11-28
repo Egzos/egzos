@@ -568,8 +568,9 @@ and take to a deleted bucket for 30 days", v0.7 §AL (6), §AN), amending [0.3 �
 alone. That they are then deleted for good, which bends v0.7 §Z's "nothing is deleted automatically
 when a retention period ends" for these bytes alone, is the operator's reading of "for 30 days", his
 to veto: §Z keeps everything still waiting on a decision, and these bytes a person has already
-decided to remove. Every other clause below is **a1p**; none of it runs until its code lands (v0.7
-§AN).
+decided to remove. That the rule covers only these agent files, for now, is his ruling too (v0.7
+§AN (2)). Every other clause below is **a1p** but where it says otherwise; none of it runs until
+its code lands (v0.7 §AN).
 
 - **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get` and
   `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
@@ -628,8 +629,9 @@ decided to remove. Every other clause below is **a1p**; none of it runs until it
 - **Bounds.** Bytes there count toward no agent's bound and no person's 16 (`rest.md` §4.4). Only a
   removal puts bytes there: by a person at the door, or with `egzos rm` and the owner `Token`; no
   `client` principal removes (`rest.md` §4). It holds what was removed of such files within 30 days.
-- **Bringing bytes back.** No route, tool or command reads or restores them. Whether egzos should
-  bring a removed file back is the Chief's to rule (v0.7 §AN).
+- **Bringing a file back.** A removed file may be brought back during its 30 days, from the app
+  (**decided**, the Chief, 2026-11-27, v0.7 §AN (2)); how, and what comes back with the bytes, is a
+  later change to this contract. Until it lands no route, tool or command reads or restores them.
 
 The `BlobStore` methods for the move and the purge enter with this code, and so do the record's, on
 the `ContainerState` substrate and never delegated (F3), as §3.4's are, with a lookup of every item

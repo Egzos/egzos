@@ -1299,18 +1299,31 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
     container.md §8; Egzos/egzos#405)
 ================================================================================
 
-[DECIDED] Decided by the Chief on 2026-11-27, and recorded in §AL (6)
-          as he gave it; carried into the contracts by the merge that
-          records this section; he may veto by reverting. The question
-          as put to him: "When you remove an agent's file that nobody
-          promoted, its bytes are deleted. This bends your 'kept bytes
-          are never deleted' ruling for those files only." His words:
-          "3. delete and take to a deleted bucket for 30 days."
+[DECIDED] Decided by the Chief on 2026-11-27, in two answers; carried
+          into the contracts by the merge that records this section; he
+          may veto by reverting.
+
+          (1) Recorded in §AL (6) as he gave it. The question as put to
+          him: "When you remove an agent's file that nobody promoted,
+          its bytes are deleted. This bends your 'kept bytes are never
+          deleted' ruling for those files only." His words: "3. delete
+          and take to a deleted bucket for 30 days."
+
+          (2) Asked the same evening about two things those words left
+          open, each with the operator's pick: "Can you get a file back
+          during the 30 days? My pick: yes, from the app, built later."
+          and "Only files agents saved that nobody promoted, or every
+          removed file, yours included? My pick: only those agent files
+          for now." His words: "let's go with your pick".
 
 [DECIDED] WHEN A PERSON REMOVES AN AGENT'S KEPT FILE THAT NO PERSON
           PROMOTED, ITS BYTES ARE DELETED BY WAY OF A PLACE FOR DELETED
           BYTES, AND KEPT THERE 30 DAYS. This amends [0.3 · 44] for
           these bytes alone.
+
+[DECIDED] THE RULE COVERS ONLY THESE AGENT FILES, FOR NOW; AND A REMOVED
+          FILE MAY BE BROUGHT BACK DURING ITS 30 DAYS, FROM THE APP,
+          BUILT LATER.
 
           THE OPERATOR'S BINDING, which the Chief did not decide and may
           veto clause by clause (each is marked a1p in the contracts,
@@ -1377,7 +1390,10 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
             same; blob.delete shows it on the chain, as staged_deleted
             and bytes_deleted already show deletes of staged bytes.
           - No route, tool or command reads the place or brings bytes
-            back. Whether egzos should is the Chief's, below.
+            back yet. That a removed file may be brought back during
+            its 30 days, from the app, is the Chief's ruling ((2)
+            above); how, and what comes back with the bytes, is a later
+            change to these contracts.
           - §AL's keep runs no earlier than this section's code, and the
             word files.agent waits on it too.
           - Two traces a1r asked for on §AL's upload: a PUT refused
@@ -1385,15 +1401,6 @@ AN. AMENDMENT — THE BYTES OF AN AGENT'S REMOVED FILE GO TO A PLACE FOR
             reason receiving; a transfer cut off for stalling is reason
             stalled, not length, so the audit tells it from a short
             body.
-
-          FOR THE CHIEF, two questions his words leave open, put to him
-          and not yet answered; nothing here decides either:
-
-          (1) May a removed file be brought back during its 30 days?
-              The operator's pick: yes, later, from the app.
-          (2) Should the same hold for every removed file, his own
-              included? The operator's pick: no, only these agent files
-              for now.
 
 
 ================================================================================
@@ -1432,9 +1439,7 @@ SOURCE-OF-RECORD INDEX & OPEN QUESTIONS (v0.7 state)
   [OPEN→CHIEF]: §AI's two (the new command's first version; signing its
   macOS builds); §AJ's two (the name a terminal shows by default; what
   its machine line holds by default); §AK's two (removing a place that
-  still holds things, for its later change; unique names among siblings);
-  §AN's two (bringing a removed file back within its 30 days; the same
-  for every removed file).
+  still holds things, for its later change; unique names among siblings).
 
 ================================================================================
 END OF v0.7 AMENDMENT SET
