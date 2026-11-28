@@ -71,20 +71,27 @@ drift a reader resolves by guessing.
 | `gate.pass.confirmed` | a widening move or copy is confirmed inline by a person: `audience_delta`, and the `step_up`'s `seq` (`rest.md` §4.2) | running |
 | `item.copy` | a copy is made: `subject` the new item, `details.from` the source (`rest.md` §4.1, v0.7 §V) | running |
 | `identity.credential` | a confirm credential is added or removed, or the attempt is refused: `op: add · remove`, `outcome`, `reason` (`rest.md` §4.3); never key material | running |
-| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already` (`rest.md` §4.4) | running |
+| `upload.put` | an upload's bytes arrive: `outcome: staged`, or `refused` with `reason: length · hash · already`, and once `rest.md` §4.4 item 2a's code runs `receiving · stalled` (`rest.md` §4.4) | running |
 | `upload.discard` | an upload no item was written from is discarded, with its staged bytes unless another upload holds them: `bytes_deleted` (`rest.md` §4.4) | running |
 
-**Entering with their code** (`rest.md` §4.5; v0.7 §AK; **a1p**, not running). These join the table
-above, its count and `_types.py`'s `Event` together, on the day code appends them; until then no
-code does, and an append under one is rejected as any unlisted name is:
+**Entering with their code** (`rest.md` §4.5, v0.7 §AK; `storage.md` §4, v0.7 §AN; **a1p**, not
+running). These join the table above, its count and `_types.py`'s `Event` together, on the day
+code appends them; until then no code does, and an append under one is rejected as any unlisted
+name is:
 
 | name | appended when | `subject` · `scope` · `details` |
 |---|---|---|
 | `item.rename` | a person renames an item | the item · its scope · `kind`, `field` (`filename` · `title`), `from`, `name` |
 | `node.rename` | a person renames a place | the node · its parent · `type`, `from`, `name` |
+| `blob.delete` | an agent's kept file no person promoted is removed and its bytes go to the place for deleted bytes, in the tombstone's atomic step | the `sha256` · the item's scope · `item`, `tombstone` (the `item.tombstone`'s `seq`), `purge_after` (UTC, the time the days run out) |
+| `blob.purge` | bytes are deleted for good from the place for deleted bytes, their days run out | the `sha256` · null · `delete` (the `seq` of the `blob.delete` whose days ran out) |
 
 A `from` and a `name` are untrusted display data, as `node.create`'s name is; every reader
-escapes them.
+escapes them. `blob.delete` names the remover as `item.tombstone` does. `blob.purge` has no caller,
+and `principal: none` is closed to six events (§2), so it carries the `actor` and `principal` of
+the `blob.delete` it finishes. Neither entry holds bytes, and the chain verifies the same once the
+bytes are gone (§3, §4 invariant 4): what it then says of the address is that it was stored, by
+whom it was removed, and when it was deleted.
 
 **`gate.pass.silent` is silent to the user, never to the log.** A zero-delta move is not an
 unaudited move; it is an audited move that does not interrupt anyone.
