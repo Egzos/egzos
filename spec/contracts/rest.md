@@ -1102,9 +1102,9 @@ storage (v0.7 §S).
    by removing or promoting the agent's files (§4). Where no person promoted a removed file and
    nothing else holds its bytes, they go to the place for deleted bytes for 30 days and are then
    deleted for good (`storage.md` §4; **decided**, the Chief, 2026-11-27, v0.7 §AL (6), §AN;
-   **a1p**, what holds them; not running). Item 3's keep runs no earlier than that clause's code
-   (the operator's order). **decided**, that an agent's kept bytes have a limit (the Chief,
-   2026-11-26); **a1p**, the numbers, the counting and the answers; not running.
+   **a1p**, what holds them and the end; not running). Item 3's keep runs no earlier than that
+   clause's code (the operator's order). **decided**, that an agent's kept bytes have a limit (the
+   Chief, 2026-11-26); **a1p**, the numbers, the counting and the answers; not running.
    The 16 still count the staged items agents wrote before item 3's keep ran. A container behind an
    edge that caps a request's body sets `blobs.upload_max_bytes` at or below that cap.
    **The answer also carries the bytes' address**: `{"upload", "expires_at", "put_url",
