@@ -306,16 +306,20 @@ forget_grants(expired_before)                    -> None    # drops the records 
 ```
 
 - **An upload's address is spent here too** (`rest.md` §4.4 item 2a; v0.7 §AL; **a1p**; running
-  in Trust's spend, made outside any block, every record, a grant's or an address's, kept at least
-  900 seconds past its `expires_at`; not running at the door, which redeems no address until item
-  2a's route runs): its record is the sha256 of its `sig` and its
+  in Trust's spend, made outside any block; not running at the door, which redeems no address
+  until item 2a's route runs): its record is the sha256 of its `sig` and its
   `expires_at`, under the same rules, and no address's `sig` is ever a grant's, so one record
   names one or the other.
+- **Every record is kept at least 900 seconds past its `expires_at`**, a grant's as well as an
+  address's: the records share one table and one `forget_grants`, so the longer of the two
+  lifetimes (`rest.md` §6, §4.4 item 2a) is the floor for both, and no forget drops a record
+  whose descriptor could still pass `rest.md` §6's check 3. **a1p**; running in Trust's forget.
 - **A grant is spent once, atomically.** Of two concurrent spends of one grant, exactly one is
   `True` (`rest.md` §6 check 4). A spend commits on its own and is never rolled back: a redemption
   refused at a later check has still spent its grant.
 - **No column holds a secret.** A record is the sha256 of a `sig`, never the `sig`, and the
-  grant's `expires_at`; it is kept at least a lifetime past that (`rest.md` §6). The key that signs
+  grant's `expires_at`; it is kept at least a lifetime past that (`rest.md` §6), and 900 seconds
+  at least (above). The key that signs
   grants is not here: it is a file in the container's home that no export carries (`rest.md` §6).
 
 ## 3.6 · One writer per container — `Transactional`
@@ -573,7 +577,9 @@ when a retention period ends" for these bytes alone, is the operator's reading o
 to veto: §Z keeps everything still waiting on a decision, and these bytes a person has already
 decided to remove. That the rule covers only these agent files, for now, is his ruling too (v0.7
 §AN (2)). Every other clause below is **a1p** but where it says otherwise; none of it runs until
-its code lands (v0.7 §AN).
+its code lands (v0.7 §AN). Here *promoted* names only a person's act (`provenance.approved_by`);
+bytes that sit at `sha256/<hash>` are *in the promoted store*, whoever's act put them there (the
+store's `promote` keeps its name).
 
 - **It is a location, not a status**, as staging is: `deleted/<hash>` under the blob root. `get` and
   `exists` never address it, and no route, tool, grant, address or command line verb reads, lists or
@@ -589,26 +595,28 @@ its code lands (v0.7 §AN).
   made are not an agent's file here. **Holds**, for an address in `sha256/`: an item not tombstoned
   whose `content.sha256` names it, of whatever kind, writer or status, a quarantined item and a copy
   included; and a tombstoned item naming it that does not meet (a) and (b), so a person's removed
-  file and a removed promoted file keep their bytes as [0.3 · 44] says. An upload holds nothing
-  here: its bytes are in `staging/`, and `promote` decides by them alone. Nor do the audit chain's
-  entries, spent grants or addresses. Bytes held when their file is removed stay promoted, as other
-  promoted bytes do, and a holder that lapses later sends them nowhere. A person's own files,
-  promoted files and staged bytes keep the rules above word for word.
+  file and a removed file a person promoted keep their bytes as [0.3 · 44] says. An upload holds
+  nothing here: its bytes are in `staging/`, and `promote` decides by them alone. Nor do the audit
+  chain's entries, spent grants or addresses. Bytes held when their file is removed stay in the
+  promoted store, as other bytes there do, and a holder that lapses later sends them nowhere. A
+  person's own files, files a person promoted, and staged bytes keep the rules above word for word.
 - **The move, crash-safe.** It runs no earlier than §3.6's rule that every write path's `put` and
   `promote` run inside its block. Inside the tombstone's atomic step (§3.6) the bytes are copied to
   `deleted/<hash>` by the store's own copy or link where it has one, its integrity the store's, or
   else by a read that re-hashes them, landing whole or not at all as `promote`'s copy does; the
   container's own state records the address and its `purge_after`; and `blob.delete` is appended
   (`events.md` §1). A copy that fails fails the removal, which rolls back and is answered as §3.6's
-  `StorageBusy`. Where the promoted copy is missing, nothing moves and no `blob.delete` is appended,
-  and the tombstone proceeds. The promoted copy is deleted after COMMIT, as §3.6 deletes a
+  `StorageBusy`. Where the copy in the promoted store is missing, nothing moves and no
+  `blob.delete` is appended, and the tombstone proceeds. The copy in the promoted store is deleted
+  after COMMIT, as §3.6 deletes a
   `promote`'s staged copy, in a short block that holds the lock from its re-check that nothing holds
   the address through the delete, so a write of the same bytes lands either before the re-check,
   which finds its item, or after the delete, when `put` writes them afresh. That block appends
   nothing, and marks the record settled, whether it deleted the copy or the re-check kept it. A
   crash before COMMIT leaves an unrecorded copy in `deleted/`, which is never read; a crash after it
   leaves a record not settled, which the pass below settles the same way, finding it only from the
-  records, never by listing `sha256/`. No promoted copy is deleted before its deleted copy is whole.
+  records, never by listing `sha256/`. No copy in the promoted store is deleted before its deleted
+  copy is whole.
 - **One record per address.** The same address removed again while its record is not purged copies
   nothing: only `purge_after` moves to 30 days from the latest removal, and the new `blob.delete`
   says so, and the record is no longer settled. Where the record is purged, the bytes are copied
@@ -625,7 +633,11 @@ its code lands (v0.7 §AN).
   deletes, through the store's own internal listing (§5) and under the lock, a `deleted/<hash>` that
   no unpurged record names, after one more check: where something holds the address and `sha256/`
   lacks it, as a restore of the state without the store may leave, the copy is first copied back to
-  `sha256/`, checked against its address. That is repair, never the return of a removed file.
+  `sha256/`, checked against its address. That is repair, never the return of a removed file,
+  and it appends nothing: it is no one's act, and an entry for it would carry `principal: none`,
+  which `events.md` §2 closes to six events; it puts back, at the address a live holder's own
+  entries already name, bytes checked against that address, whose `blob.put` the chain holds
+  from when they first arrived, so it serves nothing that was not already the holder's.
   The bytes go only from `deleted/`, never from `sha256/` or `staging/`.
 - **What the chain keeps.** Every entry naming the address stays, and `audit verify` passes
   unchanged: the chain hashes entries, never bytes (`events.md` §3, §4 invariant 4). Unless the same
